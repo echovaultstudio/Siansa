@@ -40,7 +40,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import app.siansa.log.AppLog
+import app.siansa.net.BeatsListens
 import app.siansa.net.ListenBrainzApi
+import app.siansa.net.beatsTakesListens
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
@@ -119,6 +121,25 @@ fun ScrobblingScreen(nav: NavController) {
                 graph.settings.save(graph.settings.current.copy(scrobbleNavidrome = it))
             }
             Hint("Keeps play counts and \"recently played\" on your server. If your server itself is linked to Last.fm or ListenBrainz, leave the matching option below off, or plays are counted twice.")
+            }
+
+            // Siansa Beats' own listening history (0.29): offered once it's set up and says it takes listens.
+            if (settings.beatsReady) {
+                HorizontalDivider()
+                val takes = settings.beatsTakesListens
+                FoldSection("Siansa Beats", if (!takes) "Needs Siansa Beats 0.29" else if (settings.scrobbleBeats) "On" else "Off", tag = "beats") {
+                    if (takes) {
+                        SwitchRow("Scrobble to Siansa Beats", settings.scrobbleBeats) {
+                            AppLog.i("Scrobble", "Scrobble to Siansa Beats: " + if (it) "on" else "off")
+                            graph.settings.save(graph.settings.current.copy(scrobbleBeats = it))
+                        }
+                        val listener = BeatsListens.listener(settings)
+                        Hint("Keeps your listening history in Siansa Beats" + (if (listener.isNotBlank()) ", as $listener" else "") +
+                            ": see it on its Listening page. Siansa Beats can send your listens on to Last.fm; turn Last.fm off below then, or plays are counted twice.")
+                    } else {
+                        Hint("Update Siansa Beats to 0.29 or newer to keep your listening history there.")
+                    }
+                }
             }
 
             HorizontalDivider()

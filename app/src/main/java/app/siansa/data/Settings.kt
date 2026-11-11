@@ -161,6 +161,8 @@ data class AppSettings(
      * yours, sends nothing to Navidrome, Last.fm or ListenBrainz.
      */
     val scrobbleOffUsers: Set<Int> = emptySet(),
+    /** "Scrobble to Siansa Beats": listens go to its listening history (Siansa Beats 0.29, [app.siansa.net.BeatsListens]). */
+    val scrobbleBeats: Boolean = false,
     val lastFmEnabled: Boolean = false,
     val lastFmApiKey: String = "",
     val lastFmSecret: String = "",
@@ -471,6 +473,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         scrobbleNavidrome = prefs.getBoolean("scrobble_nd", true),
         scrobblePercent = prefs.getInt("scrobble_pct", 50),
         scrobbleOffUsers = prefs.getString("scrobble_off_users", null).orEmpty().split(',').mapNotNull { it.trim().toIntOrNull() }.toSet(),
+        scrobbleBeats = prefs.getBoolean("scrobble_beats", false),
         lastFmEnabled = prefs.getBoolean("lfm_on", false),
         lastFmApiKey = prefs.getString("lfm_key", "") ?: "",
         lastFmSecret = secret("lfm_secret"),
@@ -596,6 +599,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
             .putBoolean("scrobble_nd", s.scrobbleNavidrome)
             .putInt("scrobble_pct", s.scrobblePercent)
             .putString("scrobble_off_users", s.scrobbleOffUsers.sorted().joinToString(","))
+            .putBoolean("scrobble_beats", s.scrobbleBeats)
             .putBoolean("lfm_on", s.lastFmEnabled)
             .putString("lfm_key", s.lastFmApiKey.trim())
             .putString("lfm_secret", SecretBox.encrypt(s.lastFmSecret.trim()))

@@ -128,7 +128,9 @@ class BeatsApi(private val http: OkHttpClient, private val settings: () -> AppSe
                     loudness = feature("loudness")?.int("songs") ?: 0,
                     genres = feature("genres")?.get("available")?.toString() == "true",
                     sound = (feature("sound")?.get("answers") as? kotlinx.serialization.json.JsonArray).orEmpty()
-                        .mapNotNull { (it as? kotlinx.serialization.json.JsonPrimitive)?.content }.toSet(),
+                        .mapNotNull { (it as? kotlinx.serialization.json.JsonPrimitive)?.content }.toSet() +
+                        // It takes listens (0.29): kept with what it answers, so the switch shows without asking again.
+                        setOfNotNull(BeatsListens.PATH.takeIf { feature("scrobbling")?.get("available")?.toString() == "true" }),
                     musicServer = (body["music_server"] as? JsonObject)?.str("kind"),
                     serverId = (body["music_server"] as? JsonObject)?.str("id"),
                     servers = (body["servers"] as? kotlinx.serialization.json.JsonArray).orEmpty().mapNotNull { it as? JsonObject }.mapNotNull { o ->
@@ -195,7 +197,13 @@ class BeatsApi(private val http: OkHttpClient, private val settings: () -> AppSe
         /** A failed answer in plain words. */
         fun message(http: Int, reason: String): String = when (http) {
             401, 403 -> "Siansa Beats wants its API key or password: check it in Settings › Connections"
-            404 -> "This Siansa Beats is too old for the app: update it to 0.20 or newer"
+            // Its own reason when it gives one ("The sound of none of those songs is known yet"): only a path it
+            // doesn't have at all means it's too old.
+            404 -> if (reason.isBlank() || reason == "no details" || reason.equals("not found", ignoreCase = true) || reason.startsWith("<")) {
+                "This Siansa Beats is too old for the app: update it to 0.20 or newer"
+            } else {
+                "Siansa Beats: $reason"
+            }
             else -> "Siansa Beats answered HTTP $http: $reason"
         }
     }

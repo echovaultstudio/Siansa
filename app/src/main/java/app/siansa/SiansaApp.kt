@@ -173,7 +173,7 @@ class SiansaApp : Application(), SingletonImageLoader.Factory {
             "crossfade ${s.crossfade.name.lowercase()} ${s.crossfadeSeconds} s, beat-matched ${s.beatMatch.name.lowercase()}, ${s.blendBars} bars, bass swap ${if (s.bassSwap) "on" else "off"}",
             "song cache ${mb(s.songCacheMb)}, image cache ${mb(s.imageCacheMb)}",
             "animated covers ${if (s.animatedCovers) "on" else "off"}, download all covers ${if (s.coverDownload) (if (s.coverDownloadAnyWifi) "any Wi-Fi" else "home") else "off"}",
-            "scrobbling: " + listOfNotNull("Navidrome".takeIf { s.scrobbleNavidrome }, "Last.fm".takeIf { s.lastFmReady }, "ListenBrainz/Koito".takeIf { s.listenBrainzReady }).joinToString(", ").ifEmpty { "off" },
+            "scrobbling: " + listOfNotNull("Navidrome".takeIf { s.scrobbleNavidrome }, "Siansa Beats".takeIf { with(app.siansa.net.BeatsListens) { s.scrobbleBeats && s.beatsReady } }, "Last.fm".takeIf { s.lastFmReady }, "ListenBrainz/Koito".takeIf { s.listenBrainzReady }).joinToString(", ").ifEmpty { "off" },
         ).joinToString(" · ")
     }
 

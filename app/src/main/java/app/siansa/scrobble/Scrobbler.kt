@@ -6,7 +6,9 @@ import app.siansa.data.SettingsRepository
 import app.siansa.data.Song
 import app.siansa.data.Users
 import app.siansa.log.AppLog
+import app.siansa.net.BeatsListens
 import app.siansa.net.LastFmApi
+import app.siansa.net.beatsScrobbleReady
 import app.siansa.net.ListenBrainzApi
 import app.siansa.net.MusicSource
 import kotlinx.coroutines.CoroutineScope
@@ -22,7 +24,7 @@ import java.io.File
 data class PendingListen(val song: Song, val startedAtSec: Long, val targets: Set<String>)
 
 /**
- * Sends "now playing" and finished listens to Navidrome, Last.fm and ListenBrainz/Koito.
+ * Sends "now playing" and finished listens to the music server, Siansa Beats, Last.fm and ListenBrainz/Koito.
  * A listen counts after half the song or four minutes, for songs longer than 30 seconds (Last.fm's rule).
  * Listens that fail (offline, server down) are kept and retried with the next one.
  */
@@ -33,6 +35,8 @@ class Scrobbler(
     private val lastFm: LastFmApi,
     private val listenBrainz: ListenBrainzApi,
     private val scope: CoroutineScope,
+    /** Posts [body] to Siansa Beats' [path] ("Scrobble to Siansa Beats"); null where there's no Siansa Beats to ask. */
+    private val beats: (suspend (path: String, body: String) -> Unit)? = null,
     /** Whose library a song is from: the user in use, or another user whose music shows with theirs (issue #356). */
     private val sourceOf: suspend (songId: String) -> Int = { Users.active },
 ) {
@@ -45,6 +49,8 @@ class Scrobbler(
         scope.launch {
             if (!scrobbles(song, s.scrobbleOffUsers)) return@launch
             if (s.scrobbleNavidrome) runCatching { source.scrobble(song.id, submission = false) }
+            if (s.beatsScrobbleReady) runCatching { beats?.invoke(BeatsListens.NOW, BeatsListens.now(BeatsListens.listener(s), song)) }
+                .onFailure { AppLog.w("Scrobble", "Siansa Beats now playing failed: ${it.message}") }
             if (s.lastFmReady) runCatching { lastFm.nowPlaying(lastFmKeys(), song) }
                 .onFailure { AppLog.w("Scrobble", "Last.fm now playing failed: ${it.message}") }
             if (s.listenBrainzReady) runCatching { listenBrainz.nowPlaying(s.listenBrainzUrl, s.listenBrainzToken, song) }
@@ -82,11 +88,7 @@ class Scrobbler(
             return
         }
         val s = settings.current
-        val targets = buildSet {
-            if (s.scrobbleNavidrome) add(NAVIDROME)
-            if (s.lastFmReady) add(LASTFM)
-            if (s.listenBrainzReady) add(LISTENBRAINZ)
-        }
+        val targets = scrobbleTargets(s)
         if (targets.isEmpty()) return
         scope.launch {
             if (!scrobbles(song, s.scrobbleOffUsers)) {
@@ -117,12 +119,20 @@ class Scrobbler(
         return runCatching {
             when (target) {
                 NAVIDROME -> source.scrobble(item.song.id, submission = true, timeMs = item.startedAtSec * 1000)
+                // Still set up when it's sent (perhaps days later): a listen kept for a Siansa Beats that's gone is dropped.
+                BEATS -> if (s.beatsScrobbleReady) {
+                    beats?.invoke(BeatsListens.PATH, BeatsListens.listen(BeatsListens.listener(s), item.song, item.startedAtSec))
+                } else Unit
                 LASTFM -> if (s.lastFmReady) lastFm.scrobble(lastFmKeys(), item.song, item.startedAtSec) else Unit
                 LISTENBRAINZ -> if (s.listenBrainzReady) listenBrainz.listen(s.listenBrainzUrl, s.listenBrainzToken, item.song, item.startedAtSec) else Unit
                 else -> Unit
             }
         }.onFailure {
-            val name = if (target == NAVIDROME) "Your server (${source.kind.name.lowercase()})" else target
+            val name = when (target) {
+                NAVIDROME -> "Your server (${source.kind.name.lowercase()})"
+                BEATS -> "Siansa Beats"
+                else -> target
+            }
             AppLog.w("Scrobble", "$name failed for ${item.song.title}: ${it.message}")
         }.isSuccess
     }
@@ -138,9 +148,18 @@ class Scrobbler(
 
     companion object {
         const val NAVIDROME = "navidrome"
+        const val BEATS = "beats"
         const val LASTFM = "lastfm"
         const val LISTENBRAINZ = "listenbrainz"
     }
+}
+
+/** Where a finished listen goes, by what's switched on and set up: any of [Scrobbler]'s targets. */
+fun scrobbleTargets(s: app.siansa.data.AppSettings): Set<String> = buildSet {
+    if (s.scrobbleNavidrome) add(Scrobbler.NAVIDROME)
+    if (s.beatsScrobbleReady) add(Scrobbler.BEATS)
+    if (s.lastFmReady) add(Scrobbler.LASTFM)
+    if (s.listenBrainzReady) add(Scrobbler.LISTENBRAINZ)
 }
 
 /** The choices for how much of a song must be heard before it counts (issue #270). */

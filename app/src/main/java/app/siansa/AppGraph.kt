@@ -391,7 +391,8 @@ class AppGraph(val app: Application) {
 
     val lastFm = LastFmApi(http)
     val listenBrainz = ListenBrainzApi(http)
-    val scrobbler = Scrobbler(app, settings, source, lastFm, listenBrainz, scope) { id -> library.userOf(id) }
+    val scrobbler = Scrobbler(app, settings, source, lastFm, listenBrainz, scope,
+        beats = { path, body -> beats.post(path, body) }) { id -> library.userOf(id) }
     val favorites = Favorites(subsonic, source, lastFm, settings, library, scope)
     /** Favourite albums, starred in Navidrome (issue #275). */
     val favouriteAlbums = FavouriteAlbums(app, source, scope)

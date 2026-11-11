@@ -9,7 +9,7 @@ import app.siansa.data.AppSettings
  * capabilities list which ([answers]); the app asks it first for those and AudioMuse-AI otherwise, so AudioMuse-AI
  * needn't be set up in the app when Siansa Beats has the songs' sound.
  *
- * The list is kept from one run to the next ([onChanged], [restore]), so what the app offers doesn't wait for the
+ * The list also says whether it takes listens ([BeatsListens.PATH], 0.29). It is kept from one run to the next ([onChanged], [restore]), so what the app offers doesn't wait for the
  * first answer after a start.
  */
 object BeatsSound {
@@ -25,8 +25,8 @@ object BeatsSound {
     @Volatile
     var onChanged: ((Set<String>) -> Unit)? = null
 
-    /** Whether Siansa Beats has the sound of songs at all. */
-    val available: Boolean get() = answers.isNotEmpty()
+    /** Whether Siansa Beats has the sound of songs at all (what else it takes, such as listens, doesn't count). */
+    val available: Boolean get() = answers.any { it != BeatsListens.PATH }
 
     /** Whether Siansa Beats answers AudioMuse-AI's [path] (`/api/similar_tracks`). */
     fun answers(path: String): Boolean = path.substringBefore('?') in answers

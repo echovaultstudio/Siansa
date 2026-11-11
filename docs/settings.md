@@ -131,7 +131,7 @@ not here.
 
 ## Scrobbling and history
 
-When a song counts, your server, Last.fm, ListenBrainz or Koito, and which users are sent. See
+When a song counts, your server, Siansa Beats (when it's set up), Last.fm, ListenBrainz or Koito, and which users are sent. See
 [Your listening](your-listening.md#scrobbling). **Time Machine**: whether it also lists songs you played that aren't
 in your library now (the same switch is on the Time Machine page).
 
