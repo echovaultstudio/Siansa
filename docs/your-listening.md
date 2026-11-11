@@ -38,7 +38,9 @@ from AudioMuse-AI's analysis of the songs closest to the sound of your most play
 - **Last.fm**: uses your own Last.fm API account (create one at last.fm/api/account/create and copy the API key
   and shared secret). Hearts are sent to Last.fm as loved tracks.
 - **ListenBrainz / Koito**: for Koito, its address and an API key from Koito's settings. Leave the address empty
-  for listenbrainz.org.
+  for listenbrainz.org. **Send listens** switches it off without forgetting it; **Remove** (or saving with the
+  token emptied) takes it away. If listens still arrive there with it off, your music server may be sending them
+  itself (Navidrome can be linked to ListenBrainz or Koito): see **Your server** above.
 - **Users**: turn a user off, and songs from their library aren't sent anywhere while you listen as you.
 
 Hearts (favourites) sync to your server and, if connected, to Last.fm.
