@@ -59,6 +59,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.setProgress
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.siansa.mix.MixSound
@@ -225,14 +226,11 @@ private fun SoundPad(
             },
     ) {
         Canvas(Modifier.matchParentSize()) {
-            // The 25 places, the middle one (as planned) a little bigger.
+            // The 25 places; the middle one (as planned) is a ring, so it isn't taken for a song.
             for (row in -2..2) for (col in -2..2) {
-                val middle = row == 0 && col == 0
-                drawCircle(
-                    if (middle) c.faint.copy(alpha = 0.6f) else c.faint.copy(alpha = c.faint.alpha / 2),
-                    (if (middle) 5.dp else 2.dp).toPx(),
-                    Offset(size.width * padAt(col), size.height * padAt(row)),
-                )
+                val at = Offset(size.width * padAt(col), size.height * padAt(row))
+                if (row == 0 && col == 0) drawCircle(c.faint.copy(alpha = 0.6f), 5.dp.toPx(), at, style = Stroke(1.5.dp.toPx()))
+                else drawCircle(c.faint.copy(alpha = c.faint.alpha / 2), 2.dp.toPx(), at)
             }
             // The mix's songs: fast ones to the right, lively ones at the top.
             dots.forEach { d ->
@@ -280,7 +278,9 @@ private fun StepPill(
     Column(Modifier.fillMaxWidth().testTag(tag), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
         Row(Modifier.fillMaxWidth()) {
             Text(low, style = MaterialTheme.typography.labelMedium, color = c.label, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(high, style = MaterialTheme.typography.labelMedium, color = c.label, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            // Each end gets half the row, so a long sound's name is cut the same on both sides.
+            Spacer(Modifier.width(Space.Small))
+            Text(high, style = MaterialTheme.typography.labelMedium, color = c.label, modifier = Modifier.weight(1f), textAlign = TextAlign.End, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         Row(
             Modifier

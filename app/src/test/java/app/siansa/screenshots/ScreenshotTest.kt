@@ -268,19 +268,21 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                 val tuning = app.siansa.mix.VibeTuning(
                     energy = -1, tempo = 1, familiar = -2,
                     sounds = listOf(
-                        app.siansa.mix.SoundDial("ambient music", 3),
                         app.siansa.mix.SoundDial("dance", -5),
-                        app.siansa.mix.SoundDial("Experimental Field Recordings", 0, genre = true),
+                        app.siansa.mix.SoundDial("Experimental Field Recordings", 2, genre = true),
                     ),
                 )
                 val dots = (0 until 24).map { app.siansa.mix.PadDot(0.12f + (it * 7 % 11) / 22f, 0.1f + (it * 5 % 9) / 18f) }
-                val more = listOf("Drone", "Piano", "Neo-Classical Downtempo").map { app.siansa.mix.MixSound(it, 4) }
-                Column {
+                val more = listOf("Drone", "Neo-Classical Downtempo").map { app.siansa.mix.MixSound(it, 4) }
+                Column(Modifier.padding(Space.Page)) {
+                    app.siansa.ui.VibeSliders(tuning, onChange = {}, dots = dots, soundsTitle = "Sounds in this mix", more = more)
+                }
+            },
+            // The same before there's a mix (Flow): nothing set, no songs on the pad, one sound; on a dark page.
+            Scene("shape_your_sound_unset") {
+                OnPlayer {
                     Column(Modifier.padding(Space.Page)) {
-                        app.siansa.ui.VibeSliders(tuning, onChange = {}, dots = dots, soundsTitle = "Sounds in this mix", more = more)
-                    }
-                    OnPlayer {
-                        Column(Modifier.padding(Space.Page)) { app.siansa.ui.VibeSliders(app.siansa.mix.VibeTuning(), onChange = {}) }
+                        app.siansa.ui.VibeSliders(app.siansa.mix.VibeTuning(sounds = listOf(app.siansa.mix.SoundDial("piano", 0))), onChange = {})
                     }
                 }
             },
