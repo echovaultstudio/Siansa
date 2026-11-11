@@ -25,6 +25,7 @@ import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Dns
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.GraphicEq
+import androidx.compose.material.icons.rounded.Speed
 import androidx.compose.material.icons.rounded.Sync
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -57,6 +58,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import app.siansa.AppGraph
+import app.siansa.BuildConfig
+import app.siansa.net.BeatsApi
+import app.siansa.playback.ProfileStore
 import app.siansa.data.AiProvider
 import app.siansa.data.AppSettings
 import app.siansa.data.SettingsRepository
@@ -303,6 +307,19 @@ fun ConnectionsHub(nav: NavController, open: String? = null) {
             ) {
                 AudioMuseFields(graph, draft) { draft = it; problem = null }
                 Button(onClick = ::save, modifier = Modifier.focusRing().fillMaxWidth()) { Text("Save") }
+            }
+            if (BEATS_OFFERED) {
+                FoldCard(
+                    icon = Icons.Rounded.Speed,
+                    title = "Siansa Beats",
+                    subtitle = beatsLine(draft.beatsReady),
+                    expanded = "beats" in opened,
+                    onToggle = { toggle("beats") },
+                    tag = "fold-beats",
+                ) {
+                    BeatsFields(graph, draft) { draft = it; problem = null }
+                    Button(onClick = ::save, modifier = Modifier.focusRing().fillMaxWidth()) { Text("Save") }
+                }
             }
             FoldCard(
                 icon = Icons.Rounded.AutoAwesome,
@@ -609,6 +626,35 @@ internal fun AudioMuseFields(graph: AppGraph, draft: AppSettings, onChange: (App
     SecretField("Password", draft.audioMusePassword) { onChange(draft.copy(audioMusePassword = it)) }
     Hint("With several music servers in AudioMuse, each server's own name there is under Servers.")
     TestRow(result) { test(graph, draft, scope, { result = it }, "AudioMuse") { s -> testAudioMuse(graph, s) } }
+}
+
+/** Siansa Beats' card shows in Siansa Dev (and test builds) first, not yet in the app everyone has. */
+internal val BEATS_OFFERED: Boolean = BuildConfig.BUILD_TYPE != "release"
+
+internal fun beatsLine(ready: Boolean): String = if (ready) "Beats, loudness and genres · set up" else "Beats, loudness and genres · not set up"
+
+/**
+ * Siansa Beats (Siansa Dev, the owner, 10 Nov): its address and API key, and Test. Once set, the app asks it for each
+ * song's loudness, fades, key and beat grid and for the genres, instead of the plugin on AudioMuse.
+ */
+@Composable
+internal fun BeatsFields(graph: AppGraph, draft: AppSettings, onChange: (AppSettings) -> Unit) {
+    val scope = rememberCoroutineScope()
+    var result by remember { mutableStateOf<String?>(null) }
+    Hint("Measures each song's beats, loudness and key for DJ blends and smooth fades, and sorts songs into genres. Leave the address empty to use the Siansa plugin on AudioMuse instead, or the songs' tags.")
+    Field("Server address", draft.beatsUrl, "192.168.1.10:8090") { onChange(draft.copy(beatsUrl = it)) }
+    SecretField("API key or password", draft.beatsKey) { onChange(draft.copy(beatsKey = it)) }
+    Hint("Only if Siansa Beats asks for one (BEATS_API_KEY or BEATS_PASSWORD).")
+    TestRow(result) { test(graph, draft, scope, { result = it }, "Siansa Beats") { s -> testBeats(graph, s) } }
+}
+
+/** Siansa Beats' Test: what it can do, said as the DJ check says it. */
+internal suspend fun testBeats(graph: AppGraph, s: AppSettings): String {
+    if (!s.beatsReady) throw ApiException("Enter Siansa Beats' address first")
+    val caps = BeatsApi(graph.http) { s }.capabilities()
+    val result = ProfileStore.beatsResult(caps, s.sourceKind)
+    if (!result.ok) throw ApiException(result.message)
+    return result.message
 }
 
 /** AudioMuse's Test: a sound search, and whether its songs are this server's (only known once it's synced). */

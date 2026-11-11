@@ -57,11 +57,15 @@ class CoverBitmapLoader(private val context: Context, private val scope: Corouti
  * (issue #62). Throws when it can't be loaded.
  */
 suspend fun loadCoverBitmap(context: Context, uri: Uri): Bitmap {
-    val id = uri.getQueryParameter("id")
+    // The cover's id on any server: Emby's and Jellyfin's addresses carry no `id=`, so their covers were kept under
+    // their whole address, sign-in included, apart from the ones the lists keep (the owner, 11 Nov; issue #903).
+    val cover = app.siansa.covers.CoverAddress.of(uri.toString())
     val builder = ImageRequest.Builder(context).data(uri.toString()).allowHardware(false).size(512)
-    if (id != null) {
+    if (cover != null) {
         // The same entries the lists use, so it's usually on the phone already.
-        val key = "cover:${app.siansa.covers.CoverVersions.cacheId(id)}:${uri.getQueryParameter("size") ?: SMALL_COVER}"
+        val loader = SingletonImageLoader.get(context)
+        app.siansa.covers.CoverCache.askAgain(loader, cover.id)
+        val key = app.siansa.covers.CoverCache.diskKey(cover.id, cover.size ?: SMALL_COVER)
         builder.diskCacheKey(key).memoryCacheKey("$key:notification")
     }
     val result = SingletonImageLoader.get(context).execute(builder.build())

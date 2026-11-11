@@ -34,8 +34,8 @@ class SimilarTest {
     }
 
     @Test fun queriesAreEncoded() {
-        assertEquals("/plugins/siansa_analysis/api/similar/albums?track_id=a%2Fb+c", SimilarPlugin.albumsQuery("a/b c"))
-        assertEquals("/plugins/siansa_analysis/api/similar/artists?artist=Simon+%26+Garfunkel", SimilarPlugin.artistsQuery("Simon & Garfunkel"))
+        assertEquals("/plugins/siansa_beats/api/similar/albums?track_id=a%2Fb+c", SimilarPlugin.albumsQuery("a/b c"))
+        assertEquals("/plugins/siansa_beats/api/similar/artists?artist=Simon+%26+Garfunkel", SimilarPlugin.artistsQuery("Simon & Garfunkel"))
     }
 
     @Test fun fansAlsoLikePutsSoundAlikesFirstWithoutDoublesOrTheArtistItself() {
@@ -50,5 +50,21 @@ class SimilarTest {
         assertEquals(listOf("Bea", "Cal", "Dee"), merged.map { it.name })
         assertEquals(navidrome.take(1), SimilarPlugin.mergeArtists("Ann", emptyList(), navidrome.take(1)))
         assertEquals(2, SimilarPlugin.mergeArtists("Zed", plugin, navidrome, limit = 2).size)
+    }
+
+    /** Similar albums and artists are asked of AudioMuse-AI itself; Siansa Beats only passes them on (the owner, 11 Nov). */
+    @Test fun audioMuseIsAskedFirstAndSiansaBeatsOnlyWhenItCant() {
+        assertEquals(listOf(Similar.AskFrom.AUDIOMUSE, Similar.AskFrom.BEATS), Similar.askOrder(audioMuseReady = true, beatsReady = true))
+        assertEquals(listOf(Similar.AskFrom.AUDIOMUSE), Similar.askOrder(audioMuseReady = true, beatsReady = false))
+        assertEquals(listOf(Similar.AskFrom.BEATS), Similar.askOrder(audioMuseReady = false, beatsReady = true))
+        assertEquals(emptyList<Similar.AskFrom>(), Similar.askOrder(audioMuseReady = false, beatsReady = false))
+    }
+
+    /** Siansa Beats 0.25 works similar albums and artists out itself: then it's asked first. */
+    @Test fun siansaBeatsIsAskedFirstOnceItHasTheSongsSound() {
+        assertEquals(listOf(Similar.AskFrom.BEATS, Similar.AskFrom.AUDIOMUSE), Similar.askOrder(audioMuseReady = true, beatsReady = true, beatsSound = true))
+        assertEquals(listOf(Similar.AskFrom.BEATS), Similar.askOrder(audioMuseReady = false, beatsReady = true, beatsSound = true))
+        // Its sound without it being set up here means nothing.
+        assertEquals(listOf(Similar.AskFrom.AUDIOMUSE), Similar.askOrder(audioMuseReady = true, beatsReady = false, beatsSound = true))
     }
 }

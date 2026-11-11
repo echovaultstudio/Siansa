@@ -83,4 +83,27 @@ class AlbumDjMixTest {
         assertFalse(albumMixPlaying(songs("c", "a", "b"), songs("d", "e", "f"), mix))
         assertFalse(albumMixPlaying(songs("c", "a", "b"), album, emptyList()))
     }
+
+    @Test
+    fun aLongPlaylistMixesAPortionOfItsSongs() {
+        val many = (1..1000).map { Song(id = "s$it", title = "s$it") }
+        val portion = mixPortion(many, kotlin.random.Random(1))
+        assertEquals(MAX_MIX_SONGS, portion.size)
+        assertEquals(portion.size, portion.map { it.id }.toSet().size)
+        assertEquals(songs("a", "b"), mixPortion(songs("a", "b"), kotlin.random.Random(1)))
+        // The page's Play keeps its grooves while that portion plays.
+        assertTrue(albumMixPlaying(portion, many, portion.map { it.id }))
+    }
+
+    @Test
+    fun aLongPlaylistTriesASpreadOfStarts() {
+        val tracks = (0 until 200).map { t("s$it", 100.0 + it % 30) }
+        val starts = startsOf(tracks)
+        assertEquals(MAX_STARTS, starts.size)
+        assertEquals("s0", starts.first().id)
+        assertEquals(starts.size, starts.map { it.id }.toSet().size)
+        assertEquals(tracks.take(5), startsOf(tracks.take(5)))
+        // Every order still has every song once.
+        pickAlbumOrder(tracks, kotlin.random.Random(2)).let { order -> assertEquals(tracks.map { it.id }.toSet(), order.map { it.id }.toSet()); assertEquals(200, order.size) }
+    }
 }

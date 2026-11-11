@@ -1,5 +1,6 @@
 package app.siansa.ui
 
+import app.siansa.net.soundReady
 import androidx.compose.ui.platform.testTag
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.text.style.TextAlign
@@ -11,6 +12,8 @@ import coil3.SingletonImageLoader
 import app.siansa.data.cover
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.rounded.SwapVert
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -299,17 +302,21 @@ internal fun coverFallbackKeys(id: String, size: Int?): List<String> {
 /** The request [Cover] makes, so covers can be loaded ahead of time into the same cache entries. */
 fun coverRequest(context: android.content.Context, graph: app.siansa.AppGraph, id: String, size: Int?): ImageRequest {
     val px = coverServerPx(size)
+    // The server's stand-in, shown a while ago: asked for again now (StandIns).
+    app.siansa.covers.CoverCache.askAgain(SingletonImageLoader.get(context), id)
     val builder = ImageRequest.Builder(context).memoryCacheKey(coverMemoryKey(id, size))
     // A phone playlist's own picture, already on the phone.
     if (id.startsWith(LocalPlaylists.FILE_COVER)) builder.data(java.io.File(id.removePrefix(LocalPlaylists.FILE_COVER)))
-    else builder.data(graph.source.coverUrl(id, px)).diskCacheKey("cover:${app.siansa.covers.CoverVersions.cacheId(id)}:${px ?: "full"}")
+    else builder.data(graph.source.coverUrl(id, px)).diskCacheKey(app.siansa.covers.CoverCache.diskKey(id, px))
     // A fixed size lets the load start straight away instead of waiting for the layout.
     coverDecodePx(size)?.let { builder.size(it) }
     return builder.build()
 }
 
 /**
- * Album art from Navidrome. size = null would ask for the original file; screens use [LARGE_COVER] instead.
+ * Album art from the server, shown as the server sends it: a picture it has is kept on the phone; its stand-in for a
+ * picture it doesn't have right now is shown but never kept, and asked for again the next time it's needed
+ * (`StandIns`, the owner, 11 Nov). size = null would ask for the original file; screens use [LARGE_COVER] instead.
  * The cache key leaves out the per-session login token, so covers are reused from disk across app starts.
  * Always a still picture (the first frame of an animated cover); [BigCover] shows animations.
  *
@@ -324,10 +331,20 @@ fun Cover(
     shape: Shape = RoundedCornerShape(8.dp),
 ) {
     val graph = LocalGraph.current
+    // An artist's picture as looked up this run (ArtistPhotos), wherever it shows: their page, Fans also like, Home,
+    // lists. The id a list holds may be from before Navidrome found the photo, and stand for its placeholder star; the
+    // new one shows as soon as it's known, without the page being opened again (the owner, 10 Nov).
+    val freshArtists by graph.artistPhotos.covers.collectAsStateWithLifecycle()
+    @Suppress("NAME_SHADOWING")
+    val coverId = coverId?.let { app.siansa.data.freshArtistCover(it, freshArtists) }
     val context = LocalContext.current
     val loader = SingletonImageLoader.get(context)
     val cached = remember(coverId, size) {
-        coverId?.let { loader.memoryCache?.get(MemoryCache.Key(coverMemoryKey(it, size)))?.image }
+        coverId?.let {
+            // The server's stand-in, shown a while ago, is dropped here, so the cover is asked for again.
+            app.siansa.covers.CoverCache.askAgain(loader, it)
+            loader.memoryCache?.get(MemoryCache.Key(coverMemoryKey(it, size)))?.image
+        }
     }
     // Not in memory at this size: show the same cover at another size that is, until this one is ready.
     val standIn = remember(coverId, size, cached) {
@@ -645,7 +662,7 @@ fun SongRow(
                         if (graph.connection.current.offline) launch.notify("You're offline: a mix needs the server")
                         else RadioChooser.ask(song)
                     })
-                    if (graph.settings.current.audioMuseReady) {
+                    if (graph.settings.current.soundReady) {
                         DropdownMenuItem(text = { Text("Song path…") }, onClick = {
                             menu = false
                             sheet.close()
@@ -657,7 +674,7 @@ fun SongRow(
                         sheet.close()
                         nav.openSimilarSongs(song.id)
                     })
-                    if (graph.settings.current.audioMuseReady && song.albumId != null) {
+                    if (graph.settings.current.soundReady && song.albumId != null) {
                         DropdownMenuItem(text = { Text("Similar albums") }, onClick = {
                             menu = false
                             sheet.close()
@@ -931,7 +948,7 @@ fun <T> Shelf(
 }
 
 /**
- * Spotify's swipe to queue: drag a song row from right to left past a third of its width and let go, and
+ * Swipe to queue: drag a song row from right to left past a third of its width and let go, and
  * the song is added to the queue (after the songs queued before it). The row slides back; an amber strip
  * with the queue icon shows behind it while dragging. [content] gets a background for the row, solid
  * only while it's dragged so the row looks as usual otherwise.
@@ -1220,4 +1237,39 @@ internal fun radioMore(startedEmpty: Boolean, restEmpty: Boolean, startedAt: Lon
     startedAt != now -> RadioMore.DROP
     startedEmpty -> RadioMore.PLAY
     else -> RadioMore.ADD
+}
+
+/**
+ * How a list is sorted, as one control everywhere (the owner, 10 Nov: playlists had chips, Your Library the arrows):
+ * the up-and-down arrows with the order's name, opening a "Sort by" menu with the chosen one ticked.
+ */
+@Composable
+internal fun <T> SortPicker(label: String, options: List<Pair<T, String>>, selected: T, modifier: Modifier = Modifier, onPick: (T) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Box(modifier) {
+        Row(
+            Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClickLabel = "Sort by") { open = true }.padding(Space.Small).testTag("sortPicker"),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Rounded.SwapVert, null, Modifier.size(20.dp).testTag("sortArrows"))
+            Spacer(Modifier.width(Space.Small))
+            Text(label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 1)
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            Text(
+                "Sort by",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = Space.Page, vertical = Space.Small),
+            )
+            options.forEach { (option, name) ->
+                DropdownMenuItem(
+                    text = { Text(name, color = if (option == selected) Accent else MaterialTheme.colorScheme.onSurface) },
+                    trailingIcon = { if (option == selected) Icon(Icons.Rounded.Check, null, tint = Accent) },
+                    onClick = { open = false; onPick(option) },
+                    modifier = Modifier.testTag("sort-$option"),
+                )
+            }
+        }
+    }
 }

@@ -1,5 +1,6 @@
 package app.siansa.ui
 
+import app.siansa.net.soundReady
 import app.siansa.net.PathMood
 import app.siansa.mix.MOOD_END
 import androidx.compose.ui.platform.testTag
@@ -85,7 +86,7 @@ fun SongPathPicker(nav: NavController, songId: String, fromNowPlaying: Boolean =
     }
 
     var lyrics by rememberSaveable { mutableStateOf(false) }
-    val audioMuse = graph.settings.current.audioMuseReady
+    val audioMuse = graph.settings.current.soundReady
 
     /** The other end: a song id, or MOOD_END + a mood (issue #208). */
     fun go(otherId: String) {
@@ -228,6 +229,9 @@ fun SongPathScreen(nav: NavController, fromId: String, toId: String, length: Int
         songs = songs,
         error = (result as? Load.Err)?.message,
         cover = { m -> GeneratedCover(title, colors, m) },
+        // Its name is on its cover, and Play takes the cover's colour, as every page with a drawn cover (the owner, 10 Nov).
+        showTitle = false,
+        coverColour = colors.first,
         header = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 CollectionByline(null, null, null, "Song path" + (songs?.let { " · ${it.size} songs" } ?: "") + if (queued) " · queued" else "")

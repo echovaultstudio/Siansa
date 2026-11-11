@@ -2,6 +2,7 @@ package app.siansa.ui
 
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.material.icons.rounded.Radio
 import androidx.compose.material.icons.rounded.AddCircle
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.filterNotNull
@@ -11,6 +12,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.scaleIn
 import androidx.compose.runtime.rememberCoroutineScope
 import app.siansa.data.cover
 import androidx.compose.foundation.background
@@ -53,9 +56,15 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.material3.TextButton
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -90,9 +99,10 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Size
 
 /**
- * The page used for albums, playlists, mixes and radios, laid out like Spotify: the cover's colour
- * runs down from the top into the page, the cover shrinks and fades away as you scroll, and the
- * title bar takes on the cover's colour once the cover is gone.
+ * The page used for albums, playlists, mixes and radios: the cover's colour runs down from the top
+ * into the page, the cover shrinks and fades away as you scroll, and the title bar takes on the
+ * cover's colour once the cover is gone. With [coverId], its buttons take that cover's colour while
+ * Style's Dynamic colours on pages is on (issue #1028).
  */
 @Composable
 fun CollectionPage(
@@ -100,6 +110,8 @@ fun CollectionPage(
     title: String,
     color: Color,
     songs: List<Song>?,
+    // The cover whose colour the page's buttons take, with Dynamic colours on pages (issue #1028).
+    coverId: String? = null,
     error: String? = null,
     cover: @Composable (Modifier) -> Unit,
     header: @Composable ColumnScope.() -> Unit,
@@ -124,17 +136,42 @@ fun CollectionPage(
     albumBar: Boolean = false,
     // Where Play continues an album you stopped part way (issue #965, was "Continue from" #367): Play shows it.
     resume: PlayResume? = null,
+    // Shuffle slides onto Play for a DJ mix of just these songs, as an album's does: on playlists, radios, mixes and
+    // every other list of songs (the owner, 9 Nov); not on search results.
+    djMix: Boolean = true,
     // What the quick-scroll handle says for a song (a letter, a month); by default where it is in the list.
     scrollLabel: ((index: Int, song: Song) -> String?)? = null,
     footer: LazyListScope.() -> Unit = {},
+    // False for a page whose cover Siansa draws (a radio): Home's shortcut shows that, not its first song's cover.
+    shortcutCover: Boolean = true,
+    // A list too long to queue whole (a genre, issue: the owner, 10 Nov): Play, Shuffle and a song start this instead
+    // (a radio of some of the songs, the song tapped first), and there's no Add all to queue or DJ mix.
+    playAs: ((first: Song?) -> Unit)? = null,
+    // With [playAs]: the colour of its one button, the radio (a genre's own colour).
+    radioColour: Color? = null,
+    // The title under the cover: it rides up with the page and glides into the title bar (as an artist's name, the
+    // owner, 10 Nov). False: no title under the cover (a genre's is on its cover), and the bar shows it as before.
+    showTitle: Boolean = true,
+    // A page whose cover Siansa draws (a radio, a mix): the cover's own colour, which Play takes with Dynamic colours
+    // (the owner, 10 Nov). Without it, or a [coverId], the page's [color] does.
+    coverColour: Color? = null,
+    // With [playAs]: what stands left of its radio button, in the same row (a genre's song count, then its heart beside
+    // the radio: the owner, 10 Nov, the radio no longer on the cover).
+    radioRow: @Composable RowScope.() -> Unit = { Spacer(Modifier.weight(1f)) },
+    // Shown in the title bar once the page's buttons have scrolled away (a radio's heart, the owner, 10 Nov).
+    barExtras: @Composable () -> Unit = {},
 ) {
     val graph = LocalGraph.current
+    val djSettings by graph.settings.state.collectAsStateWithLifecycle()
+    val djConnection by graph.connection.state.collectAsStateWithLifecycle()
+    val djBeats by graph.djReady.beats.collectAsStateWithLifecycle()
+    val djPossible = app.siansa.mix.DjReady.problem(djSettings, djConnection, djBeats) == null
     val player by graph.player.state.collectAsStateWithLifecycle()
     // This page as Home's shortcuts open it again (issue #271): its route with the ids filled in.
     val route = remember(nav.currentBackStackEntry) { nav.currentBackStackEntry?.let { routeOf(it.destination.route, it.arguments) } }
     fun notePlayed() {
         val r = route ?: return
-        val cover = songs?.firstOrNull()?.cover
+        val cover = if (shortcutCover) songs?.firstOrNull()?.cover else null
         graph.scope.launch { graph.recentPlays.note(r, title, cover) }
     }
     val listState = rememberLazyListState()
@@ -153,6 +190,8 @@ fun CollectionPage(
     // worked out once the last row is in view, from the rows alone, so it never changes because of itself.
     var roomPx by remember { mutableFloatStateOf(0f) }
     val loaded = songs != null
+    // The title's glide takes this much scrolling past the cover's (DOCK_SPAN times its last stretch into the bar).
+    val glideRoomPx = with(density) { (DOCK_START_GAP + 56.dp).toPx() } * DOCK_SPAN
     LaunchedEffect(listState, coverPx, loaded) {
         snapshotFlow {
             val info = listState.layoutInfo
@@ -165,12 +204,35 @@ fun CollectionPage(
                     viewportEndPx = info.viewportEndOffset.toFloat(),
                     afterPaddingPx = info.afterContentPadding.toFloat(),
                 ),
-                coverPx = coverPx,
+                // Enough to scroll the cover away, and the title all the way into the bar.
+                coverPx = maxOf(coverPx, (coverPx + glideRoomPx) / FULL_FADE),
             )
         }.filterNotNull().collect { roomPx = it }
     }
     val progress = (scrolled / coverPx).coerceIn(0f, 1f)
-    val barAlpha = ((scrolled - coverPx * 0.8f) / (coverPx * 0.3f)).coerceIn(0f, 1f)
+    // The title's glide into the bar (glideFrame): where it is on the page while the header is in view, and from there
+    // its way into the bar's title place, shrinking to the bar's size.
+    val statusPx = WindowInsets.statusBars.getTop(density).toFloat()
+    val barPx = with(density) { 56.dp.toPx() }  // spacing: exact (the title bar's height)
+    val measurer = rememberTextMeasurer()
+    val baseTitleStyle = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.ExtraBold)
+    val titleWidthPx = with(density) { (LocalConfiguration.current.screenWidthDp.dp - Space.Page * 2).toPx() }
+    val titleStyle = remember(title, baseTitleStyle, titleWidthPx) { fitOneLine(measurer, title, baseTitleStyle, titleWidthPx) }
+    val barTitleStyle = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black)
+    val dockScale = barTitleStyle.fontSize.value / titleStyle.fontSize.value
+    val titleLinePx = with(density) { titleStyle.lineHeight.toPx() }
+    val gapPx = with(density) { DOCK_START_GAP.toPx() }
+    val dockTop = statusPx + barPx / 2f - titleLinePx * dockScale / 2f
+    var pageTop by remember { mutableFloatStateOf(0f) }
+    var titleTop by remember { mutableStateOf<Float?>(null) }
+    val headerInView = listState.firstVisibleItemIndex == 0
+    val titleFrame = when {
+        !showTitle -> null
+        !headerInView -> HeroNameFrame(dockTop, 1f)
+        else -> titleTop?.let { glideFrame(it, startTop = statusPx + barPx + gapPx, dockTop = dockTop) }
+    }
+    val titleBar = titleFrame?.let { smooth(((statusPx + barPx + 2 * gapPx - it.top) / (2 * gapPx)).coerceIn(0f, 1f)) } ?: 0f
+    val barAlpha = maxOf(((scrolled - coverPx * 0.8f) / (coverPx * 0.3f)).coerceIn(0f, 1f), titleBar)
     val surface = MaterialTheme.colorScheme.surface
     // Albums with several discs get a heading above each disc (its title, or "Disc 2").
     val discs = remember(songs, numbered, discTitles) { if (numbered && songs != null) discHeaders(songs, discTitles) else emptyMap() }
@@ -181,7 +243,29 @@ fun CollectionPage(
     val pastHeader by remember { derivedStateOf { listState.firstVisibleItemIndex > 0 } }
     val rowEnd = if (fast) AlphabetBarWidth else 0.dp
 
-    Box(Modifier.fillMaxSize().background(surface)) {
+    // Dynamic colours: the cover's colour for Play only (BigPlayButton reads it). A page without a picture (a radio, a
+    // mix, a card) takes its own cover's colour, so every Play button follows the switch (the owner, 10 Nov).
+    val backdrop = pageBackdrop(surface, color)
+    val fromCover = rememberPageColours(coverId, backdrop, where = "Page \"$title\"")
+    val dynamicOn = djSettings.dynamicColours
+    val ownColours = remember(coverId, coverColour, color, backdrop, dynamicOn) {
+        if (dynamicOn && coverId == null) DynamicAccent.of(coverColour ?: color, backdrop) else null
+    }
+    val playColours = fromCover ?: ownColours
+    // The page's Play (or its radio), also in the title bar once its buttons have scrolled under it (the owner, 10 Nov).
+    val pagePlayback = rememberListPlayback(songs.orEmpty())
+    fun playPage() {
+        val list = songs.orEmpty()
+        if (list.isEmpty()) return
+        if (playAs != null) playAs(null) else pagePlayback.press {
+            val at = resume?.index?.takeIf { it in list.indices } ?: 0
+            graph.player.play(list, at)
+        }
+        notePlayed()
+    }
+    var buttonsBottom by remember { mutableStateOf<Float?>(null) }
+    CompositionLocalProvider(LocalPlayColours provides playColours) {
+    Box(Modifier.fillMaxSize().background(surface).onGloballyPositioned { pageTop = it.positionInRoot().y }) {
         if (showCovers && songs != null) {
             val covers = remember(songs) { songs.map { it.cover } }
             PrefetchCovers(listState.firstVisibleItemIndex, listState.layoutInfo.visibleItemsInfo.size, covers, 150)
@@ -218,24 +302,35 @@ fun CollectionPage(
                     }
                     Spacer(Modifier.height(Space.Page))
                     Column(Modifier.alpha(slideDim)) {
-                        Text(
-                            title,
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.ExtraBold,
-                            maxLines = 3,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Spacer(Modifier.height(Space.Small))
+                        if (showTitle) {
+                            // Its place: the title itself is drawn over the page (below), gliding into the bar from here.
+                            Text(
+                                title,
+                                style = titleStyle,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier
+                                    .alpha(0f)
+                                    .onGloballyPositioned { titleTop = it.positionInRoot().y - pageTop },
+                            )
+                            Spacer(Modifier.height(Space.Small))
+                        }
                         header()
                     }
                     Spacer(Modifier.height(Space.Tight))
+                    Box(Modifier.onGloballyPositioned { buttonsBottom = it.positionInRoot().y + it.size.height - pageTop }) {
                     ActionRow(
-                        songs.orEmpty(), offline, onSimilar, onPlayed = ::notePlayed, saveAs = title.takeIf { saveAsPlaylist },
+                        songs.orEmpty(), offline, onSimilar, onPlayed = ::notePlayed, saveAs = title.takeIf { saveAsPlaylist && playAs == null },
+                        playAs = playAs,
+                        radioColour = radioColour,
+                        radioRow = radioRow,
                         // An album's shuffle slides right onto Play for a DJ mix of its own songs (issue #965); it needs
                         // AudioMuse, as similar albums does.
-                        onDjMix = if (albumBar && onSimilar != null) ({ graph.scope.launch { app.siansa.mix.AlbumDjMix.start(graph, title, songs.orEmpty()) } }) else null,
+                        // Only when a DJ mix's needs are met (AudioMuse and Siansa Beats): otherwise a plain Shuffle.
+                        onDjMix = if (((albumBar && onSimilar != null) || djMix) && djPossible && playAs == null) ({ graph.scope.launch { app.siansa.mix.AlbumDjMix.start(graph, title, songs.orEmpty()) } }) else null,
                         djSlide = djSlide, onDjSlide = { djSlide = it }, dim = slideDim, albumBar = albumBar, resume = resume,
                     )
+                    }
                 }
             }
             when {
@@ -264,7 +359,7 @@ fun CollectionPage(
                             ) {
                                 SongRow(
                                     song = song,
-                                    onClick = { graph.player.play(songs, index); notePlayed() },
+                                    onClick = { if (playAs != null) playAs(song) else graph.player.play(songs, index); notePlayed() },
                                     leading = if (numbered) song.track?.toString() ?: "${index + 1}" else null,
                                     highlighted = now,
                                     showCover = showCovers,
@@ -305,7 +400,50 @@ fun CollectionPage(
             }
         }
 
-        FadingTitleBar(nav, title, color, barAlpha, actions)
+        // Once the page's Play (or radio) has scrolled under the bar, the bar has it (the owner, 10 Nov).
+        val buttonsGone = !headerInView || (buttonsBottom?.let { it < statusPx + barPx } ?: false)
+        val barActions: @Composable () -> Unit = {
+            BarReveal(buttonsGone) {
+                barExtras()
+                if (!songs.isNullOrEmpty()) {
+                    BarPlayButton(
+                        radio = playAs != null,
+                        colour = if (playAs != null) radioColour ?: Accent else playColours?.controls ?: Accent,
+                        onColour = if (playAs != null) Color.White else playColours?.onControls ?: MaterialTheme.colorScheme.onPrimary,
+                        playing = playAs == null && pagePlayback.playing,
+                        onClick = ::playPage,
+                    )
+                }
+            }
+            actions()
+        }
+        FadingTitleBar(nav, title, color, barAlpha, barActions, showTitle = !showTitle)
+        // The title, one all the way: under the cover, then up into the bar, shrinking, as an artist's name.
+        if (titleFrame != null) {
+            val restColour = MaterialTheme.colorScheme.onSurface
+            Text(
+                title,
+                style = titleStyle,
+                color = lerp(restColour, Color.White, smooth(titleFrame.t)),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .padding(start = Space.Page, end = Space.Page)
+                    .graphicsLayer {
+                        transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
+                        val e = smooth((titleFrame.t * SIDEWAYS_LEAD).coerceAtMost(1f))
+                        val restLeft = Space.Page.toPx()
+                        translationX = ((Space.Tight + BACK_BUTTON + Space.Small).toPx() - restLeft) * e
+                        translationY = titleFrame.top
+                        val sc = 1f + (dockScale - 1f) * smooth(titleFrame.t)
+                        scaleX = sc
+                        scaleY = sc
+                        alpha = if (titleFrame.t > 0f) 1f else slideDim
+                    }
+                    .testTag("collectionTitle"),
+            )
+        }
+    }
     }
 }
 
@@ -332,7 +470,7 @@ internal fun roomBelow(maxScrollPx: Float, coverPx: Float): Float = (coverPx * F
  * colour until the page scrolls, then a solid bar in that colour with the title.
  */
 @Composable
-internal fun FadingTitleBar(nav: NavController, title: String, color: Color, barAlpha: Float, actions: @Composable () -> Unit = {}) {
+internal fun FadingTitleBar(nav: NavController, title: String, color: Color, barAlpha: Float, actions: @Composable () -> Unit = {}, showTitle: Boolean = true) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -354,7 +492,7 @@ internal fun FadingTitleBar(nav: NavController, title: String, color: Color, bar
             color = Color.White,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f).graphicsLayer { alpha = barAlpha },
+            modifier = Modifier.weight(1f).graphicsLayer { alpha = if (showTitle) barAlpha else 0f },
         )
         actions()
     }
@@ -414,8 +552,19 @@ private fun ActionRow(
     dim: Float = 1f,
     albumBar: Boolean = false,
     resume: PlayResume? = null,
+    playAs: ((first: Song?) -> Unit)? = null,
+    radioColour: Color? = null,
+    radioRow: @Composable RowScope.() -> Unit = { Spacer(Modifier.weight(1f)) },
 ) {
     val graph = LocalGraph.current
+    // A list too long to play whole (a genre): one button, its radio, in the page's own colour (the owner, 10 Nov).
+    if (playAs != null) {
+        PlayButtonRow {
+            radioRow()
+            BigRadioButton(radioColour ?: Accent, enabled = songs.isNotEmpty()) { playAs(null); onPlayed() }
+        }
+        return
+    }
     var saving by remember { mutableStateOf(false) }
     // ⏸ while this page's songs play; it pauses them rather than starting over (issue #644).
     val playback = rememberListPlayback(songs)
@@ -435,13 +584,17 @@ private fun ActionRow(
     ActionButtons(
         enabled = songs.isNotEmpty(),
         onQueue = { songs.forEach { graph.player.addToQueue(it) } },
+        queueAll = playAs == null,
         onSave = if (saveAs != null) ({ saving = true }) else null,
         download = { if (offline != null) DownloadButton(offline, songs) },
         onSimilar = onSimilar,
-        onShuffle = { graph.player.play(songs, shuffle = true); onPlayed() },
+        onShuffle = { if (playAs != null) playAs(null) else graph.player.play(songs, shuffle = true); onPlayed() },
         // Play continues where you stopped, when you did (issue #965); held, it starts from the top.
         onPlay = {
-            playback.press {
+            if (playAs != null) {
+                playAs(null)
+                onPlayed()
+            } else playback.press {
                 val at = resume?.index?.takeIf { it in songs.indices } ?: 0
                 if (at > 0) AppLog.i("Album", "Continue from ${at + 1} of ${songs.size}")
                 graph.player.play(songs, at)
@@ -486,6 +639,8 @@ internal fun ActionButtons(
     onPlayFromStart: (() -> Unit)? = null,
     // An album's plus: the whole album into a playlist you pick.
     onAddToPlaylist: (() -> Unit)? = null,
+    // False for a list too long to queue whole (a genre): no Add all to queue.
+    queueAll: Boolean = true,
 ) {
     // How far right of shuffle's middle Play's near edge is: sliding there starts the DJ mix.
     var shuffleX by remember { mutableStateOf<Float?>(null) }
@@ -515,14 +670,15 @@ internal fun ActionButtons(
             )
         } else {
             IconButton(onClick = onShuffle, enabled = enabled, modifier = Modifier.testTag("shuffleAll")) {
-                Icon(Icons.Rounded.Shuffle, "Shuffle", tint = Accent, modifier = Modifier.size(30.dp))
+                // Plain, as Radio and Shuffle on an artist's page: only Play takes the page's colour (the owner, 10 Nov).
+                Icon(Icons.Rounded.Shuffle, "Shuffle", tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(30.dp))
             }
         }
     }
     val similarButton: @Composable () -> Unit = {
         // The waveform with an "A", as "Similar albums" in the now playing menu (issue #239).
         if (onSimilar != null) IconButton(onClick = onSimilar, modifier = Modifier.testTag("findSimilarAlbums")) {
-            Icon(rememberSimilarAlbumsIcon(), "Find similar albums", tint = Accent, modifier = Modifier.size(28.dp))
+            Icon(rememberSimilarAlbumsIcon(), "Find similar albums", tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(28.dp))
         }
     }
     if (albumBar) {
@@ -548,7 +704,7 @@ internal fun ActionButtons(
         return
     }
     PlayButtonRow {
-        IconButton(onClick = onQueue, enabled = enabled, modifier = Modifier.alpha(dim).testTag("queueAll")) {
+        if (queueAll) IconButton(onClick = onQueue, enabled = enabled, modifier = Modifier.alpha(dim).testTag("queueAll")) {
             Icon(Icons.AutoMirrored.Rounded.PlaylistAdd, "Add all to queue", Modifier.size(28.dp))
         }
         if (onSave != null) {
@@ -585,6 +741,88 @@ fun PlayButtonRow(
     )
 }
 
+/**
+ * How a page's own buttons arrive in its title bar once they've scrolled under it, and leave again: growing in as
+ * they fade in, the same on every page (albums, playlists, radios, genres, artists, books: the owner, 10 Nov).
+ */
+@Composable
+internal fun BarReveal(visible: Boolean, content: @Composable RowScope.() -> Unit) {
+    AnimatedVisibility(visible = visible, enter = fadeIn() + scaleIn(initialScale = 0.6f), exit = fadeOut() + scaleOut(targetScale = 0.6f)) {
+        Row(verticalAlignment = Alignment.CenterVertically, content = content)
+    }
+}
+
+/**
+ * A page's details on the left and, on the right, what it can do with them: [extra] (a radio's heart), then New picks
+ * when the page can pick again. One row for every page that picks songs (radios, mood playlists, cards: the owner,
+ * 10 Nov; they had "New picks", "Again" and an arrow in the title bar).
+ */
+@Composable
+internal fun PicksRow(details: String, onNewPicks: (() -> Unit)?, extra: @Composable RowScope.() -> Unit = {}) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.weight(1f)) { CollectionByline(null, null, null, details) }
+        extra()
+        if (onNewPicks != null) {
+            TextButton(onClick = onNewPicks, modifier = Modifier.focusRing().testTag("newPicks")) {
+                Icon(Icons.Rounded.Refresh, null)
+                Spacer(Modifier.width(Space.Tight))
+                Text("New picks")
+            }
+        }
+    }
+}
+
+/**
+ * The page's Play in the title bar once its own has scrolled away (the owner, 10 Nov): small and round, in the page's
+ * Play colour; a radio's is the radio icon alone, in white like the bar's other icons.
+ */
+@Composable
+internal fun BarPlayButton(radio: Boolean, colour: Color, onColour: Color, playing: Boolean, onClick: () -> Unit) {
+    // A radio's is the icon alone, as the bar's other icons (the owner, 10 Nov: no coloured ring round it).
+    if (radio) {
+        IconButton(onClick = onClick, modifier = Modifier.testTag("barPlayButton")) {
+            Icon(Icons.Rounded.Radio, "Start the radio", tint = Color.White)
+        }
+        return
+    }
+    Box(
+        Modifier
+            .padding(horizontal = Space.Tight)
+            .size(BAR_PLAY_SIZE)
+            .clip(CircleShape)
+            .background(colour)
+            .clickable(onClick = onClick)
+            .testTag("barPlayButton"),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            if (radio) Icons.Rounded.Radio else if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+            if (radio) "Start the radio" else if (playing) "Pause" else "Play",
+            tint = onColour,
+            modifier = Modifier.size(if (radio) 20.dp else 24.dp),
+        )
+    }
+}
+
+/** The title bar's Play: as big as an icon button's touch area. */
+internal val BAR_PLAY_SIZE = 40.dp
+
+/** A genre page's one button (the owner, 10 Nov): its radio, round as Play, in the genre's [colour]. */
+@Composable
+fun BigRadioButton(colour: Color, enabled: Boolean, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .size(BIG_PLAY_SIZE)
+            .clip(CircleShape)
+            .background(if (enabled) colour else colour.copy(alpha = 0.4f))
+            .clickable(enabled = enabled, onClick = onClick)
+            .testTag("genreRadioButton"),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(Icons.Rounded.Radio, "Start the genre's radio", tint = Color.White, modifier = Modifier.size(28.dp))
+    }
+}
+
 /** The big round Play button of album, playlist, mix and artist pages. Only ever inside a [PlayButtonRow]. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -597,6 +835,23 @@ fun BigPlayButton(
     progress: Float? = null,
     // Held: the album from the top, when Play would continue it.
     onLongPlay: (() -> Unit)? = null,
+    onPlay: () -> Unit,
+) {
+    // With Dynamic colours, only Play takes the cover's colour on a page (the owner, 10 Nov): Shuffle and the rest keep
+    // the theme's, so the row doesn't shout.
+    val own = LocalPlayColours.current
+    WithAccent(own?.controls, own?.onControls) { BigPlayButtonDrawn(enabled, playing, grooves, turning, progress, onLongPlay, onPlay) }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun BigPlayButtonDrawn(
+    enabled: Boolean,
+    playing: Boolean,
+    grooves: Boolean,
+    turning: Boolean,
+    progress: Float?,
+    onLongPlay: (() -> Unit)?,
     onPlay: () -> Unit,
 ) {
     val ring = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.18f)
@@ -752,7 +1007,7 @@ private val BIG_PLAY_SIZE = 56.dp
  * circle's own margin in its 24-unit drawing (2 units). The plus moves left by that, so its circle starts in line with
  * the text above.
  */
-private val ICON_SIZE = 28.dp
-private val ICON_INSET = (48.dp - ICON_SIZE) / 2 + ICON_SIZE * 2 / 24
+internal val ICON_SIZE = 28.dp
+internal val ICON_INSET = (48.dp - ICON_SIZE) / 2 + ICON_SIZE * 2 / 24
 private val BIG_PLAY_RING = 2.5.dp
 private val BIG_PLAY_RING_OUTSET = 1.5.dp

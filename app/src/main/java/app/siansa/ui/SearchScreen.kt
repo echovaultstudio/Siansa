@@ -403,9 +403,11 @@ private fun MakeVibeRow(query: String, nav: NavController, onOpen: () -> Unit) {
 @Composable
 private fun BrowseGrid(nav: NavController) {
     val graph = LocalGraph.current
-    val version by graph.library.version.collectAsStateWithLifecycle()
-    val genreList by loadState(version to "browse-genres") { if (graph.library.isSynced) graph.library.genres(30) else emptyList() }
-    val genres = genreList.valueOrNull().orEmpty()
+    // Siansa Beats' genres (each song's sound first, its tags second) as last saved, at once; the songs' tags
+    // otherwise. The first [BROWSE_GENRES] as tiles, then All genres for the rest.
+    val genreList by rememberBrowseGenres(ALL_GENRES)
+    val allGenres = genreList.orEmpty()
+    val genres = allGenres.take(BROWSE_GENRES)
     LazyVerticalGrid(
         columns = GridCells.Adaptive(160.dp),
         contentPadding = PaddingValues(start = Space.Page, end = Space.Page, bottom = bottomBarPadding(Space.Section)),
@@ -424,16 +426,34 @@ private fun BrowseGrid(nav: NavController) {
                 Text("Genres", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = Space.Small))
             }
             items(genres, key = { "genre-" + it.name }) { genre ->
-                BrowseTile(genre.name, tileColors(genre.name)) { nav.openGenreRadio(genre.name) }
+                BrowseTile(genre.name, genreColors(genre.name)) { nav.openGenreRadio(genre.name) }
+            }
+            if (allGenres.size > genres.size) {
+                item(key = "genre-all") {
+                    BrowseTile("All genres", MaterialTheme.colorScheme.surfaceVariant to MaterialTheme.colorScheme.surfaceVariant,
+                        textColor = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.testTag("allGenres")) {
+                        nav.navigate(app.siansa.ui.HomeSection.Genres.route)
+                    }
+                }
             }
         }
     }
 }
 
+/** Genre tiles on Search before All genres; every one on the page All genres opens. */
+internal const val BROWSE_GENRES = 30
+internal const val ALL_GENRES = 500
+
 @Composable
-private fun BrowseTile(title: String, colors: Pair<Color, Color>, onClick: () -> Unit) {
+private fun BrowseTile(
+    title: String,
+    colors: Pair<Color, Color>,
+    textColor: Color = Color.White,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
     Box(
-        Modifier
+        modifier
             .fillMaxWidth()
             .height(96.dp)
             .clip(RoundedCornerShape(8.dp))
@@ -441,7 +461,7 @@ private fun BrowseTile(title: String, colors: Pair<Color, Color>, onClick: () ->
             .clickable(onClick = onClick)
             .padding(Space.Medium),
     ) {
-        WholeWordsText(title, MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold), color = Color.White, maxLines = 2)
+        WholeWordsText(title, MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold), color = textColor, maxLines = 2)
     }
 }
 

@@ -19,8 +19,10 @@ When you start a radio you pick **Steady** (the wave) or **DJ** (the turntable) 
 
 ### Shape the mix
 
-While a DJ radio plays, the queue (pull up from now playing) has **Shape the mix**: what the energy does over the
-songs not yet played, and how far the mix may stray. Each change picks the radio's next songs again, starting
+While a DJ radio plays, the queue (pull up from now playing) has **Shape your mix**, folded under its heading with
+what's set beside it ("Steady build · some surprises"). Tap it to open two bars like the DJ mix bar on now playing:
+slide or tap along the first for what the energy does over the songs not yet played, and along **Surprises** for how
+far the mix may stray. Each change picks the radio's next songs again, starting
 with the very next one: from the ones queued and a fresh lot that sound like the song playing, so a wind down finds
 calmer songs and a euphoric mix brighter ones at a tempo that still mixes. The queue keeps as many songs as before;
 ones that don't fit the new shape go, and may come back later. The song playing and anything you queued yourself
@@ -53,7 +55,7 @@ Without AudioMuse-AI, song radio uses Navidrome's similar songs, or Emby's Insta
 |---|---|
 | **Off** | The music stops when the queue ends. |
 | **Steady** | Adds songs like the last one in the queue, so the music carries on in the same style. |
-| **DJ** | Adds songs like the last one and orders them for smooth changes: close tempo and keys that go together, shaped as the mix is (see above). Needs AudioMuse-AI. |
+| **DJ** | Adds songs like the last one and orders them for smooth changes: close tempo and keys that go together, shaped as the mix is (see above). Needs Siansa Beats. |
 
 Songs already in the queue or played lately aren't added again. Songs Siansa added by itself are marked in the
 queue.
@@ -68,7 +70,7 @@ On an album's page, the buttons under its details: **add to a playlist** (the pl
 - **Play** carries on where you stopped, when you left the album part way: a ring round it shows how far you got,
   and the details line says **Continue from 8**. Press and hold Play to start from the first song instead.
 - The **plus** adds the whole album to a playlist you pick.
-- **Shuffle** plays the album shuffled. With AudioMuse-AI, **slide right** from it all the way onto Play for a **DJ mix
+- **Shuffle** plays the album shuffled. With AudioMuse-AI and Siansa Beats answering, **slide right** from it all the way onto Play for a **DJ mix
   of the album**: its own songs only, in an order that blends well (tempo and key, as a DJ mix orders them), played
   with DJ blends. It picks among the orders that blend best, so it doesn't always start from the same song. Nothing
   else is added, so the mix ends with the album.
@@ -76,6 +78,19 @@ On an album's page, the buttons under its details: **add to a playlist** (the pl
 While you slide, the cover says **DJ mix**, as in now playing, and the rest of the page dims. Once your finger is on
 Play, it turns into a record and the phone clicks; letting go starts the mix. Play stays a turning record while the
 album's mix plays.
+
+The same slide works on every list of songs: a playlist, a radio, a mix, a card, Liked songs and the others (not
+search results). A list of more than 300 songs mixes a random 300 of them.
+
+On an artist's page, the buttons under the release count: the **heart** on the left makes the artist a favourite
+(in your server too); **Radio**, **Shuffle** and **Play** on the right.
+
+Under the buttons, the artist's release types are tabs: **All**, then each type they have (**Albums**, **EPs**,
+**Singles**, **Live**, **DJ-mixes**…). Pick one to see only those releases; **All** (or tapping the chosen tab again)
+shows the whole page: popular songs, every release, **Appears on**, **About** and **Fans also like**. An artist with
+many types scrolls the tabs sideways. As you scroll down, the page slides softly over the artist's picture and the tabs
+stay pinned under the title bar. The artist's name, large at the foot of the picture, moves up with the page and
+then glides into the title bar, shrinking as it goes, to become the page's title; scroll back and it glides out again.
 
 - **Similar songs** come from the best source your setup has: Navidrome's sonic similarity (if the AudioMuse-AI
   Navidrome plugin is installed), else AudioMuse-AI directly, else Navidrome's similar songs (or Emby's Instant
@@ -108,6 +123,15 @@ and can be renamed or deleted.
 ("dreamy synth pop", "energetic electronic"), where AudioMuse-AI finds songs that sound like your words. Each kind
 shows its top five; tap a section's title (**Artists**, **Albums**, **Songs**, **Sounds like …**) to see every
 match on a page of its own, with Play and Shuffle at the top for songs.
+
+Before you type, Search shows your genres to browse, the 30 with the most songs, then **All genres** for every one. In
+Siansa Dev with Siansa Beats, they're the genres Siansa Beats hears in your music, most songs first: a song is in every genre
+it sounds like (its tags play no part there), and a genre's page lists all its songs. The list is saved on your phone, so it shows at once, and it's brought up to date in the background every
+half hour. When Siansa Beats is slow or away, the saved list stays. A genre whose songs are all in libraries you hide
+(Home's filter) isn't listed, and each genre counts only its songs in the libraries you show. A genre's page shows the
+first three lines of what it is, with **Show more** for the rest. Home's **Your genres** shows the same list. Without
+AudioMuse or Siansa Beats, or until Siansa Beats has heard enough songs, Search and Home show your library's genre
+tags as always: Siansa Beats is never needed. The genre on an album's or an artist's page is still the one in its tags.
 
 ## Roll the dice
 

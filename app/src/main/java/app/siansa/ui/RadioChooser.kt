@@ -20,6 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.font.FontWeight
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.siansa.data.Song
@@ -45,10 +46,16 @@ object RadioChooser {
      * Starts a mix from [song] in [mode] without asking (a slide from the play button, issue #919, or a choice here),
      * saying so with [say], and why not if it can't.
      */
-    fun startNow(graph: app.siansa.AppGraph, song: Song, mode: ContinuousMode, say: (String) -> Unit) {
+    fun startNow(graph: app.siansa.AppGraph, song: Song, mode: ContinuousMode, shape: app.siansa.mix.MixShape? = null, say: (String) -> Unit) {
+        // A DJ mix only when its needs are met: otherwise it says why and nothing starts (Steady radio still can).
+        if (mode == ContinuousMode.DJ) graph.djProblem()?.let { problem ->
+            AppLog.i("SongRadio", "No DJ mix from \"${song.title}\": $problem")
+            say(app.siansa.mix.DjReady.explain(problem))
+            return
+        }
         AppLog.i("SongRadio", "Chose ${mode.label} for a radio from \"${song.title}\"")
         say("Starting ${mixName(mode)} from ${song.title}… more songs are added as it plays")
-        graph.songRadio.start(song, mode) { message -> say(message) }
+        graph.songRadio.start(song, mode, shape) { message -> say(message) }
     }
 }
 
@@ -66,20 +73,26 @@ internal fun radioModeIcon(mode: ContinuousMode): ImageVector = when (mode) {
  * docs, Discovery › Song radio).
  */
 @Composable
-internal fun RadioModeChoices(onPick: (ContinuousMode) -> Unit) {
+internal fun RadioModeChoices(djProblem: String? = null, onPick: (ContinuousMode) -> Unit) {
     Column {
         listOf(ContinuousMode.STEADY, ContinuousMode.DJ).forEach { mode ->
+            // A DJ mix only when its needs are met: shown greyed with why (Needs Siansa Beats…), not to be picked.
+            val why = djProblem.takeIf { mode == ContinuousMode.DJ }
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .clickable { onPick(mode) }
+                    .alpha(if (why != null) 0.45f else 1f)
+                    .clickable(enabled = why == null) { onPick(mode) }
                     .padding(vertical = Space.Medium)
                     .testTag("radioMode-${mode.name.lowercase()}"),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(Space.Page),
             ) {
                 Icon(radioModeIcon(mode), null, tint = MaterialTheme.colorScheme.primary)
-                Text(mode.label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Column {
+                    Text(mode.label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    if (why != null) Text(why, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.testTag("radioModeWhy"))
+                }
             }
         }
     }
@@ -92,6 +105,9 @@ fun RadioChooserHost() {
     val snack = LocalSnack.current
     val scope = rememberCoroutineScope()
     val song by RadioChooser.song.collectAsStateWithLifecycle()
+    val settings by graph.settings.state.collectAsStateWithLifecycle()
+    val connection by graph.connection.state.collectAsStateWithLifecycle()
+    val djBeats by graph.djReady.beats.collectAsStateWithLifecycle()
     val seed = song ?: return
 
     fun start(mode: ContinuousMode) {
@@ -102,7 +118,7 @@ fun RadioChooserHost() {
     AlertDialog(
         onDismissRequest = { RadioChooser.song.value = null },
         title = { Text("Start a mix") },
-        text = { RadioModeChoices(::start) },
+        text = { RadioModeChoices(app.siansa.mix.DjReady.problem(settings, connection, djBeats), ::start) },
         confirmButton = {},
         dismissButton = { TextButton(onClick = { RadioChooser.song.value = null }) { Text("Cancel") } },
     )

@@ -20,7 +20,7 @@ import androidx.compose.ui.unit.dp
 import app.siansa.data.Playlist
 
 /**
- * The line under a playlist in a list, as Spotify writes it: "Playlist · owner · 12 songs".
+ * The line under a playlist in a list: "Playlist · owner · 12 songs".
  * [fallbackOwner] is used when the server doesn't say who made it; a blank owner is left out.
  */
 fun playlistSubtitle(playlist: Playlist, fallbackOwner: String? = null): String {

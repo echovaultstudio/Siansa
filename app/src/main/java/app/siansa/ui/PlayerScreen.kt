@@ -118,6 +118,7 @@ import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -155,7 +156,7 @@ internal fun playerColors() = darkColorScheme(
 )
 
 /**
- * Now playing, in the style of Spotify: the cover blurred into the background, a large cover that
+ * Now playing: the cover blurred into the background, a large cover that
  * opens its album, title and artist with a heart, the controls, where the music plays (bottom left) and
  * the queue (bottom right). The ⋮ menu has everything else. Scrolling down shows the lyrics, the artist
  * and the song's details on cards; they stay out of sight until then (#294), and the lyrics have their own
@@ -199,7 +200,7 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
     // The cover's colour, for the page, the cards under the player and the lyrics screen.
     val tint = rememberCoverColor(song?.cover)
     // With Style's Dynamic colours, the seek bar, Play, the liked heart and where it plays take the cover's colour (issues #970, #998).
-    val dynamic = rememberDynamicColours(song?.cover, style.dynamicPlayerColours)
+    val dynamic = rememberDynamicColours(song?.cover, style.dynamicColours)
     // The song's lyrics, for the lyrics button and the preview card. Cleared as the song changes, so the
     // button doesn't stay lit for a song without lyrics.
     val lyrics by loadStateFresh("lyrics-${song?.id}") { song?.let { graph.source.lyrics(it) } }
@@ -248,6 +249,27 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
             PlaySlide.SONIC_MATCH -> openSimilarSongs()
             PlaySlide.START_A_MIX -> RadioChooser.ask(from)
             PlaySlide.NOTHING -> Unit
+        }
+    }
+
+    // The DJ mix bar (issues #1033, #1035): with no DJ mix playing ([starting]), letting go on a place starts one from this
+    // song, in that place's shape; while one plays, it stops it, or gives it that shape as the queue's Shape the mix does
+    // (the next songs change).
+    fun djBar(place: DjBarSpot, starting: Boolean) {
+        val shape = place.shape
+        if (starting) {
+            val from = song ?: return
+            AppLog.i("Player", "DJ mix bar: start a DJ mix${shape?.let { " as ${it.label}" }.orEmpty()} from ${from.id}")
+            RadioChooser.startNow(graph, from, app.siansa.mix.ContinuousMode.DJ, shape) { message -> scope.launch { snack.showSnackbar(message) } }
+        } else if (shape == null) {
+            AppLog.i("Player", "DJ mix bar: stop the mix")
+            graph.songRadio.stop()
+            app.siansa.mix.AlbumDjMix.stop()
+            scope.launch { snack.showSnackbar("Mix off") }
+        } else {
+            AppLog.i("Player", "DJ mix bar: ${shape.label}")
+            graph.settings.setMixShape(shape)
+            graph.songRadio.reshape()
         }
     }
 
@@ -323,7 +345,7 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
             BoxWithConstraints(Modifier.fillMaxSize()) {
                 // The player fills the screen; the cards below only come into view when scrolling, so none
                 // sits under the phone's own buttons (#294). The classic style leaves the top of the lyrics card
-                // peeking in at the bottom, as in Spotify, to show there's more below (issue #346).
+                // peeking in at the bottom, to show there's more below (issue #346).
                 val pageHeight = if (classic) maxHeight - PLAYER_PEEK - navBar else maxHeight
                 val queueButton = @Composable {
                     RoundIcon(
@@ -349,12 +371,15 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                     ) {
                         // A gap above the header that suits the screen's height, so the top of the player
                         // isn't pressed against the status bar.
-                        Spacer(Modifier.height(playerTopGapDp(LocalConfiguration.current.screenHeightDp).dp))
-                        TopRow(song, onClose = onClose, onAlbum = ::openAlbum, onMenu = { menuOpen = true }, onSleep = { sleepOpen = true })
-
-                        Box(Modifier.weight(1f).fillMaxWidth().padding(top = Space.Page, bottom = Space.Medium), contentAlignment = Alignment.Center) {
-                            SwipeCover(song, onTap = ::openAlbum, slideLabel = slideLabel)
-                        }
+                        // The top row sits exactly halfway between the status bar and the cover (the owner, 9 Nov).
+                        PlayerTop(
+                            topGap = playerTopGapDp(LocalConfiguration.current.screenHeightDp).dp,
+                            row = { TopRow(song, onClose = onClose, onAlbum = ::openAlbum, onMenu = { menuOpen = true }, onSleep = { sleepOpen = true }) },
+                            cover = { SwipeCover(song, onTap = ::openAlbum, slideLabel = slideLabel) },
+                            // Siansa Dev: marks the last DJ blend as bad (the owner, 9 Nov).
+                            belowCover = { BadBlendButton() },
+                            modifier = Modifier.weight(1f).fillMaxWidth(),
+                        )
 
                         // The filled heart of a liked song takes the cover's colour too, with Dynamic colours on (issue #998).
                         WithAccent(dynamic?.controls, dynamic?.onControls) {
@@ -368,9 +393,38 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                         val slideDim by animateFloatAsState(if (slideLabel != null) SLIDING_OTHERS else 1f, label = "pageDim")
                         val castAlpha = if (slideLabel?.way == SlideWay.DOWN) 0f else slideDim
                         var trackY by remember { mutableStateOf<Float?>(null) }
+                        var trackWidth by remember { mutableStateOf<Int?>(null) }
                         WithAccent(dynamic?.controls, dynamic?.onControls) {
-                            if (OutsideMedia.isLive(song?.id)) LiveBar() else SeekBar(state, Modifier.alpha(slideDim)) { trackY = it }
-                            Controls(state, onSlide = ::slide, onSlideLabel = { slideLabel = it }, upTo = trackY)
+                            if (OutsideMedia.isLive(song?.id)) LiveBar() else {
+                                // As a finger heads up from Play, the seek bar's line opens into the DJ mix bar (issues
+                                // #1033, #1035), centred on that line, and closes back into it when the finger lets go,
+                                // on a quick spring. It stays within the seek bar's room: nothing moves.
+                                val bar = slideLabel?.bar
+                                var lastBar by remember { mutableStateOf<DjBarView?>(null) }
+                                if (bar != null) lastBar = bar
+                                val open by animateFloatAsState(
+                                    if (bar != null) 1f else 0f,
+                                    spring(dampingRatio = DJ_BAR_SPRING_DAMPING, stiffness = DJ_BAR_SPRING_STIFFNESS),
+                                    label = "djBarOpen",
+                                )
+                                val shownBar = bar ?: lastBar?.takeIf { open > DJ_BAR_CLOSED }
+                                Box {
+                                    SeekBar(state, Modifier.alpha(slideDim * (1f - open.coerceIn(0f, 1f))), onTrackWidth = { trackWidth = it }) { trackY = it }
+                                    if (shownBar != null) {
+                                        val now = style.mixShape.takeIf { !shownBar.starting && shownBar.spots.size > 1 }?.let { DjBarSpot.of(it) }
+                                        Box(Modifier.matchParentSize()) {
+                                            DjBar(
+                                                shownBar.spots, shownBar.chosen, now = now, starting = shownBar.starting, open = open,
+                                                modifier = Modifier.padding(top = DJ_BAR_CENTRE - DJ_BAR_HEIGHT / 2),
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                            Controls(
+                                state, onSlide = ::slide, onSlideLabel = { slideLabel = it }, upTo = trackY,
+                                djBarWidthPx = trackWidth.takeIf { !OutsideMedia.isLive(song?.id) }, onDjBar = ::djBar,
+                            )
                         }
                         // The lyrics bottom left (greyed out when the song has none), where the music plays in
                         // the middle (with the TV, speaker or headphones' name), and the queue bottom right: tap
@@ -423,6 +477,19 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                         Column {
                             if (OutsideMedia.isLive(song?.id)) LiveBar() else SeekBar(state)
                             Controls(state, onSlide = ::slide)
+                            // The same row as under the player's controls, the lyrics button lit bottom left: one
+                            // tap there closes the lyrics again (the owner, 9 Nov).
+                            Row(Modifier.fillMaxWidth().padding(top = Space.Medium).testTag("lyricsBottomRow"), verticalAlignment = Alignment.CenterVertically) {
+                                Box(Modifier.width(SIDE_BUTTON_WIDTH), contentAlignment = Alignment.Center) {
+                                    LyricsButton(enabled = true, open = true) { lyricsOpen = false }
+                                }
+                                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                                    WithAccent(dynamic?.text, dynamic?.onControls) { CastDeviceButton(tint = Color.White.copy(alpha = 0.8f)) }
+                                }
+                                Box(Modifier.width(SIDE_BUTTON_WIDTH), contentAlignment = Alignment.Center) {
+                                    RoundIcon(Icons.AutoMirrored.Rounded.QueueMusic, "Queue") { queueOpen = true }
+                                }
+                            }
                         }
                     }
                 }
@@ -451,6 +518,8 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                 enter = slideInVertically(tween(230, easing = FastOutSlowInEasing)) { it },
                 exit = slideOutVertically(tween(180, easing = FastOutLinearInEasing)) { it },
             ) {
+                // Back closes the queue first, also when it was opened over the lyrics.
+                BackHandler(enabled = queueOpen) { queueOpen = false }
                 // Swipe down anywhere on the queue to close it: the list scrolls back to the top first,
                 // then the panel follows the finger down.
                 var queueY by remember { mutableFloatStateOf(0f) }
@@ -524,7 +593,7 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                     ) {
                         Box(Modifier.size(width = 40.dp, height = 4.dp).clip(RoundedCornerShape(2.dp)).background(Color.White.copy(alpha = 0.5f)))
                     }
-                    QueueView(state)
+                    QueueView(state, ::djBar)
                 }
             }
         }
@@ -587,10 +656,50 @@ private fun SwipeCover(song: Song?, onTap: () -> Unit, slideLabel: SlideLabel? =
     }
 }
 
+/**
+ * Now playing's top: the [row] ("Playing from album", the arrow and ⋮) and the [cover]. The cover takes the room that's
+ * left under a [topGap], the row and a [Space.Page] gap, down to a [Space.Medium] gap, and is centred in it; the row
+ * then sits exactly halfway between the top and the cover's top edge. [belowCover] sits at the bottom of the cover's
+ * room, in the middle.
+ */
+@Composable
+internal fun PlayerTop(
+    topGap: androidx.compose.ui.unit.Dp,
+    row: @Composable () -> Unit,
+    cover: @Composable () -> Unit,
+    belowCover: @Composable () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    androidx.compose.ui.layout.Layout(
+        contents = listOf(row, cover, belowCover),
+        modifier = modifier.testTag("playerTop"),
+    ) { (rows, covers, belows), constraints ->
+        val width = constraints.maxWidth
+        val height = constraints.maxHeight
+        val loose = constraints.copy(minWidth = 0, minHeight = 0)
+        val rowPlaced = rows.map { it.measure(loose) }
+        val rowHeight = rowPlaced.maxOfOrNull { it.height } ?: 0
+        val gap = topGap.roundToPx()
+        val above = Space.Page.roundToPx()
+        val under = Space.Medium.roundToPx()
+        val room = (height - gap - rowHeight - above - under).coerceAtLeast(0)
+        val coverPlaced = covers.map { it.measure(loose.copy(maxHeight = room)) }
+        val coverHeight = coverPlaced.maxOfOrNull { it.height } ?: 0
+        val coverTop = playerCoverTop(gap, rowHeight, above, room, coverHeight)
+        val belowPlaced = belows.map { it.measure(loose) }
+        layout(width, height) {
+            val rowY = playerTopRowY(coverTop, rowHeight)
+            rowPlaced.forEach { it.place(0, rowY) }
+            coverPlaced.forEach { it.place((width - it.width) / 2, coverTop) }
+            belowPlaced.forEach { it.place((width - it.width) / 2, height - under - it.height) }
+        }
+    }
+}
+
 @Composable
 private fun TopRow(song: Song?, onClose: () -> Unit, onAlbum: () -> Unit, onMenu: () -> Unit, onSleep: () -> Unit) {
     val timerRunning = LocalGraph.current.sleepTimer.state.collectAsStateWithLifecycle().value != null
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().testTag("playerTopRow"), verticalAlignment = Alignment.CenterVertically) {
         IconButton(onClick = onClose) { Icon(Icons.Rounded.KeyboardArrowDown, "Close", Modifier.size(32.dp)) }
         if (timerRunning) Spacer(Modifier.size(48.dp))  // spacing: exact (the width of the button it balances)
         Column(Modifier.weight(1f).clickable(enabled = song?.albumId != null, onClick = onAlbum), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -609,7 +718,7 @@ private fun TopRow(song: Song?, onClose: () -> Unit, onAlbum: () -> Unit, onMenu
 }
 
 /**
- * While a sleep timer runs, the moon with the time left shows in the top row (as Spotify does); it opens the
+ * While a sleep timer runs, the moon with the time left shows in the top row; it opens the
  * timer. Otherwise the timer is only in the ⋮ menu, so the player stays uncluttered.
  */
 @Composable
@@ -657,7 +766,7 @@ private fun TitleRow(song: Song?, liked: Boolean, onArtist: () -> Unit, onHeart:
  * while you drag, and the time shown follows your finger.
  */
 @Composable
-private fun SeekBar(state: PlayerState, modifier: Modifier = Modifier, onTrackCentre: (Float) -> Unit = {}) {
+private fun SeekBar(state: PlayerState, modifier: Modifier = Modifier, onTrackWidth: (Int) -> Unit = {}, onTrackCentre: (Float) -> Unit = {}) {
     val graph = LocalGraph.current
     val tracker = remember { SeekTracker() }
     var shown by remember { mutableStateOf(graph.player.progress().let { SeekTracker.Shown(it.positionMs, it.durationMs) }) }
@@ -692,9 +801,13 @@ private fun SeekBar(state: PlayerState, modifier: Modifier = Modifier, onTrackCe
         BoxWithConstraints(
             Modifier
                 .fillMaxWidth()
-                .height(28.dp)
-                // Where its line is, for the slide's up choice to sit on (issue #963).
-                .onGloballyPositioned { onTrackCentre(it.positionInRoot().y + it.size.height / 2f) }
+                .height(SEEK_TRACK_HEIGHT)
+                // Where its line is, for the slide's up choice to sit on (issue #963), and how wide, for the DJ mix
+                // bar's places (issue #1033).
+                .onGloballyPositioned {
+                    onTrackCentre(it.positionInRoot().y + it.size.height / 2f)
+                    onTrackWidth(it.size.width)
+                }
                 .pointerInput(duration) {
                     detectTapGestures { offset -> seek((offset.x / size.width).coerceIn(0f, 1f)) }
                 }
@@ -744,7 +857,15 @@ private fun SeekBar(state: PlayerState, modifier: Modifier = Modifier, onTrackCe
  * null for none; [onSlideLabel] gets what the slide shows, for the cover (issue #933).
  */
 @Composable
-internal fun Controls(state: PlayerState, onSlide: ((PlaySlide) -> Unit)? = null, onSlideLabel: (SlideLabel?) -> Unit = {}, upTo: Float? = null) {
+internal fun Controls(
+    state: PlayerState,
+    onSlide: ((PlaySlide) -> Unit)? = null,
+    onSlideLabel: (SlideLabel?) -> Unit = {},
+    upTo: Float? = null,
+    // The seek bar's width, where the DJ mix bar comes in (issue #1033); null: no bar here (the lyrics screen).
+    djBarWidthPx: Int? = null,
+    onDjBar: (DjBarSpot, starting: Boolean) -> Unit = { _, _ -> },
+) {
     val graph = LocalGraph.current
     val settings by graph.settings.state.collectAsStateWithLifecycle()
     val radioSeed by graph.songRadio.seed.collectAsStateWithLifecycle()
@@ -783,22 +904,38 @@ internal fun Controls(state: PlayerState, onSlide: ((PlaySlide) -> Unit)? = null
         val slides = settings.playSlides.let { if (onSlide == null || song == null || OutsideMedia.isOutside(song.id)) it.copy(on = false) else it }
         // The up choice sits on the seek bar's line when there is one (issue #963).
         var playCentre by remember { mutableStateOf<Float?>(null) }
+        // Up is the DJ mix bar (issues #1033, #1035): while a DJ mix plays, a radio's shapes and Stop, a list's own mix only
+        // Stop; with none playing, the shapes and Start, when up starts a DJ mix and one can start (else up is as set).
+        val djRadio = radioSeed != null && graph.songRadio.mode == app.siansa.mix.ContinuousMode.DJ
+        val listMix = song != null && song.id in albumDj
+        val djBeats by graph.djReady.beats.collectAsStateWithLifecycle()
+        val connection by graph.connection.state.collectAsStateWithLifecycle()
+        val djProblem = app.siansa.mix.DjReady.problem(settings, connection, djBeats)
+        val canStart = slides.on && slides.up == PlaySlide.DJ_MIX && djProblem == null
+        val barPlaces = djBarPlaces(settings.djBarOrder, djRadio, listMix, canStart).takeIf { djBarWidthPx != null }
         PlayButton(
             modifier = Modifier.onGloballyPositioned { playCentre = it.positionInRoot().y + it.size.height / 2f },
             upReachPx = upReach(playCentre, upTo),
             playing = state.isPlaying,
             slides = slides,
-            djMix = (radioSeed != null && graph.songRadio.mode == app.siansa.mix.ContinuousMode.DJ) ||
-                (song != null && song.id in albumDj),
+            djMix = djRadio || listMix,
+            djBar = barPlaces?.spots,
+            djBarWidthPx = djBarWidthPx,
+            onDjBar = { place -> barPlaces?.let { onDjBar(place, it.starting) } },
             onToggle = { graph.player.togglePlay() },
             onStop = { graph.player.stop() },
             onSlide = { onSlide?.invoke(it) },
-            unavailable = { slideUnavailable(it, settings, graph.connection.current.aiProblem(settings)) },
+            unavailable = { slideUnavailable(it, settings, graph.connection.current.soundProblem(settings), djProblem) },
             onSliding = { shown ->
                 sliding = shown?.way
                 onSlideLabel(shown?.let {
-                    val slide = slides.of(it.way)
-                    SlideLabel(slide, it.way, it.armed, slideUnavailable(slide, settings, graph.connection.current.aiProblem(settings)))
+                    val places = barPlaces
+                    if (it.bar && places != null) {
+                        SlideLabel(PlaySlide.DJ_MIX, it.way, it.armed, bar = DjBarView(places.spots, it.spot, places.starting, it.rise))
+                    } else {
+                        val slide = slides.of(it.way)
+                        SlideLabel(slide, it.way, it.armed, slideUnavailable(slide, settings, graph.connection.current.soundProblem(settings), djProblem))
+                    }
                 })
             },
         )
@@ -868,7 +1005,7 @@ private val QUEUE_SHEET = Color(0xF2121212)
 internal val QUEUE_ROW = Color(0xFF121212)
 
 @Composable
-private fun QueueView(state: PlayerState) {
+private fun QueueView(state: PlayerState, onDjBar: (DjBarSpot, Boolean) -> Unit) {
     val graph = LocalGraph.current
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = max(0, state.index - 1))
     if (state.queue.isEmpty()) {
@@ -890,14 +1027,33 @@ private fun QueueView(state: PlayerState) {
                 Icon(Icons.Rounded.AddCircle, "Save queue as playlist", tint = Color.White)
             }
         }
-        // Shape the mix (issue #649): only while a DJ song radio fills the queue.
+        // Shape your mix (issue #649; the owner, 10 Nov): the glide bar of now playing, folded under its heading, with
+        // the Surprises bar under it while a DJ radio plays. Its places as the glide bar's: a radio's shapes and Stop,
+        // a list's own mix only Stop, or the shapes and Start when a DJ mix can start from this song.
         val radioSeed by graph.songRadio.seed.collectAsStateWithLifecycle()
-        if (radioSeed != null && graph.songRadio.mode == app.siansa.mix.ContinuousMode.DJ) {
-            val settings by graph.settings.state.collectAsStateWithLifecycle()
-            MixShapeControls(settings.mixShape, settings.mixSurprise) { shape, surprise ->
-                graph.settings.setMixShape(shape, surprise)
-                graph.songRadio.reshape()
-            }
+        val albumDj by app.siansa.mix.AlbumDjMix.playing.collectAsStateWithLifecycle()
+        val settings by graph.settings.state.collectAsStateWithLifecycle()
+        val song = state.current
+        val djRadio = radioSeed != null && graph.songRadio.mode == app.siansa.mix.ContinuousMode.DJ
+        val listMix = song != null && song.id in albumDj
+        val djBeats by graph.djReady.beats.collectAsStateWithLifecycle()
+        val connection by graph.connection.state.collectAsStateWithLifecycle()
+        val canStart = song != null && !OutsideMedia.isOutside(song.id) &&
+            app.siansa.mix.DjReady.problem(settings, connection, djBeats) == null
+        djBarPlaces(settings.djBarOrder, djRadio, listMix, canStart)?.let { places ->
+            var open by rememberSaveable { mutableStateOf(false) }
+            MixShapePanel(
+                places = places,
+                shape = settings.mixShape.takeIf { djRadio },
+                surprise = settings.mixSurprise.takeIf { djRadio },
+                open = open,
+                onOpen = { open = it },
+                onPlace = { onDjBar(it, places.starting) },
+                onSurprise = { level ->
+                    graph.settings.setMixShape(settings.mixShape, level.value)
+                    graph.songRadio.reshape()
+                },
+            )
         }
         Spacer(Modifier.height(Space.Tight))
         LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
@@ -945,40 +1101,78 @@ private fun QueueView(state: PlayerState) {
 
 
 /**
- * The shape of a DJ mix (issue #649), in the queue: a chip for what the energy does over the next songs, and a
- * slider for how far the mix may stray. Each change puts the songs not yet played in a new order.
+ * Shape your mix (issue #649; the owner, 10 Nov), in the queue: a heading that folds open on the glide bar of now
+ * playing, tapped instead of slid to ([places]: start, stop or shape the mix), and, while a DJ radio plays ([surprise]
+ * not null), the Surprises bar in the same design: how far the mix may stray. Folded, the heading says what's set.
+ * [shape]: the mix's shape now (a DJ radio's), ringed on the bar.
  */
 @Composable
-internal fun MixShapeControls(shape: app.siansa.mix.MixShape, surprise: Int, onChange: (app.siansa.mix.MixShape, Int) -> Unit) {
-    Column(Modifier.fillMaxWidth().padding(horizontal = Space.Page).testTag("mixShape")) {
-        Text("Shape the mix", style = MaterialTheme.typography.labelLarge, color = Color.White.copy(alpha = 0.8f))
-        Spacer(Modifier.height(Space.Small))
-        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
-            app.siansa.mix.MixShape.entries.forEach { s ->
-                androidx.compose.material3.FilterChip(
-                    selected = shape == s,
-                    onClick = { if (s != shape) onChange(s, surprise) },
-                    label = { Text(s.label) },
-                    modifier = Modifier.testTag("mixShape-${s.name}"),
+internal fun MixShapePanel(
+    places: DjBarPlaces,
+    shape: app.siansa.mix.MixShape?,
+    surprise: Int?,
+    open: Boolean,
+    onOpen: (Boolean) -> Unit,
+    onPlace: (DjBarSpot) -> Unit,
+    onSurprise: (SurpriseLevel) -> Unit,
+) {
+    val level = surprise?.let { SurpriseLevel.of(it) }
+    Column(Modifier.fillMaxWidth().testTag("mixShape")) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clickable(onClickLabel = if (open) "Fold" else "Unfold") { onOpen(!open) }
+                .padding(horizontal = Space.Page, vertical = Space.Medium)
+                .testTag("mixShapeHeading"),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text("Shape your mix", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                Text(
+                    mixShapeSummary(places, shape, level),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.7f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.testTag("mixShapeSummary"),
                 )
             }
+            val turn by animateFloatAsState(if (open) 180f else 0f, label = "mixShapeChevron")
+            Icon(Icons.Rounded.KeyboardArrowDown, null, tint = Color.White, modifier = Modifier.rotate(turn))
         }
-        Spacer(Modifier.height(Space.Small))
-        Text(shape.hint, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.7f))
-        var value by remember(surprise) { mutableFloatStateOf(surprise.toFloat()) }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            // On one line whatever the font size (issue #677): the slider takes what's left.
-            Text("Surprises", style = MaterialTheme.typography.bodyMedium, maxLines = 1, softWrap = false, modifier = Modifier.padding(end = Space.Small).testTag("mixSurpriseLabel"))
-            Slider(
-                value = value,
-                onValueChange = { value = it },
-                onValueChangeFinished = { if (value.roundToInt() != surprise) onChange(shape, value.roundToInt()) },
-                valueRange = 0f..100f,
-                modifier = Modifier.weight(1f).testTag("mixSurprise"),
-            )
-            Text(surpriseLabel(value.roundToInt()), style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.End, maxLines = 1, softWrap = false, modifier = Modifier.padding(start = Space.Small).width(SURPRISE_LABEL_WIDTH))
+        AnimatedVisibility(open) {
+            Column(Modifier.fillMaxWidth().padding(start = Space.Page, end = Space.Page, bottom = Space.Medium)) {
+                val now = shape?.let { DjBarSpot.of(it) }
+                DjBar(places.spots, chosen = now?.let { places.spots.indexOf(it) }?.takeIf { it >= 0 }, now = now,
+                    starting = places.starting, open = 1f, onTap = onPlace)
+                Text(
+                    (now ?: places.spots.singleOrNull() ?: DjBarSpot.MIX).hint(places.starting),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.7f),
+                    modifier = Modifier.padding(top = Space.Small).testTag("mixShapeHint"),
+                )
+                if (level != null) {
+                    Text("Surprises", style = MaterialTheme.typography.labelLarge, color = Color.White.copy(alpha = 0.8f),
+                        modifier = Modifier.padding(top = Space.Page, bottom = Space.Small).testTag("mixSurpriseLabel"))
+                    GlidePill(1f, Modifier.testTag("mixSurprise")) {
+                        SurpriseLevel.entries.forEach { l ->
+                            GlidePlace(l.icon, "Surprises: ${l.label}", chosen = l == level, now = false, tag = "surprise",
+                                onTap = { if (l != level) onSurprise(l) }, modifier = Modifier.weight(1f))
+                        }
+                    }
+                    Text("${level.label}: ${level.hint}", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.7f),
+                        modifier = Modifier.padding(top = Space.Small).testTag("mixSurpriseHint"))
+                }
+            }
         }
     }
+}
+
+/** What Shape your mix says folded: the shape and surprises a DJ radio has, or what its bar does. */
+internal fun mixShapeSummary(places: DjBarPlaces, shape: app.siansa.mix.MixShape?, level: SurpriseLevel?): String = when {
+    shape != null -> shape.label + (level?.let { " · " + if (it == SurpriseLevel.NONE) "no surprises" else "${it.label.lowercase()} surprises" }.orEmpty())
+    places.starting -> "Start a DJ mix from this song"
+    else -> "A DJ mix of this list"
 }
 
 /** What a surprise setting means, in a word. */
@@ -989,7 +1183,6 @@ internal fun surpriseLabel(surprise: Int): String = when {
     else -> "Lots"
 }
 
-private val SURPRISE_LABEL_WIDTH = 64.dp
 
 /** In the classic now playing style, how much of the lyrics card shows under the player before scrolling (issue #346). */
 private val PLAYER_PEEK = 44.dp
@@ -1005,6 +1198,14 @@ object LyricsShortcut {
 
 /** How strongly the song playing now is marked in the queue (#212). */
 private const val NOW_PLAYING_TINT = 0.14f
+
+/**
+ * How the DJ mix bar opens and closes (issue #1035): a quick spring with a touch of give, fluid but snappy; below
+ * [DJ_BAR_CLOSED] open it's gone.
+ */
+private const val DJ_BAR_SPRING_DAMPING = 0.78f
+private const val DJ_BAR_SPRING_STIFFNESS = 800f
+private const val DJ_BAR_CLOSED = 0.01f
 
 /** How faint the other controls go while a finger slides from the play button (issue #919). */
 private const val SLIDING_OTHERS = 0.3f

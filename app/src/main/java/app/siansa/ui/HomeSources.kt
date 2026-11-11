@@ -108,6 +108,8 @@ internal fun SourcesPanel(modifier: Modifier = Modifier) {
             booksReady = settings.booksReady,
         )
         AppLog.i("Sources", "Sync all: ${plan.describe()}")
+        // The covers kept on the phone are checked too: missing ones fetched fresh, changed ones replaced.
+        graph.refreshCovers(afterSync = plan.inUse)
         if (plan.inUse) {
             watching = true
             graph.sync.start(full = true)

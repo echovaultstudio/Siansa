@@ -35,12 +35,16 @@ enum class CardLook(val label: String, val hint: String) {
     BUTTON("Play button", "A slim card that plays the songs when tapped"),
     // Issue #782: a cover with who it's by, what it is and how long it is beside it, three to a column.
     COVER_ROWS("Cover rows", "Covers with their details beside them, three to a column, to swipe through"),
+    // The owner, 10 Nov: any card as the Shortcuts card is, two small tiles a row, 2 to 8 of them.
+    GRID("Shortcut grid", "Small tiles two to a row, as Shortcuts: tap one to play it"),
 }
 
 /** Where a custom card's songs come from. */
 enum class CardSource(val label: String, val hint: String) {
     LIBRARY("From your library", "Songs whose tags match: a genre, years, an artist, an album, words in the title, your favourites"),
     SOUND("By sound", "Describe a sound, like \"rainy jazz piano\", and AudioMuse finds songs that match"),
+    // The owner, 10 Nov: a radio you hearted, its songs on Home.
+    RADIO("A favourite radio", "A radio you hearted on its page: its songs, new each day"),
 }
 
 /**
@@ -80,6 +84,11 @@ data class PinnedCard(
     val sort: CardSort = CardSort.RANDOM,
     /** At most this many songs or albums. */
     val size: Int = SIZE,
+    /** The favourite radio's page ([CardSource.RADIO]), "radio/mood/happy", and its name. */
+    val radio: String = "",
+    val radioTitle: String = "",
+    /** Tiles of a [CardLook.GRID] card: 2 to [GRID_MOST], two to a row. */
+    val gridSize: Int = GRID_MOST,
 ) {
     /** Every rule: [rules], and the single fields of a card made before rules, as rules. */
     val allRules: List<CardRule>
@@ -104,6 +113,7 @@ data class PinnedCard(
         get() = when {
             contents.fromBooks -> "${contents.label} · ${sort.label}"
             source == CardSource.SOUND -> "Sound: ${sound.trim()}"
+            source == CardSource.RADIO -> "Radio: ${radioTitle.ifBlank { radio }}"
             rules.isNotEmpty() -> (if (contents == CardContents.ALBUMS) "Albums · " else "") +
                 allRules.take(3).joinToString(if (matchAll) " · " else " or ") { it.text } + (if (allRules.size > 3) " …" else "")
             else -> (if (contents == CardContents.ALBUMS) "Albums · " else "") + buildList {
@@ -125,6 +135,10 @@ data class PinnedCard(
 
         /** At most this many songs on a card. */
         const val SIZE = 50
+
+        /** The most tiles a [CardLook.GRID] card shows: four rows of two, as Shortcuts. */
+        const val GRID_MOST = 8
+        val GRID_SIZES = listOf(2, 4, 6, 8)
     }
 }
 
@@ -139,8 +153,11 @@ fun pinnedCardProblem(card: PinnedCard, audioMuseReady: Boolean, thisYear: Int =
     card.contents.fromBooks && card.look != CardLook.COVER_ROWS -> "Books and episodes show as Cover rows."
     card.contents.fromBooks -> if (card.size !in 1..MAX_SIZE) "A card holds 1 to $MAX_SIZE." else null
     card.contents == CardContents.ALBUMS && card.source == CardSource.SOUND -> "Albums come from your library: pick From your library."
-    card.source == CardSource.SOUND && !audioMuseReady -> "Set up AudioMuse-AI in Settings › Connections to make a card by sound."
+    card.source == CardSource.SOUND && !audioMuseReady -> "Set up Siansa Beats or AudioMuse-AI in Settings › Connections to make a card by sound."
     card.source == CardSource.SOUND && card.sound.isBlank() -> "Describe the sound."
+    card.contents == CardContents.ALBUMS && card.source == CardSource.RADIO -> "Albums come from your library: pick From your library."
+    card.source == CardSource.RADIO && card.radio.isBlank() -> "Pick one of your favourite radios."
+    card.look == CardLook.GRID && card.gridSize !in 2..PinnedCard.GRID_MOST -> "A grid has 2 to ${PinnedCard.GRID_MOST} tiles."
     card.source == CardSource.LIBRARY && !card.hasRule -> "Set at least one rule, so the card isn't your whole library."
     card.fromYear != null && card.fromYear !in 1900..thisYear -> "Years run from 1900 to $thisYear."
     card.toYear != null && card.toYear !in 1900..thisYear -> "Years run from 1900 to $thisYear."
@@ -302,6 +319,10 @@ class PinnedCards(private val graph: AppGraph, context: Context) {
             return content
         }
         val (songs, albums) = when {
+            card.source == CardSource.RADIO -> {
+                val found = graph.radios.ofRoute(card.radio).take(card.size.coerceIn(1, PinnedCard.SIZE))
+                found to if (card.look == CardLook.ALBUMS) albumIdsOf(found).take(ALBUMS).mapNotNull { graph.library.album(it) } else emptyList()
+            }
             card.source == CardSource.SOUND -> {
                 val found = graph.generator.soundSearch(card.sound.trim(), card.size.coerceAtMost(PinnedCard.SIZE))
                 found to if (card.look == CardLook.ALBUMS) albumIdsOf(found).take(ALBUMS).mapNotNull { graph.library.album(it) } else emptyList()

@@ -1,5 +1,6 @@
 package app.siansa.mix
 
+import app.siansa.net.soundReady
 import app.siansa.AppGraph
 import app.siansa.data.Song
 import app.siansa.log.AppLog
@@ -18,7 +19,7 @@ import kotlin.math.abs
 enum class ContinuousMode(val label: String, val hint: String) {
     OFF("Off", "The music stops when the queue ends."),
     STEADY("Steady", "Adds songs like the last one in the queue, so the music carries on in the same style."),
-    DJ("DJ", "Adds songs like the last one and orders them for smooth changes: close tempo and keys that go together. Needs AudioMuse.");
+    DJ("DJ", "Adds songs like the last one and orders them for smooth changes: close tempo and keys that go together. Needs Siansa Beats.");
 
     companion object {
         fun parse(name: String?): ContinuousMode = entries.firstOrNull { it.name == name } ?: OFF
@@ -210,6 +211,11 @@ class ContinuousPlay(private val graph: AppGraph) {
     private var job: Job? = null
     /** Songs this has added since the app started, so a long session doesn't loop back to them. */
     private val added = LinkedHashSet<String>()
+    /** The songs it added in DJ mode, which blend as DJ playback (read from the player's thread). */
+    private val addedDj: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
+
+    /** Whether [id] was added by Keep playing in DJ mode: a change into or out of it is beat-matched. */
+    fun addedForDj(id: String?): Boolean = id != null && id in addedDj
 
     private data class Snapshot(val left: Int, val last: Song?, val hasMedia: Boolean, val repeatOff: Boolean)
 
@@ -231,7 +237,8 @@ class ContinuousPlay(private val graph: AppGraph) {
                         left = snapshot.left,
                         hasMedia = snapshot.hasMedia,
                         repeatOff = snapshot.repeatOff,
-                        radioOn = graph.songRadio.seed.value != null,
+                        // A song radio or a genre radio adds its own songs.
+                        radioOn = graph.songRadio.seed.value != null || graph.genreRadio.active,
                         windingDown = graph.sleepTimer.windingDown(),
                         sleepFinishing = graph.sleepTimer.state.value?.finishing == true,
                     )
@@ -257,10 +264,13 @@ class ContinuousPlay(private val graph: AppGraph) {
                 AppLog.i("KeepPlaying", "Nothing new like \"${last.title}\" to add")
                 return
             }
-            val ids = when (mode) {
-                ContinuousMode.DJ -> djIds(last, hits) ?: hits.take(TOP_UP).map { it.id }
-                else -> hits.take(TOP_UP).map { it.id }
+            // DJ only when its needs are met (AudioMuse and Siansa Beats, DjReady): else these are added as in Steady,
+            // and play as ordinary songs, not blended as a DJ mix.
+            val dj = mode == ContinuousMode.DJ && graph.djProblem().let { problem ->
+                if (problem != null) AppLog.i("KeepPlaying", "DJ isn't possible now ($problem); adding as in Steady")
+                problem == null
             }
+            val ids = if (dj) djIds(last, hits) ?: hits.take(TOP_UP).map { it.id } else hits.take(TOP_UP).map { it.id }
             val byId = hits.associateBy { it.id }
             var songs = graph.generator.resolveHits(ids.mapNotNull { byId[it] })
             // Offline, or with "Only downloaded music" on, only songs on the phone can play.
@@ -276,6 +286,10 @@ class ContinuousPlay(private val graph: AppGraph) {
                 return
             }
             added += songs.map { it.id }
+            if (dj) {
+                addedDj += songs.map { it.id }
+                if (addedDj.size > MAX_REMEMBERED) addedDj.retainAll(added)
+            }
             while (added.size > MAX_REMEMBERED) added.remove(added.first())
             AppLog.i(
                 "KeepPlaying",
@@ -308,11 +322,12 @@ class ContinuousPlay(private val graph: AppGraph) {
      * likeness, and ranking by it kept whatever was next where it was, whatever the shape.
      */
     private suspend fun djIds(last: Song, hits: List<app.siansa.net.ClapHit>, count: Int = TOP_UP, likeness: ((String) -> Double)? = null): List<String>? {
-        if (!graph.settings.current.audioMuseReady) {
-            AppLog.i("KeepPlaying", "DJ needs AudioMuse; adding in Steady order")
+        if (!graph.settings.current.soundReady) {
+            AppLog.i("KeepPlaying", "DJ needs Siansa Beats; adding in Steady order")
             return null
         }
-        val features = runCatching { graph.audioMuse.features(listOf(last.id) + hits.map { it.id }) }
+        // From Siansa Beats alone: a DJ mix never goes by AudioMuse's tempo (the owner, 11 Nov).
+        val features = runCatching { graph.audioMuse.features(listOf(last.id) + hits.map { it.id }, beatsOnly = true) }
             .onFailure { AppLog.w("KeepPlaying", "DJ couldn't read tempo and key: ${it.message}") }
             .getOrNull()
             ?.associateBy { it.id }

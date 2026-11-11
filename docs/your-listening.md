@@ -35,10 +35,17 @@ from AudioMuse-AI's analysis of the songs closest to the sound of your most play
 - **Your server** (**Record plays in Navidrome**, also used for Emby): keeps play counts and "recently played" there, and shows
   what's playing. If your server itself is linked to Last.fm or ListenBrainz, leave the matching option below off,
   or plays count twice.
+- **Siansa Beats** (**Scrobble to Siansa Beats**; shown when Siansa Beats 0.29 or newer is set up in Settings ›
+  Connections): keeps your listening history in Siansa Beats, under the name you sign in to your music server with.
+  A listen reaches it by the same rules as everywhere else: **When a song counts**, and **Users**.
+  Its **Listening** page shows any month or year: your top songs, artists and albums, hours, when you listen. You
+  can bring in an export of Koito or Last.fm there, and have it send your listens on to Last.fm; turn **Last.fm**
+  off here then, or plays count twice.
 - **Last.fm**: uses your own Last.fm API account (create one at last.fm/api/account/create and copy the API key
   and shared secret). Hearts are sent to Last.fm as loved tracks.
 - **ListenBrainz / Koito**: for Koito, its address and an API key from Koito's settings. Leave the address empty
   for listenbrainz.org.
 - **Users**: turn a user off, and songs from their library aren't sent anywhere while you listen as you.
 
-Hearts (favourites) sync to your server and, if connected, to Last.fm.
+Hearts (favourites) sync to your server and, if connected, to Last.fm. With **Scrobble to Siansa Beats** on, they
+also go to Siansa Beats, which loves the song on Last.fm when it sends your listens on there.

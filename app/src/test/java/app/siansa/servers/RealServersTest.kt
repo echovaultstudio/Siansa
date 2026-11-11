@@ -163,6 +163,49 @@ class RealServersTest(private val server: String) {
         assertEquals("$server: covers", emptyList<String>(), missing)
     }
 
+    /**
+     * What the phone's cover cache relies on (the owner, 11 Nov). A cover the server has can be told from its stand-in
+     * for one it hasn't: Navidrome sends its placeholder as a picture marked "don't keep" with no version, which the
+     * app shows but never keeps (StandIns); Emby and Jellyfin say 404. And a changed cover can be noticed: Navidrome
+     * answers "still this one" (304) to the version it gave, Emby and Jellyfin give each picture a tag.
+     */
+    @Test fun aCoverTheServerHasIsToldFromItsStandIn() = runBlocking {
+        val albums = source().albums("alphabeticalByName", 50, 0)
+        val real = albums.first { it.name == "First Light" }
+        val bare = albums.first { it.name == "Loose Ends" }
+        val address = source().coverUrl(real.coverArt ?: real.id, 300)
+        assertEquals("$server: the cover's id and size are read from its address",
+            app.siansa.covers.CoverAddress(real.coverArt ?: real.id, 300), app.siansa.covers.CoverAddress.of(address))
+        get(address).use { r ->
+            assertEquals(200, r.code)
+            assertTrue("$server: a real cover isn't taken for a stand-in", !app.siansa.covers.StandIns.isStandIn(r))
+        }
+        if (server == "navidrome") {
+            // The versionless id the app makes for a song without a picture id.
+            get(source().coverUrl("al-${bare.id}", 300)).use { r ->
+                assertEquals(200, r.code)
+                assertTrue("navidrome: its placeholder is a stand-in (${r.header("Cache-Control")}, ETag ${r.header("ETag")})",
+                    app.siansa.covers.StandIns.isStandIn(r))
+                val bytes = r.body!!.bytes()
+                assertTrue("navidrome: its placeholder is one the app knows (${bytes.size} bytes, ${app.siansa.covers.StandIns.sha256(bytes)})",
+                    app.siansa.covers.StandIns.known(bytes.size.toLong()) { app.siansa.covers.StandIns.sha256(bytes) })
+            }
+            val versionless = source().coverUrl("al-${real.id}", 300)
+            val etag = get(versionless).use { r ->
+                assertTrue("navidrome: a real cover without a version isn't a stand-in", !app.siansa.covers.StandIns.isStandIn(r))
+                r.header("ETag") ?: error("navidrome gave the cover no ETag")
+            }
+            http.newCall(Request.Builder().url(versionless).header("If-None-Match", etag).build()).execute().use { r ->
+                assertEquals("navidrome: asked with the version it gave, it says the cover is the same", 304, r.code)
+            }
+        } else {
+            // (Unless the server found the album a picture of its own somewhere.)
+            if (bare.coverArt == null) get(source().coverUrl(bare.id, 300)).use { r ->
+                assertTrue("$server: a missing picture is an error (${r.code}), never a picture to keep", r.code >= 400)
+            }
+        }
+    }
+
     /** The player's and lock screen's picture of a song, for each way its album keeps its cover. */
     @Test fun songCoversShowHoweverTheAlbumKeepsIt() = runBlocking {
         val missing = listOf("Morning Tone", "Upstairs", "Shared Room").mapNotNull { title ->

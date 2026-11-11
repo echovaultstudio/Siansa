@@ -1,5 +1,7 @@
 package app.siansa
 
+import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -23,27 +25,24 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getBoundsInRoot
-import androidx.compose.ui.test.hasAnyDescendant
-import androidx.compose.ui.test.hasClickAction
-import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.siansa.data.AlbumCategory
-import app.siansa.ui.CHIPS_GAP
 import app.siansa.ui.CollectionByline
 import app.siansa.ui.FastScrollBar
-import app.siansa.ui.HeroPage
 import app.siansa.ui.MoreChipsHint
-import app.siansa.ui.ReleaseTypeRow
+import app.siansa.ui.ReleaseTypeTabs
 import app.siansa.ui.SectionTitle
 import app.siansa.ui.SiansaTheme
 import app.siansa.ui.Space
+import app.siansa.ui.TABS_GAP
 import app.siansa.ui.lastPlayedLine
 import kotlin.math.abs
 import org.junit.Assert.assertEquals
@@ -54,23 +53,27 @@ import org.junit.runner.RunWith
 /** Even spacing, measured on a real screen: Your Library, artist, album, playlist and book pages, album grids, song rows and Downloads. Shared setup in [SpacingCheck]. */
 @RunWith(AndroidJUnit4::class)
 class SpacingLibraryTest : SpacingCheck() {
-    /** Artist page: the release-type chips sit evenly between the last Popular song and the first heading. */
-    @Test fun releaseTypeChipsAreEvenlySpaced() {
+    /**
+     * Artist page (issue #1029): the release types are tabs, the chosen one's line inside the row's own room, and with
+     * many types, the chosen one is scrolled into view.
+     */
+    @Test fun releaseTypeTabsShowTheChosenOneOfMany() {
         compose.setContent {
             SiansaTheme {
-                Column {
-                    // A song row: 60 dp, of which the last 6 dp are its own padding below the cover.
-                    Box(Modifier.fillMaxWidth().height(60.dp).testTag("song"))
-                    ReleaseTypeRow(listOf(AlbumCategory.ALBUM, AlbumCategory.SINGLE), null) { }
-                    SectionTitle("Discography", top = CHIPS_GAP)
+                Column(Modifier.width(360.dp)) {
+                    ReleaseTypeTabs(AlbumCategory.entries.toList(), AlbumCategory.OTHER) { }
+                    // Not "Other releases": the chosen tab says that too.
+                    SectionTitle("Releases", top = TABS_GAP)
                 }
             }
         }
-        val song = compose.onNodeWithTag("song").getBoundsInRoot()
-        // The chip's label can sit in the unmerged tree only, depending on how the chip merges it.
-        val chip = compose.onNode(hasClickAction() and hasAnyDescendant(hasText("Singles")), useUnmergedTree = true).getBoundsInRoot()
-        val title = compose.onNodeWithText("Discography").getBoundsInRoot()
-        assertEven("Release-type chips", chip.top - (song.bottom - 6.dp), title.top - chip.bottom)
+        compose.waitForIdle()
+        val row = compose.onNodeWithTag("releaseTypeTabs").getBoundsInRoot()
+        val chosen = compose.onNodeWithTag("releaseTypeTabChosen").getBoundsInRoot()
+        assertTrue("the chosen tab is in view: $chosen in $row", chosen.left >= row.left && chosen.right <= row.right)
+        assertTrue("the tabs are easy to tap: ${row.bottom - row.top}", row.bottom - row.top >= 44.dp)
+        val title = compose.onNodeWithText("Releases").getBoundsInRoot()
+        assertTrue("the heading comes under the tabs", title.top >= row.bottom)
     }
 
     /** Stations in Your Library (issue #353): a station's row has the same room above and below its picture, with its ⋮ menu. */
@@ -194,12 +197,27 @@ class SpacingLibraryTest : SpacingCheck() {
         assertTrue("Stop all is right of the line", stop.left >= bar.right - 0.5.dp)
     }
 
-    /** Liked songs and playlists (issue #257): the sort chips sit the same distance apart. */
-    @Test fun sortChipsAreEvenlySpaced() {
-        compose.setContent { SiansaTheme { androidx.compose.foundation.layout.Column { app.siansa.ui.SortChips(app.siansa.data.ListSort.DEFAULT, "Recently liked") { } } } }
-        val chips = listOf("DEFAULT", "PLAYED", "ADDED").map { compose.onNodeWithTag("sort-$it").getBoundsInRoot() }
-        val gaps = chips.zipWithNext().map { (a, b) -> b.left - a.right }
-        gaps.zipWithNext().forEach { (a, b) -> assertEven("Gap between sort chips", a, b, 1.dp) }
+    /**
+     * Liked songs and playlists (issue #257; the owner, 10 Nov: the arrows and menu of Your Library, not chips): the
+     * sort's arrows start at the page margin, in line with the text above, and its menu lists every order.
+     */
+    @Test fun aListsSortStartsAtThePageMargin() {
+        compose.setContent {
+            SiansaTheme {
+                androidx.compose.foundation.layout.Column(Modifier.padding(horizontal = Space.Page)) {
+                    androidx.compose.material3.Text("502 songs", Modifier.testTag("above"))
+                    app.siansa.ui.SongSortPicker(app.siansa.data.ListSort.DEFAULT, "Recently liked") { }
+                }
+            }
+        }
+        val above = compose.onNodeWithTag("above").getBoundsInRoot()
+        // The arrows themselves: the touch area round them reaches a step past the margin.
+        val sort = compose.onNodeWithTag("sortArrows", useUnmergedTree = true).getBoundsInRoot()
+        assertEven("The sort's arrows in line with the text above", sort.left, above.left, 1.dp)
+        compose.onNodeWithText("Recently liked").assertIsDisplayed()
+        compose.onNodeWithTag("sortPicker", useUnmergedTree = true).performClick()
+        compose.waitForIdle()
+        listOf("Last played", "Date added", "Title", "Artist").forEach { compose.onNodeWithText(it).assertIsDisplayed() }
     }
 
     /** Every grid of albums is three across, evenly spaced (issue #289). */
@@ -274,30 +292,34 @@ class SpacingLibraryTest : SpacingCheck() {
         assertTrue("Artist ${gap.value} dp under the name", gap.value >= -1f && gap.value <= Space.Tight.value)
     }
 
-    /** Artist page (issue #397): the heart sits on the title bar's line, level with the back arrow. */
-    @Test fun artistHeartSitsLevelWithTheBackArrow() {
+    /**
+     * Artist page (the owner's layout, 9 Nov): the heart on the left, its drawing in line with the text above; Radio,
+     * Shuffle and Play on the right, side by side; all on Play's middle line.
+     */
+    @Test fun artistBarLinesUp() {
         compose.setContent {
             SiansaTheme {
-                HeroPage(
-                    title = "Burial",
-                    heroHeight = 200.dp,
-                    scrolledPx = 0f,
-                    onBack = { },
-                    color = androidx.compose.ui.graphics.Color.DarkGray,
-                    image = { m -> Box(m) },
-                    // The artist page's heart is an IconButton like the back arrow (FavouriteArtistButton).
-                    actions = {
-                        androidx.compose.material3.IconButton(onClick = { }, modifier = Modifier.testTag("heart")) {
-                            androidx.compose.material3.Icon(Icons.Rounded.FavoriteBorder, "Heart")
-                        }
-                    },
-                ) { }
+                Column {
+                    Text("12 releases · 140 songs", Modifier.testTag("details"))
+                    app.siansa.ui.ArtistButtons(
+                        heart = { m -> app.siansa.ui.FavouriteHeart(on = false, modifier = m, iconSize = 28.dp) { } },
+                        onRadio = {}, onShuffle = {}, playing = false, onPlay = {},
+                    )
+                }
             }
         }
-        val back = compose.onNodeWithContentDescription("Back").getBoundsInRoot()
-        val heart = compose.onNodeWithTag("heart").getBoundsInRoot()
-        assertEven("Heart and back arrow on one line", back.top, heart.top, 1.dp)
-        assertEven("Heart and back arrow the same size", back.bottom - back.top, heart.bottom - heart.top, 1.dp)
+        val details = compose.onNodeWithTag("details").getBoundsInRoot()
+        val heart = compose.onNodeWithTag("favouriteArtist").getBoundsInRoot()
+        val radio = compose.onNodeWithTag("artistRadio").getBoundsInRoot()
+        val shuffle = compose.onNodeWithTag("shuffleAll").getBoundsInRoot()
+        val play = compose.onNodeWithTag("bigPlay").getBoundsInRoot()
+        // The heart's drawing (28 dp, centred on the 40 dp button, with 2 of its 24 units round it) starts where the
+        // text above starts.
+        assertEven("The heart in line with the details", (heart.left + heart.right) / 2 - 14.dp + 28.dp * 2 / 24, details.left, 1.dp)
+        val line = (play.top + play.bottom) / 2
+        listOf(heart, radio, shuffle).forEach { assertEven("On Play's middle line", (it.top + it.bottom) / 2, line, 1.dp) }
+        assertTrue("Radio, shuffle, then Play, left to right", radio.right <= shuffle.left + 0.5.dp && shuffle.right <= play.left + 0.5.dp)
+        assertTrue("Radio right next to Shuffle (${(shuffle.left - radio.right).value} dp)", shuffle.left - radio.right <= Space.Small + 0.5.dp)
     }
 
     /** Album page (issue #367): the last-played line is drawn behind its row, so the title keeps its even room. */
@@ -513,11 +535,74 @@ class SpacingLibraryTest : SpacingCheck() {
         compose.onNode(androidx.compose.ui.test.hasScrollToIndexAction()).performScrollToIndex(2)
         compose.waitForIdle()
         val bar = compose.onNodeWithTag("fadingTitleBar").getBoundsInRoot()
-        // The page's own title, not the title bar's: the lower of the two.
+        // The page's title has glided up into the title bar (one title, as on an artist's page, the owner, 10 Nov),
+        // and what was under it comes up under the bar, with no empty band where the cover was.
         val title = compose.onAllNodesWithText("A single").fetchSemanticsNodes().maxBy { it.boundsInRoot.top }
-        val titleTop = with(compose.density) { title.boundsInRoot.top.toDp() }
-        assertTrue("The title sits under the title bar: ${titleTop.value} dp vs bar ${bar.bottom.value} dp",
-            abs((titleTop - bar.bottom).value) <= Space.Page.value)
+        val middle = with(compose.density) { title.boundsInRoot.center.y.toDp() }
+        assertTrue("The title is in the title bar: its middle at ${middle.value} dp, bar ${bar.top.value}–${bar.bottom.value} dp",
+            middle >= bar.top && middle <= bar.bottom)
+        val byline = with(compose.density) { compose.onNodeWithText("Sunborn").fetchSemanticsNode().boundsInRoot.top.toDp() }
+        assertTrue("What was under the title comes up under the bar: ${byline.value} dp vs bar ${bar.bottom.value} dp",
+            byline - bar.bottom <= Space.Section * 2)
         compose.onNodeWithText("The only song").assertIsDisplayed()
+    }
+
+    /**
+     * A genre's page (the owner, 10 Nov): nothing on its cover; under it one row with the song count at the page
+     * margin and the heart beside the radio at the right margin, the heart level with the radio; and once that row has
+     * scrolled under the title bar, the bar has both.
+     */
+    @Test fun aGenresRadioSitsBesideItsHeartAndBothGoToTheBar() {
+        val graph = (androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as SiansaApp).graph
+        val songs = (1..40).map { app.siansa.data.Song(id = "g-$it", title = "Song $it", artist = "Artist", album = "Album") }
+        compose.setContent {
+            val nav = androidx.navigation.compose.rememberNavController()
+            androidx.compose.runtime.CompositionLocalProvider(
+                app.siansa.ui.LocalGraph provides graph,
+                app.siansa.ui.LocalNav provides nav,
+                app.siansa.ui.LocalSnack provides androidx.compose.runtime.remember { androidx.compose.material3.SnackbarHostState() },
+            ) {
+                SiansaTheme {
+                    app.siansa.ui.CollectionPage(
+                        nav = nav,
+                        title = "Halftime",
+                        color = androidx.compose.ui.graphics.Color(0xFF7A1F2B),
+                        songs = songs,
+                        cover = { m -> Box(m.background(androidx.compose.ui.graphics.Color.Gray).testTag("genreCover")) },
+                        header = { },
+                        showTitle = false,
+                        playAs = { },
+                        radioColour = androidx.compose.ui.graphics.Color(0xFFE53935),
+                        barExtras = { Box(Modifier.size(Space.Section).testTag("barHeartStandIn")) },
+                        radioRow = {
+                            Box(Modifier.weight(1f)) { app.siansa.ui.CollectionByline(null, null, null, "2,000 songs") }
+                            Box(Modifier.size(Space.Section).testTag("pageHeartStandIn"))
+                            androidx.compose.foundation.layout.Spacer(Modifier.width(Space.Small))
+                        },
+                    )
+                }
+            }
+        }
+        compose.waitForIdle()
+        val cover = compose.onNodeWithTag("genreCover").getBoundsInRoot()
+        val radio = compose.onNodeWithTag("genreRadioButton").getBoundsInRoot()
+        val heart = compose.onNodeWithTag("pageHeartStandIn").getBoundsInRoot()
+        val screen = compose.onRoot().getBoundsInRoot()
+        assertTrue("The radio under the cover, not on it: $radio, cover $cover", radio.top >= cover.bottom)
+        assertEven("The radio at the page margin", screen.right - radio.right, Space.Page, 1.dp)
+        assertEven("The heart a step left of the radio", radio.left - heart.right, Space.Small, 1.dp)
+        assertEven("The heart level with the radio", (heart.top + heart.bottom) / 2, (radio.top + radio.bottom) / 2, 1.dp)
+        val count = compose.onNodeWithText("2,000 songs").getBoundsInRoot()
+        assertEven("The count at the page margin", count.left - screen.left, Space.Page, 1.dp)
+        assertEven("The count level with the radio", (count.top + count.bottom) / 2, (radio.top + radio.bottom) / 2, 1.dp)
+        compose.onAllNodesWithTag("barPlayButton").assertCountEquals(0)
+        compose.onAllNodesWithTag("barHeartStandIn").assertCountEquals(0)
+        compose.onNode(androidx.compose.ui.test.hasScrollToIndexAction()).performScrollToIndex(20)
+        compose.waitForIdle()
+        compose.onNodeWithTag("barPlayButton").assertIsDisplayed()
+        compose.onNodeWithTag("barHeartStandIn").assertIsDisplayed()
+        val bar = compose.onNodeWithTag("fadingTitleBar").getBoundsInRoot()
+        val inBar = compose.onNodeWithTag("barPlayButton").getBoundsInRoot()
+        assertTrue("The bar's radio inside the bar: $inBar in $bar", inBar.top >= bar.top && inBar.bottom <= bar.bottom)
     }
 }

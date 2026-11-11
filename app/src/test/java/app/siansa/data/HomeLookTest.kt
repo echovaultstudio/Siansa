@@ -32,7 +32,7 @@ class HomeLookTest {
     }
 
     @Test fun theLooksAreTheCustomCardsLooks() {
-        assertEquals(listOf("As it is", "Tiles", "Banner", "List", "Play button", "Cover rows"), HomeLook.entries.map { it.label })
+        assertEquals(listOf("As it is", "Tiles", "Banner", "List", "Play button", "Cover rows", "Shortcut grid"), HomeLook.entries.map { it.label })
     }
 
     @Test fun theSlimCardSaysWhatATapDoes() {

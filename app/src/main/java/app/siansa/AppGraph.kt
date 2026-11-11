@@ -1,12 +1,18 @@
 package app.siansa
 
+import kotlinx.serialization.json.JsonElement
+import app.siansa.net.BeatsApi
 import app.siansa.data.StationRepository
 import app.siansa.net.OutsideSource
 import app.siansa.net.WebStationPictures
 import app.siansa.playback.ActivePlayer
 import app.siansa.playback.MiniFor
 import app.siansa.mix.Dice
+import app.siansa.mix.DjReady
+import app.siansa.mix.GenreRadio
+import app.siansa.mix.BeatsGenres
 import app.siansa.data.ArtistPhotos
+import app.siansa.data.FavouriteRadios
 import app.siansa.data.audioMuseUserFor
 import app.siansa.data.Users
 import app.siansa.data.NoticeStore
@@ -23,6 +29,12 @@ import app.siansa.data.BookSpeeds
 import app.siansa.offline.BookDownloads
 import app.siansa.covers.CoverStore
 import app.siansa.covers.CoverVersions
+import app.siansa.net.BeatsSound
+import app.siansa.data.QuietWrites
+import app.siansa.covers.CoverRefresh
+import app.siansa.covers.CoverCache
+import app.siansa.covers.CoverEtags
+import app.siansa.covers.StandIns
 import kotlinx.coroutines.runBlocking
 
 import android.app.Application
@@ -196,6 +208,17 @@ class AppGraph(val app: Application) {
         .connectionPool(ConnectionPool(6, 5, TimeUnit.MINUTES))
         // Animated covers Navidrome can't shrink: downloaded once, then answered from the phone.
         .addInterceptor(CoverStore.interceptor)
+        // The server's stand-in for a cover it doesn't have right now: its fingerprint is kept, so one kept on the
+        // phone before can be told from a real cover and removed (StandIns, CoverRefresh).
+        .addInterceptor { chain ->
+            val response = chain.proceed(chain.request())
+            if (StandIns.isStandIn(response)) {
+                runCatching { response.peekBody(StandIns.PEEK_BYTES).bytes() }.getOrNull()
+                    ?.takeIf { it.size < StandIns.PEEK_BYTES }
+                    ?.let(StandIns::learn)
+            }
+            response
+        }
         .addNetworkInterceptor { chain ->
             val response = chain.proceed(chain.request())
             // Big images are worth knowing about when playback struggles.
@@ -280,6 +303,8 @@ class AppGraph(val app: Application) {
             val user = audioMuseUserFor(ids, { guests.ownerOf(it) }, Users.active, guests.shown.value, library.ownHidden.value)
             if (user == Users.active) settings.current.audioMuseServer else guests.settingsOf(user).current.audioMuseServer
         },
+        // What songs sound like is asked of Siansa Beats first, once it has it (BeatsSound).
+        beats = { pathAndQuery, body -> if (body == null) beats.get(pathAndQuery) else beats.post(pathAndQuery, body) },
     ) { settings.current }
     /** Audiobooks and podcasts (issue #521): one login for the whole app, like AudioMuse. */
     val audiobookshelf = AudiobookshelfApi(http) { settings.current }
@@ -291,8 +316,32 @@ class AppGraph(val app: Application) {
     val bookPlayer: BookPlayer by lazy { BookPlayer(this) }
     /** Which mini player shows: the player started last (beta #45). */
     val activePlayer: ActivePlayer by lazy { ActivePlayer(scope, player.state, bookPlayer.state) }
+    /** Siansa Beats, asked directly when it's set up (Siansa Dev, the owner, 10 Nov). */
+    val beats = BeatsApi(http) { settings.current }
+
+    /**
+     * A GET of the Siansa Beats (dev) plugin's [pluginPath], answered by Siansa Beats itself when it's set up (its v1
+     * API has the same paths and answers), by the plugin on AudioMuse otherwise.
+     */
+    suspend fun siansaBeats(pluginPath: String): JsonElement =
+        if (settings.current.beatsReady) beats.get(BeatsApi.fromPlugin(pluginPath)) else audioMuse.plugin(pluginPath)
+
+    /** A POST to the plugin's [pluginPath], or to Siansa Beats itself (as [siansaBeats]). */
+    suspend fun siansaBeatsPost(pluginPath: String, body: String): JsonElement =
+        if (settings.current.beatsReady) beats.post(BeatsApi.fromPlugin(pluginPath), body) else audioMuse.pluginPost(pluginPath, body)
+
     /** Song loudness and fade shapes for levelling and crossfades (issue #60). */
-    val profiles = ProfileStore({ path -> audioMuse.plugin(path) }, { settings.current })
+    val profiles = ProfileStore({ path -> siansaBeats(path) }, { settings.current }, beats = { beats.capabilities() })
+    /** The genres Siansa Beats hears and their songs, when it's there; the songs' tags otherwise. */
+    val beatsGenres = BeatsGenres(
+        { path -> siansaBeats(path) }, { settings.current.let { it.beatsReady || it.audioMuseReady } },
+        // Its genre list (the file's name is from when they were voted with the tags), saved so Search and Home show it at once (and while Siansa Beats is away).
+        load = { java.io.File(app.filesDir, "voted-genres.json").takeIf { it.exists() }?.readText() },
+        save = { java.io.File(app.filesDir, "voted-genres.json").writeText(it) },
+        // Each genre's description, kept so its page shows it at once, also while Siansa Beats is away.
+        loadAbouts = { java.io.File(app.filesDir, "genre-abouts.json").takeIf { it.exists() }?.readText() },
+        saveAbouts = { java.io.File(app.filesDir, "genre-abouts.json").writeText(it) },
+    )
     /** The AI service that writes mix titles and sound searches (issue #665). */
     val ai = ChatApi(http) { settings.current }
     val deezer = DeezerApi(http)
@@ -342,12 +391,15 @@ class AppGraph(val app: Application) {
 
     val lastFm = LastFmApi(http)
     val listenBrainz = ListenBrainzApi(http)
-    val scrobbler = Scrobbler(app, settings, source, lastFm, listenBrainz, scope) { id -> library.userOf(id) }
-    val favorites = Favorites(subsonic, source, lastFm, settings, library, scope)
+    val scrobbler = Scrobbler(app, settings, source, lastFm, listenBrainz, scope,
+        beats = { path, body -> beats.post(path, body) }) { id -> library.userOf(id) }
+    val favorites = Favorites(subsonic, source, lastFm, settings, library, scope, beats = { path, body -> beats.post(path, body) })
     /** Favourite albums, starred in Navidrome (issue #275). */
     val favouriteAlbums = FavouriteAlbums(app, source, scope)
     /** Favourite artists, starred in Navidrome (issue #397). */
     val favouriteArtists = FavouriteArtists(app, source, scope)
+    /** Radios hearted on their page (the owner, 10 Nov): in Your Library › Favourites, and as custom cards. */
+    val favouriteRadios = FavouriteRadios(app, scope)
 
     /**
      * Songs kept on the phone as they play (and the next one in the queue), so replays start at once
@@ -395,6 +447,31 @@ class AppGraph(val app: Application) {
         isDownloaded = { downloads.isDownloaded(it) }
         onPlayStarted = { activePlayer.choose(MiniFor.MUSIC); bookPlayer.pause() }
     }
+    /** Whether a DJ mix can run: AudioMuse and Siansa Beats answering ([DjReady]). */
+    val djReady = DjReady()
+
+    /** Why a DJ mix can't run now (a few words for its button), or null when it can. */
+    fun djProblem(): String? = DjReady.problem(settings.current, connection.current, djReady.beats.value)
+
+    init {
+        // DJ mixes need Siansa Beats' beat grids (directly, or through its plugin on AudioMuse): checked at the start,
+        // again every half hour (every two minutes while it doesn't answer), and from scratch when either is set up anew.
+        scope.launch(CoroutineName("dj-ready")) {
+            settings.state.map { Triple(it.audioMuseUrl, it.beatsUrl, it.beatsKey) }.distinctUntilChanged().drop(1).collect { djReady.forget() }
+        }
+        scope.launch(CoroutineName("dj-ready-check")) {
+            while (true) {
+                val s = settings.current
+                // Siansa Beats directly when it's set up; else the plugin, once AudioMuse answers.
+                if ((s.beatsReady || s.audioMuseReady && connection.current.audioMuse == true) && djReady.due()) {
+                    val result = runCatching { profiles.check() }.getOrNull()
+                    if (result != null) djReady.checked(result.ok, result.message)
+                }
+                delay(DJ_CHECK_LOOK_MS)
+            }
+        }
+    }
+
     init {
         // The playing artist's popular songs, fetched ahead so their page shows them at once (issue #398). After
         // a short wait, so skipping through songs doesn't ask for every artist on the way.
@@ -450,6 +527,96 @@ class AppGraph(val app: Application) {
     val similar = Similar(this)
     /** Fresh photos for Home's artist radios (beta report 95a30366). */
     val artistPhotos = ArtistPhotos(source, library)
+
+    // ---- What Siansa Beats answers about how songs sound (BeatsSound; the owner, 11 Nov) ----
+
+    init {
+        val prefs = app.getSharedPreferences("beats_sound", android.content.Context.MODE_PRIVATE)
+        BeatsSound.restore(prefs.getStringSet("answers", emptySet()).orEmpty())
+        BeatsSound.onChanged = { paths ->
+            AppLog.i("Beats", if (paths.isEmpty()) "Siansa Beats doesn't answer what songs sound like (yet)"
+            else "Siansa Beats answers what songs sound like: ${paths.joinToString { it.removePrefix("/api/") }}")
+            QuietWrites.save(prefs) { putStringSet("answers", paths) }
+        }
+        // Asked at the start and whenever Siansa Beats' address or key changes, so what the app offers is current.
+        scope.launch(CoroutineName("beats-sound")) {
+            settings.state.map { it.beatsUrl to it.beatsKey }.distinctUntilChanged().collectLatest { (url, _) ->
+                if (url.isBlank()) BeatsSound.heard(emptySet())
+                else runCatching { beats.capabilities() }.onFailure {
+                    if (it is kotlinx.coroutines.CancellationException) throw it
+                    AppLog.d("Beats", "Siansa Beats' capabilities weren't read: ${it.message}")
+                }
+            }
+        }
+    }
+
+    // ---- Covers kept on the phone: the server's stand-ins never, changed ones fetched fresh (the owner, 11 Nov) ----
+
+    private val coverPrefs = app.getSharedPreferences("cover_refresh", android.content.Context.MODE_PRIVATE)
+
+    @Volatile
+    private var refreshCoversAfterSync = false
+
+    /**
+     * Sync all also checks the covers kept on the phone (CoverRefresh): after the library's sync when one was started
+     * ([afterSync]), so it reads the library as it is now; else straight away.
+     */
+    fun refreshCovers(afterSync: Boolean) {
+        if (afterSync) refreshCoversAfterSync = true
+        else scope.launch(CoroutineName("cover-refresh")) { runCoverRefresh(askServer = true) }
+    }
+
+    private suspend fun runCoverRefresh(askServer: Boolean) = runCatching {
+        CoverRefresh.run(app, this, askServer)
+    }.onFailure {
+        if (it is kotlinx.coroutines.CancellationException) throw it
+        AppLog.w("Covers", "Cover refresh failed: ${it.javaClass.simpleName}: ${it.message}")
+    }.getOrNull()
+
+    init {
+        StandIns.restore(coverPrefs.getStringSet("stand_ins", emptySet()).orEmpty())
+        StandIns.onLearned = { prints ->
+            AppLog.i("Covers", "The server sent a stand-in picture not seen before (${prints.size} known now)")
+            QuietWrites.save(coverPrefs) { putStringSet("stand_ins", prints.mapTo(HashSet()) { it.toString() }) }
+        }
+        // The server's version of each kept cover whose id has none, for Sync all to ask about.
+        val etags = app.getSharedPreferences("cover_etags", android.content.Context.MODE_PRIVATE)
+        scope.launch(Dispatchers.IO) {
+            CoverEtags.restore(etags.all.mapNotNull { (key, value) -> (value as? String)?.let { key to it } }.toMap())
+        }
+        CoverEtags.onChanged = { key, etag ->
+            QuietWrites.save(etags) { if (etag == null) remove(key) else putString(key, etag) }
+        }
+        // Emby's and Jellyfin's picture tags: an item seen with a new one has its kept covers fetched fresh.
+        val tags = File(app.filesDir, "cover-tags.txt")
+        CoverVersions.kept = { runCatching { tags.takeIf { it.exists() }?.readText() }.getOrNull() }
+        CoverVersions.onChanged = { id ->
+            AppLog.i("Covers", "Cover $id changed on the server: fetched fresh at its next showing")
+            runCatching { CoverCache.forget(coil3.SingletonImageLoader.get(app), id) }
+        }
+        scope.launch(CoroutineName("cover-tags")) {
+            library.version.collectLatest {
+                kotlinx.coroutines.delay(2_000)
+                CoverVersions.dump()?.let { text -> kotlinx.coroutines.withContext(Dispatchers.IO) { runCatching { tags.writeText(text) } } }
+            }
+        }
+        scope.launch(CoroutineName("cover-refresh")) {
+            sync.progress.map { it.phase }.distinctUntilChanged().collect { phase ->
+                if (!refreshCoversAfterSync || (phase != SyncPhase.DONE && phase != SyncPhase.FAILED)) return@collect
+                refreshCoversAfterSync = false
+                if (phase == SyncPhase.DONE) launch { runCoverRefresh(askServer = true) }
+            }
+        }
+        // Once after updating: the stand-ins earlier versions kept are removed, without asking the server anything.
+        if (!coverPrefs.getBoolean("stand_ins_removed", false)) {
+            scope.launch(CoroutineName("cover-clean-up")) {
+                kotlinx.coroutines.delay(20_000)
+                if (runCoverRefresh(askServer = false) != null) {
+                    QuietWrites.save(coverPrefs) { putBoolean("stand_ins_removed", true) }
+                }
+            }
+        }
+    }
     /** Roll the dice on Home (issue #347). */
     val dice = Dice(this)
     /** Your sonic fingerprint on Home (issue #216). */
@@ -465,6 +632,8 @@ class AppGraph(val app: Application) {
     val sleepTimer = SleepTimer()
     val windDown = WindDown(this)
     /** Keep playing: songs added when the queue is about to end (issue #337). */
+    /** A genre's radio: 30 random songs of it, more as the queue ends (the owner, 10 Nov). Before Keep playing, which asks it. */
+    val genreRadio = GenreRadio(this)
     val continuousPlay = ContinuousPlay(this)
 }
 
@@ -479,3 +648,5 @@ fun movedPreamp(oldReplayGainPreamp: Float, equaliserPreamp: Float): Float? {
 
 /** How long a song plays before its artist's popular songs are fetched ahead (issue #398). */
 private const val TOP_SONGS_AHEAD_WAIT_MS = 5_000L
+/** How often the DJ check looks whether the plugin is due to be asked again (it asks only every 2 or 30 minutes). */
+private const val DJ_CHECK_LOOK_MS = 15_000L

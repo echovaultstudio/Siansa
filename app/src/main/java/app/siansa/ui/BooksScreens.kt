@@ -308,6 +308,8 @@ fun BookScreen(nav: NavController, id: String) {
         derivedStateOf { if (listState.firstVisibleItemIndex == 0) listState.firstVisibleItemScrollOffset.toFloat() else 100_000f }
     }
     val barAlpha = titleBarAlpha(scrolled, headerPx)
+    // What the page's Play does now (it knows where you were, a podcast's episode too), for the bar's Play.
+    var barPlay by remember { mutableStateOf<() -> Unit>({}) }
     Box(Modifier.fillMaxSize().background(surface)) {
         LoadBox(page, Modifier) { b ->
             // Loaded here: a list's content block isn't composable (issue #521).
@@ -318,10 +320,16 @@ fun BookScreen(nav: NavController, id: String) {
             val current = position?.currentSec ?: 0.0
             val chapterNow = if (b.podcast) null else b.chapterAt(current)
             val finished = !b.podcast && progress?.finished == true
+            androidx.compose.runtime.SideEffect {
+                barPlay = { graph.bookPlayer.playOrToggle(b, if (position != null && !position.finished) position.currentSec else 0.0) }
+            }
             LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomBarPadding(Space.Section))) {
                 item {
                     BookPageHeader(b, color, surface, bookDetails(b, episodeList.size.takeIf { b.podcast && it > 0 }, finished), position) {
-                        BookActions(b, progress, position)
+                        // Dynamic colours: Play in the cover's colour, as an album's (the owner, 10 Nov: books and podcasts too).
+                        androidx.compose.runtime.CompositionLocalProvider(
+                            LocalPlayColours provides rememberPageColours(b.cover, pageBackdrop(surface, color), where = "Book page"),
+                        ) { BookActions(b, progress, position) }
                     }
                 }
                 if (b.podcast) {
@@ -369,7 +377,26 @@ fun BookScreen(nav: NavController, id: String) {
                 }
             }
         }
-        FadingTitleBar(nav, book?.title ?: "Book", color, barAlpha)
+        // Play in the bar once the page's own has scrolled under it, as on every page (the owner, 10 Nov).
+        val b = book
+        val barColours = rememberPageColours(b?.cover, pageBackdrop(surface, color), where = "Book page bar")
+        FadingTitleBar(nav, book?.title ?: "Book", color, barAlpha, actions = {
+            BarReveal(b != null && listState.firstVisibleItemIndex > 0) {
+                if (b != null) {
+                    val now = playing.book?.id == b.id && playing.playing
+                    BarPlayButton(
+                        radio = false,
+                        colour = barColours?.controls ?: Accent,
+                        onColour = barColours?.onControls ?: MaterialTheme.colorScheme.onPrimary,
+                        playing = now,
+                        onClick = {
+                            barPlay()  // what the page's own Play does: carries on where you were, or pauses
+                            AppLog.i("Books", "${if (now) "Pause" else "Play"} \"${b.title}\" from its title bar")
+                        },
+                    )
+                }
+            }
+        })
     }
 }
 

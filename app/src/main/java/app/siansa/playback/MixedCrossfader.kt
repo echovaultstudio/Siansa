@@ -79,6 +79,11 @@ internal class MixedCrossfader(
     private var tailBase = 1f
     private var startedAt = 0L
     private var expectSeek = false
+    /** When the listener last moved in the song ([SystemClock.elapsedRealtime]), and in which: Smart blends quickly just after. */
+    private var userSeekAt = 0L
+    private var userSeekIn: String? = null
+    /** The last blend's technique: Smart doesn't use the same twice running when another fits. */
+    private var lastTechnique: Technique? = null
     private var skipped: String? = null
     private var baseSpeed = 1f
     private var plannedWithNext = true
@@ -155,10 +160,11 @@ internal class MixedCrossfader(
             return LOOK_MS
         }
         val position = main.currentPosition
-        val maxMs = s.crossfadeSeconds * 1000L
-        val beatMatch = s.crossfade == CrossfadeMode.SMART && s.beatMatch.appliesTo(inDjRadio())
+        val blending = Blending.of(s)
+        val maxMs = blending.maxMs
+        val beatMatch = Blending.beatMatched(s, inDjRadio())
         val cut = if (s.crossfade == CrossfadeMode.SMART) Crossfade.endCut(profiles.cached(item.mediaId), duration, maxMs).first else 0L
-        val beatLook = if (beatMatch) max(maxMs, profiles.cached(item.mediaId)?.outro?.let { BeatMatch.maxMsFor(it, s.blendBars) } ?: 0L) else maxMs
+        val beatLook = if (beatMatch) max(maxMs, profiles.cached(item.mediaId)?.outro?.let { BeatMatch.maxMsFor(it, blending.blendBars) } ?: 0L) else maxMs
         // A blend after the last beat can be longer than the setting: it's planned early enough for that.
         val lookMs = if (s.crossfade == CrossfadeMode.SMART && profiles.cached(item.mediaId)?.beatsUntilMs != null) max(beatLook, Crossfade.AFTER_BEAT_MAX_MS) else beatLook
         if (duration - cut - position > lookMs + LEAD_MS + PREPARE_MS) {
@@ -179,7 +185,9 @@ internal class MixedCrossfader(
                 currentProfile = profiles.cached(current.id),
                 nextProfile = profiles.cached(next.id),
                 beatMatch = beatMatch,
-                blendBars = s.blendBars,
+                blendBars = blending.blendBars,
+                sinceSeekMs = if (userSeekIn == current.id && userSeekAt > 0) SystemClock.elapsedRealtime() - userSeekAt else null,
+                lastTechnique = lastTechnique,
             )
             if (planned == null) {
                 val why = Crossfade.whyNoFade(s.crossfade, maxMs, current, next, profiles.cached(current.id), profiles.cached(next.id), beatMatch)
@@ -274,7 +282,7 @@ internal class MixedCrossfader(
             return
         }
         baseSpeed = main.playbackParameters.speed.takeIf { it > 0f } ?: 1f
-        t.playbackParameters = BeatMatch.parameters(baseSpeed, baseSpeed, settings().keepKey)
+        t.playbackParameters = BeatMatch.parameters(baseSpeed, baseSpeed, Blending.of(settings()).keepKey)
         val cued = tMix.cueNow(handoverAt * 1000, gate, engine.outRate)
         if (cued == null) {
             AppLog.w("Crossfade", "The song's second copy couldn't be cued; playing on without a crossfade")
@@ -327,21 +335,26 @@ internal class MixedCrossfader(
         incomingFrom = from
         incomingMix = at?.let { ceil(it).toLong() } ?: (engine.writtenMix + MIN_CUE_FRAMES)
         if (beat != null) {
-            main.playbackParameters = BeatMatch.parameters(baseSpeed * beat.speed, baseSpeed, settings().keepKey)
-            if (settings().bassSwap) {
+            main.playbackParameters = BeatMatch.parameters(baseSpeed * beat.speed, baseSpeed, Blending.of(settings()).keepKey)
+            if (Blending.of(settings()).bassSwap) {
                 mainMix.filter.shelfDb = DeckFilter.SHELF_START_DB
                 AppLog.d("Crossfade", "Bass swap over the first ${SWAP_FRACTION_PERCENT} % of the blend: next song's bass held back ${-DeckFilter.SHELF_START_DB.toInt()} dB, old song's cut up to ${DeckFilter.LOW_CUT_HZ.toInt()} Hz")
             }
-            if (settings().echoTail) {
-                tailMix?.let { d ->
-                    val echo = engine.core.echoOf(d)
-                    echo.clear()
-                    echo.delayMs = beat.outgoing.beatLengthMs
-                    AppLog.d("Crossfade", "Echo at the end: over the old song's last bar, repeats a beat apart (${beat.outgoing.beatLengthMs.toInt()} ms)")
-                }
-            }
-            if (settings().keepKey && beat.speed != 1f) AppLog.d("Crossfade", "Keep the key: the next song is stretched in time, its pitch kept")
+            if (planned.filterHz > 0) AppLog.d("Crossfade", "Filter fade: the old song's high-pass sweeps up to ${planned.filterHz.toInt()} Hz over the blend")
+            if (planned.swapFrom > 0f) AppLog.d("Crossfade", "Bass swap from ${(planned.swapFrom * 100).toInt()} % to ${(planned.swapTo * 100).toInt()} % of the blend")
+            if (Blending.of(settings()).keepKey && beat.speed != 1f) AppLog.d("Crossfade", "Keep the key: the next song is stretched in time, its pitch kept")
         }
+        echoBeatMs(planned)?.let { beatMs ->
+            tailMix?.let { d ->
+                val echo = engine.core.echoOf(d)
+                echo.clear()
+                echo.delayMs = beatMs
+                // An echo out's repeats are few and faint: gone about a beat after the next song drops in.
+                echo.feedback = if (planned.technique == Technique.ECHO_OUT) ECHO_OUT_FEEDBACK else app.siansa.playback.engine.Echo.FEEDBACK
+                AppLog.d("Crossfade", "Echo at the end: over the old song's last bar, repeats a beat apart (${beatMs.toInt()} ms)")
+            }
+        }
+        planned.technique?.let { lastTechnique = it }
         // Sent a little before its point: a jump lands on the start of a decoded block at or after where it's
         // sent, so the point itself is then in what's decoded and the cue is exact.
         val seekTo = (from - INCOMING_SEEK_BACK_MS).coerceAtLeast(0L)
@@ -354,6 +367,7 @@ internal class MixedCrossfader(
             "Fading ${item.mediaId} into $incomingId: ${planned.why} · old song handed over on mix frame $handoverMix · " +
                 "next song comes in at ${clock(from)} (${from} ms) on mix frame $incomingMix, with ${clock(against)} of the old song (in $inMs ms)",
         )
+        LastBlend.record(item.mediaId, incomingId ?: "", against, planned, dj = inDjRadio())
         handler.post(fadeTick)
     }
 
@@ -371,16 +385,19 @@ internal class MixedCrossfader(
             val tailMs = tMix.mediaUsAt(heardMix)?.let { it / 1000 } ?: t.currentPosition
             val out = ((tailMs - startAt).toFloat() / planned.overlapMs).coerceIn(0f, 1f)
             val tailDone = out >= 1f || t.playbackState == Player.STATE_ENDED || t.playbackState == Player.STATE_IDLE
-            t.volume = if (tailDone) 0f else tailBase * sleepLevel() * Crossfade.fadeOut(out)
+            // An echo out plays the old song's last bar at full level and stops it dead on the bar line.
+            val outLevel = if (planned.technique == Technique.ECHO_OUT) 1f else Crossfade.fadeOut(out)
+            t.volume = if (tailDone) 0f else tailBase * sleepLevel() * outLevel
             val beat = planned.beat
-            if (beat != null && settings().bassSwap) swapBass(out, tMix)
-            if (beat != null && settings().echoTail) tMix.echo?.let { echoOut(it, planned, beat, tailMs, tailDone) }
+            if (beat != null && Blending.of(settings()).bassSwap) swapBass(out, tMix, planned)
+            else if (planned.filterHz > 0) tMix.filter.lowCutHz = DeckFilter.filterAt(out.toDouble(), planned.filterHz)
+            echoBeatMs(planned)?.let { beatMs -> tMix.echo?.let { echoOut(it, planned, beatMs, tailMs, tailDone) } }
             val onNext = main.currentMediaItemIndex == incomingIndex
             // How long the next song has been heard, on the mixer's own clock: never a song time that can be misread,
             // so the fade-in can't stay at nothing (0.52.0-dev).
             val heard = if (onNext && heardMix >= incomingMix) ((heardMix - incomingMix) * 1000 / engine.outRate).toLong() else 0L
             val fadedIn = (heard.toFloat() / planned.fadeInMs).coerceIn(0f, 1f)
-            level = Crossfade.fadeIn(fadedIn)
+            level = if (planned.buildUp) Crossfade.buildIn(fadedIn) else Crossfade.fadeIn(fadedIn)
             onLevel()
             fallbackReason(onNext, heardMix)?.let { why ->
                 fallBack(why)
@@ -457,11 +474,17 @@ internal class MixedCrossfader(
         }
     }
 
-    private fun swapBass(out: Float, tMix: MixCore.Deck) {
-        val t = (out / SWAP_FRACTION).toDouble()
-        tMix.filter.lowCutHz = DeckFilter.lowCutAt(t)
+    /** The bass swap over its span of the blend ([FadePlan.swapFrom] to [FadePlan.swapTo]), with a filter fade's sweep. */
+    private fun swapBass(out: Float, tMix: MixCore.Deck, planned: FadePlan) {
+        val span = (planned.swapTo - planned.swapFrom).coerceAtLeast(0.01f)
+        val t = ((out - planned.swapFrom) / span).toDouble().coerceIn(0.0, 1.0)
+        tMix.filter.lowCutHz = maxOf(DeckFilter.lowCutAt(t), DeckFilter.filterAt(out.toDouble(), planned.filterHz))
         mainMix.filter.shelfDb = DeckFilter.shelfAt(t)
     }
+
+    /** The echo's beat, when this blend echoes out: an echo out's own, or a beat-matched blend's with the echo on. */
+    private fun echoBeatMs(planned: FadePlan): Double? =
+        planned.echoBeatMs ?: planned.beat?.takeIf { Blending.of(settings()).echoTail }?.outgoing?.beatLengthMs
 
     // ---- After a beat-matched blend: back to the song's own speed ----
 
@@ -471,7 +494,7 @@ internal class MixedCrossfader(
             val elapsed = SystemClock.elapsedRealtime() - easingSince
             BeatMatch.easeStep(easingFrom, elapsed, main.playbackParameters.speed, baseSpeed)?.let {
                 easeChanges++
-                main.playbackParameters = BeatMatch.parameters(it, baseSpeed, settings().keepKey)
+                main.playbackParameters = BeatMatch.parameters(it, baseSpeed, Blending.of(settings()).keepKey)
             }
             if (elapsed >= BeatMatch.EASE_MS) {
                 easingFrom = 0f
@@ -498,7 +521,7 @@ internal class MixedCrossfader(
         handler.removeCallbacks(easeTick)
         if (easingFrom != 0f) {
             easingFrom = 0f
-            main.playbackParameters = BeatMatch.parameters(baseSpeed, baseSpeed, settings().keepKey)
+            main.playbackParameters = BeatMatch.parameters(baseSpeed, baseSpeed, Blending.of(settings()).keepKey)
         }
     }
 
@@ -618,7 +641,7 @@ internal class MixedCrossfader(
             if (beat != null && main.currentMediaItemIndex == incomingIndex) {
                 startEasing(beat)
             } else if (beat != null) {
-                main.playbackParameters = BeatMatch.parameters(baseSpeed, baseSpeed, settings().keepKey)
+                main.playbackParameters = BeatMatch.parameters(baseSpeed, baseSpeed, Blending.of(settings()).keepKey)
             }
             // Stopped before the next song came in: the old song's main copy sounds again.
             if (main.currentMediaItemIndex != incomingIndex) uncut()
@@ -641,14 +664,15 @@ internal class MixedCrossfader(
      * volume, so its last beats repeat on the beat after it's gone; once it's done, nothing more is sent and the
      * repeats die away by themselves.
      */
-    private fun echoOut(echo: app.siansa.playback.engine.Echo, planned: FadePlan, beat: BeatMatch.Plan, tailMs: Long, tailDone: Boolean) {
+    private fun echoOut(echo: app.siansa.playback.engine.Echo, planned: FadePlan, beatMs: Double, tailMs: Long, tailDone: Boolean) {
         if (tailDone) {
             echo.send = 0f
             return
         }
-        val bar = beat.outgoing.beatLengthMs * BeatMatch.BEATS_PER_BAR
+        val bar = beatMs * BeatMatch.BEATS_PER_BAR
         val left = planned.overlapMs - (tailMs - startAt)
-        echo.send = ((bar - left) / bar).toFloat().coerceIn(0f, 1f) * ECHO_SEND * tailBase * sleepLevel()
+        val most = if (planned.technique == Technique.ECHO_OUT) ECHO_OUT_SEND else ECHO_SEND
+        echo.send = ((bar - left) / bar).toFloat().coerceIn(0f, 1f) * most * tailBase * sleepLevel()
     }
 
     private fun releaseTail() {
@@ -674,6 +698,8 @@ internal class MixedCrossfader(
             expectSeek = false
             return
         }
+        userSeekAt = SystemClock.elapsedRealtime()
+        userSeekIn = main.currentMediaItem?.mediaId
         when (phase) {
             Phase.FADING -> cancel("you skipped or moved in the song")
             Phase.READY, Phase.CUED -> disarm()
@@ -775,6 +801,9 @@ internal class MixedCrossfader(
         const val MUTED_MS = 3_000L
         /** How much of the old song goes to the echo by the end of its last bar (as the old engine's hall, #759). */
         const val ECHO_SEND = 0.75f
+        /** An echo out's echo: quieter and shorter than the blend's, a faint trail under the next song. */
+        const val ECHO_OUT_SEND = 0.5f
+        const val ECHO_OUT_FEEDBACK = 0.25f
         /** An output playing this long without its position moving on is stuck. */
         const val STALLED_MS = 3_000L
         /** The player has handed over sound this long without a break: what it handed first should be heard by now. */
@@ -814,7 +843,7 @@ internal object EngineFade {
         return when {
             beat != null -> beat.incomingStartMs to beat.startMs
             // A cold end: after the old song's last sound and the pause (the point is past its end, on its clock).
-            plan.coldEnd -> 0L to startAtMs + plan.overlapMs + plan.gapMs
+            plan.coldEnd -> plan.incomingFromMs to startAtMs + plan.overlapMs + plan.gapMs
             else -> 0L to startAtMs
         }
     }

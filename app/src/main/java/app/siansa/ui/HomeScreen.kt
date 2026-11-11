@@ -1,5 +1,7 @@
 package app.siansa.ui
 
+import app.siansa.net.wordsReady
+import app.siansa.net.soundReady
 import app.siansa.data.normalizeKey
 import app.siansa.mix.mixArtistRadios
 import app.siansa.mix.ArtistRadioPicks
@@ -32,6 +34,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.Radio
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Settings
@@ -143,7 +146,7 @@ fun HomeScreen(nav: NavController) {
     val aiProblem = rememberAiProblem()
     // Mixes aren't attempted (and tiles say why) only when AudioMuse is set up but can't be used; Today's mix
     // shows the reason in either case.
-    val aiDown = aiProblem.takeIf { homeSettings.audioMuseReady }
+    val aiDown = aiProblem.takeIf { homeSettings.wordsReady }
 
     fun build(selector: Selector?, force: Boolean, open: Boolean) {
         if (busySelector != null) return
@@ -219,7 +222,7 @@ fun HomeScreen(nav: NavController) {
     // Today's mix is made once a day; after that only when you tap refresh, also when the hour's vibe moves on
     // (beta testers #37). Showing other music in the source filter doesn't make it again (issue #486). AI mixes
     // need AudioMuse.
-    val aiMixes = MixRules.showsAiMixes(homeSettings.audioMuseReady)
+    val aiMixes = MixRules.showsAiMixes(homeSettings.wordsReady)
     LaunchedEffect(hour, aiMixes) {
         graph.mixes.all()
         graph.selectors.all()
@@ -230,7 +233,7 @@ fun HomeScreen(nav: NavController) {
     LaunchedEffect(aiMixes) {
         delay(1500)
         val today = LocalDate.now().toString()
-        for (kind in MixGenerator.Personal.entries.filter { MixRules.showsPersonal(it, graph.settings.current.audioMuseReady) }) {
+        for (kind in MixGenerator.Personal.entries.filter { MixRules.showsPersonal(it, graph.settings.current.soundReady) }) {
             if (graph.mixes.get("$today-${kind.id}") != null) continue
             while (busySelector != null || personalBusy != null) delay(500)
             buildPersonal(kind, open = false, quiet = true)
@@ -258,7 +261,8 @@ fun HomeScreen(nav: NavController) {
         if (graph.library.isSynced) graph.library.randomAlbums(20)
         else graph.source.albums("random", 20, 0).distinctBy { it.name + "|" + it.artist }
     }
-    val genres by loadState(version to "genres") { if (graph.library.isSynced) graph.library.genres(12) else emptyList() }
+    // The genres Siansa Beats hears, as last saved, or the songs' tags (the same list as Search).
+    val genres by rememberBrowseGenres(12)
 
     // The Home tab tapped again: glide back to the top. From far down, jump most of the way first so it's quick.
     val listState = rememberLazyListState()
@@ -320,10 +324,10 @@ fun HomeScreen(nav: NavController) {
                 // The notices are the top of Home now (issue #872), not a section of their own.
                 HomeSection.NOTICES -> Unit
                 HomeSection.QUICK -> {
-                    // Quick access, like the top grid in Spotify (issue #271): what you played last, newest first, as
+                    // Quick access, the top grid (issue #271): what you played last, newest first, as
                     // many as Settings › Style › Home says (issue #934); until there's enough of that, today's mixes,
                     // playlists and recent albums. Liked songs is one of them only when you played it.
-                    titledItem(section !in homeSettings.homeUntitled, key = "quick") {
+                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, key = "quick") {
                         val mixIds = mixes.orEmpty().mapTo(HashSet()) { it.id }
                         val fill = buildList {
                             todaysMixes.take(2).forEach { m -> add(RecentPlay("mix/${m.id}", m.title, m.songs.firstOrNull()?.cover)) }
@@ -333,10 +337,19 @@ fun HomeScreen(nav: NavController) {
                         val played = shownRecents(recentPlays.orEmpty(), shownRecentAlbums)
                             .filter { !it.route.startsWith("mix/") || it.route.removePrefix("mix/") in mixIds }
                         val quick = quickShortcuts(played, fill, homeSettings.homeShortcuts)
-                        fun colorsOf(r: RecentPlay) = if (r.route == "liked") Color(0xFF4B2BD6) to Color(0xFF8FD3C8) else tileColors(r.title)
+                        fun colorsOf(r: RecentPlay) = if (r.route == "liked") Color(0xFF4B2BD6) to Color(0xFF8FD3C8) else generatedCoverColors(r.route) ?: tileColors(r.title)
+                        // A radio's (or another page whose cover Siansa draws) is its own cover, in its colours, never one
+                        // of its songs' (the owner, 10 Nov), also for shortcuts noted before.
+                        fun coverOf(r: RecentPlay) = if (generatedCoverColors(r.route) != null) null else r.cover
+                        fun iconOf(r: RecentPlay) = when {
+                            r.route == "liked" && r.cover == null -> Icons.Rounded.Favorite
+                            r.route.startsWith("radio/") -> Icons.Rounded.Radio
+                            r.route.startsWith("blend/") || r.route.startsWith("mood/") -> Icons.Rounded.AutoAwesome
+                            else -> null
+                        }
                         if (look != HomeLook.AS_IS) {
                             HomeLookRow(look, "quick", "Shortcuts", quick.mapIndexed { i, r ->
-                                HomeItem("quick-$i", r.title, coverArt = r.cover, colors = colorsOf(r), open = { nav.navigate(r.route) })
+                                HomeItem("quick-$i", r.title, coverArt = coverOf(r), colors = colorsOf(r), open = { nav.navigate(r.route) })
                             })
                         } else if (quick.isNotEmpty()) {
                             Column(Modifier.padding(horizontal = Space.Page, vertical = Space.Medium).testTag("quickShortcuts"), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
@@ -344,8 +357,8 @@ fun HomeScreen(nav: NavController) {
                                     Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
                                         row.forEach { r ->
                                             QuickTile(
-                                                r.title, r.cover, colorsOf(r), { nav.navigate(r.route) }, Modifier.weight(1f),
-                                                icon = if (r.route == "liked" && r.cover == null) Icons.Rounded.Favorite else null,
+                                                r.title, coverOf(r), colorsOf(r), { nav.navigate(r.route) }, Modifier.weight(1f),
+                                                icon = iconOf(r),
                                             )
                                         }
                                         if (row.size == 1) Spacer(Modifier.weight(1f))
@@ -356,7 +369,7 @@ fun HomeScreen(nav: NavController) {
                     }
                 }
                 HomeSection.TODAY -> {
-                    titledItem(section !in homeSettings.homeUntitled, key = "today") {
+                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, key = "today") {
                         val mix = current
                         when {
                             mix != null && look != HomeLook.AS_IS -> HomeLookRow(
@@ -391,7 +404,7 @@ fun HomeScreen(nav: NavController) {
                     // While AudioMuse can't be reached the card above says so; no error and Try again as well. Without
                     // AudioMuse at all there's no today's mix (issue #486).
                     error?.takeIf { aiDown == null && aiMixes }?.let { message ->
-                        titledItem(section !in homeSettings.homeUntitled, key = "today_error") {
+                        titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, key = "today_error") {
                             Column(Modifier.padding(horizontal = Space.Page)) {
                                 ErrorText(message, Modifier)
                                 TextButton(onClick = { build(null, force = false, open = false) }) { Text("Try again") }
@@ -402,14 +415,14 @@ fun HomeScreen(nav: NavController) {
                 HomeSection.CAROUSEL -> {
                     // Your own mixes for this part of the day, set in Vibes (issue #253): AI mixes, so only with
                     // AudioMuse (issue #486).
-                    if (homeSettings.navidromeReady && aiMixes) titledItem(section !in homeSettings.homeUntitled, key = "carousel") { HomeCarousel(nav, aiDown, look) }
+                    if (homeSettings.navidromeReady && aiMixes) titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, key = "carousel") { HomeCarousel(nav, aiDown, look) }
                 }
                 // Audiobookshelf's books and podcasts (issue #521): only with a server set up.
-                HomeSection.BOOKS -> if (homeSettings.booksReady) titledItem(section !in homeSettings.homeUntitled, key = "books") { BooksCarousel(nav, podcasts = false, look = look) }
-                HomeSection.PODCASTS -> if (homeSettings.booksReady) titledItem(section !in homeSettings.homeUntitled, key = "podcasts") { BooksCarousel(nav, podcasts = true, look = look) }
+                HomeSection.BOOKS -> if (homeSettings.booksReady) titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, key = "books") { BooksCarousel(nav, podcasts = false, look = look) }
+                HomeSection.PODCASTS -> if (homeSettings.booksReady) titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, key = "podcasts") { BooksCarousel(nav, podcasts = true, look = look) }
                 HomeSection.MADE_FOR_YOU -> {
                     // Made for you: the vibe for this hour, then mixes from your own listening.
-                    titledItem(section !in homeSettings.homeUntitled, key = "made") {
+                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, key = "made") {
                         // The same tiles as plain items, for the other looks (issue #655).
                         val made: List<HomeItem> = buildList {
                             applicable.filter { aiMixes }.forEach { selector ->
@@ -418,7 +431,7 @@ fun HomeScreen(nav: NavController) {
                                     mix?.songs?.firstOrNull()?.coverArt, open = { if (mix != null) nav.navigate("mix/${mix.id}") else build(selector, force = false, open = true) }))
                             }
                             MixGenerator.Personal.entries.filter { kind ->
-                                MixRules.showsPersonalTile(kind, homeSettings.audioMuseReady, madeToday = todaysMixes.any { it.selectorId == kind.id }, notEnough = kind.id in notEnough)
+                                MixRules.showsPersonalTile(kind, homeSettings.soundReady, madeToday = todaysMixes.any { it.selectorId == kind.id }, notEnough = kind.id in notEnough)
                             }.forEach { kind ->
                                 val mix = todaysMixes.firstOrNull { it.selectorId == kind.id }
                                 add(HomeItem(kind.id, kind.title, madeForYouCaption(mix?.songs?.size, aiDown != null, "Tap to make it"),
@@ -444,7 +457,7 @@ fun HomeScreen(nav: NavController) {
                             }
                             MixGenerator.Personal.entries.filter { kind ->
                                 MixRules.showsPersonalTile(
-                                    kind, homeSettings.audioMuseReady,
+                                    kind, homeSettings.soundReady,
                                     madeToday = todaysMixes.any { it.selectorId == kind.id },
                                     notEnough = kind.id in notEnough,
                                 )
@@ -479,12 +492,12 @@ fun HomeScreen(nav: NavController) {
                 HomeSection.CARDS -> {
                     // Your cards (issue #622), in the order set in Settings › Notices and Cards › Cards; each is its own row.
                     pinnedCards.orEmpty().filter { it.shown }.forEach { card ->
-                        titledItem(section !in homeSettings.homeUntitled, key = "pinned-${card.id}") { PinnedCardSection(nav, card, aiDown) }
+                        titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, key = "pinned-${card.id}") { PinnedCardSection(nav, card, aiDown) }
                     }
                 }
                 HomeSection.REDISCOVER -> {
                     // Albums you loved a while ago but haven't played since.
-                    titledItem(section !in homeSettings.homeUntitled, key = "rediscover") {
+                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, key = "rediscover") {
                         val albums = lovedBefore.valueOrNull().orEmpty()
                         if (look != HomeLook.AS_IS) {
                             HomeLookRow(look, "rediscover", "Rediscover", albums.map { r -> albumItem(r.album, rediscoverSubtitle(r), play = { playAlbums(r.album.name, listOf(r.album)) }) { nav.navigate("album/${r.album.id}") } },
@@ -501,7 +514,7 @@ fun HomeScreen(nav: NavController) {
                     }
                 }
                 HomeSection.RADIOS -> {
-                    titledItem(section !in homeSettings.homeUntitled, key = "radios") {
+                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, key = "radios") {
                         if (look != HomeLook.AS_IS) {
                             HomeLookRow(look, "radios", "Radios", moodRadios.map { radio ->
                                 HomeItem(radio.id, radio.name, colors = Color(radio.colors.first) to Color(radio.colors.second), open = { nav.openMoodRadio(radio.id) })
@@ -518,7 +531,7 @@ fun HomeScreen(nav: NavController) {
                     }
                 }
                 HomeSection.PLAYLISTS -> {
-                    titledItem(section !in homeSettings.homeUntitled, key = "playlists") {
+                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, key = "playlists") {
                         if (look != HomeLook.AS_IS) {
                             HomeLookRow(look, "playlists", "Your playlists", playlists.valueOrNull().orEmpty().map { p ->
                                 HomeItem(p.id, p.name, if (p.songCount > 0) "${p.songCount} songs" else "", p.coverArt, open = { nav.navigate("playlist/${p.id}") })
@@ -529,7 +542,7 @@ fun HomeScreen(nav: NavController) {
                     }
                 }
                 HomeSection.RECENT -> {
-                    titledItem(section !in homeSettings.homeUntitled, key = "recent") {
+                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, key = "recent") {
                         val albums = recentAlbums.valueOrNull().orEmpty()
                         if (look != HomeLook.AS_IS) {
                             HomeLookRow(look, "recent", "Recently played", albums.map { a -> albumItem(a, a.artist, play = { playAlbums(a.name, listOf(a)) }) { nav.navigate("album/${a.id}") } },
@@ -540,7 +553,7 @@ fun HomeScreen(nav: NavController) {
                     }
                 }
                 HomeSection.ARTIST_RADIOS -> {
-                    titledItem(section !in homeSettings.homeUntitled, key = "artist_radios") {
+                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, key = "artist_radios") {
                         if (look != HomeLook.AS_IS) {
                             HomeLookRow(look, "artist_radios", "Artist radios", recentArtists.valueOrNull().orEmpty().map { artist ->
                                 HomeItem(artist.id, "${artist.name} radio", "With similar artists", freshCovers[artist.id] ?: artist.coverArt, round = true, open = {
@@ -562,7 +575,7 @@ fun HomeScreen(nav: NavController) {
                     }
                 }
                 HomeSection.ADDED -> {
-                    titledItem(section !in homeSettings.homeUntitled, key = "added") {
+                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, key = "added") {
                         val albums = newest.valueOrNull().orEmpty()
                         if (look != HomeLook.AS_IS) {
                             HomeLookRow(look, "added", "Recently added", albums.map { a -> albumItem(a, a.artist, play = { playAlbums(a.name, listOf(a)) }) { nav.navigate("album/${a.id}") } },
@@ -573,15 +586,15 @@ fun HomeScreen(nav: NavController) {
                     }
                 }
                 HomeSection.GENRES -> {
-                    titledItem(section !in homeSettings.homeUntitled, key = "genres") {
+                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, key = "genres") {
                         if (look != HomeLook.AS_IS) {
-                            HomeLookRow(look, "genres", "Your genres", genres.valueOrNull().orEmpty().map { genre ->
+                            HomeLookRow(look, "genres", "Your genres", genres.orEmpty().map { genre ->
                                 HomeItem(genre.name, genre.name, open = { nav.openGenreRadio(genre.name) })
                             }, openAll = nav.openAll(app.siansa.ui.HomeSection.Genres))
-                        } else Shelf("Your genres", genres.valueOrNull().orEmpty(), key = { it.name }, onOpenAll = nav.openAll(app.siansa.ui.HomeSection.Genres)) { genre ->
+                        } else Shelf("Your genres", genres.orEmpty(), key = { it.name }, onOpenAll = nav.openAll(app.siansa.ui.HomeSection.Genres)) { genre ->
                             GradientTile(
                                 title = genre.name,
-                                colors = tileColors(genre.name),
+                                colors = genreColors(genre.name),
                                 size = 130.dp,
                                 // Just the tile (issue #338).
                                 onClick = { nav.openGenreRadio(genre.name) },
@@ -590,7 +603,7 @@ fun HomeScreen(nav: NavController) {
                     }
                 }
                 HomeSection.RANDOM -> {
-                    titledItem(section !in homeSettings.homeUntitled, key = "random") {
+                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, key = "random") {
                         val albums = rediscover.valueOrNull().orEmpty()
                         if (look != HomeLook.AS_IS) {
                             HomeLookRow(look, "random", "Random picks", albums.map { a -> albumItem(a, a.artist, play = { playAlbums(a.name, listOf(a)) }) { nav.navigate("album/${a.id}") } },
@@ -915,7 +928,9 @@ internal fun quickShortcuts(played: List<RecentPlay>, fill: List<RecentPlay>, co
 internal fun androidx.compose.foundation.lazy.LazyListScope.titledItem(
     titleShown: Boolean,
     key: Any,
+    // Tiles of the row when it's set to the shortcut grid (the owner, 10 Nov).
+    gridSize: Int = GRID_LOOK_MOST,
     content: @Composable androidx.compose.foundation.lazy.LazyItemScope.() -> Unit,
 ) = item(key = key) {
-    androidx.compose.runtime.CompositionLocalProvider(LocalSectionTitleShown provides titleShown) { content() }
+    androidx.compose.runtime.CompositionLocalProvider(LocalSectionTitleShown provides titleShown, LocalGridSize provides gridSize) { content() }
 }

@@ -1,5 +1,7 @@
 package app.siansa.mix
 
+import app.siansa.net.wordsReady
+import app.siansa.net.soundReady
 import android.content.Context
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
@@ -20,9 +22,9 @@ class MixWorker(context: Context, params: WorkerParameters) : CoroutineWorker(co
         if (!settings.navidromeReady) return Result.success()
         // The vibe's mix is an AI mix: only with AudioMuse (issue #486).
         // Only the day's first mix: a new vibe for the hour doesn't replace the one you have (beta testers #37).
-        if (MixRules.showsAiMixes(settings.audioMuseReady)) runCatching { graph.generator.ensureToday() }
+        if (MixRules.showsAiMixes(settings.wordsReady)) runCatching { graph.generator.ensureToday() }
         // Today's personal mixes too (each is made once a day; later runs find them ready).
-        MixGenerator.Personal.entries.filter { MixRules.showsPersonal(it, settings.audioMuseReady) }
+        MixGenerator.Personal.entries.filter { MixRules.showsPersonal(it, settings.soundReady) }
             .forEach { kind -> runCatching { graph.generator.ensurePersonal(kind) } }
         return Result.success()
     }

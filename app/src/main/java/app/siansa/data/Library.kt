@@ -464,8 +464,11 @@ class LibraryRepository(context: Context) {
     suspend fun replaceArtists(artists: List<Artist>) = db.withTransaction {
         combined = null
         serverArtists.clear()
+        // Picture ids found by looking artists up (ArtistPhotos) outlive the sync, when the server lists the artist
+        // without a version (keptArtistCover).
+        val keptCovers = dao.artists().associate { it.id to it.coverArt }
         dao.deleteAllArtists()
-        artists.distinctBy { it.id }.chunked(CHUNK).forEach { chunk ->
+        artists.distinctBy { it.id }.map { it.copy(coverArt = keptArtistCover(it.coverArt, keptCovers[it.id])) }.chunked(CHUNK).forEach { chunk ->
             dao.forgetSources(chunk.map { it.id })
             dao.putArtists(chunk.map { it.toEntity() })
         }

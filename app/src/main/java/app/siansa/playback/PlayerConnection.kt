@@ -196,7 +196,7 @@ class PlayerConnection(
     }
 
     /**
-     * Spotify's "Add to queue": the song plays after the current one and after songs queued before it,
+     * "Add to queue": the song plays after the current one and after songs queued before it,
      * ahead of the rest of the album or playlist. With nothing playing, it starts playing.
      */
     fun addToQueue(song: Song) {

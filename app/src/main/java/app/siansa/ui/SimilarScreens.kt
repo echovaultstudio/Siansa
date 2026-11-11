@@ -42,6 +42,8 @@ fun SimilarSongsScreen(nav: NavController, songId: String) {
         nav = nav,
         title = song?.let { "Like ${it.title}" } ?: "Similar songs",
         color = rememberCoverColor(song?.cover),
+        // Play in the cover's colour with Dynamic colours, as an album's (the owner, 10 Nov: every Play follows it).
+        coverId = song?.cover,
         songs = songs.valueOrNull(),
         error = (songs as? Load.Err)?.message ?: (seed as? Load.Err)?.message,
         cover = { m -> BigCover(song?.cover, song?.albumId, m, RoundedCornerShape(6.dp)) },

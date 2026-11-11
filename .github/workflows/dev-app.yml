@@ -6,14 +6,15 @@ name: Siansa Dev
 # history skips it). Each push to dev replaces the APK.
 on:
   push:
-    branches: [dev]
+    # experiment/…: a try-out (as Siansa Beats' grids) built as its own Siansa Dev download, never dev-latest.
+    branches: [dev, "experiment/**"]
   workflow_dispatch:
 
 permissions:
   contents: write
 
 concurrency:
-  group: dev-app
+  group: dev-app-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -63,8 +64,16 @@ jobs:
           set -euo pipefail
           short=$(git rev-parse --short HEAD)
           apk="siansa-dev-$short.apk"
+          # dev's build is dev-latest; an experiment branch's is its own pre-release, so dev's stays as it is.
+          tag=dev-latest
+          title="Siansa Dev"
+          if [ "$GITHUB_REF_NAME" != dev ]; then
+            name="${GITHUB_REF_NAME#experiment/}"
+            tag="dev-experiment-${name//\//-}"
+            title="Siansa Dev, experiment $name"
+          fi
           cp "$(ls app/build/outputs/apk/dev/*.apk | head -1)" "$apk"
-          notes="Siansa Dev, built from \`dev\` at $short on $(date -u '+%Y-%m-%d %H:%M') UTC.
+          notes="Siansa Dev, built from \`$GITHUB_REF_NAME\` at $short on $(date -u '+%Y-%m-%d %H:%M') UTC.
 
           **Test build: only install it if you want to help find bugs and try features before they're finished.** Things may
           break, change or disappear without warning, and it may lose its settings. For everyday listening, get Siansa from
@@ -74,16 +83,16 @@ jobs:
           library and sign-ins. Not for F-Droid or Google Play.
 
           Latest change: $(git log -1 --format=%s)"
-          git tag -f dev-latest
-          git push -f origin dev-latest
-          if gh release view dev-latest > /dev/null 2>&1; then
+          git tag -f "$tag"
+          git push -f origin "$tag"
+          if gh release view "$tag" > /dev/null 2>&1; then
             # The previous APKs go, so there's only ever one to pick.
-            for old in $(gh release view dev-latest --json assets -q '.assets[].name'); do
-              gh release delete-asset dev-latest "$old" -y
+            for old in $(gh release view "$tag" --json assets -q '.assets[].name'); do
+              gh release delete-asset "$tag" "$old" -y
             done
-            gh release edit dev-latest --title "Siansa Dev ($short)" --notes "$notes" --prerelease --latest=false
+            gh release edit "$tag" --title "$title ($short)" --notes "$notes" --prerelease --latest=false
           else
-            gh release create dev-latest --title "Siansa Dev ($short)" --notes "$notes" --prerelease --latest=false
+            gh release create "$tag" --title "$title ($short)" --notes "$notes" --prerelease --latest=false
           fi
-          gh release upload dev-latest "$apk" --clobber
-          echo "::notice::Siansa Dev $short: $(gh release view dev-latest --json url -q .url)"
+          gh release upload "$tag" "$apk" --clobber
+          echo "::notice::$title $short: $(gh release view "$tag" --json url -q .url)"

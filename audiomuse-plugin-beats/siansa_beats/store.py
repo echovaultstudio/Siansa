@@ -1,0 +1,517 @@
+"""The plugin's own tables, and the queries on AudioMuse-AI's tables it reads.
+
+Tables (each named ``plugin_siansa_beats__<name>`` by AudioMuse-AI):
+
+* ``profiles``: one row per song, its loudness, ramps and beat grids, or why it couldn't be measured;
+* ``wanted``: songs the app asked for that have no profile yet, measured first;
+* ``state``: small JSON values: the input generations, each job's state and the last finished build;
+* ``similar_albums`` / ``similar_artists``: the published similar lists.
+
+Songs are keyed by AudioMuse-AI's canonical id (``score.item_id``).
+"""
+
+import json
+
+from plugin.api import get_db, logger, table
+
+ANALYZER_VERSION = 1
+# The beat grids (Siansa issue #646) have a version of their own: a profile measured before them keeps its
+# loudness and ramps (so levelling and SmoothFade go on working) and is measured again, in the background, for
+# its beats. Raise this to measure every song's beats again.
+BEATS_VERSION = 3  # 2: the phrases (Siansa issue #757); 3: related tempos (Siansa issue #802)
+# Where the beat stops (0.5.0) isn't worth reading the whole library again for: a song measured before it is checked
+# for it only when the app asks for it (it's about to play), a few at a time, and every new song gets it anyway.
+UNTIL_KEY = "beats_until_checked"
+RETRY_HOURS = (1, 6, 24, 72)  # wait after the 1st, 2nd, 3rd, later failure
+
+
+def migrate(db):
+    cur = db.cursor()
+    cur.execute(f"""
+        CREATE TABLE IF NOT EXISTS {table('profiles')} (
+            item_id TEXT PRIMARY KEY,
+            status TEXT NOT NULL,
+            ref_lufs DOUBLE PRECISION,
+            start_ramp TEXT,
+            end_ramp TEXT,
+            duration_ms INTEGER,
+            analyzer_version INTEGER NOT NULL DEFAULT 0,
+            attempts INTEGER NOT NULL DEFAULT 0,
+            retry_after TIMESTAMPTZ,
+            error TEXT,
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )""")
+    # Where a profile came from ('measured' here).
+    cur.execute(f"ALTER TABLE {table('profiles')} ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'measured'")
+    # The beat grid at each end (JSON: intro_bpm, intro_beat_ms, …) and which version of the beat tracker made it.
+    cur.execute(f"ALTER TABLE {table('profiles')} ADD COLUMN IF NOT EXISTS beats JSONB")
+    cur.execute(f"ALTER TABLE {table('profiles')} ADD COLUMN IF NOT EXISTS beats_version INTEGER NOT NULL DEFAULT 0")
+    # Why a song measured before the beat tracker couldn't be measured again for its beats (it keeps its loudness),
+    # how often that happened, and when it's tried again (Siansa issue #657: 0.3.1 never tried again).
+    cur.execute(f"ALTER TABLE {table('profiles')} ADD COLUMN IF NOT EXISTS beats_error TEXT")
+    cur.execute(f"ALTER TABLE {table('profiles')} ADD COLUMN IF NOT EXISTS beats_attempts INTEGER NOT NULL DEFAULT 0")
+    cur.execute(f"ALTER TABLE {table('profiles')} ADD COLUMN IF NOT EXISTS beats_retry_after TIMESTAMPTZ")
+    # 0.3.2 put songs on another music server off for a week, and the run for that server then skipped them (issue
+    # #659); 0.3.3 fetches a song from whichever server has it, so they're measured now. The same for profiles.
+    cur.execute(f"""
+        UPDATE {table('profiles')} SET beats_retry_after=NULL
+         WHERE beats_error='not on this music server' AND beats_version<>%s""", (BEATS_VERSION,))
+    cur.execute(f"UPDATE {table('profiles')} SET retry_after=NULL WHERE status='elsewhere'")
+    # 0.3.1 marked such songs done for good: they wait to be measured again, now.
+    cur.execute(f"""
+        UPDATE {table('profiles')} SET beats_version=0, beats_retry_after=NULL, beats_attempts=GREATEST(beats_attempts, 1)
+         WHERE beats_error IS NOT NULL AND beats_version=%s""", (BEATS_VERSION,))
+    cur.execute(f"CREATE INDEX IF NOT EXISTS {table('profiles_status')} ON {table('profiles')} (status, analyzer_version)")
+    cur.execute(f"""
+        CREATE TABLE IF NOT EXISTS {table('wanted')} (
+            item_id TEXT PRIMARY KEY,
+            asked_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )""")
+    cur.execute(f"""
+        CREATE TABLE IF NOT EXISTS {table('state')} (
+            name TEXT PRIMARY KEY,
+            value JSONB NOT NULL,
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )""")
+    for kind, key in (("albums", "album_key"), ("artists", "artist_key")):
+        cur.execute(f"""
+            CREATE TABLE IF NOT EXISTS {table('similar_' + kind)} (
+                {key} TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                artist TEXT NOT NULL,
+                candidates JSONB NOT NULL,
+                generation INTEGER NOT NULL
+            )""")
+    # The background tick, every 15 minutes. Enabled, so the parts keep themselves current; the admin can
+    # change or switch it off under Administration > Scheduled Tasks. Never overwrites the admin's choice.
+    cur.execute(
+        "INSERT INTO cron (name, task_type, cron_expr, enabled) VALUES (%s, %s, %s, TRUE) "
+        "ON CONFLICT (task_type) DO NOTHING",
+        ("plugin.siansa_beats.tick", "plugin.siansa_beats.tick", "*/15 * * * *"),
+    )
+    cur.close()
+    db.commit()
+
+
+# ---- state -------------------------------------------------------------------------------------------------
+
+def get_state(name, default=None, db=None):
+    db = db or get_db()
+    cur = db.cursor()
+    cur.execute(f"SELECT value FROM {table('state')} WHERE name=%s", (name,))
+    row = cur.fetchone()
+    cur.close()
+    if not row:
+        return default
+    return row[0] if not isinstance(row[0], str) else json.loads(row[0])
+
+
+def set_state(name, value, db=None, commit=True):
+    db = db or get_db()
+    cur = db.cursor()
+    cur.execute(
+        f"INSERT INTO {table('state')} (name, value, updated_at) VALUES (%s, %s::jsonb, now()) "
+        "ON CONFLICT (name) DO UPDATE SET value=EXCLUDED.value, updated_at=now()",
+        (name, json.dumps(value)),
+    )
+    cur.close()
+    if commit:
+        db.commit()
+
+
+def try_lock(db, name):
+    """A session lock so only one worker runs a job at a time; ``False`` when another one holds it."""
+    cur = db.cursor()
+    cur.execute("SELECT pg_try_advisory_lock(hashtext('siansa_beats'), hashtext(%s))", (name,))
+    got = bool(cur.fetchone()[0])
+    cur.close()
+    db.commit()
+    return got
+
+
+def unlock(db, name):
+    db.rollback()
+    cur = db.cursor()
+    cur.execute("SELECT pg_advisory_unlock(hashtext('siansa_beats'), hashtext(%s))", (name,))
+    cur.close()
+    db.commit()
+
+
+# ---- AudioMuse-AI's schedule and queue, read only (Siansa issue #765) -----------------------------------------
+
+def _quiet_rollback(db):
+    try:
+        db.rollback()
+    except Exception:
+        pass
+
+
+def scheduled_tick(db):
+    """This plugin's scheduled task as AudioMuse-AI has it: ``{"enabled", "cron_expr", "last_run"}``, or ``None``
+    when it can't be read (another AudioMuse version)."""
+    if db is None:
+        return None
+    try:
+        cur = db.cursor()
+        cur.execute("SELECT enabled, cron_expr, last_run FROM cron WHERE task_type LIKE %s ORDER BY id LIMIT 1",
+                    ("plugin.siansa_beats%tick",))
+        row = cur.fetchone()
+        cur.close()
+        db.commit()
+    except Exception:
+        _quiet_rollback(db)
+        return None
+    if not row:
+        return None
+    return {"enabled": bool(row[0]), "cron_expr": row[1], "last_run": row[2]}
+
+
+def blocking_task(db):
+    """The job holding AudioMuse-AI's queue now (``{"task_type", "status"}``), or ``None``: while it runs, no
+    scheduled task starts, this plugin's rounds included."""
+    if db is None:
+        return None
+    try:
+        from database import get_queue_blocking_task
+
+        task = get_queue_blocking_task(conn=db)
+        db.commit()
+    except Exception:
+        _quiet_rollback(db)
+        return None
+    return {"task_type": task.get("task_type"), "status": task.get("status")} if task else None
+
+
+# ---- inputs (AudioMuse-AI's own tables, read only) -----------------------------------------------------------
+
+def library_digest(db):
+    """Digest and count of what the similar lists read from the library: each song's album and artists."""
+    cur = db.cursor()
+    cur.execute("""
+        SELECT md5(COALESCE(string_agg(
+                   md5(concat_ws(chr(31), item_id, album, album_artist, author)), '' ORDER BY item_id), '')),
+               count(*)
+          FROM score""")
+    digest, count = cur.fetchone()
+    cur.close()
+    return str(digest), int(count)
+
+
+def analysis_digest(db):
+    """Digest and count of the sound analysis the similar lists read: each song's embedding."""
+    cur = db.cursor()
+    cur.execute("""
+        SELECT md5(COALESCE(string_agg(item_id || ':' || md5(embedding), '' ORDER BY item_id), '')),
+               count(*)
+          FROM embedding WHERE embedding IS NOT NULL""")
+    digest, count = cur.fetchone()
+    cur.close()
+    return str(digest), int(count)
+
+
+def similarity_tracks(db):
+    """``(item_id, album, album_artist, author, embedding bytes)`` of every analysed song, streamed."""
+    cur = db.cursor(name="siansa_similarity_inputs")  # server-side cursor: rows arrive in batches
+    cur.itersize = 2000
+    cur.execute("""
+        SELECT s.item_id, s.album, s.album_artist, s.author, e.embedding
+          FROM score s JOIN embedding e USING (item_id)
+         WHERE e.embedding IS NOT NULL""")
+    try:
+        for row in cur:
+            yield row
+    finally:
+        cur.close()
+
+
+def song_info(db, item_ids):
+    """``{item_id: (title, album, album_artist, author)}`` for the given canonical ids."""
+    if not item_ids:
+        return {}
+    cur = db.cursor()
+    cur.execute("SELECT item_id, title, album, album_artist, author FROM score WHERE item_id = ANY(%s)",
+                (list(item_ids),))
+    out = {row[0]: row[1:] for row in cur.fetchall()}
+    cur.close()
+    return out
+
+
+# ---- profiles ------------------------------------------------------------------------------------------------
+
+def save_profile(db, item_id, profile):
+    """Stores a measured song (``profile`` from :func:`jobs.profile_of`)."""
+    cur = db.cursor()
+    cur.execute(f"""
+        INSERT INTO {table('profiles')}
+            (item_id, status, ref_lufs, start_ramp, end_ramp, duration_ms, analyzer_version, beats, beats_version,
+             attempts, retry_after, error, updated_at)
+        VALUES (%s, 'ready', %s, %s, %s, %s, %s, %s, %s, 0, NULL, NULL, now())
+        ON CONFLICT (item_id) DO UPDATE SET
+            status='ready', ref_lufs=EXCLUDED.ref_lufs, start_ramp=EXCLUDED.start_ramp,
+            end_ramp=EXCLUDED.end_ramp, duration_ms=EXCLUDED.duration_ms,
+            analyzer_version=EXCLUDED.analyzer_version, beats=EXCLUDED.beats, beats_version=EXCLUDED.beats_version,
+            beats_error=NULL, beats_attempts=0, beats_retry_after=NULL, attempts=0, retry_after=NULL, error=NULL,
+            source='measured', updated_at=now()""",
+        (item_id, profile["ref_lufs"], profile["start_ramp"], profile["end_ramp"], profile["duration_ms"],
+         ANALYZER_VERSION, json.dumps(profile.get("beats") or {}), BEATS_VERSION))
+    cur.execute(f"DELETE FROM {table('wanted')} WHERE item_id=%s", (item_id,))
+    cur.close()
+    db.commit()
+
+
+def save_failure(db, item_id, error):
+    """Notes that a song couldn't be measured; it is tried again later, waiting longer each time."""
+    cur = db.cursor()
+    cur.execute(f"SELECT attempts FROM {table('profiles')} WHERE item_id=%s", (item_id,))
+    row = cur.fetchone()
+    attempts = (row[0] if row else 0) + 1
+    hours = RETRY_HOURS[min(attempts, len(RETRY_HOURS)) - 1]
+    cur.execute(f"""
+        INSERT INTO {table('profiles')} (item_id, status, attempts, retry_after, error, updated_at)
+        VALUES (%s, 'failed', %s, now() + make_interval(hours => %s), %s, now())
+        ON CONFLICT (item_id) DO UPDATE SET
+            status='failed', attempts=EXCLUDED.attempts, retry_after=EXCLUDED.retry_after,
+            error=EXCLUDED.error, updated_at=now()
+          WHERE {table('profiles')}.status <> 'ready'""",
+        (item_id, attempts, hours, str(error)[:500]))
+    cur.close()
+    db.commit()
+
+
+ELSEWHERE_DAYS = 7  # a song on none of the music servers is looked at again a week later
+
+
+def save_beats_failure(db, item_id, error, elsewhere=False):
+    """Notes that a song measured before the beat tracker couldn't be measured again for its beats. Its loudness
+    and ramps stay, and it's tried again later, waiting longer each time (as profiles do), so one bad file doesn't
+    come back every round and a passing problem doesn't last. A song that isn't on this run's music server (one
+    on any of AudioMuse-AI's servers (removed, or not mapped yet) waits :data:`ELSEWHERE_DAYS` and doesn't count
+    as a failure."""
+    cur = db.cursor()
+    cur.execute(f"SELECT beats_attempts FROM {table('profiles')} WHERE item_id=%s", (item_id,))
+    row = cur.fetchone()
+    attempts = (row[0] if row else 0) + (0 if elsewhere else 1)
+    hours = ELSEWHERE_DAYS * 24 if elsewhere else RETRY_HOURS[min(max(attempts, 1), len(RETRY_HOURS)) - 1]
+    cur.execute(f"""
+        UPDATE {table('profiles')}
+           SET beats_error=%s, beats_attempts=%s, beats_retry_after=now() + make_interval(hours => %s), updated_at=now()
+         WHERE item_id=%s AND status='ready'""",
+        (ELSEWHERE if elsewhere else str(error)[:500], attempts, hours, item_id))
+    cur.execute(f"DELETE FROM {table('wanted')} WHERE item_id=%s", (item_id,))
+    cur.close()
+    db.commit()
+
+
+ELSEWHERE = "not on any music server"
+
+
+def retry_beats(db):
+    """Every song that failed its beat measurement is tried again with the next round (the page's Try again).
+    Returns how many."""
+    cur = db.cursor()
+    cur.execute(f"""
+        UPDATE {table('profiles')} SET beats_retry_after=NULL
+         WHERE status='ready' AND beats_version<>%s AND beats_error IS NOT NULL""", (BEATS_VERSION,))
+    count = cur.rowcount
+    cur.close()
+    db.commit()
+    return int(count or 0)
+
+
+def beats_failure_reasons(db, limit=5):
+    """Why songs couldn't be measured for their beats, the most common first: ``[(reason, songs)]``."""
+    cur = db.cursor()
+    cur.execute(f"""
+        SELECT beats_error, count(*) FROM {table('profiles')} p JOIN score s USING (item_id)
+         WHERE p.status='ready' AND p.beats_version<>%s AND p.beats_error IS NOT NULL
+           AND p.beats_error NOT IN (%s, 'not on this music server')
+         GROUP BY beats_error ORDER BY count(*) DESC LIMIT %s""", (BEATS_VERSION, ELSEWHERE, int(limit)))
+    rows = [(r[0], int(r[1])) for r in cur.fetchall()]
+    cur.close()
+    return rows
+
+
+def save_elsewhere(db, item_id):
+    """Notes a song that isn't on any of AudioMuse-AI's music servers (removed, or one AudioMuse
+    hasn't mapped yet). It is looked at again a day later, without counting as a failure."""
+    cur = db.cursor()
+    cur.execute(f"""
+        INSERT INTO {table('profiles')} (item_id, status, retry_after, error, updated_at)
+        VALUES (%s, 'elsewhere', now() + interval '1 day', 'not on any music server', now())
+        ON CONFLICT (item_id) DO UPDATE SET status='elsewhere', retry_after=EXCLUDED.retry_after,
+            error=EXCLUDED.error, updated_at=now()
+          WHERE {table('profiles')}.status <> 'ready'""", (item_id,))
+    cur.close()
+    db.commit()
+
+
+def profiles_for(db, item_ids):
+    """Ready profiles of the given canonical ids, ``{item_id: row dict}``."""
+    if not item_ids:
+        return {}
+    cur = db.cursor()
+    cur.execute(f"""
+        SELECT item_id, ref_lufs, start_ramp, end_ramp, duration_ms, beats FROM {table('profiles')}
+         WHERE item_id = ANY(%s) AND status='ready' AND analyzer_version=%s""",
+        (list(item_ids), ANALYZER_VERSION))
+    out = {}
+    for row in cur.fetchall():
+        profile = {"ref_lufs": row[1], "start_ramp": row[2] or "", "end_ramp": row[3] or "", "duration_ms": row[4] or 0}
+        grids = row[5] if isinstance(row[5], dict) else (json.loads(row[5]) if row[5] else {})
+        profile.update(grids or {})  # intro_bpm, intro_beat_ms, … when the beats have been measured
+        out[row[0]] = profile
+    cur.close()
+    return out
+
+
+def mark_wanted(db, item_ids):
+    """Remembers songs the app asked for that have no profile yet (or no beat grids yet), so the next run
+    measures them first."""
+    if not item_ids:
+        return
+    cur = db.cursor()
+    cur.execute(f"""
+        INSERT INTO {table('wanted')} (item_id)
+        SELECT item_id FROM score WHERE item_id = ANY(%s)
+        ON CONFLICT (item_id) DO UPDATE SET asked_at=now()""", (list(item_ids),))
+    cur.close()
+    db.commit()
+
+
+def profile_counts(db):
+    """``(songs, ready, failed, wanted)`` across the library."""
+    cur = db.cursor()
+    cur.execute(f"""
+        SELECT (SELECT count(*) FROM score),
+               count(*) FILTER (WHERE p.status='ready' AND p.analyzer_version=%s),
+               count(*) FILTER (WHERE p.status='failed'),
+               (SELECT count(*) FROM {table('wanted')})
+          FROM {table('profiles')} p JOIN score s USING (item_id)""", (ANALYZER_VERSION,))
+    songs, ready, failed, wanted = cur.fetchone()
+    cur.close()
+    return int(songs or 0), int(ready or 0), int(failed or 0), int(wanted or 0)
+
+
+def beats_counts(db):
+    """``(done, with_beat, failed, waiting, elsewhere)`` over the songs with a volume and fade profile: measured by
+    the current beat tracker, of those how many have a beat at either end; of the rest, how many failed (tried
+    again later), how many wait to be measured, and how many are only on another music server."""
+    cur = db.cursor()
+    cur.execute(f"""
+        SELECT count(*) FILTER (WHERE p.beats_version=%s),
+               count(*) FILTER (WHERE p.beats_version=%s AND (p.beats ? 'intro_bpm' OR p.beats ? 'outro_bpm')),
+               count(*) FILTER (WHERE p.beats_version<>%s AND p.beats_error IS NOT NULL AND p.beats_error NOT IN (%s, 'not on this music server')),
+               count(*) FILTER (WHERE p.beats_version<>%s AND (p.beats_error IS NULL OR p.beats_error='not on this music server')),
+               count(*) FILTER (WHERE p.beats_version<>%s AND p.beats_error=%s)
+          FROM {table('profiles')} p JOIN score s USING (item_id)
+         WHERE p.status='ready' AND p.analyzer_version=%s""",
+        (BEATS_VERSION, BEATS_VERSION, BEATS_VERSION, ELSEWHERE, BEATS_VERSION, BEATS_VERSION, ELSEWHERE, ANALYZER_VERSION))
+    done, with_beat, failed, waiting, elsewhere = cur.fetchone()
+    cur.close()
+    return int(done or 0), int(with_beat or 0), int(failed or 0), int(waiting or 0), int(elsewhere or 0)
+
+
+def until_waiting(db):
+    """Songs measured before 0.5.0 still to be checked for where their beat stops."""
+    cur = db.cursor()
+    cur.execute(f"""
+        SELECT count(*) FROM {table('profiles')} p JOIN score s USING (item_id)
+         WHERE p.status='ready' AND p.analyzer_version=%s AND p.beats_version=%s
+           AND NOT (COALESCE(p.beats, '{{}}'::jsonb) ? %s)""", (ANALYZER_VERSION, BEATS_VERSION, UNTIL_KEY))
+    n = cur.fetchone()[0]
+    cur.close()
+    return int(n or 0)
+
+
+def songs_to_measure(db, limit, beats=False, fill=False):
+    """Up to ``limit`` songs to measure, newest first.
+
+    Without ``beats``, songs without a current volume and fade profile (none yet, an older analyser, or due to be
+    tried again), asked-for songs first. With ``beats``, songs whose profile is current but whose beat grids are
+    missing: measured before the beat tracker, or by an older one (Siansa issue #646); asked-for songs first too,
+    since the app is about to play them. The two never overlap, so each part keeps its own pace.
+    """
+    cur = db.cursor()
+    if beats:
+        # Songs that failed come back once their wait is over; songs waiting their first try come first.
+        # Also songs measured before 0.5.0 looked for where the beat stops: asked-for ones always, the rest only with
+        # Measure all on (``fill``), when the owner chose to have the whole library done.
+        missing = f"NOT (COALESCE(p.beats, '{{}}'::jsonb) ? '{UNTIL_KEY}')"
+        where = f"""p.status='ready' AND p.analyzer_version = %s
+                AND (p.beats_version <> %s OR ({missing} AND {"TRUE" if fill else "w.item_id IS NOT NULL"}))
+                AND (p.beats_retry_after IS NULL OR p.beats_retry_after <= now())"""
+        params = (ANALYZER_VERSION, BEATS_VERSION)
+    else:
+        where = """(p.item_id IS NULL
+                OR (p.status='ready' AND p.analyzer_version <> %s)
+                OR (p.status IN ('failed', 'elsewhere') AND (p.retry_after IS NULL OR p.retry_after <= now())))"""
+        params = (ANALYZER_VERSION,)
+    cur.execute(f"""
+        SELECT s.item_id, s.title
+          FROM score s
+          LEFT JOIN {table('profiles')} p USING (item_id)
+          LEFT JOIN {table('wanted')} w USING (item_id)
+         WHERE {where}
+         ORDER BY w.asked_at DESC NULLS LAST, {"p.beats_attempts ASC," if beats else ""} s.created_at DESC
+         LIMIT %s""", (*params, int(limit)))
+    rows = cur.fetchall()
+    cur.close()
+    return rows
+
+
+def recent_beats_failures(db, limit=5):
+    """The last songs that couldn't be read again for their beats: ``(item_id, title, artist, error)``."""
+    cur = db.cursor()
+    cur.execute(f"""
+        SELECT p.item_id, s.title, s.author, p.beats_error
+          FROM {table('profiles')} p LEFT JOIN score s USING (item_id)
+         WHERE p.beats_error IS NOT NULL AND p.beats_error<>%s AND p.beats_version<>%s
+         ORDER BY p.updated_at DESC LIMIT %s""", (ELSEWHERE, BEATS_VERSION, int(limit)))
+    rows = cur.fetchall()
+    cur.close()
+    return rows
+
+
+def recent_failures(db, limit=5):
+    cur = db.cursor()
+    cur.execute(f"""
+        SELECT p.item_id, s.title, s.author, p.error, p.attempts
+          FROM {table('profiles')} p LEFT JOIN score s USING (item_id)
+         WHERE p.status='failed' ORDER BY p.updated_at DESC LIMIT %s""", (limit,))
+    rows = cur.fetchall()
+    cur.close()
+    return rows
+
+
+# ---- similar lists -------------------------------------------------------------------------------------------
+
+def publish_similar(db, albums, album_names, artists, artist_names, generation):
+    """Swaps in a finished build in one transaction: readers see the old lists until the commit."""
+    from psycopg2.extras import execute_values
+
+    cur = db.cursor()
+    cur.execute(f"DELETE FROM {table('similar_albums')}")
+    execute_values(
+        cur,
+        f"INSERT INTO {table('similar_albums')} (album_key, name, artist, candidates, generation) VALUES %s",
+        [(key, album_names[key][0], album_names[key][1], json.dumps(found), generation) for key, found in albums.items()],
+        template="(%s, %s, %s, %s::jsonb, %s)", page_size=1000)
+    cur.execute(f"DELETE FROM {table('similar_artists')}")
+    execute_values(
+        cur,
+        f"INSERT INTO {table('similar_artists')} (artist_key, name, artist, candidates, generation) VALUES %s",
+        [(key, artist_names[key], artist_names[key], json.dumps(found), generation) for key, found in artists.items()],
+        template="(%s, %s, %s, %s::jsonb, %s)", page_size=1000)
+    cur.close()
+
+
+def similar_row(db, kind, key):
+    cur = db.cursor()
+    column = "album_key" if kind == "albums" else "artist_key"
+    cur.execute(f"SELECT name, artist, candidates FROM {table('similar_' + kind)} WHERE {column}=%s", (key,))
+    row = cur.fetchone()
+    cur.close()
+    if not row:
+        return None
+    candidates = row[2] if not isinstance(row[2], str) else json.loads(row[2])
+    return {"name": row[0], "artist": row[1], "candidates": candidates}

@@ -84,9 +84,10 @@ class PluginProfilesTest {
         assertEquals(listOf(RampPoint(-18, 30_000), RampPoint(6, 100)), p.startRamp)
         assertTrue(p.endRamp.isEmpty())
         assertEquals(201_000L, p.durationMs)
-        assertEquals("/plugins/siansa_analysis/api/profiles", PluginProfiles.PATH)
-        assertEquals("/plugins/siansa_analysis/api/health", ProfileStore.HEALTH_PATH)
-        assertEquals("siansa_analysis", ProfileStore.PLUGIN_NAME)
+        // Siansa Dev's experiment: Siansa Beats (dev), next to the Siansa plugin.
+        assertEquals("/plugins/siansa_beats/api/profiles", PluginProfiles.PATH)
+        assertEquals("/plugins/siansa_beats/api/health", ProfileStore.HEALTH_PATH)
+        assertEquals("siansa_beats", ProfileStore.PLUGIN_NAME)
     }
 
     @Test fun theStoredChoiceIsRead() {
@@ -136,9 +137,11 @@ class CrossfadePlanTest {
     }
 
     @Test fun fixedFadesTheWholeLength() {
-        val plan = Crossfade.plan(CrossfadeMode.FIXED, 6_000, a1, a2, minutes4, minutes4)!!
+        val plan = Crossfade.plan(CrossfadeMode.FIXED, 6_000, a1, b1, minutes4, minutes4)!!
         assertEquals(6_000L, plan.overlapMs)
         assertEquals(6_000L, plan.fadeInMs)
+        // An album playing in order stays gapless with Fixed too (the owner, 9 Nov).
+        assertNull(Crossfade.plan(CrossfadeMode.FIXED, 6_000, a1, a2, minutes4, minutes4))
     }
 
     @Test fun smartKeepsAlbumsGaplessWhenTheyRunStraightOn() {
@@ -153,7 +156,10 @@ class CrossfadePlanTest {
     @Test fun smartFollowsTheQuietTailAndTheIntro() {
         val plan = Crossfade.plan(CrossfadeMode.SMART, 12_000, a1, b1, minutes4, minutes4, profile("a1", 0, 5_000), profile("b1", 2_000, 0))!!
         assertEquals(7_000L, plan.overlapMs)
-        assertEquals(2_000L, plan.fadeInMs)
+        // The old song ends quietly (5 s): the next one builds up over the whole of it (the owner, 9 Nov), no longer
+        // coming in over 2 s and then playing at full level over the quiet end.
+        assertEquals(7_000L, plan.fadeInMs)
+        assertTrue(plan.buildUp)
     }
 
     @Test fun aHardEndingIntoAHardStartIsAColdEndWithAShortPause() {
@@ -198,9 +204,11 @@ class CrossfadePlanTest {
         assertEquals(0L, plan.gapMs)
         assertEquals(Crossfade.COLD_OUT_MS, plan.overlapMs)
         assertTrue(plan.why, plan.why.contains("no pause"))
-        // One side without a beat (Yor Zarad's 0.15 into a beat): the pause, as before.
+        // One side without a beat (Yor Zarad's 0.15 into a beat): outside DJ playback the pause, as before; in it, never
+        // a pause (the owner's bad blends, 9 Nov).
         val beatless = out.copy(outro = house.copy(rhythm = 0.15f, steady = 0.0f))
-        assertTrue(Crossfade.plan(CrossfadeMode.SMART, 24_000, a1, b1, minutes4, minutes4, beatless, inn, beatMatch = true)!!.gapMs > 0)
+        assertTrue(Crossfade.plan(CrossfadeMode.SMART, 24_000, a1, b1, minutes4, minutes4, beatless, inn, beatMatch = false)!!.gapMs > 0)
+        assertEquals(0L, Crossfade.plan(CrossfadeMode.SMART, 24_000, a1, b1, minutes4, minutes4, beatless, inn, beatMatch = true)!!.gapMs)
     }
 
     @Test fun aColdEndPausesLongerWhenTheTemposAreFarApart() {
@@ -492,6 +500,17 @@ class ProfileStoreTest {
         assertEquals(2, asked.size)
     }
 
+    @Test fun aProfileWithoutSiansaBeatsIsFetchedAgainLater() = runBlocking {
+        // The owner's bad blend #1: a profile fetched before Siansa Beats had the song was kept all morning.
+        store.fetch(listOf("a"))
+        store.fetch(listOf("a"))
+        assertEquals(1, asked.size)
+        time += ProfileStore.RETRY_MISSING_MS + 1
+        store.fetch(listOf("a"))
+        assertEquals(2, asked.size)
+        assertNotNull(store.cached("a"))  // kept meanwhile, and after
+    }
+
     @Test fun aFailingPluginIsLeftAloneForAWhile() = runBlocking {
         reply = { throw ApiException("AudioMuse answered HTTP 404: not found") }
         assertTrue(store.fetch(listOf("a")).isEmpty())
@@ -517,11 +536,29 @@ class ProfileStoreTest {
     }
 
     @Test fun theTestSaysWhetherThePluginWorks() = runBlocking {
-        reply = { JsonObject(mapOf("plugin" to JsonPrimitive("siansa_analysis"), "plugin_version" to JsonPrimitive("1.4.0"), "status" to JsonPrimitive("ok"))) }
+        reply = { JsonObject(mapOf("plugin" to JsonPrimitive("siansa_beats"), "plugin_version" to JsonPrimitive("0.1.0"), "status" to JsonPrimitive("ok"))) }
         val ok = store.check()
         assertTrue(ok.ok)
-        assertEquals("Siansa plugin 1.4.0 is working", ok.message)
+        assertEquals("Siansa Beats (dev) 0.1.0 is working", ok.message)
         assertEquals(ProfileStore.HEALTH_PATH, asked.last())
+
+        // Siansa Beats (dev) says whether Siansa Beats answers it.
+        val beats = { reachable: Boolean -> JsonObject(mapOf(
+            "plugin" to JsonPrimitive("siansa_beats"), "plugin_version" to JsonPrimitive("0.1.0"), "status" to JsonPrimitive("ok"),
+            "siansa_plugin" to JsonPrimitive(true),
+            "beats" to JsonObject(if (reachable) mapOf("reachable" to JsonPrimitive(true), "version" to JsonPrimitive("0.8.1"))
+                else mapOf("reachable" to JsonPrimitive(false), "problem" to JsonPrimitive("Nothing answers at beats:8090"))),
+        )) }
+        reply = { beats(true) }
+        assertEquals("Siansa Beats (dev) 0.1.0 is working · Siansa Beats 0.8.1 answers", store.check().message)
+        reply = { beats(false) }
+        val down = store.check()
+        assertFalse(down.ok)
+        assertTrue(down.message, "Nothing answers at beats:8090" in down.message)
+
+        // The Siansa plugin itself isn't what this build asks.
+        reply = { JsonObject(mapOf("plugin" to JsonPrimitive("siansa_analysis"), "status" to JsonPrimitive("ok"))) }
+        assertTrue(store.check().message.contains("not as Siansa Beats (dev)"))
 
         reply = { throw ApiException("AudioMuse sent something that isn't JSON. Is the address its API port?") }
         val login = store.check()

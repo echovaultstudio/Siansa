@@ -55,11 +55,14 @@ Settings) always open that tab's own page, wherever you are.
   plain words to open, then Play, Shuffle and Add to favourites in line under them; down from them goes straight to the songs. The button at the end of each
   song has Play next, Add to queue, Add to playlist, Like, Start (or Stop) a mix, Similar songs, Go to album or
   artist, and Song details.
-- **Artists**: Play, Shuffle, Artist radio and Add to favourites, then their top three songs (**Show all** for the rest), a row for each kind of release (Albums, EPs, Singles,
+- **Artists**: their photo (looked up again, so one Navidrome found since your library was read shows instead of a
+  placeholder), Play, Shuffle, Artist radio and Add to favourites, then their top three songs (**Show all** for the rest), a row for each kind of release (Albums, EPs, Singles,
   DJ-mixes…) and similar artists.
 - **Search**: type with the on-screen keyboard or press the microphone button and say it. "Play … on Siansa" from
   Google TV's own search opens it too. With nothing typed, it shows your recent searches (the phone's, kept when you
-  search or go into the results; **Clear** forgets them), then radios (with AudioMuse) and your genres, as on the phone.
+  search or go into the results; **Clear** forgets them), then radios (with AudioMuse) and your genres, as on the phone:
+  in Siansa Dev with Siansa Beats, the genres it heard in your music (Home's Your genres and Library's genres too),
+  otherwise your genre tags.
 - **Now playing**: as simple as Siansa's Chromecast screen: the cover, the song, its artist and album, a thin line
   for the time, over the cover blurred as on the phone, and Siansa's logo in the corner. There are no buttons: **OK**
   plays and pauses (paused, the cover darkens under a pause sign), **left** and **right** go to the previous and next
@@ -86,7 +89,8 @@ the phone:
 
 - **Your sound** and **Discover for you** among Your mixes on Home, made when you pick them.
 - **Radios** on Home: sound radios that play straight away.
-- **Similar songs** in a song's actions, and **Start a mix** with DJ blends.
+- **Similar songs** in a song's actions, and **Start a mix** with DJ blends. A DJ mix is offered only when Siansa Beats
+  answers with the songs' sound, as on the phone; otherwise its choice is greyed out with the reason, and Steady still plays.
 - **Songs that sound like…** in Search: type or say a few words ("rainy sunday morning").
 - **Your sound** in the Library: the sound of your library.
 - **Song path** in Now playing and in a song's actions: from that song to another, through songs that sound in between.

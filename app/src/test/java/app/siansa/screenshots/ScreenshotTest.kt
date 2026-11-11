@@ -50,7 +50,6 @@ import app.siansa.ui.DlnaSettingsContent
 import app.siansa.ui.GradientTile
 import app.siansa.ui.HomeItem
 import app.siansa.ui.HomeLookRow
-import app.siansa.ui.MixShapeControls
 import app.siansa.ui.ProgressCard
 import app.siansa.playback.BeatMatchMode
 import app.siansa.ui.BeatMatchSection
@@ -179,6 +178,22 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     }
                 }
             },
+            // All genres: three small tiles a row, where three lines didn't fit the height and were cut off ("Drum And B…",
+            // 10 Nov): they shrink to fit.
+            Scene("genre_tiles_small") {
+                Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
+                        GradientTile("Drum And Bass", Color(0xFF2C7A8C) to Color(0xFF173A47), onClick = {}, size = 104.dp)
+                        GradientTile("Alternative Rock", Color(0xFF4A5AC8) to Color(0xFF22285A), onClick = {}, size = 104.dp)
+                        GradientTile("Progressive Breaks", Color(0xFFB0306A) to Color(0xFF4A1230), onClick = {}, size = 104.dp)
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
+                        GradientTile("Hip Hop / Electro", Color(0xFF3A8C4A) to Color(0xFF173A20), onClick = {}, size = 104.dp)
+                        GradientTile("Contemporary Jazz", Color(0xFFE08A2C) to Color(0xFFB04A20), onClick = {}, size = 104.dp)
+                        GradientTile("Idm", Color(0xFF4A5AC8) to Color(0xFF22285A), onClick = {}, size = 104.dp)
+                    }
+                }
+            },
             // Home rows in their other looks (issue #655).
             Scene("home_banner") {
                 HomeLookRow(HomeLook.BANNER, "today", "Rainy Window, Early Hours", items("Evian", "Revenant", "Infinity Pool"))
@@ -236,9 +251,16 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     }
                 }
             },
-            // The queue's mix controls ("Surprises", issue #677).
+            // The queue's Shape your mix (the owner, 10 Nov): folded, and open with the glide bar and the Surprises bar.
             Scene("queue_mix_shape") {
-                OnPlayer { Box(Modifier.padding(vertical = Space.Medium)) { MixShapeControls(MixShape.STEADY, 50) { _, _ -> } } }
+                OnPlayer {
+                    Column(Modifier.padding(vertical = Space.Medium)) {
+                        val places = app.siansa.ui.DjBarPlaces(app.siansa.ui.DjBarSpot.default, starting = false)
+                        app.siansa.ui.MixShapePanel(places, MixShape.BUILD, 55, open = false, onOpen = {}, onPlace = {}, onSurprise = {})
+                        app.siansa.ui.MixShapePanel(places, MixShape.BUILD, 55, open = true, onOpen = {}, onPlace = {}, onSurprise = {})
+                        app.siansa.ui.MixShapePanel(places.copy(starting = true), null, null, open = true, onOpen = {}, onPlace = {}, onSurprise = {})
+                    }
+                }
             },
             // Settings › Style (issue #681).
             Scene("style_top_bar") { TopBarChoice(TopBarStyle.BLACK) {} },
@@ -453,6 +475,41 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     }
                 }
             },
+            // The DJ mix bar (issues #1033, #1035), the seek bar's width: opening out of the seek bar's line; open with no
+            // mix playing (Start in the middle, then on Start); while a mix plays (Euphoric now), on Steady build and on
+            // Stop; and an album's DJ mix, only Stop.
+            Scene("dj_bar") {
+                OnPlayer {
+                    Column(Modifier.padding(horizontal = Space.Section, vertical = Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
+                        val all = app.siansa.ui.DjBarSpot.default
+                        val now = app.siansa.ui.DjBarSpot.EUPHORIC
+                        app.siansa.ui.DjBar(all, chosen = null, now = null, starting = true, open = 0.4f)
+                        app.siansa.ui.DjBar(all, chosen = null, now = null, starting = true, open = 1f)
+                        app.siansa.ui.DjBar(all, chosen = 2, now = null, starting = true, open = 1f)
+                        app.siansa.ui.DjBar(all, chosen = 1, now = now, starting = false, open = 1f)
+                        app.siansa.ui.DjBar(all, chosen = 2, now = now, starting = false, open = 1f)
+                        app.siansa.ui.DjBar(listOf(app.siansa.ui.DjBarSpot.MIX), chosen = 0, now = null, starting = false, open = 1f)
+                    }
+                }
+            },
+            // The cover while on the DJ mix bar (issue #1035): on Start with no mix playing, and on Stop while one plays.
+            Scene("dj_bar_cover") {
+                OnPlayer {
+                    Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Page)) {
+                        val all = app.siansa.ui.DjBarSpot.default
+                        listOf(true, false).forEach { starting ->
+                            val label = app.siansa.ui.SlideLabel(
+                                app.siansa.ui.PlaySlide.DJ_MIX, app.siansa.ui.SlideWay.UP, armed = true,
+                                bar = app.siansa.ui.DjBarView(all, chosen = 2, starting = starting, rise = 1f),
+                            )
+                            Box(
+                                Modifier.size(300.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
+                                    .background(androidx.compose.ui.graphics.Brush.linearGradient(listOf(Color(0xFF2FA39A), Color(0xFF3A1D6E)))),
+                            ) { app.siansa.ui.SlideCoverLabel(label, Modifier.fillMaxSize()) }
+                        }
+                    }
+                }
+            },
             // Settings › Style › Home: how many shortcuts Home shows (issue #934).
             Scene("home_style_shortcuts") {
                 Column(Modifier.padding(vertical = Space.Page)) { app.siansa.ui.ShortcutCountRow(6) {} }
@@ -467,6 +524,88 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
             // An album's details with "Continue from 8", and its bar (issue #965, the owner's layout): at rest; continuing (a ring
             // round Play); sliding shuffle onto Play (the rest dims, Play a record); while the album's DJ mix plays; and DJ mix
             // on the cover, on Play and before.
+            // An artist's bar (the owner, 9 Nov): the heart on the left, in line with the details; Radio, Shuffle and Play
+            // on the right. Not a favourite, a favourite, and an artist without songs of their own.
+            Scene("artist_bar") {
+                Column(Modifier.padding(Space.Page)) {
+                    androidx.compose.material3.Text("12 releases · 140 songs")
+                    listOf(false, true).forEach { on ->
+                        app.siansa.ui.ArtistButtons(
+                            heart = { m -> app.siansa.ui.FavouriteHeart(on, m, MaterialTheme.colorScheme.onSurface, 28.dp) {} },
+                            onRadio = {}, onShuffle = {}, playing = false, onPlay = {},
+                        )
+                    }
+                    app.siansa.ui.ArtistButtons(
+                        heart = { m -> app.siansa.ui.FavouriteHeart(false, m, MaterialTheme.colorScheme.onSurface, 28.dp) {} },
+                        onRadio = {}, onShuffle = null, playing = false, onPlay = null,
+                    )
+                }
+            },
+            // Dynamic colours on pages (issue #1028): Radio, Shuffle and Play in the cover's colour, on the page as it is in
+            // light and dark, for a bright yellow title, a rust cover and a black and white one (silver, or graphite in light).
+            Scene("page_colours") {
+                val surface = MaterialTheme.colorScheme.surface
+                Column(Modifier.padding(vertical = Space.Page)) {
+                    listOf(Color(0xFFE8E21E), Color(0xFFAD6B41), Color(0xFF808080)).forEach { seed ->
+                        val page = app.siansa.ui.pageBackdrop(surface, Color(0xFF3A2A20))
+                        val colours = app.siansa.ui.DynamicAccent.of(seed, page)!!
+                        Box(Modifier.fillMaxWidth().background(page).padding(horizontal = Space.Page)) {
+                            app.siansa.ui.WithAccent(colours.controls, colours.onControls) {
+                                app.siansa.ui.ArtistButtons(
+                                    heart = { m -> app.siansa.ui.FavouriteHeart(false, m, MaterialTheme.colorScheme.onSurface, 28.dp) {} },
+                                    onRadio = {}, onShuffle = {}, playing = false, onPlay = {},
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            // An artist's release types as tabs at the top of their page (issue #1029): All chosen; Singles chosen; every
+            // type with DJ-mixes chosen, scrolled into view and fading at the edges; and pinned under the title bar, white on
+            // its colour.
+            Scene("artist_tabs") {
+                val few = listOf(app.siansa.data.AlbumCategory.ALBUM, app.siansa.data.AlbumCategory.EP, app.siansa.data.AlbumCategory.SINGLE)
+                val all = app.siansa.data.AlbumCategory.entries.toList()
+                Column(Modifier.padding(vertical = Space.Page)) {
+                    app.siansa.ui.ReleaseTypeTabs(few, null) {}
+                    app.siansa.ui.ReleaseTypeTabs(few, app.siansa.data.AlbumCategory.SINGLE) {}
+                    app.siansa.ui.ReleaseTypeTabs(all, app.siansa.data.AlbumCategory.DJMIX) {}
+                    Box(Modifier.fillMaxWidth().background(Color(0xFF3A2A20))) {
+                        app.siansa.ui.ReleaseTypeTabs(all, null, content = Color.White) {}
+                    }
+                }
+            },
+            // An artist's name on their page (the owner, 10 Nov): at rest on the picture, riding up with the page, halfway into
+            // the title bar (shrinking, sideways past the back arrow), and settled there as the bar's title. A long name too.
+            Scene("artist_name_glide") {
+                val density = androidx.compose.ui.platform.LocalDensity.current
+                val hero = 150.dp
+                val heroPx = with(density) { hero.toPx() }
+                Column(verticalArrangement = Arrangement.spacedBy(Space.Small)) {
+                    listOf(
+                        "Joy Orbison" to 0f, "Joy Orbison" to heroPx * 0.25f, "Joy Orbison" to heroPx * 0.62f,
+                        "Joy Orbison" to heroPx * 2f, "Tayo Meets Acid Rockers Uptown" to heroPx * 0.62f,
+                    ).forEach { (name, scrolled) ->
+                        Box(Modifier.fillMaxWidth().height(170.dp)) {
+                            app.siansa.ui.HeroPage(
+                                title = name, heroHeight = hero, scrolledPx = scrolled, onBack = {}, color = Color(0xFF4A2A26),
+                                image = { m -> Box(m.background(androidx.compose.ui.graphics.Brush.radialGradient(listOf(Color(0xFF7A5A4C), Color(0xFF26171A))))) },
+                            ) { page -> Box(page.fillMaxSize()) }
+                        }
+                    }
+                }
+            },
+            // The lyrics button under the player's controls: at rest, greyed out without lyrics, and lit while the lyrics
+            // are open, when it closes them (the owner, 9 Nov).
+            Scene("lyrics_button") {
+                OnPlayer {
+                    Row(Modifier.background(Color(0xFF2A1F3D)).padding(Space.Page), horizontalArrangement = Arrangement.spacedBy(Space.Page)) {
+                        app.siansa.ui.LyricsButton(enabled = true) {}
+                        app.siansa.ui.LyricsButton(enabled = false) {}
+                        app.siansa.ui.LyricsButton(enabled = true, open = true) {}
+                    }
+                }
+            },
             Scene("album_bar") {
                 Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Page)) {
                     app.siansa.ui.CollectionByline("Thornhill", null, null, "Album · 2019", note = "Continue from 8")
@@ -530,6 +669,8 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
             Scene("radio_choices_and_mixing_docs") {
                 Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Section)) {
                     app.siansa.ui.RadioModeChoices {}
+                    // Without Siansa Beats a DJ mix isn't offered: greyed, with why (the owner, 10 Nov).
+                    app.siansa.ui.RadioModeChoices("Needs Siansa Beats") {}
                     app.siansa.ui.MixingDocsLink()
                 }
             },
@@ -591,6 +732,50 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
             // Now playing for a live station (issue #353): no seek bar, only that it's live.
             Scene("player_live") {
                 OnPlayer { Box(Modifier.padding(horizontal = Space.Page, vertical = Space.Medium)) { app.siansa.ui.LiveBar() } }
+            },
+            // The shortcut grid look for any card or Home row, and its size chips (the owner, 10 Nov).
+            Scene("tile_grid") {
+                Column {
+                    app.siansa.ui.TileGrid(
+                        "Recently played with a long title",
+                        listOf("Halftime radio", "Supercalifragilistic expialidocious", "Liked songs", "Happy").mapIndexed { i, t ->
+                            app.siansa.ui.GridTile("t$i", t, null, Color(0xFF7A1F2B) to Color(0xFF2B5FD6), icon = if (i == 0) Icons.Rounded.PlayArrow else null, onClick = {})
+                        },
+                        4,
+                    )
+                    app.siansa.ui.GridSizeChips(6, Modifier.padding(Space.Page)) {}
+                }
+            },
+            // A page's Play in the title bar once its own has scrolled away, and a radio's (the owner, 10 Nov).
+            Scene("bar_play") {
+                Row(Modifier.background(Color(0xFF7A1F2B)).padding(Space.Page), horizontalArrangement = Arrangement.spacedBy(Space.Page)) {
+                    app.siansa.ui.BarPlayButton(radio = false, colour = Color(0xFFFFB547), onColour = Color(0xFF1A1200), playing = false) {}
+                    app.siansa.ui.BarPlayButton(radio = false, colour = Color(0xFF9DB4C8), onColour = Color(0xFF120D00), playing = true) {}
+                    app.siansa.ui.BarPlayButton(radio = true, colour = Color(0xFFE53935), onColour = Color.White, playing = false) {}
+                }
+            },
+            // A list's sort (liked songs, playlists): Your Library's arrows and menu, not chips; and the line under a
+            // drawn cover with its heart and New picks, the same on radios, mood playlists and cards (the owner, 10 Nov).
+            Scene("song_sort_and_picks") {
+                Column(Modifier.padding(horizontal = Space.Page, vertical = Space.Small), verticalArrangement = Arrangement.spacedBy(Space.Section)) {
+                    Column {
+                        app.siansa.ui.CollectionByline(null, null, null, "Playlist · 100 songs · 6:41:38")
+                        app.siansa.ui.SongSortPicker(app.siansa.data.ListSort.DEFAULT, "Playlist order") {}
+                    }
+                    app.siansa.ui.PicksRow("Made for you · supercalifragilistic expialidocious sounds · 30 songs", onNewPicks = {})
+                    app.siansa.ui.PicksRow("Your card · 30 songs", onNewPicks = null)
+                }
+            },
+            // A genre's description: three lines and "Show more", or all of a short one (the owner, 10 Nov).
+            Scene("genre_about") {
+                Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Section)) {
+                    app.siansa.ui.GenreAboutText(
+                        "Indie pop is a music genre and subculture that combines guitar pop with a DIY ethic in opposition to the " +
+                            "style and tone of mainstream pop music. It originated from British post-punk in the late 1970s.",
+                        "Wikipedia", onSource = {},
+                    )
+                    app.siansa.ui.GenreAboutText("Kayōkyoku is Japanese popular music of the Shōwa era.", "Wikipedia", onSource = null)
+                }
             },
             // Custom card editor: a rule (issue #663).
             Scene("card_rule") {

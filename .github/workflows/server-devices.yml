@@ -1,0 +1,106 @@
+name: Server devices
+
+# The app itself on an emulator against Navidrome, Emby and Jellyfin with the same test library (the owner, 10 Nov):
+# app/src/androidTest/java/app/siansa/EveryServerDeviceTest.kt signs in to each in turn, syncs, opens an artist, reads the
+# genres, searches and plays a song in each format. The Servers workflow checks Siansa's server code on the JVM; this
+# checks the app on a phone. On a pull request labelled "server devices", and on demand.
+on:
+  pull_request:
+    types: [labeled, synchronize, reopened]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: server-devices-${{ github.event.pull_request.number || github.ref }}${{ github.event.action == 'labeled' && github.event.label.name != 'server devices' && '-other-label' || '' }}
+  cancel-in-progress: true
+
+jobs:
+  server-devices:
+    name: App on an emulator against every server
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (contains(github.event.pull_request.labels.*.name, 'server devices') &&
+       (github.event.action != 'labeled' || github.event.label.name == 'server devices'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      # The emulator needs ~7.5 GB for its storage; the runner image leaves too little free.
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/share/boost /usr/share/swift /opt/hostedtoolcache/CodeQL /usr/local/lib/node_modules || true
+          echo "::notice::Free disk: $(df -h / | awk 'NR==2{print $4}')"
+
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: "8.14.3"
+
+      - name: Install ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg > /dev/null
+
+      - name: Start Navidrome, Emby and Jellyfin with the test library
+        run: scripts/servers/start.sh
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run the app against each server
+        run: |
+          set -o pipefail
+          # The emulator reaches the machine it runs on at 10.0.2.2.
+          gradle ":app:ciPhoneDebugAndroidTest" \
+            -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect \
+            -Pandroid.experimental.testOptions.managedDevices.setupTimeoutMinutes=20 \
+            -Pandroid.testInstrumentationRunnerArguments.class=app.siansa.EveryServerDeviceTest \
+            "-Pandroid.testInstrumentationRunnerArguments.servers=navidrome=http://10.0.2.2:4533,emby=http://10.0.2.2:8096,jellyfin=http://10.0.2.2:8097" \
+            2>&1 | tee gradle.txt
+
+      - name: Results
+        if: always()
+        run: |
+          find app/build/outputs -iname "logcat*.txt" -exec cat {} + > logcat.txt 2>/dev/null || true
+          python3 - <<'PY'
+          import glob, re, xml.etree.ElementTree as ET
+          for f in sorted(glob.glob("app/build/outputs/androidTest-results/**/*.xml", recursive=True)):
+              for case in ET.parse(f).getroot().iter("testcase"):
+                  fail, skipped = case.find("failure"), case.find("skipped")
+                  name = case.get("name")
+                  if fail is not None:
+                      print(f"::error::{name}: " + (fail.get("message") or fail.text or "").replace("\n", " ")[:400])
+                  elif skipped is not None:
+                      print(f"::warning::{name}: skipped")
+                  else:
+                      print(f"::notice::{name}: passed")
+          try:
+              log = open("logcat.txt", errors="ignore").read().splitlines()
+          except OSError:
+              log = []
+          played = [re.sub(r".*System.out: ", "", l) for l in log if "System.out" in l and (" played to " in l or "Server: " in l)]
+          for line in played[:20]:
+              print("::notice::" + line)
+          PY
+          docker logs --tail 40 siansa-emby > emby.log 2>&1 || true
+          docker logs --tail 40 siansa-jellyfin > jellyfin.log 2>&1 || true
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: server-devices-results
+          path: |
+            app/build/reports/
+            app/build/outputs/androidTest-results/
+            logcat.txt
+            emby.log
+            jellyfin.log
+            ${{ runner.temp }}/siansa-servers/*.log
