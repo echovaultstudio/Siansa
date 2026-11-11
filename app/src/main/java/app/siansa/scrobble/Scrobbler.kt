@@ -112,7 +112,9 @@ class Scrobbler(
         }
         // Keep at most a few thousand, so a long offline stretch can't grow the file without limit.
         pending.update { current -> (left + current.drop(queue.size)).takeLast(5000) }
-        AppLog.i("Scrobble", "Sent ${queue.size - left.size} listen(s), ${left.size} waiting")
+        // Where they went, so the log answers "is it still sending there?".
+        val places = queue.flatMap { it.targets }.distinct().sorted().joinToString()
+        AppLog.i("Scrobble", "Sent ${queue.size - left.size} listen(s) to $places, ${left.size} waiting")
     }
 
     private suspend fun send(target: String, item: PendingListen): Boolean {
@@ -162,6 +164,20 @@ fun scrobbleTargets(s: app.siansa.data.AppSettings): Set<String> = buildSet {
     if (s.lastFmReady) add(Scrobbler.LASTFM)
     if (s.listenBrainzReady) add(Scrobbler.LISTENBRAINZ)
 }
+
+/**
+ * These settings with the listen server (ListenBrainz or Koito) set to [url] and [token], as "Test and save" keeps
+ * them. An empty token takes the server away and switches sending off. A new one switches sending on the first time
+ * only: changing the address or token later leaves "Send listens" as it was set (the owner, 11 Nov: saving switched it
+ * back on, and an emptied token couldn't be saved at all).
+ */
+fun app.siansa.data.AppSettings.withListenServer(url: String, token: String): app.siansa.data.AppSettings =
+    if (token.isBlank()) copy(listenBrainzEnabled = false, listenBrainzUrl = "", listenBrainzToken = "")
+    else copy(
+        listenBrainzEnabled = listenBrainzEnabled || listenBrainzToken.isBlank(),
+        listenBrainzUrl = url.trim(),
+        listenBrainzToken = token.trim(),
+    )
 
 /** The choices for how much of a song must be heard before it counts (issue #270). */
 val SCROBBLE_PERCENTS = listOf(25, 40, 50, 60, 75, 90)

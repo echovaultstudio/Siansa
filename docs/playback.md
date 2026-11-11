@@ -238,7 +238,8 @@ in your own order under **Settings › Style › DJ Mix Bar**.
 
 Swipe the mini player left for the next song or right for the one before; the phone gives a short buzz as the song
 changes, and when you press **Repeat** or **Add to playlist** in now playing (if touch vibration is on in your
-phone's settings).
+phone's settings). With no song after this one, a swipe left springs back and the song plays on; with none before
+it, a swipe right starts it again.
 
 Pull up from now playing, or tap the queue button, for the queue. Tap a song to jump to it. Swipe a song to the
 left to take it out of the queue, behind a red strip whose bin gives a little shake; swipe it to the right to play it
