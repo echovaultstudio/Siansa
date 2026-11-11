@@ -1,5 +1,6 @@
 package app.siansa.ui
 
+import app.siansa.net.soundReady
 import app.siansa.net.PathMood
 import app.siansa.mix.MOOD_END
 import androidx.compose.ui.platform.testTag
@@ -85,7 +86,7 @@ fun SongPathPicker(nav: NavController, songId: String, fromNowPlaying: Boolean =
     }
 
     var lyrics by rememberSaveable { mutableStateOf(false) }
-    val audioMuse = graph.settings.current.audioMuseReady
+    val audioMuse = graph.settings.current.soundReady
 
     /** The other end: a song id, or MOOD_END + a mood (issue #208). */
     fun go(otherId: String) {

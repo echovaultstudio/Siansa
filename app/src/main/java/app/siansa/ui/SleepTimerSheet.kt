@@ -1,5 +1,6 @@
 package app.siansa.ui
 
+import app.siansa.net.soundReady
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -121,7 +122,7 @@ fun SleepTimerSheet(hasSong: Boolean, onDismiss: () -> Unit) {
     val timer by graph.sleepTimer.state.collectAsStateWithLifecycle()
     val windingAlone by graph.sleepTimer.windDownAlone.collectAsStateWithLifecycle()
     val now = rememberTimerNow(timer != null)
-    val audioMuse = graph.settings.current.audioMuseReady
+    val audioMuse = graph.settings.current.soundReady
     var windDown by remember { mutableStateOf(graph.sleepTimer.windDownChosen && audioMuse) }
     var custom by remember { mutableStateOf(false) }
     var customMinutes by remember { mutableFloatStateOf(90f) }

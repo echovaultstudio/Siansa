@@ -1,5 +1,6 @@
 package app.siansa.mix
 
+import app.siansa.net.soundReady
 import app.siansa.AppGraph
 import app.siansa.data.Song
 import app.siansa.log.AppLog
@@ -70,7 +71,7 @@ class WindDown(private val graph: AppGraph) {
     }
 
     private suspend fun steer(seed: Song? = null) {
-        if (!graph.settings.current.audioMuseReady) {
+        if (!graph.settings.current.soundReady) {
             AppLog.w("Sleep", "Wind down skipped: AudioMuse isn't set up")
             return
         }

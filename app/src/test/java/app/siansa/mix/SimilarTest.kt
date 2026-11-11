@@ -59,4 +59,12 @@ class SimilarTest {
         assertEquals(listOf(Similar.AskFrom.BEATS), Similar.askOrder(audioMuseReady = false, beatsReady = true))
         assertEquals(emptyList<Similar.AskFrom>(), Similar.askOrder(audioMuseReady = false, beatsReady = false))
     }
+
+    /** Siansa Beats 0.25 works similar albums and artists out itself: then it's asked first. */
+    @Test fun siansaBeatsIsAskedFirstOnceItHasTheSongsSound() {
+        assertEquals(listOf(Similar.AskFrom.BEATS, Similar.AskFrom.AUDIOMUSE), Similar.askOrder(audioMuseReady = true, beatsReady = true, beatsSound = true))
+        assertEquals(listOf(Similar.AskFrom.BEATS), Similar.askOrder(audioMuseReady = false, beatsReady = true, beatsSound = true))
+        // Its sound without it being set up here means nothing.
+        assertEquals(listOf(Similar.AskFrom.AUDIOMUSE), Similar.askOrder(audioMuseReady = true, beatsReady = false, beatsSound = true))
+    }
 }

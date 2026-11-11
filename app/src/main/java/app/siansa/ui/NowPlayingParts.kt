@@ -1,5 +1,6 @@
 package app.siansa.ui
 
+import app.siansa.net.soundReady
 import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.ui.graphics.drawscope.clipPath
 
@@ -199,11 +200,11 @@ fun PlayerMenu(
                     }
                     onDismiss()
                 }
-                if (graph.settings.current.audioMuseReady) {
+                if (graph.settings.current.soundReady) {
                     MenuRow(Icons.Rounded.AltRoute, "Song path…") { onDismiss(); onOpenSongPath() }
                 }
                 MenuRow(Icons.Rounded.GraphicEq, "Similar songs") { onDismiss(); onOpenSimilarSongs() }
-                if (graph.settings.current.audioMuseReady && song.albumId != null) {
+                if (graph.settings.current.soundReady && song.albumId != null) {
                     MenuRow(rememberSimilarAlbumsIcon(), "Similar albums") { onDismiss(); onOpenSimilarAlbums() }
                 }
                 MenuDivider()

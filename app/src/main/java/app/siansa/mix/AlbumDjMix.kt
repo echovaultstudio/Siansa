@@ -1,5 +1,6 @@
 package app.siansa.mix
 
+import app.siansa.net.soundReady
 import app.siansa.AppGraph
 import app.siansa.data.Song
 import app.siansa.log.AppLog
@@ -70,7 +71,7 @@ object AlbumDjMix {
         // Never the same start twice running for one album (the owner): last time's first song, if it was this album.
         val lastFirst = songs.value.firstOrNull()?.takeIf { first -> album.any { it.id == first } }
         lastArrangedByFlow = false
-        if (album.size < 3 || !graph.settings.current.audioMuseReady) return album.shuffled()
+        if (album.size < 3 || !graph.settings.current.soundReady) return album.shuffled()
         val features = runCatching { graph.audioMuse.features(album.map { it.id }) }
             .onFailure { AppLog.w("AlbumMix", "Couldn't read tempo and key: ${it.message}; shuffled instead") }
             .getOrNull()?.associateBy { it.id } ?: return album.shuffled()

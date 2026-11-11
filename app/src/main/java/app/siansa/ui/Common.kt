@@ -1,5 +1,6 @@
 package app.siansa.ui
 
+import app.siansa.net.soundReady
 import androidx.compose.ui.platform.testTag
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.text.style.TextAlign
@@ -661,7 +662,7 @@ fun SongRow(
                         if (graph.connection.current.offline) launch.notify("You're offline: a mix needs the server")
                         else RadioChooser.ask(song)
                     })
-                    if (graph.settings.current.audioMuseReady) {
+                    if (graph.settings.current.soundReady) {
                         DropdownMenuItem(text = { Text("Song path…") }, onClick = {
                             menu = false
                             sheet.close()
@@ -673,7 +674,7 @@ fun SongRow(
                         sheet.close()
                         nav.openSimilarSongs(song.id)
                     })
-                    if (graph.settings.current.audioMuseReady && song.albumId != null) {
+                    if (graph.settings.current.soundReady && song.albumId != null) {
                         DropdownMenuItem(text = { Text("Similar albums") }, onClick = {
                             menu = false
                             sheet.close()

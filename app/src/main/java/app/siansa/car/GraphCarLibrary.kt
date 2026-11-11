@@ -1,5 +1,6 @@
 package app.siansa.car
 
+import app.siansa.net.soundReady
 import app.siansa.AppGraph
 import app.siansa.data.Album
 import app.siansa.data.Artist
@@ -16,7 +17,7 @@ import app.siansa.mix.moodRadios
 class GraphCarLibrary(private val graph: AppGraph) : CarLibrary {
     override suspend fun mixes(): List<Mix> = latestMixes(graph.mixes.all())
     override suspend fun mix(id: String): Mix? = graph.mixes.get(id)
-    override fun moods(): List<MoodRadio> = if (graph.settings.current.audioMuseReady) moodRadios else emptyList()
+    override fun moods(): List<MoodRadio> = if (graph.settings.current.soundReady) moodRadios else emptyList()
     override suspend fun moodSongs(id: String): List<Song> = moodRadios.firstOrNull { it.id == id }?.let { graph.radios.mood(it) }.orEmpty()
     override suspend fun recent(): List<RecentPlay> = graph.recentPlays.all()
     override suspend fun playlists(): List<Playlist> = graph.library.playlists()

@@ -1,5 +1,6 @@
 package app.siansa.ui
 
+import app.siansa.net.soundReady
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
@@ -539,7 +540,7 @@ private const val GLINT_TURN_MS = 4_000
  */
 fun slideUnavailable(slide: PlaySlide, settings: app.siansa.data.AppSettings, aiProblem: String?, djProblem: String? = null): String? = when (slide) {
     PlaySlide.SONG_PATH -> when {
-        !settings.audioMuseReady -> "Needs AudioMuse"
+        !settings.soundReady -> "Needs AudioMuse"
         aiProblem != null -> "Not available now"
         else -> null
     }

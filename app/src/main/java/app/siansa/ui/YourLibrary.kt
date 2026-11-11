@@ -1,5 +1,6 @@
 package app.siansa.ui
 
+import app.siansa.net.soundReady
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.ScrollState
 import app.siansa.data.Song
@@ -1194,7 +1195,7 @@ private suspend fun buildLibrary(graph: app.siansa.AppGraph, me: String): Librar
     )
 
     // Your sonic fingerprint (issue #255, was on Home): what you play most sounds like, with its numbers.
-    if (graph.settings.current.audioMuseReady) {
+    if (graph.settings.current.soundReady) {
         entries += Entry(
             key = "sonic-fingerprint",
             kind = Kind.LISTENING,

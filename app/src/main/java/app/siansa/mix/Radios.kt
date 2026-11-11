@@ -1,5 +1,6 @@
 package app.siansa.mix
 
+import app.siansa.net.soundReady
 import app.siansa.AppGraph
 import app.siansa.data.Artist
 import app.siansa.data.Song
@@ -132,7 +133,7 @@ class Radios(private val graph: AppGraph) {
         AppLog.i("Radio", "Artist radio ${artist.id} ${artist.name}")
         val have = already.map { it.id }.toSet()
         val own = graph.library.songsOf(artist).shuffled()
-        if (graph.settings.current.audioMuseReady && own.isNotEmpty()) {
+        if (graph.settings.current.soundReady && own.isNotEmpty()) {
             val alike = runCatching { soundsLike(own) }
                 .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it; AppLog.w("Radio", "AudioMuse couldn't make the artist radio: ${it.message}; asking the music server") }
                 .getOrDefault(emptyList())

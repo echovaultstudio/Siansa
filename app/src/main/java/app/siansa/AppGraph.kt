@@ -29,6 +29,7 @@ import app.siansa.data.BookSpeeds
 import app.siansa.offline.BookDownloads
 import app.siansa.covers.CoverStore
 import app.siansa.covers.CoverVersions
+import app.siansa.net.BeatsSound
 import app.siansa.data.QuietWrites
 import app.siansa.covers.CoverRefresh
 import app.siansa.covers.CoverCache
@@ -302,6 +303,8 @@ class AppGraph(val app: Application) {
             val user = audioMuseUserFor(ids, { guests.ownerOf(it) }, Users.active, guests.shown.value, library.ownHidden.value)
             if (user == Users.active) settings.current.audioMuseServer else guests.settingsOf(user).current.audioMuseServer
         },
+        // What songs sound like is asked of Siansa Beats first, once it has it (BeatsSound).
+        beats = { pathAndQuery, body -> if (body == null) beats.get(pathAndQuery) else beats.post(pathAndQuery, body) },
     ) { settings.current }
     /** Audiobooks and podcasts (issue #521): one login for the whole app, like AudioMuse. */
     val audiobookshelf = AudiobookshelfApi(http) { settings.current }
@@ -523,6 +526,28 @@ class AppGraph(val app: Application) {
     val similar = Similar(this)
     /** Fresh photos for Home's artist radios (beta report 95a30366). */
     val artistPhotos = ArtistPhotos(source, library)
+
+    // ---- What Siansa Beats answers about how songs sound (BeatsSound; the owner, 11 Nov) ----
+
+    init {
+        val prefs = app.getSharedPreferences("beats_sound", android.content.Context.MODE_PRIVATE)
+        BeatsSound.restore(prefs.getStringSet("answers", emptySet()).orEmpty())
+        BeatsSound.onChanged = { paths ->
+            AppLog.i("Beats", if (paths.isEmpty()) "Siansa Beats doesn't answer what songs sound like (yet)"
+            else "Siansa Beats answers what songs sound like: ${paths.joinToString { it.removePrefix("/api/") }}")
+            QuietWrites.save(prefs) { putStringSet("answers", paths) }
+        }
+        // Asked at the start and whenever Siansa Beats' address or key changes, so what the app offers is current.
+        scope.launch(CoroutineName("beats-sound")) {
+            settings.state.map { it.beatsUrl to it.beatsKey }.distinctUntilChanged().collectLatest { (url, _) ->
+                if (url.isBlank()) BeatsSound.heard(emptySet())
+                else runCatching { beats.capabilities() }.onFailure {
+                    if (it is kotlinx.coroutines.CancellationException) throw it
+                    AppLog.d("Beats", "Siansa Beats' capabilities weren't read: ${it.message}")
+                }
+            }
+        }
+    }
 
     // ---- Covers kept on the phone: the server's stand-ins never, changed ones fetched fresh (the owner, 11 Nov) ----
 

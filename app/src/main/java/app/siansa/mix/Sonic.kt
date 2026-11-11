@@ -1,5 +1,6 @@
 package app.siansa.mix
 
+import app.siansa.net.soundReady
 import app.siansa.AppGraph
 import app.siansa.log.AppLog
 import app.siansa.net.ClapHit
@@ -26,7 +27,7 @@ fun sonicRoute(navidromeSonic: Boolean, audioMuseReady: Boolean): SonicRoute = w
  */
 class Sonic(private val graph: AppGraph) {
     suspend fun similar(songId: String, count: Int): List<ClapHit> {
-        val audioMuse = graph.settings.current.audioMuseReady
+        val audioMuse = graph.settings.current.soundReady
         val route = sonicRoute(graph.source.hasSonicMatch(), audioMuse)
         if (route == SonicRoute.NAVIDROME_SONIC) {
             val found = runCatching { graph.source.sonicSimilar(songId, count) }

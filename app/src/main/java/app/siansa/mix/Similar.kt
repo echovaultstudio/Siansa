@@ -1,5 +1,7 @@
 package app.siansa.mix
 
+import app.siansa.net.BeatsSound
+import app.siansa.net.soundReady
 import app.siansa.AppGraph
 import app.siansa.data.Album
 import app.siansa.data.SimilarArtist
@@ -100,7 +102,9 @@ class Similar(private val graph: AppGraph) {
 
     /** Artists that sound like [name], as "Fans also like" shows them; empty when the plugin isn't there. */
     suspend fun artists(name: String): List<SimilarArtist> {
-        if (!graph.settings.current.audioMuseReady || pluginKnownMissing()) return emptyList()
+        val settings = graph.settings.current
+        val fromBeats = settings.beatsReady && BeatsSound.available
+        if (!settings.soundReady || (pluginKnownMissing() && !fromBeats)) return emptyList()
         val hits = try {
             SimilarPlugin.parseArtists(ask(SimilarPlugin.artistsQuery(name)))
         } catch (e: CancellationException) {
@@ -129,13 +133,13 @@ class Similar(private val graph: AppGraph) {
     }
 
     /**
-     * The plugin's answer to [query], asked of AudioMuse-AI itself (the owner, 11 Nov): Siansa Beats only passes this
-     * question on to AudioMuse-AI for now, so going through it added a hop and nothing else. Siansa Beats is asked
-     * when AudioMuse-AI isn't set up in the app or can't answer, as it may hold a connection of its own ([askOrder]).
+     * The plugin's answer to [query]: from Siansa Beats once it has the songs' sound, else from AudioMuse-AI itself
+     * (a Siansa Beats without the sound only passes the question on to AudioMuse-AI), each asked when the other
+     * isn't set up or can't answer ([askOrder]; the owner, 11 Nov).
      */
     private suspend fun ask(query: String): JsonObject {
         val settings = graph.settings.current
-        val order = askOrder(settings.audioMuseReady, settings.beatsReady)
+        val order = askOrder(settings.audioMuseReady, settings.beatsReady, BeatsSound.available)
         if (order.isEmpty()) throw IllegalStateException("Set up AudioMuse in Settings › Connections first")
         var failed: Exception? = null
         for (from in order) {
@@ -160,9 +164,15 @@ class Similar(private val graph: AppGraph) {
     enum class AskFrom(val label: String) { AUDIOMUSE("The Siansa plugin"), BEATS("Siansa Beats") }
 
     companion object {
-        /** Who is asked for similar albums and artists, in turn: AudioMuse-AI itself first, then Siansa Beats. */
-        fun askOrder(audioMuseReady: Boolean, beatsReady: Boolean): List<AskFrom> =
-            listOfNotNull(AskFrom.AUDIOMUSE.takeIf { audioMuseReady }, AskFrom.BEATS.takeIf { beatsReady })
+        /**
+         * Who is asked for similar albums and artists, in turn. Siansa Beats first once it has the songs' sound
+         * ([beatsSound], Siansa Beats 0.25: it works them out itself); before that it only passes the question on
+         * to AudioMuse-AI, so AudioMuse-AI itself is asked first.
+         */
+        fun askOrder(audioMuseReady: Boolean, beatsReady: Boolean, beatsSound: Boolean = false): List<AskFrom> {
+            val order = listOfNotNull(AskFrom.AUDIOMUSE.takeIf { audioMuseReady }, AskFrom.BEATS.takeIf { beatsReady })
+            return if (beatsReady && beatsSound) order.reversed() else order
+        }
 
         const val SONGS = 50
         /** How long a missing plugin is taken as still missing before asking again. */

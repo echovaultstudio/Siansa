@@ -81,8 +81,41 @@ class AudioMuseApi(
      * Without it, the settings' own name.
      */
     private val serverFor: ((ids: List<String>) -> String)? = null,
+    /**
+     * Siansa Beats' answer to one of AudioMuse's own paths ([BeatsSound]): a GET of the path and query, or a POST of
+     * the body. Asked first for the paths it answers; AudioMuse itself when it can't, or for the rest.
+     */
+    private val beats: (suspend (pathAndQuery: String, body: String?) -> JsonElement)? = null,
     private val settings: () -> AppSettings,
 ) {
+    /**
+     * What songs sound like, asked of Siansa Beats when it answers [path] (the owner, 11 Nov), else of AudioMuse:
+     * [query] for a GET, [payload] (a JSON object) for a POST, about the songs [about]. When Siansa Beats fails and
+     * AudioMuse is set up, AudioMuse is asked; without AudioMuse, Siansa Beats' reason is the answer.
+     */
+    private suspend fun sound(path: String, query: List<Pair<String, String?>> = emptyList(), payload: String? = null, about: List<String> = emptyList()): JsonElement {
+        val s = settings()
+        val asked = query.filter { it.second != null }
+        if (beats != null && s.beatsReady && BeatsSound.answers(path)) {
+            val pathAndQuery = path + if (asked.isEmpty()) "" else "?" + asked.joinToString("&") { (k, v) ->
+                java.net.URLEncoder.encode(k, "UTF-8") + "=" + java.net.URLEncoder.encode(v, "UTF-8")
+            }
+            try {
+                return beats.invoke(BeatsSound.path(pathAndQuery), payload)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (!s.audioMuseReady) throw e
+                AppLog.w("AudioMuse", "Siansa Beats couldn't answer $path (${e.message}); asking AudioMuse")
+            }
+        }
+        if (payload != null) {
+            return executeElement { request(path, about).post(serverInBody(payload, server(about)).toRequestBody(JSON_TYPE)).build() }
+        }
+        val url = apiUrl(path.removePrefix("/")).apply { asked.forEach { (k, v) -> addQueryParameter(k, v) } }.build()
+        return executeElement { request("", about, at = url).get().build() }
+    }
+
     private fun server(ids: List<String>): String =
         serverFor?.invoke(ids.filter { it.isNotBlank() }) ?: settings().audioMuseServer
     private val loginLock = Mutex()
@@ -257,18 +290,17 @@ class AudioMuseApi(
      * SIMILARITY_RADIUS_DEFAULT): Siansa only sends [sameMood] when the listener chose it (issue #208).
      */
     suspend fun similarTracks(itemId: String, count: Int, sameMood: Boolean? = null): List<ClapHit> {
-        val url = apiUrl("api/similar_tracks")
-            .addQueryParameter("item_id", itemId)
-            .addQueryParameter("n", count.toString())
-            .apply { sameMood?.let { addQueryParameter("mood_similarity", it.toString()) } }
-            .build()
-        return neighbours(executeElement { request("", listOf(itemId), at = url).get().build() })
+        return neighbours(sound(
+            "/api/similar_tracks",
+            listOf("item_id" to itemId, "n" to count.toString(), "mood_similarity" to sameMood?.toString()),
+            about = listOf(itemId),
+        ))
     }
 
     /** AudioMuse's mood centres (happy, relaxed…), each with the tags that describe it (issue #208). */
     suspend fun moodCentres(): List<MoodCentre> {
         centres?.let { return it }
-        val root = execute { request("/api/mood_centroids").get().build() }
+        val root = sound("/api/mood_centroids") as? JsonObject ?: throw ApiException("AudioMuse sent an unexpected answer")
         return parseMoodCentres(root).also { centres = it }
     }
 
@@ -276,12 +308,10 @@ class AudioMuseApi(
 
     /** Tracks around one of AudioMuse's mood centres: a radio for that mood (issue #208). */
     suspend fun moodRadio(centre: MoodCentre, count: Int): List<ClapHit> {
-        val url = apiUrl("api/similar_tracks")
-            .addQueryParameter("mood", centre.mood)
-            .addQueryParameter("centroid_index", centre.index.toString())
-            .addQueryParameter("n", count.toString())
-            .build()
-        return neighbours(executeElement { request("", at = url).get().build() })
+        return neighbours(sound(
+            "/api/similar_tracks",
+            listOf("mood" to centre.mood, "centroid_index" to centre.index.toString(), "n" to count.toString()),
+        ))
     }
 
     /**
@@ -296,11 +326,16 @@ class AudioMuseApi(
             })
             count?.let { put("n", it) }
         }.toString()
-        val root = execute { request("/api/alchemy", blend + avoid).post(serverInBody(payload, server(blend + avoid)).toRequestBody(JSON_TYPE)).build() }
+        val root = sound("/api/alchemy", payload = payload, about = blend + avoid) as? JsonObject
+            ?: throw ApiException("AudioMuse sent an unexpected answer")
         return neighbours(root["results"] ?: JsonArray(emptyList()))
     }
 
-    private fun apiUrl(path: String) = settings().audioMuseUrl.trimEnd('/').toHttpUrl().newBuilder().addPathSegments(path)
+    private fun apiUrl(path: String): okhttp3.HttpUrl.Builder {
+        val base = settings().audioMuseUrl.trimEnd('/')
+        if (base.isBlank()) throw ApiException("AudioMuse isn't set up yet")
+        return base.toHttpUrl().newBuilder().addPathSegments(path)
+    }
 
     /** AudioMuse's track rows ({item_id, title, author, album, distance}); closer is a higher similarity. */
     private fun neighbours(root: JsonElement): List<ClapHit> {
@@ -322,7 +357,16 @@ class AudioMuseApi(
             if (navidromeUser.isNotBlank()) put("navidrome_user", navidromeUser)
             if (navidromePassword.isNotBlank()) put("navidrome_password", navidromePassword)
         }.toString()
-        val root = executeElement { request("/api/sonic_fingerprint/generate").post(serverInBody(payload, server(emptyList())).toRequestBody(JSON_TYPE)).build() }
+        // Siansa Beats reads the most played songs with its own sign-in to the music server: it gets no login.
+        val forBeats = buildJsonObject { put("n", count) }.toString()
+        val root = if (settings().beatsReady && BeatsSound.answers("/api/sonic_fingerprint/generate")) {
+            runCatching { sound("/api/sonic_fingerprint/generate", payload = forBeats) }.getOrElse { e ->
+                if (e is kotlinx.coroutines.CancellationException || !settings().audioMuseReady) throw e
+                executeElement { request("/api/sonic_fingerprint/generate").post(serverInBody(payload, server(emptyList())).toRequestBody(JSON_TYPE)).build() }
+            }
+        } else {
+            executeElement { request("/api/sonic_fingerprint/generate").post(serverInBody(payload, server(emptyList())).toRequestBody(JSON_TYPE)).build() }
+        }
         val rows = (root as? JsonArray) ?: JsonArray(emptyList())
         return rows.mapNotNull { element ->
             val r = element as? JsonObject ?: return@mapNotNull null
@@ -345,18 +389,17 @@ class AudioMuseApi(
         endMood: PathMood? = null,
         lyrics: Boolean = false,
     ): List<ClapHit> {
-        val url = apiUrl("api/find_path")
-            .apply {
-                startId?.let { addQueryParameter("start_song_id", it) }
-                endId?.let { addQueryParameter("end_song_id", it) }
-                startMood?.let { addQueryParameter("start_mood", it.id) }
-                endMood?.let { addQueryParameter("end_mood", it.id) }
-                if (lyrics) addQueryParameter("path_space", "lyrics")
-            }
-            .addQueryParameter("max_steps", length.toString())
-            .addQueryParameter("path_fix_size", "true")
-            .build()
-        val root = executeElement { request("", listOfNotNull(startId, endId), at = url).get().build() }
+        val asked = listOf(
+            "start_song_id" to startId, "end_song_id" to endId, "start_mood" to startMood?.id, "end_mood" to endMood?.id,
+            "max_steps" to length.toString(), "path_fix_size" to "true",
+        )
+        // A path through the lyrics' meaning is AudioMuse's own: Siansa Beats has the sound alone.
+        val root = if (lyrics) {
+            val url = apiUrl("api/find_path").apply { (asked + ("path_space" to "lyrics")).forEach { (k, v) -> v?.let { addQueryParameter(k, it) } } }.build()
+            executeElement { request("", listOfNotNull(startId, endId), at = url).get().build() }
+        } else {
+            sound("/api/find_path", asked, about = listOfNotNull(startId, endId))
+        }
         val rows = (root as? JsonArray) ?: (root as? JsonObject)?.let { it["path"] as? JsonArray } ?: JsonArray(emptyList())
         return rows.mapNotNull { element ->
             val r = element as? JsonObject ?: return@mapNotNull null
@@ -382,12 +425,11 @@ class AudioMuseApi(
      * (`/api/sync`), at most 500 at a time, without the large sound data (issue #216).
      */
     suspend fun features(ids: List<String>): List<TrackFeatures> = syncBatches(ids.distinct()).flatMap { batch ->
-        val url = apiUrl("api/sync")
-            .addQueryParameter("ids", batch.joinToString(","))
-            .addQueryParameter("include_embeddings", "false")
-            .addQueryParameter("limit", batch.size.toString())
-            .build()
-        val root = execute { request("", batch, at = url).get().build() }
+        val root = sound(
+            "/api/sync",
+            listOf("ids" to batch.joinToString(","), "include_embeddings" to "false", "limit" to batch.size.toString()),
+            about = batch,
+        ) as? JsonObject ?: throw ApiException("AudioMuse sent an unexpected answer")
         root.arr("tracks").mapNotNull(::parseFeatures)
     }
 

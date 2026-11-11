@@ -1,5 +1,6 @@
 package app.siansa.mix
 
+import app.siansa.net.soundReady
 import app.siansa.data.AppSettings
 import app.siansa.log.AppLog
 import app.siansa.net.ConnectionState
@@ -41,7 +42,7 @@ class DjReady(private val now: () -> Long = System::currentTimeMillis) {
 
         /** Why a DJ mix can't run now, in a few words for its button, or null when it can. */
         fun problem(settings: AppSettings, connection: ConnectionState, beats: Boolean?): String? = when {
-            !settings.audioMuseReady -> "Needs AudioMuse"
+            !settings.soundReady -> "Needs AudioMuse"
             connection.offline || connection.audioMuse == false -> "Not available now"
             beats == null -> "Checking…"
             !beats -> "Needs Siansa Beats"

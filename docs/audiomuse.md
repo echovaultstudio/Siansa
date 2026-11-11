@@ -125,9 +125,26 @@ straight away, so more servers don't make it take longer.
 Siansa Beats is a separate service (its own container, next to Navidrome) that finds every beat and downbeat of each
 song, measures its loudness, fades and key, and sorts songs into genres by their sound. Siansa Dev can ask it directly:
 set its address in **Settings › Connections › Siansa Beats**. Then levelling, smart crossfades, DJ blends and the
-genres come from Siansa Beats, and the Siansa plugin isn't needed for them. Similar albums and artists are still
-asked of AudioMuse-AI's Siansa plugin, by Siansa itself; only when AudioMuse-AI isn't set up in Siansa, or doesn't
-answer, are they asked of Siansa Beats (which passes the question on to an AudioMuse-AI set up on its page).
+genres come from Siansa Beats, and the Siansa plugin isn't needed for them.
+
+**From Siansa Beats 0.25, it also answers what songs sound like.** Siansa Beats takes over what AudioMuse-AI has
+worked out about each song (connect AudioMuse-AI on Siansa Beats' page, under Setup), and Siansa then asks Siansa
+Beats first for:
+
+- songs like a song (song radio, Similar songs, Keep playing, Wind down),
+- similar albums and "Fans also like",
+- Song path and Flow (not the path through the lyrics' meaning, which stays AudioMuse-AI's),
+- radios blended from several songs, and the mood radios,
+- Your sound (your sonic fingerprint) and the mixes made from it,
+- each song's tempo, key, moods and energy, which DJ mixes and Keep playing choose by.
+
+With Siansa Beats answering these, **AudioMuse-AI can be left out of Siansa's own settings**: its address can be
+empty and all of the above still work. Two things still need AudioMuse-AI set up in Siansa: the search by words
+(mixes from a description, vibes and their sliders, cards made from a sound), and the path through the lyrics.
+AudioMuse-AI itself keeps running next to Siansa Beats for now, as it's what listens to new songs.
+
+When Siansa Beats can't answer (a song whose sound it doesn't have yet) and AudioMuse-AI is set up in Siansa,
+AudioMuse-AI is asked, as before. Without Siansa Beats nothing changes.
 
 Without Siansa Beats set up, everything works as before: through the Siansa plugin when it's installed, otherwise
 from the songs' tags. A DJ mix is only offered when beat grids are there (from Siansa Beats or through its plugin)

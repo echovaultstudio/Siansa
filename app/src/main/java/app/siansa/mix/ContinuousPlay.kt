@@ -1,5 +1,6 @@
 package app.siansa.mix
 
+import app.siansa.net.soundReady
 import app.siansa.AppGraph
 import app.siansa.data.Song
 import app.siansa.log.AppLog
@@ -321,7 +322,7 @@ class ContinuousPlay(private val graph: AppGraph) {
      * likeness, and ranking by it kept whatever was next where it was, whatever the shape.
      */
     private suspend fun djIds(last: Song, hits: List<app.siansa.net.ClapHit>, count: Int = TOP_UP, likeness: ((String) -> Double)? = null): List<String>? {
-        if (!graph.settings.current.audioMuseReady) {
+        if (!graph.settings.current.soundReady) {
             AppLog.i("KeepPlaying", "DJ needs AudioMuse; adding in Steady order")
             return null
         }

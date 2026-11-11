@@ -1,5 +1,6 @@
 package app.siansa.ui
 
+import app.siansa.net.soundReady
 import androidx.compose.material.icons.rounded.SwapVert
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.ui.text.font.FontWeight
@@ -270,7 +271,7 @@ fun PlaybackSettingsScreen(nav: NavController) {
             FoldSection("Keep playing", settings.continuousPlay.label) {
                 Hint("When the queue is about to end, should Siansa add more songs?")
                 ContinuousChips(settings.continuousPlay) { graph.settings.setContinuousPlay(it) }
-                Hint(continuousHint(settings.continuousPlay, settings.audioMuseReady, graph.djProblem()))
+                Hint(continuousHint(settings.continuousPlay, settings.soundReady, graph.djProblem()))
             }
             // The TV app has no sleep timer (issue #860), so nothing to wind down.
             if (!app.siansa.BuildConfig.TV_APP) {

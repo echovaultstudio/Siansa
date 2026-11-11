@@ -1,5 +1,6 @@
 package app.siansa.ui
 
+import app.siansa.net.soundReady
 import androidx.compose.foundation.layout.offset
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
@@ -373,7 +374,7 @@ fun AlbumScreen(nav: NavController, id: String) {
         // A heart for favourite albums, starred in Navidrome (issue #275).
         actions = { d?.album?.let { FavouriteAlbumButton(it) } },
         // "Find similar albums" beside Shuffle (issue #228), through any of its songs; needs AudioMuse.
-        onSimilar = d?.songs?.firstOrNull()?.id?.takeIf { graph.settings.current.audioMuseReady }?.let { id -> { nav.openSimilarAlbums(id) } },
+        onSimilar = d?.songs?.firstOrNull()?.id?.takeIf { graph.settings.current.soundReady }?.let { id -> { nav.openSimilarAlbums(id) } },
         // Genres, labels, the version and the length at the foot of the page (#558).
         footer = {
             if (d != null) item(key = "album-foot") {

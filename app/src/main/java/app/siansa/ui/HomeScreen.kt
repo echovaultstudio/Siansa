@@ -1,5 +1,6 @@
 package app.siansa.ui
 
+import app.siansa.net.soundReady
 import app.siansa.data.normalizeKey
 import app.siansa.mix.mixArtistRadios
 import app.siansa.mix.ArtistRadioPicks
@@ -231,7 +232,7 @@ fun HomeScreen(nav: NavController) {
     LaunchedEffect(aiMixes) {
         delay(1500)
         val today = LocalDate.now().toString()
-        for (kind in MixGenerator.Personal.entries.filter { MixRules.showsPersonal(it, graph.settings.current.audioMuseReady) }) {
+        for (kind in MixGenerator.Personal.entries.filter { MixRules.showsPersonal(it, graph.settings.current.soundReady) }) {
             if (graph.mixes.get("$today-${kind.id}") != null) continue
             while (busySelector != null || personalBusy != null) delay(500)
             buildPersonal(kind, open = false, quiet = true)
@@ -429,7 +430,7 @@ fun HomeScreen(nav: NavController) {
                                     mix?.songs?.firstOrNull()?.coverArt, open = { if (mix != null) nav.navigate("mix/${mix.id}") else build(selector, force = false, open = true) }))
                             }
                             MixGenerator.Personal.entries.filter { kind ->
-                                MixRules.showsPersonalTile(kind, homeSettings.audioMuseReady, madeToday = todaysMixes.any { it.selectorId == kind.id }, notEnough = kind.id in notEnough)
+                                MixRules.showsPersonalTile(kind, homeSettings.soundReady, madeToday = todaysMixes.any { it.selectorId == kind.id }, notEnough = kind.id in notEnough)
                             }.forEach { kind ->
                                 val mix = todaysMixes.firstOrNull { it.selectorId == kind.id }
                                 add(HomeItem(kind.id, kind.title, madeForYouCaption(mix?.songs?.size, aiDown != null, "Tap to make it"),
@@ -455,7 +456,7 @@ fun HomeScreen(nav: NavController) {
                             }
                             MixGenerator.Personal.entries.filter { kind ->
                                 MixRules.showsPersonalTile(
-                                    kind, homeSettings.audioMuseReady,
+                                    kind, homeSettings.soundReady,
                                     madeToday = todaysMixes.any { it.selectorId == kind.id },
                                     notEnough = kind.id in notEnough,
                                 )

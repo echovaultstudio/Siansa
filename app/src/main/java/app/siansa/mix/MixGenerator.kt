@@ -1,5 +1,6 @@
 package app.siansa.mix
 
+import app.siansa.net.soundReady
 import app.siansa.data.daysLabel
 
 import app.siansa.data.fittingSelector
@@ -397,7 +398,7 @@ class MixGenerator(private val graph: AppGraph) {
     /** AudioMuse's sonic fingerprint: the songs closest to the sound of what you play most. */
     private suspend fun soundMix(skipped: Set<String>): Pair<List<Song>, String> {
         val s = graph.settings.current
-        if (!s.audioMuseReady) throw MixException("Set up AudioMuse in Settings first")
+        if (!s.soundReady) throw MixException("Set up AudioMuse in Settings first")
         val recent = graph.history.playedSince(System.currentTimeMillis() - 2 * DAY_MS)
         val hits = graph.audioMuse.sonicFingerprint(150, s.fingerprintUser, s.fingerprintPassword)
             .filter { it.id !in skipped && it.id !in recent }
@@ -438,7 +439,7 @@ class MixGenerator(private val graph: AppGraph) {
      */
     private suspend fun discoverMix(taste: TasteProfile?, skipped: Set<String>): Pair<List<Song>, String> {
         val s = graph.settings.current
-        if (!s.audioMuseReady) throw MixException("Set up AudioMuse in Settings first")
+        if (!s.soundReady) throw MixException("Set up AudioMuse in Settings first")
         val heard = graph.history.all().map { it.id }.toSet()
         var seeds = taste?.favouriteSongs.orEmpty().shuffled().take(8)
         if (seeds.size < 3) {
