@@ -4,6 +4,7 @@ import app.siansa.data.AppJson
 import app.siansa.data.SimilarArtist
 import kotlinx.serialization.json.jsonObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -66,5 +67,22 @@ class SimilarTest {
         assertEquals(listOf(Similar.AskFrom.BEATS), Similar.askOrder(audioMuseReady = false, beatsReady = true, beatsSound = true))
         // Its sound without it being set up here means nothing.
         assertEquals(listOf(Similar.AskFrom.AUDIOMUSE), Similar.askOrder(audioMuseReady = true, beatsReady = false, beatsSound = true))
+    }
+
+    /**
+     * Report 40469175 (issue #1071): similar albums of an album added minutes before. Siansa Beats 0.35 had the sound of
+     * the library but not of that album yet, asked AudioMuse-AI (switched off) and answered 502 with its trouble; the TV
+     * showed "Siansa Beats answered HTTP 502: Couldn't reach AudioMuse-AI: [Errno 111] Connection refused".
+     */
+    @Test fun siansaBeatsNotKnowingAnAlbumYetIsSaidPlainly() {
+        val reported = "Siansa Beats answered HTTP 502: Couldn't reach AudioMuse-AI: [Errno 111] Connection refused"
+        assertTrue(Similar.beatsCouldntSay(reported, beatsSound = true))
+        assertTrue(Similar.beatsCouldntSay("Siansa Beats answered HTTP 502: AudioMuse-AI isn't set up for Siansa Beats: add it on its page (Setup › AudioMuse-AI)", beatsSound = true))
+        // A Siansa Beats without the songs' sound only passes questions on: then it is AudioMuse-AI's trouble.
+        assertFalse(Similar.beatsCouldntSay(reported, beatsSound = false))
+        // Anything else is said as it is.
+        assertFalse(Similar.beatsCouldntSay("Siansa Beats wants its API key or password: check it in Settings › Connections", beatsSound = true))
+        assertFalse(Similar.beatsCouldntSay("Failed to connect to /192.168.1.106:8090", beatsSound = true))
+        assertFalse(Similar.beatsCouldntSay(null, beatsSound = true))
     }
 }

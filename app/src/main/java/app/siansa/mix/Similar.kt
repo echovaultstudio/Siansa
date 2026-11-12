@@ -154,7 +154,10 @@ class Similar(private val graph: AppGraph) {
                 throw e
             } catch (e: Exception) {
                 AppLog.w("Similar", "${from.label} couldn't answer: ${e.message}")
-                failed = failed ?: e
+                // Siansa Beats with the songs' sound passes a question on to AudioMuse-AI only when its own sound
+                // can't answer it; that failing says nothing of use ("Couldn't reach AudioMuse-AI", issue #1071).
+                val said = if (from == AskFrom.BEATS && beatsCouldntSay(e.message, BeatsSound.available)) IllegalStateException(NOT_KNOWN_YET, e) else e
+                failed = failed ?: said
             }
         }
         throw IllegalStateException(ProfileStore.friendly(failed?.message), failed)
@@ -173,6 +176,19 @@ class Similar(private val graph: AppGraph) {
             val order = listOfNotNull(AskFrom.AUDIOMUSE.takeIf { audioMuseReady }, AskFrom.BEATS.takeIf { beatsReady })
             return if (beatsReady && beatsSound) order.reversed() else order
         }
+
+        /**
+         * Whether Siansa Beats' failure [message] means its own sound couldn't answer (issue #1071). With the songs'
+         * sound ([beatsSound], Siansa Beats 0.25) it works similar albums and artists out itself, and asks AudioMuse-AI
+         * only for a song or album whose sound it doesn't have yet (one just added). When AudioMuse-AI isn't there
+         * either, it answers HTTP 502 with AudioMuse-AI's trouble ("Couldn't reach AudioMuse-AI: Connection refused"),
+         * which reads as if Siansa Beats were down. Without its sound, a 502 is AudioMuse-AI's own trouble: said as it is.
+         */
+        fun beatsCouldntSay(message: String?, beatsSound: Boolean): Boolean = beatsSound && message?.contains("HTTP 502") == true
+
+        /** What's shown instead when [beatsCouldntSay]. */
+        const val NOT_KNOWN_YET = "Siansa Beats doesn't know the sound of this music yet, so it can't say what's like it. " +
+            "It gets to new music as it analyses your library: try again later."
 
         const val SONGS = 50
         /** How long a missing plugin is taken as still missing before asking again. */
