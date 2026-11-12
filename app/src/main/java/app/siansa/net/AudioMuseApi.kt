@@ -39,6 +39,12 @@ data class TrackFeatures(
     val genres: Map<String, Double>,
     /** AudioMuse's energy for the song (higher is more energetic), when it sends one (issue #339). */
     val energy: Double? = null,
+    /**
+     * Who measured [energy]: "beats" (Siansa Beats heard the song) or "audiomuse" (taken over from AudioMuse-AI); null
+     * from AudioMuse-AI itself or a Siansa Beats before 0.34. The two can be on different scales, so energies compare
+     * only within one.
+     */
+    val energySource: String? = null,
 )
 
 /**
@@ -533,6 +539,7 @@ class AudioMuseApi(
                 moods = parseScores(o.str("other_features")),
                 genres = parseScores(o.str("mood_vector")),
                 energy = o.dbl("energy"),
+                energySource = o.str("energy_source"),
             )
         }
 

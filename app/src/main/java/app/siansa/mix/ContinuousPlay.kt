@@ -111,6 +111,8 @@ data class DjTrack(
     val level: Double? = null,
     /** The kinds of music it is by its sound ([soundFamilies]): each family and how much of it (Siansa Beats' genres). */
     val families: Map<String, Double> = emptyMap(),
+    /** Who measured [level] ([app.siansa.net.TrackFeatures.energySource]): two songs' levels compare only when it's the same. */
+    val levelFrom: String? = null,
 )
 
 /**
@@ -241,10 +243,24 @@ data class SteadyRails(
             val there = to.tempo?.takeIf { it > 0 }
             over += if (there == null) 1.0 else (tempoOff(from, there, halfDouble) - tempo).coerceAtLeast(0.0)
         }
-        if (energy != null) energyOff(start.level, to.level)?.let { over += (it - energy).coerceAtLeast(0.0) }
+        if (energy != null) energyOff(start, to)?.let { over += (it - energy).coerceAtLeast(0.0) }
         over += (likeness - to.likeness).coerceAtLeast(0.0)
         if (!sameKind(start, to)) over += 1.0
         return over
+    }
+
+    /**
+     * Which rails keep [to] out, for the log: "tempo", "energy", "likeness", "kind of music" (none when it fits).
+     */
+    fun keptOutBy(start: DjTrack, to: DjTrack): List<String> = buildList {
+        val from = start.tempo?.takeIf { it > 0 }
+        if (tempo != null && from != null) {
+            val there = to.tempo?.takeIf { it > 0 }
+            if (there == null || tempoOff(from, there, halfDouble) > tempo) add("tempo")
+        }
+        if (energy != null && (energyOff(start, to) ?: 0.0) > energy) add("energy")
+        if (to.likeness < likeness) add("likeness")
+        if (!sameKind(start, to)) add("kind of music")
     }
 
     /** In a line of the log: "tempo within 6 % of the start, energy within 25 %, at least 0.50 alike, the start's kind of music". */
@@ -281,6 +297,14 @@ fun energyOff(a: Double?, b: Double?): Double? {
     if (a == null || b == null || a <= 0 || b <= 0) return null
     return maxOf(a / b, b / a) - 1
 }
+
+/**
+ * How far apart two songs' energies are ([energyOff]); null when either isn't known, or when they were measured by
+ * different services ([DjTrack.levelFrom]): Siansa Beats' own and the ones it took over from AudioMuse-AI aren't on
+ * one scale (the owner's library, 12 Nov: alike house songs at about 0.7 and about 0.3), and a steady mix held to
+ * the start's energy found nothing that fit.
+ */
+fun energyOff(a: DjTrack, b: DjTrack): Double? = if (a.levelFrom != b.levelFrom) null else energyOff(a.level, b.level)
 
 /**
  * The kinds of music Siansa Beats' styles fall into, for telling a house song from a techno one in a mix. Electronic
@@ -389,7 +413,7 @@ fun transition(
         0.4 * s * wild.coerceIn(0.0, 1.0)
     // Pulled towards the start's energy: on AudioMuse's own scale when both are known, else by rank among the songs.
     if (rails != null && start != null) {
-        val near = energyOff(start.level, to.level)?.let { (1 - it).coerceIn(0.0, 1.0) }
+        val near = energyOff(start, to)?.let { (1 - it).coerceIn(0.0, 1.0) }
             ?: start.energy?.let { from -> to.energy?.let { 1 - abs(it - from) } }
         score += ENERGY_WEIGHT * rails.hold * (near ?: 0.5)
     }
@@ -438,10 +462,15 @@ fun djOrder(
 }
 
 /** Each song's energy as its rank among [values] (0 the calmest, 1 the most energetic); null stays null. */
-fun energyByRank(values: Map<String, Double?>): Map<String, Double?> {
-    val known = values.filterValues { it != null }.entries.sortedBy { it.value }
-    val n = known.size
-    val ranked = known.mapIndexed { i, e -> e.key to (if (n <= 1) 0.5 else i.toDouble() / (n - 1)) }.toMap()
+fun energyByRank(values: Map<String, Double?>, sources: Map<String, String?> = emptyMap()): Map<String, Double?> {
+    // Ranked among the songs measured by the same service ([sources]): on two scales, every song of one would rank
+    // under every song of the other.
+    val ranked = HashMap<String, Double>()
+    values.filterValues { it != null }.entries.groupBy { sources[it.key] }.values.forEach { group ->
+        val known = group.sortedBy { it.value }
+        val n = known.size
+        known.forEachIndexed { i, e -> ranked[e.key] = if (n <= 1) 0.5 else i.toDouble() / (n - 1) }
+    }
     return values.mapValues { (id, _) -> ranked[id] }
 }
 
@@ -607,11 +636,11 @@ class ContinuousPlay(private val graph: AppGraph) {
         // Each song's genres by its sound (Siansa Beats 0.32), for halftime drum and bass's tempo in a mix ([mixTempo]);
         // without them every tempo counts as read.
         val genres = graph.beatsGenres.ofSongs(all).orEmpty()
-        val energy = energyByRank(all.associateWith { features[it]?.energy })
+        val energy = energyByRank(all.associateWith { features[it]?.energy }, all.associateWith { features[it]?.energySource })
         fun lift(f: app.siansa.net.TrackFeatures?): Double? = f?.moods?.let { m -> listOfNotNull(m["happy"], m["party"]).takeIf { it.isNotEmpty() }?.average()?.coerceIn(0.0, 1.0) }
         fun track(id: String, artist: String, likeness: Double): DjTrack {
             val f = features[id]
-            return DjTrack(id, artist, likeness, mixTempo(f?.tempo, genres[id]), f?.key, f?.scale, energy[id], lift(f), f?.energy, soundFamilies(genres[id]))
+            return DjTrack(id, artist, likeness, mixTempo(f?.tempo, genres[id]), f?.key, f?.scale, energy[id], lift(f), f?.energy, soundFamilies(genres[id]), f?.energySource)
         }
         val seed = track(last.id, last.artist, 1.0)
         val begun = start?.let { track(it.id, it.artist, 1.0) }
@@ -623,14 +652,18 @@ class ContinuousPlay(private val graph: AppGraph) {
         if (begun != null && shape == MixShape.STEADY) {
             // What the rails let through, for "why did it pick that?": how many songs fit, and what was let in besides.
             val rails = SteadyRails.of(surprise)
-            val (allowed, outside) = onRails(begun, pool.filter { it.id != seed.id && it.id != begun.id }, count, rails)
+            val others = pool.filter { it.id != seed.id && it.id != begun.id }
+            val (allowed, outside) = onRails(begun, others, count, rails)
             AppLog.i(
                 "KeepPlaying",
                 "Steady rails from \"${start?.title}\" (${begun.tempo?.let { "%.0f BPM".format(it) } ?: "tempo unknown"}" +
                     "${begun.level?.let { ", energy %.3f".format(it) } ?: ""}" +
                     "${begun.families.takeIf { it.isNotEmpty() }?.let { f -> ", " + f.entries.joinToString(" and ") { "%s %.2f".format(it.key, it.value) } } ?: ", kind of music unknown"}" +
                     "): ${allowed.size - outside} of ${pool.size} songs fit " +
-                    "(${rails.inWords()})" + (if (outside > 0) ", $outside nearest outside let in so the mix carries on" else "") +
+                    "(${rails.inWords()})" +
+                    // Which rail kept how many out (a song can be out by several), so a mix that ran dry says why.
+                    others.flatMap { rails.keptOutBy(begun, it) }.groupingBy { it }.eachCount().entries.sortedByDescending { it.value }
+                        .joinToString { "${it.value} by ${it.key}" }.let { if (it.isEmpty()) "" else "; kept out: $it" } + (if (outside > 0) ", $outside nearest outside let in so the mix carries on" else "") +
                     ", ${order.size} picked",
             )
         }
