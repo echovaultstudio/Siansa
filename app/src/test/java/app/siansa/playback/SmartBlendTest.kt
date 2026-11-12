@@ -111,10 +111,25 @@ class SmartBlendTest {
         assertEquals("short blend", LastBlend.of("a", "b", 0, FadePlan(1_500, 1_500, "smart"), dj = true, now = 0).technique)
     }
 
-    @Test fun theButtonShowsOnlyAroundADjBlendInSiansaDev() {
+    @Test fun theButtonIsOffByDefaultOutsideSiansaDev() {
         val report = LastBlend.of("a", "b", 0, FadePlan(10_000, 10_000, "smart"), dj = true, now = 0)
-        // Unit tests build the debug type, not Siansa Dev: never shown there.
-        assertFalse(LastBlend.showing(report, 5_000))
+        // Unit tests build the debug type, not Siansa Dev: off until it's turned on in Settings › Help.
+        assertFalse(LastBlend.onByDefault)
         assertFalse(LastBlend.enabled)
+        assertFalse(LastBlend.showing(report, 5_000))
+    }
+
+    @Test fun turnedOnTheButtonShowsAroundADjBlendOnly() {
+        val report = LastBlend.of("a", "b", 0, FadePlan(10_000, 10_000, "smart"), dj = true, now = 0)
+        LastBlend.enabled = true
+        try {
+            assertTrue(LastBlend.showing(report, 5_000))
+            assertTrue(LastBlend.showing(report, 10_000 + LastBlend.SHOWN_AFTER_MS))
+            assertFalse(LastBlend.showing(report, 10_000 + LastBlend.SHOWN_AFTER_MS + 1))
+            // Not for an ordinary crossfade.
+            assertFalse(LastBlend.showing(LastBlend.of("a", "b", 0, FadePlan(10_000, 10_000, "smart"), dj = false, now = 0), 5_000))
+        } finally {
+            LastBlend.enabled = false
+        }
     }
 }

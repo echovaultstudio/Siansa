@@ -21,13 +21,15 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * Siansa Dev's "Bad blend" button (the owner, 9 Nov): over the cover, during a DJ blend and for a minute after it.
- * One tap writes the blend to the log and sends it to Siansa Beats' list of bad blends.
+ * The "Bad blend" button (the owner, 9 Nov): over the cover, during a DJ blend and for a minute after it. One tap
+ * writes the blend to the log and sends it to Siansa Beats' list of bad blends. Shown or hidden in Settings › Help
+ * (on by default in Siansa Dev only).
  */
 @Composable
 internal fun BadBlendButton(modifier: Modifier = Modifier) {
-    if (!LastBlend.enabled) return
     val graph = LocalGraph.current
+    val shown by graph.settings.state.collectAsStateWithLifecycle()
+    if (!shown.badBlendButton) return
     val report by LastBlend.report.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     var now by remember { mutableLongStateOf(SystemClock.elapsedRealtime()) }

@@ -13,6 +13,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -180,6 +181,19 @@ fun HelpScreen(nav: NavController) {
                 Spacer(Modifier.width(Space.Small))
                 Text("Report a problem")
             }
+            HorizontalDivider()
+            // Marking a DJ blend that sounded wrong (the owner, 12 Nov): the button on now playing, shown or hidden.
+            Heading("DJ blends")
+            Box(Modifier.testTag("helpBadBlend")) {
+                SwitchRow("Bad blend button", settings.badBlendButton) { on ->
+                    graph.settings.setBadBlendButton(on)
+                    AppLog.i("Help", "Bad blend button ${if (on) "shown" else "hidden"}")
+                }
+            }
+            Hint(
+                "While on, now playing shows Bad blend during a DJ blend and for a minute after it. Tap it when a change " +
+                    "sounded wrong: it goes to the log and to Siansa Beats' list of bad blends.",
+            )
         }
     }
 }
