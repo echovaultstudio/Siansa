@@ -53,3 +53,63 @@ class Size(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DevBuilds(unittest.TestCase):
+    """The changelog of a Siansa Dev build: notes main hasn't released, the newest since the last build first."""
+
+    def setUp(self):
+        import subprocess
+        self.here = os.getcwd()
+        self.repo = tempfile.mkdtemp()
+        os.chdir(self.repo)
+        self.addCleanup(os.chdir, self.here)
+        self.run_git = lambda *a: subprocess.run(["git", *a], check=True, capture_output=True, text=True).stdout.strip()
+        self.run_git("init", "-q", "-b", "main")
+        self.run_git("config", "user.email", "t@example.com")
+        self.run_git("config", "user.name", "T")
+        os.makedirs("changelog.d")
+        open("version.txt", "w").write("1.1.0\n")
+        self.add("README.md", "notes\n", when=1_700_000_000)
+
+    def add(self, name, text, when):
+        open(os.path.join("changelog.d", name) if name.endswith(".md") and name != "version.txt" else name, "w").write(text)
+        self.run_git("add", "-A")
+        env = dict(os.environ, GIT_AUTHOR_DATE=f"@{when} +0000", GIT_COMMITTER_DATE=f"@{when} +0000")
+        import subprocess
+        subprocess.run(["git", "commit", "-q", "-m", name], check=True, env=env)
+        return self.run_git("rev-parse", "HEAD")
+
+    def test_unreleased_notes_newest_first_and_new_ones_on_top(self):
+        self.add("fix-a.md", "### Fixed\n- **A fix.** Out on main.\n", when=1_762_800_000)  # 10 Nov 2025
+        self.run_git("checkout", "-q", "-b", "dev")
+        self.add("old.md", "### Added\n- **Old feature.** Text.\n", when=1_762_900_000)
+        last_build = self.add("older.md", "### Changed\n- **Older change.**\n  more of it\n", when=1_762_950_000)
+        self.add("new.md", "<!-- release: minor -->\n### Added\n- **New feature.** Text.\n", when=1_763_000_000)
+        # main releases fix-a: its note is taken out there; dev still has it until main is merged into dev.
+        self.run_git("checkout", "-q", "main")
+        self.run_git("rm", "-q", "changelog.d/fix-a.md")
+        self.run_git("commit", "-q", "-m", "release")
+        self.run_git("checkout", "-q", "dev")
+
+        out = rn.dev_notes(main="main", since=last_build, released="1.1.0")
+        self.assertTrue(out.startswith("## What's coming since Siansa 1.1.0\n"))
+        self.assertNotIn("A fix.", out)  # released
+        self.assertNotIn("release: minor", out)
+        new_at, old_at, older_at = out.index("New feature"), out.index("Old feature"), out.index("Older change")
+        self.assertLess(out.index("### New in this build"), new_at)
+        self.assertLess(new_at, older_at)
+        self.assertLess(older_at, old_at)  # newest first
+        self.assertIn("- Added · **New feature.** Text.", out)
+        self.assertIn("- Changed · **Older change.**\n  more of it", out)  # a note's further lines are kept
+        self.assertIn("### 12 Nov 2025", out)
+
+    def test_without_a_last_build_or_notes(self):
+        self.run_git("checkout", "-q", "-b", "dev")
+        self.assertIn("Nothing yet", rn.dev_notes(main="main", since=None, released="1.1.0"))
+        self.add("one.md", "### Fixed\n- **One.**\n", when=1_763_000_000)
+        out = rn.dev_notes(main="main", since=None)
+        self.assertNotIn("New in this build", out)
+        self.assertIn("- Fixed · **One.**", out)
+        # A last build git doesn't know (history too short): every note counts as new, none is lost.
+        self.assertIn("New in this build", rn.dev_notes(main="main", since="0" * 40))
