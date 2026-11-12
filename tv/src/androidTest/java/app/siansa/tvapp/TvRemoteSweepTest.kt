@@ -110,7 +110,9 @@ class TvRemoteSweepTest {
     /** Puts the focus back on the control at [bounds] (the row a left or right press just left). */
     private fun refocus(bounds: androidx.compose.ui.geometry.Rect) {
         runCatching {
-            compose.onAllNodes(SemanticsMatcher("at $bounds") { it.boundsInRoot == bounds }).onFirst().requestFocus()
+            // The one that takes focus: a folded card's frame has the same bounds as its heading and takes none.
+            compose.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsActions.RequestFocus) and SemanticsMatcher("at $bounds") { it.boundsInRoot == bounds })
+                .onFirst().requestFocus()
         }
         compose.waitForIdle()
     }
