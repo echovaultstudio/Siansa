@@ -211,6 +211,36 @@ class CrossfadePlanTest {
         assertEquals(0L, Crossfade.plan(CrossfadeMode.SMART, 24_000, a1, b1, minutes4, minutes4, beatless, inn, beatMatch = true)!!.gapMs)
     }
 
+    @Test fun aSoftEndFadesIntoTheNextSong() {
+        // The owner's DJ mix, 12 Nov: "Everything U" (132 BPM, its end not steady enough to lay on a beat) into a
+        // 128 BPM song got 1.5 s, "beats would clash". He hears that end as quiet, and wants quiet ends to fade.
+        val end = BeatEnd(bpm = 132.0, beatMs = 203_800.0, barMs = 203_800.0, rhythm = 1.0f, steady = 0.74f, lockMs = 203_800.0)
+        val start = BeatEnd(bpm = 128.0, beatMs = 1_100.0, barMs = 1_100.0, rhythm = 1.0f, steady = 0.92f, lockMs = 1_100.0)
+        fun out(softMs: Long, key: String? = "A", scale: String? = "minor") = TrackProfile(
+            "a1", -10.0, listOf(RampPoint(-18, 0)), listOf(RampPoint(-18, 2_200), RampPoint(-6, softMs)), outro = end, key = key, scale = scale)
+        fun inn(key: String? = "A", scale: String? = "minor") =
+            TrackProfile("b1", -10.0, listOf(RampPoint(-18, 100)), emptyList(), intro = start, key = key, scale = scale)
+        fun plan(o: TrackProfile, i: TrackProfile, max: Long = 30_000) =
+            Crossfade.plan(CrossfadeMode.SMART, max, a1, b1, minutes4, minutes4, o, i, beatMatch = true)!!
+
+        // Its last 14 s are under -6 dB: faded over, as long as a soft blend goes.
+        val soft = plan(out(14_000), inn())
+        assertEquals(soft.why, Crossfade.SOFT_BLEND_MAX_MS, soft.overlapMs)
+        assertTrue(soft.why, soft.why.contains("a soft end"))
+        assertEquals(null, soft.beat)
+        assertEquals(false, soft.coldEnd)
+        // Eight soft seconds: over those; never longer than the crossfade length set.
+        assertEquals(8_000L, plan(out(8_000), inn()).overlapMs)
+        assertEquals(6_000L, plan(out(14_000), inn(), max = 6_000).overlapMs)
+        // Keys that aren't known don't stop it.
+        assertEquals(Crossfade.SOFT_BLEND_MAX_MS, plan(out(14_000, key = null, scale = null), inn()).overlapMs)
+        // Keys that clash (A minor into D# minor), or an end soft for a moment only: the short blend, as before.
+        val clash = plan(out(14_000), inn("D#", "minor"))
+        assertTrue(clash.why, clash.overlapMs <= BeatMatch.CLASH_MS && clash.why.contains("the keys clash"))
+        val loud = plan(out(3_000), inn())
+        assertTrue(loud.why, loud.overlapMs <= BeatMatch.CLASH_MS && loud.why.contains("soft for the last 3.0 s"))
+    }
+
     @Test fun aColdEndPausesLongerWhenTheTemposAreFarApart() {
         assertEquals(Crossfade.COLD_GAP_MS, Crossfade.coldGap(120.0, 126.0))
         assertEquals(Crossfade.COLD_GAP_FAR_MS, Crossfade.coldGap(145.0, 191.5))
