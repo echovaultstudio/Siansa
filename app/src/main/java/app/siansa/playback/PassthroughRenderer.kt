@@ -46,6 +46,9 @@ class PassthroughRenderer private constructor(
     private var markedBatch: Pair<Long, Int>? = null
     private var loggedLevel: Pair<Int, Int>? = null
 
+    /** The song (its format, one for each song) last said to be played louder or not, so each song says it once (issue #1078). */
+    private var saidFor: Format? = null
+
     /**
      * Dolby Digital Plus songs marked louder for the receiver on their way to it (issue #930, [DolbyLevel]), when
      * Settings › Playback asks for it.
@@ -64,20 +67,32 @@ class PassthroughRenderer private constructor(
         format: Format,
     ): Boolean {
         val db = louderDb()
-        if (db > 0 && buffer != null && !isDecodeOnlyBuffer &&
-            (format.sampleMimeType == MimeTypes.AUDIO_E_AC3 || format.sampleMimeType == MimeTypes.AUDIO_E_AC3_JOC)
-        ) {
+        if (db > 0 && buffer != null && !isDecodeOnlyBuffer) {
+            val eac3 = format.sampleMimeType == MimeTypes.AUDIO_E_AC3 || format.sampleMimeType == MimeTypes.AUDIO_E_AC3_JOC
             val batch = bufferPresentationTimeUs to sampleCount
             if (batch != markedBatch) {
                 markedBatch = batch
-                DolbyLevel.raise(buffer, db)?.let { raised ->
+                // Read before it's changed: what the song itself is marked with.
+                val marked = if (eac3) DolbyLevel.marked(buffer) else null
+                val raised = if (eac3) DolbyLevel.raise(buffer, db) else null
+                val newSong = format !== saidFor
+                if (raised != null) {
                     val level = raised.fromDb to raised.toDb
-                    if (level != loggedLevel) {
+                    if (level != loggedLevel || newSong) {
                         loggedLevel = level
+                        saidFor = format
                         AppLog.i("Passthrough", "${Passthrough.name(format.sampleMimeType)} played louder on the receiver: marked " +
-                            "${raised.fromDb} dB, sent as ${raised.toDb} dB (+${raised.toDb - raised.fromDb} dB of the +$db dB asked for)",
+                            "${raised.fromDb} dB, sent as ${raised.toDb} dB (+${raised.fromDb - raised.toDb} dB of the +$db dB asked for)",
                             event = "passthrough.louder", fields = mapOf("from_db" to raised.fromDb, "to_db" to raised.toDb, "asked_db" to db))
                     }
+                } else if (newSong) {
+                    // Asked for and not done: said once for each song, with why (issue #1078). Before, nothing was
+                    // logged, so "it doesn't always work" couldn't be told from the log.
+                    saidFor = format
+                    loggedLevel = null
+                    AppLog.i("Passthrough", "${Passthrough.name(format.sampleMimeType)} not played louder though +$db dB is asked for: " +
+                        DolbyLevel.whyNot(eac3, marked),
+                        event = "passthrough.not_louder", fields = mapOf("mime" to format.sampleMimeType, "marked_db" to marked?.let { -it }, "asked_db" to db))
                 }
             }
         }
