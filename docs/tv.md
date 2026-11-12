@@ -65,8 +65,8 @@ Settings) always open that tab's own page, wherever you are.
   in Siansa Dev with Siansa Beats, the genres it heard in your music (Home's Your genres and Library's genres too),
   otherwise your genre tags.
 - **Now playing**: as simple as Siansa's Chromecast screen: the cover, the song, its artist and album, a thin line
-  for the time, over the cover blurred as on the phone, and Siansa's logo in the corner. Under the cover, a short
-  guide to the remote's keys. There are no buttons: **OK**
+  for the time, over the cover blurred as on the phone, and Siansa's logo in the corner. Under the time line, a short
+  guide to the remote's keys on one line. There are no buttons: **OK**
   plays and pauses (paused, the cover darkens under a pause sign), **left** and **right** go to the previous and next
   song (hold them to wind back or forward through the song, faster the longer you hold; it plays from there when you
   let go), and **down** opens the menu: Like, Shuffle and Repeat (each saying how it's set), Lyrics, Up next, Start a mix
