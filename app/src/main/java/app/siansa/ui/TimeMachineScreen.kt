@@ -6,7 +6,18 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalDensity
+import android.os.Build
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.unit.sp
+import app.siansa.data.picture
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -137,12 +148,25 @@ private fun TimeMachinePage(nav: NavController) {
         }
     }
 
+    // The top artist of the month or year, behind the header and in the big numbers. Nothing waits for it: the page
+    // shows at once, and the picture and its colour fade in when the report (kept on the phone for a finished month)
+    // and the picture (kept on the phone once seen) are there. The last one stays while the next month loads.
+    val shown = report.valueOrNull()
+    var picture by remember { mutableStateOf<String?>(null) }
+    if (report is Load.Ok) picture = shown?.topArtists?.firstOrNull()?.artist?.picture
+    val tint = rememberCoverColor(picture)
+    val n = remember { java.text.NumberFormat.getIntegerInstance() }
+    val summary = shown?.takeIf { it.plays > 0 }?.let { "${n.format(it.plays)} plays · ${n.format(it.minutes / 60)} hours" }
+        ?: "How you listened, any month or year."
+    val mostPlayed = shown?.topArtists?.firstOrNull()?.let { "Most played: ${it.name}" }.orEmpty()
+
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomBarPadding(Space.Large))) {
             item {
-                ListeningHeader(nav, "Time machine", "How you listened, any month or year.") {
-                    Spacer(Modifier.height(Space.Small))
+                TimeMachineHeader(nav, picture, tint) {
+                    TimeMachineName()
                     TimePicker(
+                        under = { TimeMachineWords(summary, mostPlayed) },
                         year = year,
                         month = month,
                         today = today,
@@ -158,7 +182,7 @@ private fun TimeMachinePage(nav: NavController) {
             item(key = "report-$year-$month") {
                 LoadBox(report) { r ->
                     Column(Modifier.padding(top = Space.Medium)) {
-                        if (r == null) songs() else ReportBody(r, nav, songs = songs)
+                        if (r == null) songs() else ReportBody(r, nav, songs = songs, tint = tint.takeIf { picture != null })
                     }
                 }
             }
@@ -169,6 +193,66 @@ private fun TimeMachinePage(nav: NavController) {
     }
 }
 
+/** How soft the top artist's picture is behind the time machine's header. */
+private val HEADER_BLUR = 48.dp
+
+/**
+ * The time machine's header: the top artist's [picture], soft and dark, fading into the page, with back and
+ * [content] on it. Without a picture (nothing played, an artist not in the library, still loading) or before
+ * Android 12, which can't blur, the usual Your listening lights. The picture fades in over them, so the header is
+ * there at once and never waits.
+ */
+@Composable
+private fun TimeMachineHeader(nav: NavController, picture: String?, tint: Color, content: @Composable ColumnScope.() -> Unit) {
+    val page = MaterialTheme.colorScheme.background
+    Box(Modifier.fillMaxWidth().clipToBounds()) {
+        Box(Modifier.matchParentSize().listeningBackdrop(page))
+        Crossfade(picture, Modifier.matchParentSize(), animationSpec = tween(450), label = "time-machine-artist") { id ->
+            if (id != null) {
+                Box(Modifier.fillMaxSize()) {
+                    if (Build.VERSION.SDK_INT >= 31) {
+                        Cover(id, 300, Modifier.fillMaxSize().blur(HEADER_BLUR), RectangleShape)
+                    } else {
+                        Box(Modifier.fillMaxSize().background(page).background(Brush.verticalGradient(listOf(tint, page))))
+                    }
+                    Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0f to page.copy(alpha = 0.30f), 0.45f to page.copy(alpha = 0.50f), 0.8f to page.copy(alpha = 0.88f), 1f to page)))
+                }
+            }
+        }
+        Column(Modifier.fillMaxWidth().statusBarsPadding().padding(bottom = Space.Page)) {
+            IconButton(onClick = { nav.popBackStack() }) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back", tint = Color.White) }
+            content()
+        }
+    }
+}
+
+/** The time machine's name, small, above what it shows. */
+@Composable
+internal fun TimeMachineName() {
+    Text(
+        "TIME MACHINE",
+        style = MaterialTheme.typography.labelMedium,
+        fontWeight = FontWeight.Bold,
+        color = Accent,
+        letterSpacing = 2.sp,
+        modifier = Modifier.padding(horizontal = Space.Page).testTag("timeMachineName"),
+    )
+}
+
+/** Under the time machine's title: what was played, and by whom most. */
+@Composable
+internal fun TimeMachineWords(summary: String, mostPlayed: String) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = Space.Page).testTag("timeMachineWords"), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
+        Text(summary, style = MaterialTheme.typography.titleMedium, color = Color.White.copy(alpha = 0.85f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        // Always a line, also while it's empty, so the months don't jump when the name arrives.
+        Text(mostPlayed, style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.72f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+/** What the time machine shows, as its title: "2025", or "Oct 2025". */
+internal fun timeMachineTitle(year: Int, month: Int?, locale: Locale = Locale.getDefault()): String =
+    if (month == null) "$year" else "${Month.of(month).getDisplayName(TextStyle.SHORT, locale).trimEnd('.')} $year"
+
 /**
  * Where to scroll a row of chips so the chip at [left] (from the row's start, padding included) and [width] sits in
  * the middle of a [viewport]-wide window, within 0..[max] (issue #496).
@@ -176,26 +260,35 @@ private fun TimeMachinePage(nav: NavController) {
 internal fun chipScrollTarget(left: Int, width: Int, viewport: Int, max: Int): Int =
     (left + width / 2 - viewport / 2).coerceIn(0, max.coerceAtLeast(0))
 
-/** The year, with arrows either side, and the months under it (the whole year first). */
+/**
+ * What's shown, big ("Oct 2025"), with the arrows for the year before and after beside it, then
+ * [under] (the time machine's words) and the months (the whole year first), one even gap apart. */
 @Composable
-internal fun TimePicker(year: Int, month: Int?, today: LocalDate, onYear: (Int) -> Unit, onMonth: (Int?) -> Unit) {
+internal fun TimePicker(year: Int, month: Int?, today: LocalDate, onYear: (Int) -> Unit, onMonth: (Int?) -> Unit, under: @Composable () -> Unit = {}) {
     Column(Modifier.fillMaxWidth().testTag("timePicker"), verticalArrangement = Arrangement.spacedBy(TIME_MACHINE_GAP)) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = Space.Small).testTag("year"), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = { onYear(year - 1) }, enabled = year > TIME_MACHINE_FIRST_YEAR) {
+        Row(
+            Modifier.fillMaxWidth().padding(start = Space.Page, end = Space.Small).testTag("year"),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Space.Tight),
+        ) {
+            Text(
+                timeMachineTitle(year, month),
+                style = MaterialTheme.typography.displaySmall,
+                fontWeight = FontWeight.Black,
+                color = Color.White,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f).testTag("timeMachineTitle"),
+            )
+            val round = Modifier.background(Color.Black.copy(alpha = 0.28f), CircleShape).border(1.dp, Color.White.copy(alpha = 0.16f), CircleShape)
+            IconButton(onClick = { onYear(year - 1) }, enabled = year > TIME_MACHINE_FIRST_YEAR, modifier = round) {
                 Icon(Icons.AutoMirrored.Rounded.KeyboardArrowLeft, "Year before", tint = Color.White)
             }
-            Text(
-                "$year",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
-                modifier = Modifier.weight(1f),
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-            )
-            IconButton(onClick = { onYear(year + 1) }, enabled = year < today.year) {
+            IconButton(onClick = { onYear(year + 1) }, enabled = year < today.year, modifier = round) {
                 Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, "Year after", tint = Color.White)
             }
         }
+        under()
         val available = monthsAvailable(year, today)
         // The chosen month's chip is scrolled into view, centred (issue #496): October sat far off to the right.
         val scroll = rememberScrollState()
