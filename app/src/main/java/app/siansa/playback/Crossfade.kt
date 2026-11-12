@@ -79,6 +79,32 @@ object Crossfade {
 
     /** The level (dB below the song's own loudness) that counts as "quiet" for the ramps. */
     const val QUIET_DB = -18
+    /**
+     * A soft end (the owner, 12 Nov: "quiet ends to fade into one another"): the song's last stretch stays under
+     * [SOFT_DB] (relative to its loudness: wound down, not silent) for at least [SOFT_END_MS]. It then fades into the
+     * next song over that stretch, at most [SOFT_BLEND_MAX_MS], also where the two beats can't be laid on each
+     * other: at that level a beat out of step is hardly heard, and a blend of a second and a half sounds cut off.
+     */
+    const val SOFT_DB = -6
+    const val SOFT_END_MS = 5_000L
+    const val SOFT_BLEND_MAX_MS = 12_000L
+
+    /**
+     * The fade out of a soft end into [next], or null when [current]'s end isn't soft or their keys clash ([keys]:
+     * [app.siansa.mix.keyMatch], null when a key isn't known; under [TechniquePicker.KEYS_CLASH] they clash). Whether
+     * two singers would clash isn't known: nothing measures where a song has a voice.
+     */
+    fun softFade(current: TrackProfile, next: TrackProfile, cut: Long, maxMs: Long, keys: Double?): FadePlan? {
+        val soft = ((current.quietForLastMs(SOFT_DB) ?: 0L) - cut).coerceAtLeast(0L)
+        if (soft < SOFT_END_MS) return null
+        if (keys != null && keys < TechniquePicker.KEYS_CLASH) return null
+        val overlap = minOf(soft, maxMs, SOFT_BLEND_MAX_MS)
+        if (overlap < SOFT_END_MS.coerceAtMost(maxMs)) return null
+        val head = next.reachesAfterMs(QUIET_DB) ?: 0L
+        val why = "smart: a soft end (its last %.1f s are under %d dB), so it fades into the next song over %.1f s".format(
+            java.util.Locale.ROOT, soft / 1000.0, SOFT_DB, overlap / 1000.0) + if (keys == null) "" else ", keys that don't clash"
+        return FadePlan(overlap, maxOf(head, overlap / 2).coerceAtMost(overlap), why, cut)
+    }
 
     /** A song's end or start that stays quiet at least this long counts as a quiet one for a long DJ blend. */
     const val QUIET_END_MS = 6_000L
@@ -362,9 +388,29 @@ object Crossfade {
             choice.technique == Technique.DROP_SWAP -> Technique.BASS_SWAP  // the drop didn't fit: the usual
             else -> choice.technique
         }
+        // A soft end fades into the next song (the owner, 12 Nov) where both ends keep a beat that can't be laid on
+        // the other's: before the cold end and the short "beats would clash" blend are looked at. Not for a
+        // continuous mix's tracks; an end without a beat has its own, longer blends below.
+        val soft = if (mode == CrossfadeMode.SMART && matched == null && rhythmic && !mixed && !currentMix && !nextMix &&
+            currentProfile != null && nextProfile != null
+        ) softFade(currentProfile, nextProfile, cut, maxMs, TechniquePicker.keys(currentProfile, nextProfile)) else null
+        // In DJ playback, two ends that keep a beat and can't be laid on each other get an echo out (the owner's bad
+        // blends, 12 Nov: the dry 1.5 s blend and the cold end sounded like a dropout; 7 of his 11 marks were one of
+        // those): the old song's last bar echoes away on its own beat and the next drops in on its downbeat, as a DJ
+        // does it. Needs Siansa Beats' grid at the end going out; a soft end fades instead.
+        val echo = if (soft == null && mode == CrossfadeMode.SMART && beatMatch && matched == null && rhythmic && !lateStart &&
+            outro?.lockMs != null && currentProfile != null
+        ) {
+            val because = when {
+                currentMix || nextMix -> "a continuous mix can't be laid on a beat"
+                speed == null -> null
+                else -> "the two can't be laid beat on beat (${BeatMatch.note(outro, intro, beatMatch).substringAfter("not beat-matched: ", "their beats aren't steady enough")})"
+            }
+            echoOut(outro, startIntro, currentDurationMs, cut, because)?.let { it.copy(why = it.why + (cutWhy?.let { c -> " · $c" } ?: "")) }
+        } else null
         // A cold end: a hard ending into a hard start never overlaps (both songs' edges loud), unless it's laid beat on
         // beat, or it's a DJ blend that brings a beatless song in under the other for the whole crossfade length.
-        if (mode == CrossfadeMode.SMART && matched == null && !mixed && currentProfile != null && nextProfile != null) {
+        if (soft == null && echo == null && mode == CrossfadeMode.SMART && matched == null && !mixed && currentProfile != null && nextProfile != null) {
             val tail = ((currentProfile.quietForLastMs(QUIET_DB) ?: 0L) - cut).coerceAtLeast(0L)
             val head = nextProfile.reachesAfterMs(QUIET_DB) ?: 0L
             val djLong = beatMatch && !rhythmic && (BeatMatch.beatless(outro) || BeatMatch.beatless(startIntro)) &&
@@ -372,11 +418,16 @@ object Crossfade {
             if (!djLong) {
                 coldEnd(tail, head, cut, outro?.bpm, intro?.bpm, bothBeat = BeatMatch.someBeat(outro) && BeatMatch.someBeat(startIntro), dj = beatMatch)?.let { cold ->
                     val note = if (outro != null || intro != null) BeatMatch.note(outro, intro, beatMatch) else null
-                    return cold.copy(why = cold.why + (cutWhy?.let { " · $it" } ?: ""), beatNote = note)
+                    val softMs = ((currentProfile.quietForLastMs(SOFT_DB) ?: 0L) - cut).coerceAtLeast(0L)
+                    return cold.copy(why = cold.why + " (soft for the last %.1f s)".format(java.util.Locale.ROOT, softMs / 1000.0) + (cutWhy?.let { " · $it" } ?: ""), beatNote = note)
                 }
             }
         }
-        var plan = if (matched != null) {
+        var plan = if (soft != null) {
+            soft
+        } else if (echo != null) {
+            echo
+        } else if (matched != null) {
             // A phrase-on-phrase blend may let the song go at the end of its last phrase (issue #757).
             val lockCut = songEnd - endMs
             val how = if (choice != null) "smart: ${technique!!.label} (${if (technique == choice.technique) choice.why else "the drop didn't fit"}) · " else ""
@@ -389,6 +440,9 @@ object Crossfade {
             val head = nextProfile.reachesAfterMs(QUIET_DB) ?: 0L
             var overlap = (tail + head).coerceAtMost(maxMs)
             var why = "smart: ${tail} ms tail + ${head} ms intro"
+            // How long the end was soft, for the log: why it wasn't faded over (a soft end is [softFade]'s).
+            val softMs = ((currentProfile.quietForLastMs(SOFT_DB) ?: 0L) - cut).coerceAtLeast(0L)
+            val softNote = " (soft for the last %.1f s%s)".format(java.util.Locale.ROOT, softMs / 1000.0, if (softMs >= SOFT_END_MS) ", but the keys clash" else "")
             if ((mixed || currentMix || nextMix) && rhythmic) {
                 // A continuous mix can't be laid on a beat, and a cut into or out of one is heard: a short blend (issue #807).
                 overlap = BeatMatch.CLASH_MS
@@ -396,11 +450,11 @@ object Crossfade {
             } else if (beatMatch && rhythmic && speed == null && outro != null && outro.bpm > 0 && outro.lockMs != null) {
                 echoOut(outro, startIntro, currentDurationMs, cut)?.let { return@run it }
                 overlap = BeatMatch.CLASH_MS
-                why += " · beats would clash, so a short blend"
+                why += " · beats would clash, so a short blend$softNote"
             } else if (rhythmic && overlap > BeatMatch.CLASH_MS) {
                 // Both ends keep a beat that can't be laid on the other's: a long blend would clash, so a short one.
                 overlap = BeatMatch.CLASH_MS
-                why += " · beats would clash, so a short blend"
+                why += " · beats would clash, so a short blend$softNote"
             } else if (beatMatch && !rhythmic && !mixed && overlap < maxMs && (BeatMatch.beatless(outro) || BeatMatch.beatless(startIntro))) {
                 if (beatlessRunsLong(BeatMatch.beatless(outro), BeatMatch.beatless(startIntro), tail, head)) {
                     // A DJ blend where one end has no beat at all (0.52.0-dev: a beatless intro under a beat-driven
@@ -499,7 +553,7 @@ object Crossfade {
      * dead on the bar line; the next song drops in at full level on its first downbeat, as the old one stops, while
      * the echo's last repeats die away under it. Null when the old song has no bar to end on.
      */
-    fun echoOut(outro: BeatEnd, intro: BeatEnd?, durationMs: Long, cut: Long): FadePlan? {
+    fun echoOut(outro: BeatEnd, intro: BeatEnd?, durationMs: Long, cut: Long, because: String? = null): FadePlan? {
         val bar = outro.beatLengthMs * BeatMatch.BEATS_PER_BAR
         val grid = outro.barMs ?: outro.beatMs
         val songEnd = (outro.lockEndMs ?: (durationMs - cut).toDouble()).coerceAtMost((durationMs - cut).toDouble())
@@ -507,8 +561,9 @@ object Crossfade {
         val end = grid + kotlin.math.floor((songEnd - grid) / bar) * bar
         if (end - bar <= 0 || end > durationMs) return null
         val from = (intro?.barMs ?: intro?.beatMs ?: 0.0).takeIf { it in 0.0..ECHO_DOWNBEAT_WITHIN_MS } ?: 0.0
-        val why = "smart: ${Technique.ECHO_OUT.label}, %.0f and %.0f BPM are too far apart to match: the old song's last bar echoes out and stops on the bar line, the next drops in on its first downbeat (%.1f s)"
-            .format(java.util.Locale.ROOT, outro.bpm, intro?.bpm ?: 0.0, from / 1000.0)
+        val reason = because ?: "%.0f and %.0f BPM are too far apart to match".format(java.util.Locale.ROOT, outro.bpm, intro?.bpm ?: 0.0)
+        val why = "smart: ${Technique.ECHO_OUT.label}, $reason: the old song's last bar echoes out and stops on the bar line, the next drops in on its first downbeat (%.1f s in)"
+            .format(java.util.Locale.ROOT, from / 1000.0)
         return FadePlan(
             overlapMs = bar.toLong(), fadeInMs = ECHO_DROP_IN_MS, why = why, cutMs = (durationMs - end).toLong(),
             coldEnd = true, gapMs = 0L, technique = Technique.ECHO_OUT, echoBeatMs = outro.beatLengthMs, incomingFromMs = from.toLong(),

@@ -208,15 +208,27 @@ internal class MixedCrossfader(
                     nextProfile = profiles.cached(next.id), beatMatch = beatMatch, blendBars = blending.blendBars,
                     sinceSeekMs = 0, lastTechnique = lastTechnique,
                 )
-                val quickAt = quick?.let { duration - it.cutMs - it.overlapMs }
-                val quickHandover = quickAt?.let { EngineFade.handoverAt(it, position) }
-                if (quick == null || quickHandover == null || quickHandover - position < MIN_PREPARE_MS) {
+                var quickAt = quick?.let { duration - it.cutMs - it.overlapMs }
+                var quickHandover = quickAt?.let { EngineFade.handoverAt(it, position) }
+                var chosen = quick
+                if (quick != null && quickHandover != null && quickHandover - position < MIN_PREPARE_MS && quick.beat == null && !quick.coldEnd) {
+                    // Not even that fits (the owner's log, 12 Nov: moved to the last half minute, the songs changed with
+                    // no blend at all): a plain blend of what's left, however short, never none.
+                    val left = duration - quick.cutMs - position - MIN_PREPARE_MS - EngineFade.LEAD_MS
+                    if (left >= SHORTEST_LEFT_MS) {
+                        chosen = quick.copy(overlapMs = left, fadeInMs = minOf(quick.fadeInMs, left).coerceAtLeast(Crossfade.MIN_FADE_IN_MS),
+                            why = "smart: a blend of what's left (%.1f s) after moving near the end · ${quick.why}".format(java.util.Locale.ROOT, left / 1000.0))
+                        quickAt = duration - chosen.cutMs - chosen.overlapMs
+                        quickHandover = EngineFade.handoverAt(quickAt, position)
+                    }
+                }
+                if (chosen == null || quickAt == null || quickHandover == null || quickHandover - position < MIN_PREPARE_MS) {
                     AppLog.i("Crossfade", "Too close to the end of ${current.id} to get a fade ready (${fade.why}): the songs change without one")
                     skipped = item.mediaId
                     return LOOK_MS
                 }
-                AppLog.i("Crossfade", "Too close to the end of ${current.id} for the blend picked (${fade.why}): a quick one instead")
-                fade = quick
+                AppLog.i("Crossfade", "Too close to the end of ${current.id} for the blend picked (${fade.why}): ${if (chosen === quick) "a quick one" else "what's left"} instead")
+                fade = chosen
                 at = quickAt
                 handover = quickHandover
             }
@@ -795,6 +807,8 @@ internal class MixedCrossfader(
         /** The tail is made ready this long before the handover. */
         const val PREPARE_MS = 10_000L
         const val MIN_PREPARE_MS = 2_500L
+        /** A blend of what's left after moving near a song's end is at least this long; less, and the songs just change. */
+        const val SHORTEST_LEFT_MS = 1_500L
         /** The handover is this long before the blend: the next song's start loads meanwhile. */
         const val LEAD_MS = EngineFade.LEAD_MS
         /** The tail starts loading this much before the handover point (a seek lands a little early or late). */
