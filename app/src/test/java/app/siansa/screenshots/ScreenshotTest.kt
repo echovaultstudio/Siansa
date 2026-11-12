@@ -801,8 +801,8 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     app.siansa.ui.GenreAboutText("Kayōkyoku is Japanese popular music of the Shōwa era.", "Wikipedia", onSource = null)
                 }
             },
-            // The time machine: its title with the year's arrows, what was played, the months, and the big numbers washed
-            // in the top artist's colour. A long artist name is cut, not wrapped.
+            // The time machine: its title (tap it for the years), what was played, the months, and the big numbers in the
+            // listening pages' one faint tile. A long artist name is cut, not wrapped.
             Scene("time_machine_header") {
                 Column(Modifier.background(Color(0xFF111111)).padding(vertical = Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Section)) {
                     Column {
@@ -818,7 +818,6 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                             topArtists = emptyList(), topTracks = emptyList(), topAlbums = emptyList(), byHour = IntArray(24),
                             rising = emptyList(), fading = emptyList(), genresUp = emptyList(), genresDown = emptyList(), source = "",
                         ),
-                        tint = Color(0xFF8C7A52),
                     )
                 }
             },

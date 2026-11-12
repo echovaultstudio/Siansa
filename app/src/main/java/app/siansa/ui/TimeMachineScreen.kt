@@ -8,7 +8,6 @@ import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalDensity
 import android.os.Build
 import androidx.compose.animation.Crossfade
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
@@ -18,7 +17,6 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clipToBounds
@@ -160,28 +158,12 @@ private fun TimeMachinePage(nav: NavController) {
         }
     }
 
-    // The top artist of the month or year, behind the header and in the big numbers. Nothing waits for it: the page
-    // shows at once, and the picture and its colour fade in when the report (kept on the phone for a finished month)
-    // and the picture (kept on the phone once seen) are there. The last one stays while the next month loads.
+    // The top artist of the month or year, behind the header. Nothing waits for it: the page shows at once, and the
+    // picture fades in when the report (kept on the phone for a finished month) and the picture (kept on the phone
+    // once seen) are there. The last one stays while the next month loads.
     val shown = shownReport.valueOrNull()
-    // The picture is read into memory first and only then put behind the header, so it fades in whole: put there
-    // straight away it showed an empty box, then popped in (the flashing, 12 Nov).
-    val wanted = shown?.topArtists?.firstOrNull()?.artist?.picture
-    var picture by remember { mutableStateOf<String?>(null) }
-    val context = LocalContext.current
-    LaunchedEffect(wanted, report is Load.Loading) {
-        if (report is Load.Loading) return@LaunchedEffect
-        if (wanted == null) { picture = null; return@LaunchedEffect }
-        val id = app.siansa.data.freshArtistCover(wanted, graph.artistPhotos.covers.value)
-        val there = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            runCatching { coil3.SingletonImageLoader.get(context).execute(coverRequest(context, graph, id, HEADER_PICTURE)) is coil3.request.SuccessResult }.getOrDefault(false)
-        }
-        picture = if (there) wanted else null
-    }
-    // Without a picture (still loading, nobody played, an artist not in the library) a quiet grey: the app's amber
-    // and violet never show here first and then change (the owner, 12 Nov).
-    val artistTint = rememberCoverColor(picture)
-    val tint by animateColorAsState(if (picture != null) artistTint else NO_ARTIST_TINT, tween(HEADER_FADE), label = "time-machine-tint")
+    val picture = rememberHeaderPicture(shown?.topArtists?.firstOrNull()?.artist?.picture, report is Load.Loading)
+    val tint = rememberHeaderTint(picture, "time-machine-tint")
     val n = remember { java.text.NumberFormat.getIntegerInstance() }
     val summary = shown?.takeIf { it.plays > 0 }?.let { "${n.format(it.plays)} plays · ${n.format(it.minutes / 60)} hours" }
         ?: "How you listened, any month or year."
@@ -209,7 +191,7 @@ private fun TimeMachinePage(nav: NavController) {
             item(key = "report") {
                 LoadBox(shownReport) { r ->
                     Column(Modifier.padding(top = Space.Medium).alpha(bodyAlpha)) {
-                        if (r == null) songs() else ReportBody(r, nav, songs = songs, tint = tint)
+                        if (r == null) songs() else ReportBody(r, nav, songs = songs)
                     }
                 }
             }
@@ -220,21 +202,17 @@ private fun TimeMachinePage(nav: NavController) {
     }
 }
 
-/** How soft the top artist's picture is behind the time machine's header, and the size it's asked for. */
+/** How soft a picture is behind a listening page's header. */
 private val HEADER_BLUR = 48.dp
-private const val HEADER_PICTURE = 300
 
 /** How much of a bright picture shows behind the header: the rest is the page, so white words stay easy to read. */
 private const val HEADER_PICTURE_ALPHA = 0.7f
 
-/** How long one artist's picture takes to give way to the next, in milliseconds: quick, a blink not a fade. */
-private const val HEADER_FADE = 220
-
-/** The big numbers' colour while there's no artist's picture to take one from: a quiet grey, never the app's own colours. */
+/** A header's colour (before Android 12, which can't blur) while there's no picture to take one from: a quiet grey, never the app's own colours. */
 internal val NO_ARTIST_TINT = Color(0xFF7A7A80)
 
 /** How faint the last month is while the next one loads. */
-private const val WAITING_ALPHA = 0.4f
+internal const val WAITING_ALPHA = 0.4f
 
 /**
  * [load], or while it's loading, what it was before: a page keeps showing the last thing it had instead of a spinner.

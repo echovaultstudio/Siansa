@@ -4,7 +4,8 @@
 
 Wrapped-style pages for this month, last month, this year and this month a year ago: your top songs, albums and
 artists, artists rising into your rotation and dropping out, genres you played more or less than before, and the
-time of day you listen most. Built from Siansa Beats (if you scrobble there; it needs Siansa Beats 0.33 or newer),
+time of day you listen most. The top of the page shows the period in big letters on a soft picture of the artist you played
+most, with chips for the four periods under it. Built from Siansa Beats (if you scrobble there; it needs Siansa Beats 0.33 or newer),
 else Koito, your server's play counts and Siansa's own history. They don't need AudioMuse-AI or AI.
 
 ## Time Machine
@@ -12,7 +13,7 @@ else Koito, your server's play counts and Siansa's own history. They don't need 
 Any month or year you played music, laid out like Your month: minutes, plays, artists and songs at the top, your
 top artists with their plays, your top songs, top albums, your listening clock and how your taste moved against
 the month or year before. The top shows the month or year in big letters (tap it for the list of years), what you played and who you played most,
-on a soft picture of that artist; the four numbers take that artist's colour. The listening clock and "Less of" take that colour too. The page opens at once and the picture
+on a soft picture of that artist. The page opens at once and the picture
 fades in; going to another month keeps the last one on the page, dimmed, until the new one is there. The songs come from Siansa Beats, Koito and Last.fm (whichever you scrobble to),
 otherwise Siansa's own history; the rest comes from Siansa Beats, else Koito, else Siansa's own history, so with
 only Last.fm an older month may show just its songs. With **Scrobble to Siansa Beats** on, nothing else needs
@@ -28,7 +29,10 @@ the current one shows what the phone had and then updates with your latest plays
 
 What the music you play most sounds like: average moods and genres, typical tempo and the most common scale,
 from AudioMuse-AI's analysis of the songs closest to the sound of your most played ones.
-The top of the page is a soft blend of the covers of the first few songs, and the four numbers take their colour.
+The top of the page is a soft blend of the covers of the first few songs.
+
+All three pages share one look: only the picture at the top changes with the music; the tiles with the big numbers are the
+same faint, see-through white everywhere, so they read on any picture.
 
 ## Scrobbling
 
