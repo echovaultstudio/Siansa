@@ -108,7 +108,7 @@ class MixSoundsTest {
             val beats = BeatsGenres({ path -> asked += path; answer(server.songId) as JsonElement }, { true })
             val genres = beats.ofSongs(listOf(server.songId, server.songId))
             assertEquals("$server", "/plugins/siansa_beats/api/songs/genres?ids=${server.songId}", asked.single())
-            assertEquals("$server", mapOf(server.songId to listOf(SongGenre("Ambient", 0.61), SongGenre("Drone", 0.2))), genres)
+            assertEquals("$server", mapOf(server.songId to listOf(SongGenre("Ambient", 0.61, "Electronic", "Ambient"), SongGenre("Drone", 0.2))), genres)
         }
     }
 
