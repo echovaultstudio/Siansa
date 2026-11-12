@@ -874,6 +874,15 @@ class PlaybackService : MediaLibraryService() {
             current = null
         }
 
+        /** Every change of repeat is in the log, whoever made it: it once came on by itself (the owner, 12 Nov). */
+        override fun onRepeatModeChanged(repeatMode: Int) {
+            AppLog.i("Player", "Repeat is now " + when (repeatMode) {
+                Player.REPEAT_MODE_ALL -> "all"
+                Player.REPEAT_MODE_ONE -> "this song"
+                else -> "off"
+            })
+        }
+
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
             // The same song swapped for another quality or format: keep counting it as one listen.
             if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED && mediaItem?.mediaId != null && mediaItem.mediaId == current?.id) return

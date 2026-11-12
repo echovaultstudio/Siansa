@@ -3,12 +3,16 @@ package app.siansa.car
 import android.net.Uri
 import androidx.annotation.OptIn
 import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.LibraryResult
 import androidx.media3.session.MediaLibraryService.LibraryParams
 import androidx.media3.session.MediaLibraryService.MediaLibrarySession
 import androidx.media3.session.MediaSession
 import androidx.media3.session.SessionError
+import androidx.media3.session.SessionResult
+import app.siansa.BuildConfig
+import app.siansa.playback.QueueRules
 import app.siansa.AppGraph
 import app.siansa.log.AppLog
 import app.siansa.playback.SongRegistry
@@ -31,6 +35,20 @@ import java.util.concurrent.ConcurrentHashMap
 class CarSessionCallback(private val graph: AppGraph, private val tree: CarTree) : MediaLibrarySession.Callback {
     /** The last searches' results, so the car's paging through them doesn't search again. */
     private val searches = ConcurrentHashMap<String, List<MediaItem>>()
+
+    /**
+     * Repeat and shuffle are changed in the app only ([QueueRules.takesModeChange]): another app's ask (a car's or a
+     * headset's Bluetooth) is turned down and written to the log, so repeat no longer comes on by itself.
+     */
+    @Suppress("OVERRIDE_DEPRECATION")
+    override fun onPlayerCommandRequest(session: MediaSession, controller: MediaSession.ControllerInfo, playerCommand: Int): Int {
+        val mode = playerCommand == Player.COMMAND_SET_REPEAT_MODE || playerCommand == Player.COMMAND_SET_SHUFFLE_MODE
+        if (mode && !QueueRules.takesModeChange(controller.packageName, BuildConfig.APPLICATION_ID)) {
+            AppLog.i("Player", "${controller.packageName} asked to change ${if (playerCommand == Player.COMMAND_SET_REPEAT_MODE) "repeat" else "shuffle"}: not taken, that's set in Siansa only")
+            return SessionError.ERROR_NOT_SUPPORTED
+        }
+        return SessionResult.RESULT_SUCCESS
+    }
 
     override fun onGetLibraryRoot(session: MediaLibrarySession, browser: MediaSession.ControllerInfo, params: LibraryParams?): ListenableFuture<LibraryResult<MediaItem>> {
         // "Recent" roots are Android's own resume suggestions, which aren't offered.
