@@ -199,13 +199,18 @@ fun ScrobblingScreen(nav: NavController) {
                 Button(modifier = button, onClick = { testListenBrainz() }) { Text("Test and save") }
             }
             if (settings.listenBrainzToken.isNotBlank()) {
-                OutlinedButton(modifier = Modifier.focusRing(), onClick = {
+                val remove = {
                     graph.settings.save(graph.settings.current.withListenServer("", ""))
                     lbUrl = ""
                     lbToken = ""
                     lbStatus = "✓ Removed: nothing is sent there"
                     AppLog.i("Scrobble", "ListenBrainz / Koito removed: nothing is sent there")
-                }) { Text("Remove") }
+                }
+                // On the TV the whole row is what the remote stops on, as for Test and save above (issue #978): a
+                // narrow button on the left is passed over for the wide row after it.
+                TvActionRow(onClick = remove) { button ->
+                    OutlinedButton(modifier = button, onClick = remove) { Text("Remove") }
+                }
             }
             lbStatus?.let { Status(it) }
             }
