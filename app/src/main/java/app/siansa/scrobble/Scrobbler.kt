@@ -21,7 +21,7 @@ import java.io.File
 
 /** A finished listen that still has to reach one or more services (kept across restarts). */
 @Serializable
-data class PendingListen(val song: Song, val startedAtSec: Long, val targets: Set<String>)
+data class PendingListen(val song: Song, val startedAtSec: Long, val targets: Set<String>, val albumArtist: String? = null)
 
 /**
  * Sends "now playing" and finished listens to the music server, Siansa Beats, Last.fm and ListenBrainz/Koito.
@@ -39,6 +39,8 @@ class Scrobbler(
     private val beats: (suspend (path: String, body: String) -> Unit)? = null,
     /** Whose library a song is from: the user in use, or another user whose music shows with theirs (issue #356). */
     private val sourceOf: suspend (songId: String) -> Int = { Users.active },
+    /** The artist of the song's album, from the library (for Last.fm, which finds the album and its cover by it). */
+    private val albumArtistOf: suspend (Song) -> String? = { null },
 ) {
     private val pending = JsonFile(File(context.filesDir, Users.scoped("pending_scrobbles.json")), ListSerializer(PendingListen.serializer())) { emptyList() }
     private val flushLock = Mutex()
@@ -49,9 +51,10 @@ class Scrobbler(
         scope.launch {
             if (!scrobbles(song, s.scrobbleOffUsers)) return@launch
             if (s.scrobbleNavidrome) runCatching { source.scrobble(song.id, submission = false) }
-            if (s.beatsScrobbleReady) runCatching { beats?.invoke(BeatsListens.NOW, BeatsListens.now(BeatsListens.listener(s), song)) }
+            val albumArtist = if (s.beatsScrobbleReady || s.lastFmReady) albumArtist(song) else null
+            if (s.beatsScrobbleReady) runCatching { beats?.invoke(BeatsListens.NOW, BeatsListens.now(BeatsListens.listener(s), song, albumArtist)) }
                 .onFailure { AppLog.w("Scrobble", "Siansa Beats now playing failed: ${it.message}") }
-            if (s.lastFmReady) runCatching { lastFm.nowPlaying(lastFmKeys(), song) }
+            if (s.lastFmReady) runCatching { lastFm.nowPlaying(lastFmKeys(), song, albumArtist) }
                 .onFailure { AppLog.w("Scrobble", "Last.fm now playing failed: ${it.message}") }
             if (s.listenBrainzReady) runCatching { listenBrainz.nowPlaying(s.listenBrainzUrl, s.listenBrainzToken, song) }
                 .onFailure { AppLog.w("Scrobble", "ListenBrainz now playing failed: ${it.message}") }
@@ -96,10 +99,16 @@ class Scrobbler(
                 AppLog.i("Scrobble", "Not sent: ${song.title} is from user ${sourceOf(song.id) + 1}, whose songs aren't scrobbled")
                 return@launch
             }
-            pending.update { it + PendingListen(song, startedAtMs / 1000, targets) }
+            val albumArtist = albumArtist(song)
+            pending.update { it + PendingListen(song, startedAtMs / 1000, targets, albumArtist) }
             flush()
         }
     }
+
+    /** The album's artist when the library knows it; a lookup that fails is no reason to lose the listen. */
+    private suspend fun albumArtist(song: Song): String? =
+        runCatching { albumArtistOf(song)?.trim()?.takeIf { it.isNotBlank() } }
+            .onFailure { AppLog.d("Scrobble", "No album artist for ${song.title}: ${it.message}") }.getOrNull()
 
     /** Sends every waiting listen, oldest first; whatever still fails stays for next time. */
     suspend fun flush() = flushLock.withLock {
@@ -124,9 +133,9 @@ class Scrobbler(
                 NAVIDROME -> source.scrobble(item.song.id, submission = true, timeMs = item.startedAtSec * 1000)
                 // Still set up when it's sent (perhaps days later): a listen kept for a Siansa Beats that's gone is dropped.
                 BEATS -> if (s.beatsScrobbleReady) {
-                    beats?.invoke(BeatsListens.PATH, BeatsListens.listen(BeatsListens.listener(s), item.song, item.startedAtSec))
+                    beats?.invoke(BeatsListens.PATH, BeatsListens.listen(BeatsListens.listener(s), item.song, item.startedAtSec, item.albumArtist))
                 } else Unit
-                LASTFM -> if (s.lastFmReady) lastFm.scrobble(lastFmKeys(), item.song, item.startedAtSec) else Unit
+                LASTFM -> if (s.lastFmReady) lastFm.scrobble(lastFmKeys(), item.song, item.startedAtSec, item.albumArtist) else Unit
                 LISTENBRAINZ -> if (s.listenBrainzReady) listenBrainz.listen(s.listenBrainzUrl, s.listenBrainzToken, item.song, item.startedAtSec) else Unit
                 else -> Unit
             }

@@ -24,8 +24,12 @@ object BeatsListens {
     /** The listener's name for Siansa Beats: the music server's user name (none with an API key alone). */
     fun listener(settings: AppSettings): String = settings.navidromeUser.trim()
 
-    /** One finished listen, started at [startedAtSec], as Siansa Beats takes it. */
-    fun listen(user: String, song: Song, startedAtSec: Long): String = buildJsonObject {
+    /**
+     * One finished listen, started at [startedAtSec], as Siansa Beats takes it. [albumArtist] (Siansa Beats 0.37) goes
+     * on to Last.fm, which finds a collaboration's or a compilation's album, and its cover, by it (the owner, 12 Nov:
+     * no pictures on Last.fm for songs credited "A • B").
+     */
+    fun listen(user: String, song: Song, startedAtSec: Long, albumArtist: String? = null): String = buildJsonObject {
         put("user", user)
         putJsonArray("listens") {
             addJsonObject {
@@ -34,6 +38,7 @@ object BeatsListens {
                 put("artist", song.artist)
                 put("title", song.title)
                 if (song.album.isNotBlank()) put("album", song.album)
+                if (!albumArtist.isNullOrBlank()) put("album_artist", albumArtist)
                 if (song.durationSec > 0) put("duration", song.durationSec)
             }
         }
@@ -49,12 +54,13 @@ object BeatsListens {
     }.toString()
 
     /** What's playing now. */
-    fun now(user: String, song: Song): String = buildJsonObject {
+    fun now(user: String, song: Song, albumArtist: String? = null): String = buildJsonObject {
         put("user", user)
         put("id", song.id)
         put("artist", song.artist)
         put("title", song.title)
         if (song.album.isNotBlank()) put("album", song.album)
+        if (!albumArtist.isNullOrBlank()) put("album_artist", albumArtist)
         if (song.durationSec > 0) put("duration", song.durationSec)
     }.toString()
 }
