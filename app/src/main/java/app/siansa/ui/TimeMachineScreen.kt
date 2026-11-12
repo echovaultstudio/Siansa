@@ -8,12 +8,18 @@ import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalDensity
 import android.os.Build
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.ui.semantics.Role
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.RectangleShape
@@ -39,8 +45,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
-import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.MusicOff
 import androidx.compose.material.icons.rounded.PlayArrow
@@ -145,7 +149,7 @@ private fun TimeMachinePage(nav: NavController) {
     val shownResult = rememberSettled(result)
     val shownReport = rememberSettled(report)
     val waiting = (result is Load.Loading && shownResult !is Load.Loading) || (report is Load.Loading && shownReport !is Load.Loading)
-    val bodyAlpha by animateFloatAsState(if (waiting) WAITING_ALPHA else 1f, tween(200), label = "time-machine-body")
+    val bodyAlpha by animateFloatAsState(if (waiting) WAITING_ALPHA else 1f, tween(120), label = "time-machine-body")
     val songs: @Composable () -> Unit = {
         LoadBox(shownResult) { tm ->
             Column {
@@ -173,7 +177,10 @@ private fun TimeMachinePage(nav: NavController) {
         }
         picture = if (there) wanted else null
     }
-    val tint = rememberCoverColor(picture)
+    // Without a picture (still loading, nobody played, an artist not in the library) a quiet grey: the app's amber
+    // and violet never show here first and then change (the owner, 12 Nov).
+    val artistTint = rememberCoverColor(picture)
+    val tint by animateColorAsState(if (picture != null) artistTint else NO_ARTIST_TINT, tween(HEADER_FADE), label = "time-machine-tint")
     val n = remember { java.text.NumberFormat.getIntegerInstance() }
     val summary = shown?.takeIf { it.plays > 0 }?.let { "${n.format(it.plays)} plays · ${n.format(it.minutes / 60)} hours" }
         ?: "How you listened, any month or year."
@@ -201,7 +208,7 @@ private fun TimeMachinePage(nav: NavController) {
             item(key = "report") {
                 LoadBox(shownReport) { r ->
                     Column(Modifier.padding(top = Space.Medium).alpha(bodyAlpha)) {
-                        if (r == null) songs() else ReportBody(r, nav, songs = songs, tint = tint.takeIf { picture != null })
+                        if (r == null) songs() else ReportBody(r, nav, songs = songs, tint = tint)
                     }
                 }
             }
@@ -218,6 +225,12 @@ private const val HEADER_PICTURE = 300
 
 /** How much of a bright picture shows behind the header: the rest is the page, so white words stay easy to read. */
 private const val HEADER_PICTURE_ALPHA = 0.7f
+
+/** How long one artist's picture takes to give way to the next, in milliseconds: quick, a blink not a fade. */
+private const val HEADER_FADE = 220
+
+/** The big numbers' colour while there's no artist's picture to take one from: a quiet grey, never the app's own colours. */
+internal val NO_ARTIST_TINT = Color(0xFF7A7A80)
 
 /** How faint the last month is while the next one loads. */
 private const val WAITING_ALPHA = 0.4f
@@ -239,16 +252,15 @@ internal fun <T> settledLoad(load: Load<T>, last: Load<T>?): Load<T> = if (load 
 
 /**
  * The time machine's header: the top artist's [picture], soft and dark, fading into the page, with back and
- * [content] on it. Without a picture (nothing played, an artist not in the library, still loading) or before
- * Android 12, which can't blur, the usual Your listening lights. The picture fades in over them, so the header is
- * there at once and never waits.
+ * [content] on it. Without a picture (nothing played, an artist not in the library, still loading) the header is
+ * the plain dark page, so no other colours show before the picture does. Before Android 12, which can't blur, a wash
+ * of the artist's colour.
  */
 @Composable
 private fun TimeMachineHeader(nav: NavController, picture: String?, tint: Color, content: @Composable ColumnScope.() -> Unit) {
     val page = MaterialTheme.colorScheme.background
     Box(Modifier.fillMaxWidth().clipToBounds()) {
-        Box(Modifier.matchParentSize().listeningBackdrop(page))
-        Crossfade(picture, Modifier.matchParentSize(), animationSpec = tween(600), label = "time-machine-artist") { id ->
+        Crossfade(picture, Modifier.matchParentSize(), animationSpec = tween(HEADER_FADE), label = "time-machine-artist") { id ->
             if (id != null) {
                 Box(Modifier.fillMaxSize()) {
                     if (Build.VERSION.SDK_INT >= 31) {
@@ -291,6 +303,13 @@ internal fun TimeMachineWords(summary: String, mostPlayed: String) {
     }
 }
 
+/** A year in the list of years, and how tall the list may be before it scrolls (five and a half years: more show there are more). */
+private val YEAR_ROW = 48.dp
+private val YEARS_HEIGHT = 280.dp
+
+/** The years the time machine can show, newest first. */
+internal fun timeMachineYears(thisYear: Int): List<Int> = (thisYear downTo TIME_MACHINE_FIRST_YEAR).toList()
+
 /** What the time machine shows, as its title: "2025", or "Oct 2025". */
 internal fun timeMachineTitle(year: Int, month: Int?, locale: Locale = Locale.getDefault()): String =
     if (month == null) "$year" else "${Month.of(month).getDisplayName(TextStyle.SHORT, locale).trimEnd('.')} $year"
@@ -303,31 +322,53 @@ internal fun chipScrollTarget(left: Int, width: Int, viewport: Int, max: Int): I
     (left + width / 2 - viewport / 2).coerceIn(0, max.coerceAtLeast(0))
 
 /**
- * What's shown, big ("Oct 2025"), with the arrows for the year before and after beside it, then
+ * What's shown, big ("Oct 2025"): tap it for the list of years, then
  * [under] (the time machine's words) and the months (the whole year first), one even gap apart. */
 @Composable
 internal fun TimePicker(year: Int, month: Int?, today: LocalDate, onYear: (Int) -> Unit, onMonth: (Int?) -> Unit, under: @Composable () -> Unit = {}) {
     Column(Modifier.fillMaxWidth().testTag("timePicker"), verticalArrangement = Arrangement.spacedBy(TIME_MACHINE_GAP)) {
-        Row(
-            Modifier.fillMaxWidth().padding(start = Space.Page, end = Space.Small).testTag("year"),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Space.Tight),
-        ) {
-            Text(
-                timeMachineTitle(year, month),
-                style = MaterialTheme.typography.displaySmall,
-                fontWeight = FontWeight.Black,
-                color = Color.White,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f).testTag("timeMachineTitle"),
-            )
-            val round = Modifier.background(Color.Black.copy(alpha = 0.28f), CircleShape).border(1.dp, Color.White.copy(alpha = 0.16f), CircleShape)
-            IconButton(onClick = { onYear(year - 1) }, enabled = year > TIME_MACHINE_FIRST_YEAR, modifier = round) {
-                Icon(Icons.AutoMirrored.Rounded.KeyboardArrowLeft, "Year before", tint = Color.White)
+        // The title opens the years (the owner, 12 Nov: no arrows). The list scrolls, newest first, and opens at the
+        // year that's showing.
+        var years by remember { mutableStateOf(false) }
+        Box(Modifier.fillMaxWidth().padding(horizontal = Space.Page).testTag("year")) {
+            Row(
+                Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable(onClickLabel = "Pick a year", role = Role.Button) { years = true }
+                    .testTag("timeMachineTitle"),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Space.Tight),
+            ) {
+                Text(
+                    timeMachineTitle(year, month),
+                    style = MaterialTheme.typography.displaySmall,
+                    fontWeight = FontWeight.Black,
+                    color = Color.White,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                Icon(Icons.Rounded.KeyboardArrowDown, null, tint = Color.White.copy(alpha = 0.72f), modifier = Modifier.size(28.dp))
             }
-            IconButton(onClick = { onYear(year + 1) }, enabled = year < today.year, modifier = round) {
-                Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, "Year after", tint = Color.White)
+            val all = remember(today) { timeMachineYears(today.year) }
+            val rowPx = with(LocalDensity.current) { YEAR_ROW.roundToPx() }
+            // Opens with the chosen year a row from the top, so the year after it shows too.
+            val menuScroll = remember(years) { androidx.compose.foundation.ScrollState(((all.indexOf(year) - 1).coerceAtLeast(0)) * rowPx) }
+            DropdownMenu(
+                expanded = years,
+                onDismissRequest = { years = false },
+                scrollState = menuScroll,
+                modifier = Modifier.heightIn(max = YEARS_HEIGHT).testTag("years"),
+            ) {
+                for (y in all) {
+                    val chosen = y == year
+                    DropdownMenuItem(
+                        text = { Text("$y", style = MaterialTheme.typography.titleMedium, fontWeight = if (chosen) FontWeight.Bold else FontWeight.Medium, color = if (chosen) Accent else Color.Unspecified) },
+                        trailingIcon = if (chosen) ({ Icon(Icons.Rounded.Check, null, tint = Accent) }) else null,
+                        onClick = { years = false; if (!chosen) onYear(y) },
+                        modifier = Modifier.height(YEAR_ROW).testTag("year-$y"),
+                    )
+                }
             }
         }
         under()
