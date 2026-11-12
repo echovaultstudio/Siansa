@@ -198,9 +198,10 @@ class BeatsApi(private val http: OkHttpClient, private val settings: () -> AppSe
         fun message(http: Int, reason: String): String = when (http) {
             401, 403 -> "Siansa Beats wants its API key or password: check it in Settings › Connections"
             // Its own reason when it gives one ("The sound of none of those songs is known yet"): only a path it
-            // doesn't have at all means it's too old.
+            // doesn't have at all means it's too old. Not "0.20 or newer": a newer one can lack a newer path too
+            // (the reports' numbers need 0.33, and the log said 0.20 to someone on 0.32).
             404 -> if (reason.isBlank() || reason == "no details" || reason.equals("not found", ignoreCase = true) || reason.startsWith("<")) {
-                "This Siansa Beats is too old for the app: update it to 0.20 or newer"
+                "This Siansa Beats doesn't have this yet: update it to the newest version"
             } else {
                 "Siansa Beats: $reason"
             }

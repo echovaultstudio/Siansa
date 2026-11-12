@@ -241,7 +241,9 @@ changes, and when you press **Repeat** or **Add to playlist** in now playing (if
 phone's settings). With no song after this one, a swipe left springs back and the song plays on; with none before
 it, a swipe right starts it again.
 
-Pull up from now playing, or tap the queue button, for the queue. Tap a song to jump to it. Swipe a song to the
+Pull up from now playing, or tap the queue button, for the queue. Tapping a song in an album, a playlist or any list
+starts a new queue from that song: the songs before it in the list aren't queued (Shuffle plays the whole list). Tap a
+song in the queue to jump to it. Swipe a song to the
 left to take it out of the queue, behind a red strip whose bin gives a little shake; swipe it to the right to play it
 next, straight after the song playing, behind an amber strip. Each gives a buzz. Its ⋮ menu has **Remove from queue**
 and **Play next** too, and **Remove songs up to here**,

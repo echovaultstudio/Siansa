@@ -96,7 +96,7 @@ class BeatsApiTest {
         val denied = runCatching { runBlocking { api.get("/api/v1/profiles?ids=a") } }.exceptionOrNull()
         assertTrue(denied?.message, denied?.message.orEmpty().contains("API key or password"))
         val old = runCatching { runBlocking { api.get("/api/v1/profiles?ids=a") } }.exceptionOrNull()
-        assertTrue(old?.message, old?.message.orEmpty().contains("too old"))
+        assertTrue(old?.message, old?.message.orEmpty().contains("doesn't have this yet"))
         settings = settings.copy(beatsKey = "")
         runBlocking { api.get("/api/v1/genres") }
         assertEquals(null, seen[3].header("Authorization"))
