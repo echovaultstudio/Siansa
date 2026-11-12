@@ -28,6 +28,7 @@ the current one shows what the phone had and then updates with your latest plays
 
 What the music you play most sounds like: average moods and genres, typical tempo and the most common scale,
 from AudioMuse-AI's analysis of the songs closest to the sound of your most played ones.
+The top of the page is a soft blend of the covers of the first few songs, and the four numbers take their colour.
 
 ## Scrobbling
 
