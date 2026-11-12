@@ -69,7 +69,7 @@ The same cog has **Show its title**: turn it off and the section shows without t
 | **Recently played** | Albums you played lately, only from music the source filter shows. |
 | **Artist radios** | Artists you played lately, mixed with artists like them. |
 | **Recently added** | The newest albums on your server. |
-| **Your genres** | Genre radios from your library: the songs tagged with that genre. In Siansa Dev with Siansa Beats, every song that sounds like it, whatever its tags say (a remix tagged with its album's genre, but sounding like trance, plays in Trance); without Siansa Beats, or until it has heard enough of them, the tags as always. |
+| **Your genres** | Genre radios from your library: the songs tagged with that genre. In Siansa Dev with Siansa Beats, every song that sounds like it, whatever its tags say (a remix tagged with its album's genre, but sounding like trance, plays in Trance), as long as the genre is among the song's three best guesses (Siansa Beats 0.36: a faint fourth guess doesn't count); without Siansa Beats, or until it has heard enough of them, the tags as always. |
 | **Random picks** | A random selection to dig into. |
 
 ## Notices
@@ -238,7 +238,7 @@ Home with its switch in Settings.
   through. With Siansa Beats (0.19 or later), it says what the genre is, with a little of its history: the opening of
   its Wikipedia article, linked under it. Under that, one line: how many songs it has on the left, and on the right
   its heart beside its one button, the **radio** (round, in the genre's colour). The radio or a song there starts the genre's radio: 30 of its songs at random (the song you
-  tapped first), and 30 more of the genre each time the queue comes to its end, for as long as you don't play
+  tapped first), the songs Siansa Beats is sure sound like the genre far more often than the faint ones (with Siansa Beats 0.36; by the tags every song is as likely), and 30 more of the genre each time the queue comes to its end, for as long as you don't play
   something else or add your own songs after it. The whole genre never goes into the queue, as some have thousands
   of songs. A genre's tile and page are coloured by its feel: red for hard and fast, blue or green for calm.
 - **Artist radios** start with a few of the artist's songs. With AudioMuse-AI set up, the rest are songs that

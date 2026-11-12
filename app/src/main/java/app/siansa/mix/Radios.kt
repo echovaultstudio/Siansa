@@ -108,7 +108,7 @@ class Radios(private val graph: AppGraph) {
             parts.size == 3 && parts[0] == "radio" && parts[1] == "genre" -> {
                 val all = graph.genreRadio.songsOf(parts[2])
                 if (all.isEmpty()) throw MixException("No songs of ${parts[2]} on the phone")
-                GenreRadio.firstPicks(all, null, GenreRadio.PICKS, kotlin.random.Random.Default)
+                GenreRadio.firstPicks(all, null, GenreRadio.PICKS, kotlin.random.Random.Default, graph.beatsGenres.weightsOf(parts[2]))
             }
             parts.size == 2 && parts[0] == "blend" -> {
                 val id = parts[1]
