@@ -77,33 +77,63 @@ class TvRemoteSweepTest {
         compose.waitForIdle()
     }
 
+    /** A node's own words and its children's (a row that the remote stops on holds its button's words in a child). */
     private fun wordsOf(node: SemanticsNode): List<String> = buildList {
-        node.config.getOrNull(SemanticsProperties.Text)?.forEach { add(it.text) }
-        node.config.getOrNull(SemanticsProperties.ContentDescription)?.forEach { add(it) }
-        node.config.getOrNull(SemanticsProperties.EditableText)?.let { add(it.text) }
+        fun add(n: SemanticsNode) {
+            n.config.getOrNull(SemanticsProperties.Text)?.forEach { add(it.text) }
+            n.config.getOrNull(SemanticsProperties.ContentDescription)?.forEach { add(it) }
+            n.config.getOrNull(SemanticsProperties.EditableText)?.let { add(it.text) }
+            n.children.forEach { add(it) }
+        }
+        add(node)
     }
 
-    private fun focused(): SemanticsNode? = compose.onAllNodes(isFocused()).fetchSemanticsNodes().firstOrNull()
+    /** The focused node, after the focus has settled (a row passes it on into itself a frame later). */
+    private fun focused(): SemanticsNode? {
+        android.os.SystemClock.sleep(150)
+        compose.waitForIdle()
+        return compose.onAllNodes(isFocused()).fetchSemanticsNodes().firstOrNull()
+    }
 
-    /** Presses down until the focus stops moving; the words of every control the focus was on, and the path it took. */
+    private fun label(node: SemanticsNode): String =
+        wordsOf(node).joinToString(" | ").ifBlank { node.config.getOrNull(SemanticsProperties.TestTag) ?: "(no words)" }
+
+    /**
+     * Presses down until the focus stops moving, and along each row it lands in presses right to the row's end (chips,
+     * buttons side by side), as the remote is used; the words of every control the focus was on, and the path it took.
+     */
     private fun sweep(path: MutableList<String>): Set<String> {
         val reached = LinkedHashSet<String>()
         var last: Pair<String, androidx.compose.ui.geometry.Rect>? = null
         var still = 0
         repeat(120) {
             press(KeyEvent.KEYCODE_DPAD_DOWN)
-            val node = focused() ?: run { path += "(nothing focused)"; return@repeat }
-            val words = wordsOf(node)
-            val here = words.joinToString(" | ") to node.boundsInRoot
-            reached += words
+            var node = focused() ?: run { path += "(nothing focused)"; return@repeat }
+            val here = label(node) to node.boundsInRoot
+            reached += wordsOf(node)
             if (here == last) {
                 still++
                 if (still >= 3) return reached
             } else {
                 still = 0
-                path += here.first.ifBlank { node.config.getOrNull(SemanticsProperties.TestTag) ?: "(no words)" } + " @${node.boundsInRoot.top.toInt()}"
+                path += here.first + " @${node.boundsInRoot.top.toInt()}"
             }
             last = here
+            // Along the row: right until the focus leaves the row's line or stops moving.
+            var row = node.boundsInRoot
+            repeat(30) {
+                press(KeyEvent.KEYCODE_DPAD_RIGHT)
+                val next = focused() ?: return@repeat
+                if (next.boundsInRoot == row || kotlin.math.abs(next.boundsInRoot.top - row.top) > 8f) {
+                    // Not along the row (nothing, or it moved to another line): back where it was.
+                    if (next.boundsInRoot != row) press(KeyEvent.KEYCODE_DPAD_LEFT)
+                    return@repeat
+                }
+                row = next.boundsInRoot
+                reached += wordsOf(next)
+                path += "→ " + label(next)
+                node = next
+            }
             // A folded section (its heading ends in -header, its body in -body): opened, so its controls count.
             val tag = node.config.getOrNull(SemanticsProperties.TestTag)
             if (tag != null && tag.endsWith("-header")) {
