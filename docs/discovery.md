@@ -30,7 +30,7 @@ stay where they are.
 
 | Shape | What happens |
 |---|---|
-| **Steady vibes** (default) | Stays where it is: songs as close as can be to the last one. |
+| **Steady vibes** (default) | Stays where the mix started: the same tempo and energy, song after song. See [Steady stays steady](#steady-stays-steady). |
 | **Steady build** | The energy climbs song by song, from where it is now to the top in about eight songs. |
 | **Euphoric** | Climbs to a high in three songs and stays there, with the brightest (happy, party) songs first. |
 | **Wind down** | The energy falls song by song, to the calmest in about eight songs. |
@@ -38,6 +38,26 @@ stay where they are.
 The next song only changes when another song fits the new shape better and still mixes: a build's next song is only
 a step livelier, and a radio with few songs at a tempo that mixes may have just the one. **Surprises** lets the mix
 stray further.
+
+#### Steady stays steady
+
+A Steady vibes mix is held to the song it **started** from, not only to the last song, so it can't walk step by step
+from a mellow house song into drum and bass. With Surprises at None, only songs within about 6 % of the first song's
+tempo and near its energy may play; half and double time don't count as the same tempo (a song at 87 doesn't follow
+one at 174). Surprises loosens this a place at a time:
+
+| | None | A few | Some | Lots |
+|---|---|---|---|---|
+| **Tempo**, of the first song's | within 6 % | within 10 % | within 15 %, or half or double time | anywhere |
+| **Energy**, of the first song's | near | a step further | further still | free |
+| **Held to the first song** | strongly | loosely | a little | not at all: the mix can travel |
+| **Keys** | count most | a lift up a tone counts too | as before | count least |
+
+A steady mix picks from four times as many similar songs as it plays, to find enough that fit. When hardly any do,
+the nearest ones are let in so the music carries on, and the radio may queue fewer songs at a time. Halftime drum and
+bass (drums that feel like 87, played in a 174 set) counts as 174 in a mix when Siansa Beats (0.32 or newer) hears
+it clearly as drum and bass or halftime; a slow song with only a trace of it stays slow. The other shapes (Steady
+build, Euphoric, Wind down) are as they were.
 
 **Surprises** (None, A few, Some, Lots): at None every song is a close neighbour of the last in tempo and how
 alike it is; the further right, the further a song may stray, though its key still has to go with the last
