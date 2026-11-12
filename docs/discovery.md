@@ -109,6 +109,10 @@ and can be renamed or deleted.
 shows its top five; tap a section's title (**Artists**, **Albums**, **Songs**, **Sounds like …**) to see every
 match on a page of its own, with Play and Shuffle at the top for songs.
 
+Names are listed best first: the one called exactly what you typed, then names that start with it, then names with
+a word that starts with it, and last the ones that only have the letters inside a word. Typing the artist too
+("moderat gita") narrows it down.
+
 ## Roll the dice
 
 One song from your library you've never played, at random. "Never played" means your server has no play for it
