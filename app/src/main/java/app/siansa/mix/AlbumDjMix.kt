@@ -88,7 +88,7 @@ object AlbumDjMix {
         if (gridTempo.isNotEmpty()) {
             AppLog.i("AlbumMix", "Tempo from the beat grids for ${gridTempo.size} of ${album.size} songs")
         }
-        val energy = energyByRank(album.associate { it.id to features[it.id]?.energy }, album.associate { it.id to features[it.id]?.energySource })
+        val energy = energyByRank(album.associate { it.id to features[it.id]?.drive }, album.associate { it.id to features[it.id]?.driveScale })
         val tracks = album.map { s ->
             val f = features[s.id]
             DjTrack(s.id, s.artist, 1.0, gridTempo[s.id] ?: f?.tempo, f?.key, f?.scale, energy[s.id])

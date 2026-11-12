@@ -45,7 +45,23 @@ data class TrackFeatures(
      * only within one.
      */
     val energySource: String? = null,
-)
+    /**
+     * How energetic the song is to a listener, about 1 (calm) to 9: Siansa Beats' arousal (0.35, Essentia's emoMusic
+     * model), null from AudioMuse-AI or an older Siansa Beats. The owner's trial (12 Nov) found it follows what he
+     * hears far better than [energy], which is a song's loudness.
+     */
+    val arousal: Double? = null,
+) {
+    /** What to order and match songs' energy by: [arousal] where there is one, else [energy]. */
+    val drive: Double? get() = arousal ?: energy
+
+    /** The scale [drive] is on: two songs' drives compare only when it's the same. */
+    val driveScale: String? get() = if (arousal != null) AROUSAL else energySource
+
+    companion object {
+        const val AROUSAL = "arousal"
+    }
+}
 
 /**
  * One concept to steer the Sound search with (issue #208): [more] or less of it. [weight] is how strongly
@@ -539,7 +555,9 @@ class AudioMuseApi(
                 moods = parseScores(o.str("other_features")),
                 genres = parseScores(o.str("mood_vector")),
                 energy = o.dbl("energy"),
-                energySource = o.str("energy_source"),
+                // "converted" (0.35) is an old energy put on today's scale: the same scale as "beats".
+                energySource = o.str("energy_source")?.let { if (it == "converted") "beats" else it },
+                arousal = o.dbl("arousal"),
             )
         }
 

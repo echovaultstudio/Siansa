@@ -251,4 +251,18 @@ class SteadyRailsTest {
         assertEquals(1.0, ranked["d"]!!, 1e-9)  // the loudest of its own, not under every song of the other
         assertEquals(null, ranked["e"])
     }
+
+    @Test
+    fun `with Siansa Beats' arousal a steady mix stays within half a point of the start`() {
+        // The owner's trial, 12 Nov: "In My Head" 6.4, "Bad Kingdom" 5.0 (louder, but he hears it as calmer).
+        val rails = SteadyRails.of(0.0)
+        val start = measured("In My Head", 6.4, "arousal", tempo = 175.0)
+        assertTrue(rails.allows(start, measured("Free", 6.6, "arousal", tempo = 175.0)))
+        assertEquals(false, rails.allows(start, measured("Bad Kingdom", 5.0, "arousal", tempo = 175.0)))
+        assertEquals(0.7, energyOff(start, measured("Bad Kingdom", 5.0, "arousal"))!!, 1e-9)
+        // "Some" surprises lets it in (within a point and a half).
+        assertTrue(SteadyRails.of(0.5).allows(start, measured("Bad Kingdom", 5.0, "arousal", tempo = 175.0)))
+        // A song without an arousal isn't held to it.
+        assertEquals(null, energyOff(start, measured("old", 0.8, "beats")))
+    }
 }

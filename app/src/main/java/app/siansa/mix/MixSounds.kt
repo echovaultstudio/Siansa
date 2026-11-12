@@ -41,6 +41,9 @@ object MixSounds {
     /** and AudioMuse's energy from [CALM] to [LIVELY] (the range it scales a song's energy to). */
     const val CALM = 0.01
     const val LIVELY = 0.15
+    /** A song's arousal (Siansa Beats 0.35), from the calmest to the most driving the owner's trial library held. */
+    const val SETTLED = 3.0
+    const val DRIVING = 7.5
 }
 
 /**
@@ -93,12 +96,20 @@ fun addSound(tuning: VibeTuning, name: String): VibeTuning {
     return tuning.copy(sounds = tuning.sounds.toMutableList().also { it[at] = dial })
 }
 
-/** Where a song of [tempo] (beats a minute) and [energy] (AudioMuse's) sits on the sound pad; null without both. */
-fun padPlace(tempo: Double?, energy: Double?): PadDot? {
-    if (tempo == null || energy == null || tempo <= 0.0) return null
+/**
+ * Where a song of [tempo] (beats a minute) sits on the sound pad, and how high: by its [arousal] (Siansa Beats 0.35:
+ * how energetic it is, from [MixSounds.SETTLED] to [MixSounds.DRIVING]) where there is one, else by [energy]
+ * (AudioMuse's). Null without a tempo and one of the two.
+ */
+fun padPlace(tempo: Double?, energy: Double?, arousal: Double? = null): PadDot? {
+    if (tempo == null || tempo <= 0.0) return null
+    val y = when {
+        arousal != null -> (arousal - MixSounds.SETTLED) / (MixSounds.DRIVING - MixSounds.SETTLED)
+        energy != null -> (energy - MixSounds.CALM) / (MixSounds.LIVELY - MixSounds.CALM)
+        else -> return null
+    }
     val x = ((tempo - MixSounds.SLOW) / (MixSounds.FAST - MixSounds.SLOW)).coerceIn(0.0, 1.0)
-    val y = ((energy - MixSounds.CALM) / (MixSounds.LIVELY - MixSounds.CALM)).coerceIn(0.0, 1.0)
-    return PadDot(x.toFloat(), y.toFloat())
+    return PadDot(x.toFloat(), y.coerceIn(0.0, 1.0).toFloat())
 }
 
 /** Under the sound pad: where its dot is, in words. */

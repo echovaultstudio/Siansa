@@ -88,6 +88,10 @@ class MixSoundsTest {
         assertEquals(PadDot(1f, 1f), padPlace(200.0, 0.4))
         assertNull(padPlace(null, 0.1))
         assertNull(padPlace(120.0, null))
+        // With Siansa Beats 0.35 a song's height is its arousal, not its loudness.
+        assertEquals(PadDot(0.5f, 0.5f), padPlace(120.0, 0.84, arousal = 5.25))
+        assertEquals(PadDot(0.5f, 1f), padPlace(120.0, null, arousal = 8.0))
+        assertEquals(PadDot(0.5f, 0f), padPlace(120.0, 0.84, arousal = 2.0))
     }
 
     @Test fun thePadSaysWhereItsDotIs() {
