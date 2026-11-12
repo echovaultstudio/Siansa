@@ -199,7 +199,7 @@ internal class Crossfader(
         // The end a smart fade leaves out (silence, a long fade-out; issue #628) comes off the time left.
         val cut = if (s.crossfade == CrossfadeMode.SMART) Crossfade.endCut(profiles.cached(item.mediaId), duration, maxMs).first else 0L
         // A beat-matched blend has its own length in bars (issue #759), often longer than the crossfade length.
-        val beatLook = if (beatMatch) max(maxMs, profiles.cached(item.mediaId)?.outro?.let { BeatMatch.maxMsFor(it, blending.blendBars) } ?: 0L) else maxMs
+        val beatLook = if (beatMatch) max(maxMs, profiles.cached(item.mediaId)?.outro?.let { BeatMatch.maxMsFor(it, TechniquePicker.lookBars(s.crossfade == CrossfadeMode.SMART, blending.blendBars)) } ?: 0L) else maxMs
         // A blend after the last beat can be longer than the setting: it's planned early enough for that.
         val lookMs = if (s.crossfade == CrossfadeMode.SMART && profiles.cached(item.mediaId)?.beatsUntilMs != null) max(beatLook, Crossfade.AFTER_BEAT_MAX_MS) else beatLook
         if (duration - cut - position > lookMs + PREPARE_MS) {
