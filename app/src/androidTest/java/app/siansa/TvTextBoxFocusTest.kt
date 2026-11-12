@@ -165,4 +165,60 @@ class TvTextBoxFocusTest {
         press(KeyEvent.KEYCODE_DPAD_CENTER)
         assertTrue("OK on Test tests (on ${on()})", tested == 1)
     }
+
+    /**
+     * ListenBrainz / Koito on the TV: the token, "Test and save", then "Remove", then the next section's wide header.
+     * Remove as a narrow button on the left would be passed over for the wide header (issue #978's arithmetic); as a
+     * row of its own the remote stops on it, and OK removes.
+     */
+    @Test fun removeUnderTestAndSaveIsReachedAndWorks() {
+        var removed = 0
+        compose.setContent {
+            SiansaTheme {
+                androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(1f)) {
+                    Column(
+                        Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(Space.Page),
+                        verticalArrangement = Arrangement.spacedBy(Space.Medium),
+                    ) {
+                        TvTextBox("", {}, "Token / API key", Modifier.fillMaxWidth(), kind = TvTextKind.SECRET)
+                        TvActionRow(onClick = {}, modifier = Modifier.testTag("test"), tv = true) { button ->
+                            Button(onClick = {}, modifier = button) { Text("Test and save") }
+                        }
+                        TvActionRow(onClick = { removed++ }, modifier = Modifier.testTag("remove"), tv = true) { button ->
+                            OutlinedButton(onClick = {}, modifier = button) { Text("Remove") }
+                        }
+                        Button(onClick = {}, modifier = Modifier.fillMaxWidth().testTag("next")) { Text("Your listening history") }
+                    }
+                }
+            }
+        }
+        compose.waitForIdle()
+        InstrumentationRegistry.getInstrumentation().setInTouchMode(false)
+        compose.onNodeWithTag("tvTextBox:Token / API key").performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.RequestFocus)
+        compose.waitForIdle()
+        fun on(): String = listOf("tvTextBox:Token / API key" to "Token", "test" to "Test", "remove" to "Remove", "next" to "Next")
+            .firstOrNull { (tag, _) ->
+                compose.onAllNodes(SemanticsMatcher.expectValue(SemanticsProperties.Focused, true) and androidx.compose.ui.test.hasTestTag(tag))
+                    .fetchSemanticsNodes().isNotEmpty()
+            }?.second ?: "none"
+        val start = on()
+        press(KeyEvent.KEYCODE_DPAD_DOWN)
+        val down = on()
+        press(KeyEvent.KEYCODE_DPAD_DOWN)
+        val downAgain = on()
+        press(KeyEvent.KEYCODE_DPAD_CENTER)
+        val pressed = removed
+        press(KeyEvent.KEYCODE_DPAD_DOWN)
+        val past = on()
+        press(KeyEvent.KEYCODE_DPAD_UP)
+        val back = on()
+        val trail = "start: $start · down: $down · down: $downAgain · down: $past · up: $back"
+        println("TV Koito remove focus: $trail")
+        assertTrue("Starts on the token ($trail)", start == "Token")
+        assertTrue("Down from the token reaches Test and save ($trail)", down == "Test")
+        assertTrue("Down from Test and save reaches Remove, not the next section ($trail)", downAgain == "Remove")
+        assertTrue("OK on Remove removes ($trail)", pressed == 1)
+        assertTrue("Down from Remove goes on to the next section ($trail)", past == "Next")
+        assertTrue("Up from the next section comes back to Remove ($trail)", back == "Remove")
+    }
 }
