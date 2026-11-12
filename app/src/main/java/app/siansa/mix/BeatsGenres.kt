@@ -73,6 +73,31 @@ class BeatsGenres(
         return ids
     }
 
+    @Volatile private var noSongGenresUntil = 0L
+
+    /**
+     * The genres each of the songs [ids] is in by its sound (Siansa Beats 0.32), its best first, for the sounds a mix
+     * has to offer ([mixSounds]). Null when Siansa Beats can't be asked or is older: a vibe then has no sounds of its
+     * own, and it isn't asked again for [BACK_OFF_MS]. One failed request doesn't count against the genres' pages.
+     */
+    suspend fun ofSongs(ids: List<String>): Map<String, List<SongGenre>>? {
+        if (!ready() || now() < backOffUntil || now() < noSongGenresUntil) return null
+        val out = HashMap<String, List<SongGenre>>()
+        for (batch in ids.distinct().chunked(SONGS_AT_ONCE)) {
+            val answer = try {
+                ask(SONGS_PATH + "?ids=" + batch.joinToString(",") { java.net.URLEncoder.encode(it, "UTF-8") }) as? JsonObject
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                noSongGenresUntil = now() + BACK_OFF_MS
+                AppLog.i("Vibe", "No genres of the songs from Siansa Beats (${e.message}): it needs Siansa Beats 0.32 or newer")
+                return null
+            }
+            out += songGenresOf(answer)
+        }
+        return out
+    }
+
     @Volatile private var memory: SavedGenres? = null
 
     /**
@@ -202,6 +227,9 @@ class BeatsGenres(
         /** Failed requests in a row before Siansa Beats is left alone for [BACK_OFF_MS]. */
         const val MISSES = 3
         const val LIST_PATH = PLUGIN_PREFIX + "api/genres"
+        /** Each song's own genres (Siansa Beats 0.32), at most [SONGS_AT_ONCE] songs a request (they're in its address). */
+        const val SONGS_PATH = PLUGIN_PREFIX + "api/songs/genres"
+        const val SONGS_AT_ONCE = 200
 
         /**
          * [genres] as the libraries [shown] have them (the libraries chosen to sync; empty: all of them): a genre whose

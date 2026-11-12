@@ -107,15 +107,21 @@ about, not only how they sound (needs lyrics analysed in AudioMuse-AI). Play it,
 ## Flow
 
 The **Flow** tab is for vibes on the spot. **Describe what you want to hear** ("tired but hopeful", "rainy
-Sunday", "need to focus") and Siansa makes a mix for it. Then **shape your sound** with sliders:
+Sunday", "need to focus") and Siansa makes a mix for it. Then **shape your sound**, on Flow before you make a
+vibe or on the vibe's own page (the sliders button next to Pin to Home):
 
-- **Energy** and **Tempo**: calmer and slower, or more energy and faster.
-- **Familiar**: from artists you rarely play to artists you play most.
-- **Sound dials**: up to a few of AudioMuse-AI's sound concepts (piano, acoustic, electronic…), each turned
-  towards or away from that sound.
+- **The sound pad**: one dot sets two things at once. Drag it up for more energy or down for calmer, right for
+  faster or left for slower. On a vibe's page each small dot is one of its songs, so you see where the mix is now;
+  the dot can go anywhere, also where the mix has no songs yet (an ambient mix drifting into something faster).
+- **Niche ↔ Familiar**: from artists you rarely play to artists you play most.
+- **Sounds**: a dial for each sound, turned towards or away from it. On a vibe's page they're the sounds the AI
+  picked for it and **the mix's own sounds**: genres some of its songs are in and others aren't, as Siansa Beats
+  hears them (an ambient mix isn't offered "more rock"). **Also in this mix** lists its other sounds: tap one to
+  add a dial for it. Without Siansa Beats the dials are the AI's alone. On Flow, before there's a mix, they're a
+  few of AudioMuse-AI's sound concepts (piano, acoustic, electronic…).
 
-Moving a slider re-runs the search and re-ranks the songs without asking the AI again. Vibes you make are kept,
-and can be renamed or deleted.
+Letting go re-runs the search and re-ranks the songs without asking the AI again; **Reset** puts everything back
+in the middle. Vibes you make are kept, and can be renamed or deleted.
 
 ## Search
 

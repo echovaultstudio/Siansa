@@ -262,6 +262,30 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     }
                 }
             },
+            // Shape your sound (the owner, 11 Nov): the pad with a mix's songs on it, the Niche ↔ Familiar pill, the dials
+            // (the AI's and the mix's own, with a long name) and the mix's sounds to add; on the page, and on a dark one.
+            Scene("shape_your_sound") {
+                val tuning = app.siansa.mix.VibeTuning(
+                    energy = -1, tempo = 1, familiar = -2,
+                    sounds = listOf(
+                        app.siansa.mix.SoundDial("dance", -5),
+                        app.siansa.mix.SoundDial("Experimental Field Recordings", 2, genre = true),
+                    ),
+                )
+                val dots = (0 until 24).map { app.siansa.mix.PadDot(0.12f + (it * 7 % 11) / 22f, 0.1f + (it * 5 % 9) / 18f) }
+                val more = listOf("Drone", "Neo-Classical Downtempo").map { app.siansa.mix.MixSound(it, 4) }
+                Column(Modifier.padding(Space.Page)) {
+                    app.siansa.ui.VibeSliders(tuning, onChange = {}, dots = dots, soundsTitle = "Sounds in this mix", more = more)
+                }
+            },
+            // The same before there's a mix (Flow): nothing set, no songs on the pad, one sound; on a dark page.
+            Scene("shape_your_sound_unset") {
+                OnPlayer {
+                    Column(Modifier.padding(Space.Page)) {
+                        app.siansa.ui.VibeSliders(app.siansa.mix.VibeTuning(sounds = listOf(app.siansa.mix.SoundDial("piano", 0))), onChange = {})
+                    }
+                }
+            },
             // Settings › Style (issue #681).
             Scene("style_top_bar") { TopBarChoice(TopBarStyle.BLACK) {} },
             // Themes › Pages and cards (issue #761): grey, warm, blue grey and the theme's own, with long labels.

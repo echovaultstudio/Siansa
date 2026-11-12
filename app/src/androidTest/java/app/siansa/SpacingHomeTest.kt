@@ -366,19 +366,27 @@ class SpacingHomeTest : SpacingCheck() {
         assertEven("Path mood chips", chip.top - label.bottom, lyrics.top - chip.bottom)
     }
 
-    /** Dscvr's sliders (issue #339): the same gap between each slider and the next. */
+    /** Shape your sound (issue #339; the pad, 11 Nov): the same gap between the pad, each pill and the sounds' title. */
     @Test fun vibeSlidersAreEvenlySpaced() {
         compose.setContent {
             SiansaTheme {
-                VibeSliders(VibeTuning(sounds = listOf(SoundDial("piano", 2))), onChange = { })
+                VibeSliders(
+                    VibeTuning(sounds = listOf(SoundDial("piano", 2), SoundDial("Drone", 0, genre = true))),
+                    onChange = { },
+                    more = listOf(app.siansa.mix.MixSound("Strings", 4)),
+                )
             }
         }
-        val energy = compose.onNodeWithTag("sliderEnergy").getBoundsInRoot()
-        val tempo = compose.onNodeWithTag("sliderTempo").getBoundsInRoot()
+        val pad = compose.onNodeWithTag("soundPadBlock").getBoundsInRoot()
         val familiar = compose.onNodeWithTag("sliderFamiliar").getBoundsInRoot()
-        val sound = compose.onNodeWithTag("sliderSound").getBoundsInRoot()
-        assertEven("Vibe sliders", tempo.top - energy.bottom, familiar.top - tempo.bottom, 1.dp)
-        assertEven("Vibe sliders", familiar.top - tempo.bottom, sound.top - familiar.bottom, 1.dp)
+        val title = compose.onNodeWithTag("soundsTitle").getBoundsInRoot()
+        val sounds = compose.onAllNodesWithTag("sliderSound")
+        val first = sounds[0].getBoundsInRoot()
+        val second = sounds[1].getBoundsInRoot()
+        val more = compose.onNodeWithTag("soundsToAdd").getBoundsInRoot()
+        assertEven("Pad to Niche and Familiar", familiar.top - pad.bottom, title.top - familiar.bottom, 1.dp)
+        assertEven("Sound dials", first.top - title.bottom, second.top - first.bottom, 1.dp)
+        assertEven("Dials to the sounds to add", second.top - first.bottom, more.top - second.bottom, 1.dp)
     }
 
     /** Vibes panel (issue #247): the "Use the moment" switch rows are the same distance apart. */

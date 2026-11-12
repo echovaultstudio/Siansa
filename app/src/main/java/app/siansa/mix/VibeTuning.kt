@@ -15,7 +15,9 @@ import kotlin.math.abs
  * - [familiar] runs from -2 (niche: artists you rarely play) to +2 (familiar: artists you play most).
  * - [sounds]: up to [MAX_SOUNDS] of AudioMuse's sound concepts, each a dial from -5 to +5 that steers the
  *   search away from or towards the concept. AudioMuse takes a steering weight of 1, 2, 3, 5 or 10, so the
- *   five steps either side of the middle are those weights ([STEER_WEIGHTS]).
+ *   five steps either side of the middle are those weights ([STEER_WEIGHTS]). On a vibe's page the dials are also
+ *   the mix's own sounds ([SoundDial.genre], [vibeDials]): genres some of its songs are in and others aren't, which
+ *   re-rank the search's songs by how much each is of that genre.
  */
 @Serializable
 data class VibeTuning(
@@ -27,8 +29,11 @@ data class VibeTuning(
     /** Nothing moved: the search runs as planned. */
     val isNeutral: Boolean get() = energy == 0 && tempo == 0 && familiar == 0 && sounds.all { it.value == 0 }
 
+    /** Only what's set: without the dials in the middle. Two tunings with the same [set] find the same songs. */
+    val set: VibeTuning get() = copy(sounds = sounds.filter { it.value != 0 })
+
     /** The sound dials as steering for AudioMuse's search: the ones set, each with its weight. */
-    fun steering(): List<Steer> = sounds.filter { it.value != 0 }.map { Steer(it.term, it.value > 0, steerWeight(it.value)) }
+    fun steering(): List<Steer> = sounds.filter { it.value != 0 && !it.genre }.map { Steer(it.term, it.value > 0, steerWeight(it.value)) }
 
     /** Every slider and dial back in the middle, keeping which sounds the dials are for (issue #369). */
     fun cleared(): VibeTuning = VibeTuning(sounds = sounds.map { it.copy(value = 0) })
@@ -38,13 +43,18 @@ data class VibeTuning(
         if (energy != 0) add(if (energy > 0) "more energy" else "calmer")
         if (tempo != 0) add(if (tempo > 0) "faster" else "slower")
         if (familiar != 0) add(if (familiar > 0) "familiar" else "niche")
-        sounds.filter { it.value != 0 }.forEach { add((if (it.value > 0) "+" else "−") + it.term + " ×" + steerWeight(it.value)) }
+        sounds.filter { it.value != 0 }.forEach {
+            add((if (it.value > 0) "+" else "−") + it.term + " ×" + if (it.genre) abs(it.value) else steerWeight(it.value))
+        }
     }.joinToString(" · ")
 
     companion object {
         const val SLIDER_MAX = 2
         const val DIAL_MAX = 5
         const val MAX_SOUNDS = 3
+
+        /** The most dials a vibe's page shows once sounds of the mix are added to them ([addSound]). */
+        const val MOST_DIALS = 5
 
         /** AudioMuse's steering weights, one per step of a sound dial away from the middle. */
         val STEER_WEIGHTS = listOf(1, 2, 3, 5, 10)
@@ -77,9 +87,12 @@ data class VibeTuning(
     }
 }
 
-/** One sound dial: an AudioMuse concept and how far towards (+) or away from (−) it. */
+/**
+ * One sound dial: an AudioMuse concept and how far towards (+) or away from (−) it. [genre]: one of the mix's own
+ * sounds instead, a genre Siansa Beats hears in some of its songs, which re-ranks the songs and doesn't steer the search.
+ */
 @Serializable
-data class SoundDial(val term: String, val value: Int = 0)
+data class SoundDial(val term: String, val value: Int = 0, val genre: Boolean = false)
 
 /**
  * The search words for a vibe made from the sliders alone (no description typed): energy, tempo and the
@@ -110,16 +123,23 @@ fun sliderQuery(tuning: VibeTuning): String? {
  * results (best first) and moves by how well it fits: higher or lower energy and tempo than the rest of the
  * results, and an artist you play often or rarely. Songs AudioMuse has no energy or tempo for, or sliders in
  * the middle, leave the order as it is. [familiarity] is plays per artist (lowercase name); [jitter] adds a
- * little variety per song (0 in tests).
+ * little variety per song (0 in tests). The mix's own sound dials ([SoundDial.genre]) move a song by how much it is of
+ * that genre ([genres]: each song's, by its id), against the others found.
  */
 fun rankVibe(
     hits: List<ClapHit>,
     features: Map<String, TrackFeatures>,
     familiarity: Map<String, Int>,
     tuning: VibeTuning,
+    genres: Map<String, List<SongGenre>> = emptyMap(),
     jitter: (Int) -> Double = { 0.0 },
 ): List<ClapHit> {
     if (hits.isEmpty()) return hits
+    // Each genre dial that's set: how much every song found is of that genre (0 for one that isn't), and their range.
+    val dials = tuning.sounds.filter { it.genre && it.value != 0 }.map { dial ->
+        val scores = hits.associate { hit -> hit.id to (genres[hit.id]?.firstOrNull { it.name.equals(dial.term, ignoreCase = true) }?.score ?: 0.0) }
+        Triple(dial, scores, spread(scores.values.toList()))
+    }
     val energy = spread(hits.mapNotNull { features[it.id]?.energy })
     val tempo = spread(hits.mapNotNull { features[it.id]?.tempo })
     val most = familiarity.values.maxOrNull()?.coerceAtLeast(1) ?: 1
@@ -132,6 +152,12 @@ fun rankVibe(
         if (tuning.familiar != 0) {
             val known = (familiarity[hit.artist.lowercase()] ?: 0).toDouble() / most
             score += SLIDER_PULL * (tuning.familiar.toDouble() / VibeTuning.SLIDER_MAX) * (known * 2 - 1)
+        }
+        dials.forEach { (dial, scores, range) ->
+            if (range != null) {
+                val position = (scores.getValue(hit.id) - range.start) / (range.endInclusive - range.start)
+                score += SLIDER_PULL * (dial.value.toDouble() / VibeTuning.DIAL_MAX) * (position * 2 - 1)
+            }
         }
         hit to score
     }.sortedByDescending { it.second }.map { it.first }
