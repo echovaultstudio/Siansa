@@ -13,10 +13,11 @@ pull requests never conflict with each other over the changelog or the version n
            Without notes, version.txt's version is used with its existing CHANGELOG.md section.
   apply    Used by the release job: applies the same update to a fresh checkout for the files listed
            in notes/fragments.txt and deletes them, ready to commit.
-  dev      Used by the Siansa Dev and Siansa TV Dev builds: prints their release notes' changelog, every note
-           waiting in changelog.d/ that main hasn't released yet, newest first. With --since <commit> (the
-           previous build), the notes added after it come first, under "New in this build". Needs the history of
-           both branches (fetch-depth: 0).
+  dev      Used by the Siansa Dev and Siansa TV Dev builds: prints their release notes' changelog. With
+           --since <commit> (the previous build), only the notes added after it, under "New in this build", and
+           one line saying how many earlier ones wait for the next release (the owner, 12 Nov: the whole list was
+           too much to read). Without it (a release's first build), every note waiting in changelog.d/ that main
+           hasn't released yet, newest first. Needs the history of both branches (fetch-depth: 0).
 """
 import datetime
 import glob
@@ -181,9 +182,10 @@ def note_lines(path):
 
 
 def dev_notes(main="origin/main", since=None, released=None, most=60):
-    """The changelog of a dev build: what changelog.d/ holds that [main] hasn't released, newest first, grouped by
-    the day each note was added; with [since], the notes added after that build first. [released] is main's last
-    version, for the heading."""
+    """The changelog of a dev build. With [since] (the build before it), only the notes added after that build, and
+    how many earlier ones wait for the next release. Without it, everything changelog.d/ holds that [main] hasn't
+    released, newest first, grouped by the day each note was added. [released] is main's last version, for the
+    headings."""
     notes = []
     for path in fragments():
         if released_on(path, main):
@@ -195,15 +197,19 @@ def dev_notes(main="origin/main", since=None, released=None, most=60):
     after = f" since Siansa {released}" if released else ""
     if not notes:
         return f"## What's coming{after}\n\nNothing yet: this build is the same as the last release.\n"
-    out = [f"## What's coming{after}", ""]
     fresh = [n for n in notes if n[0]]
     if since is not None:
-        out += ["### New in this build", ""]
+        out = ["## New in this build", ""]
         for _, _, path in fresh:
             out += note_lines(path)
         if not fresh:
             out.append("Nothing new in the changelog since the last build.")
-        out.append("")
+        earlier = len(notes) - len(fresh)
+        if earlier:
+            out += ["", f"Also in this build, from earlier ones: {earlier} more change{'s' if earlier != 1 else ''}{after} "
+                        "([all of them](https://github.com/echovaultstudio/Siansa/tree/dev/changelog.d))."]
+        return "\n".join(out).strip() + "\n"
+    out = [f"## What's coming{after}", ""]
     day = None
     shown = [n for n in notes if not n[0]][: max(0, most - len(fresh))]
     for _, when, path in shown:

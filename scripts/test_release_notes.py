@@ -92,15 +92,26 @@ class DevBuilds(unittest.TestCase):
         self.run_git("commit", "-q", "-m", "release")
         self.run_git("checkout", "-q", "dev")
 
+        # A build after another: only what's new since it, and how many earlier changes it carries.
         out = rn.dev_notes(main="main", since=last_build, released="1.1.0")
-        self.assertTrue(out.startswith("## What's coming since Siansa 1.1.0\n"))
+        self.assertTrue(out.startswith("## New in this build\n"))
+        self.assertIn("- Added · **New feature.** Text.", out)
+        self.assertNotIn("Old feature", out)
+        self.assertNotIn("Older change", out)
         self.assertNotIn("A fix.", out)  # released
         self.assertNotIn("release: minor", out)
+        self.assertIn("from earlier ones: 2 more changes since Siansa 1.1.0", out)
+        # The same commit built again: nothing new, still the count.
+        again = rn.dev_notes(main="main", since=self.run_git("rev-parse", "HEAD"), released="1.1.0")
+        self.assertIn("Nothing new in the changelog since the last build.", again)
+        self.assertIn("3 more changes", again)
+        # A release's first build: everything not released, newest first, by the day it was added.
+        out = rn.dev_notes(main="main", since=None, released="1.1.0")
+        self.assertTrue(out.startswith("## What's coming since Siansa 1.1.0\n"))
+        self.assertNotIn("A fix.", out)
         new_at, old_at, older_at = out.index("New feature"), out.index("Old feature"), out.index("Older change")
-        self.assertLess(out.index("### New in this build"), new_at)
         self.assertLess(new_at, older_at)
         self.assertLess(older_at, old_at)  # newest first
-        self.assertIn("- Added · **New feature.** Text.", out)
         self.assertIn("- Changed · **Older change.**\n  more of it", out)  # a note's further lines are kept
         self.assertIn("### 12 Nov 2025", out)
 
@@ -112,4 +123,7 @@ class DevBuilds(unittest.TestCase):
         self.assertNotIn("New in this build", out)
         self.assertIn("- Fixed · **One.**", out)
         # A last build git doesn't know (history too short): every note counts as new, none is lost.
-        self.assertIn("New in this build", rn.dev_notes(main="main", since="0" * 40))
+        unknown = rn.dev_notes(main="main", since="0" * 40)
+        self.assertIn("New in this build", unknown)
+        self.assertIn("- Fixed · **One.**", unknown)
+        self.assertNotIn("from earlier ones", unknown)
