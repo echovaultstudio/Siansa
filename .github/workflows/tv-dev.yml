@@ -85,8 +85,8 @@ jobs:
           its own settings, library and sign-in. Not for F-Droid or Google Play.
 
           Latest change: $(git log -1 --format=%s)"
-          # What's coming: the changelog notes main hasn't released, the ones new since this release's last build
-          # first (scripts/release_notes.py dev). The release's tag still points at that build until it's moved below.
+          # What's new: the changelog notes added since this release's last build, and how many earlier ones wait
+          # for the next release (scripts/release_notes.py dev). The tag still points at that build until it's moved below.
           git fetch -q origin +refs/heads/main:refs/remotes/origin/main "+refs/tags/$tag:refs/tags/$tag" 2>/dev/null || true
           since=$(git rev-parse -q --verify "refs/tags/$tag^{commit}" || true)
           printf '%s\n\n' "$notes" > notes.md
