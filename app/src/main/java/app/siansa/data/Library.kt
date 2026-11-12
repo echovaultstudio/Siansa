@@ -442,10 +442,13 @@ class LibraryRepository(context: Context) {
         val artists = rankByName(query, albumArtists + credited) { it.name }
         val albums = dao.searchAlbums(first, 400).filter { all(it.sortKey + " " + it.artistKey) }.map { it.toAlbum() }
         val songs = found.distinctBy { songKey(it) }
+        // The best answers first, before the lists are cut: the song called just what was typed, not the first of
+        // thousands with those letters somewhere in a word.
+        val best = SearchResults(artists, albums, songs).bestFirst(query)
         SearchResults(
-            artists = (only?.artists(artists) ?: artists).take(30),
-            albums = (only?.albums(albums) ?: albums).take(40),
-            songs = (only?.songs(songs) ?: songs).take(100),
+            artists = (only?.artists(best.artists) ?: best.artists).take(30),
+            albums = (only?.albums(best.albums) ?: best.albums).take(40),
+            songs = (only?.songs(best.songs) ?: best.songs).take(100),
         )
     }
 

@@ -56,6 +56,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
+import app.siansa.data.bestFirst
 import app.siansa.data.RecentSearch
 import app.siansa.data.picture
 import androidx.compose.material3.CircularProgressIndicator
@@ -139,7 +140,8 @@ fun SearchScreen(nav: NavController) {
         busy = true
         error = null
         try {
-            results = if (graph.library.isSynced) graph.library.search(q) else graph.source.search(q)
+            // The server's own order isn't by how well a name fits: the best answers first there too.
+            results = if (graph.library.isSynced) graph.library.search(q) else graph.source.search(q).bestFirst(q)
             // Books too, after the music so a slow Audiobookshelf never holds the names back.
             books = if (graph.books.ready) runCatching { graph.books.search(q) }.onFailure { AppLog.w("Search", "Books for \"$q\": ${it.message}") }.getOrDefault(emptyList()) else null
         } catch (e: CancellationException) {

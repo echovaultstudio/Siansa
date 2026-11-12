@@ -162,6 +162,10 @@ in the middle. Vibes you make are kept, and can be renamed or deleted.
 shows its top five; tap a section's title (**Artists**, **Albums**, **Songs**, **Sounds like …**) to see every
 match on a page of its own, with Play and Shuffle at the top for songs.
 
+Names are listed best first: the one called exactly what you typed, then names that start with it, then names with
+a word that starts with it, and last the ones that only have the letters inside a word. Typing the artist too
+("moderat gita") narrows it down.
+
 Before you type, Search shows your genres to browse, the 30 with the most songs, then **All genres** for every one. In
 Siansa Dev with Siansa Beats, they're the genres Siansa Beats hears in your music, most songs first: a song is in every genre
 it sounds like (its tags play no part there), and a genre's page lists all its songs. The list is saved on your phone, so it shows at once, and it's brought up to date in the background every
