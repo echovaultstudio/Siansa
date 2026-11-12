@@ -374,25 +374,21 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     }
                 }
             },
-            // Home's menu (the owner, 12 Nov): one card of rows, a tile column wide, with what's in use under each name:
-            // Sources lit under the finger of a glide; and while casting with the source filter on, Play on… and
-            // Sources' lines in the accent colour, a long cast name cut.
+            // Home's menu (the owner, 12 Nov): the top row's chips give way to one pill of glass with the four places as
+            // circles, Sources lit under the finger of a glide; and while casting with the source filter on, Play on…
+            // and Sources ringed in the accent colour. Fully open, and half way with the chips still fading under it.
             Scene("home_menu") {
-                val card = Modifier.width(180.dp).clip(RoundedCornerShape(app.siansa.ui.QUICK_TILE_CORNER))
-                    .background(Color(0xFF2C2C2C).copy(alpha = app.siansa.ui.glassAlpha(true)))
-                    .border(1.dp, Color.White.copy(alpha = 0.14f), RoundedCornerShape(app.siansa.ui.QUICK_TILE_CORNER))
-                Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Page)) {
-                    app.siansa.ui.HomeMenuPanel(
-                        app.siansa.ui.HomeMenuInfo(app.siansa.ui.PlayOnLine("Play on…", "TV or speaker", false), "All libraries", false),
-                        highlighted = app.siansa.data.HomeMenuItem.SOURCES, onPick = {}, modifier = card,
-                    )
-                    app.siansa.ui.HomeMenuPanel(
-                        app.siansa.ui.HomeMenuInfo(
-                            app.siansa.ui.PlayOnLine("Playing on Living Room SHIELD with an uncharacteristically long name", "Chromecast", true),
-                            "Downloaded only · 2 users · 2 of 3 libraries", true,
-                        ),
-                        highlighted = null, onPick = {}, modifier = card,
-                    )
+                val quiet = app.siansa.ui.HomeMenuInfo(app.siansa.ui.PlayOnLine("Play on…", "TV or speaker", false), "All libraries", false)
+                val busy = app.siansa.ui.HomeMenuInfo(app.siansa.ui.PlayOnLine("Playing on Living Room SHIELD", "Chromecast", true), "Downloaded only · 2 users", true)
+                val chips = listOf(app.siansa.mix.Notices.newAlbums(24, "a")!!)
+                Column(Modifier.padding(vertical = Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Page)) {
+                    for ((open, info, lit) in listOf(Triple(1f, quiet, app.siansa.data.HomeMenuItem.SOURCES), Triple(1f, busy, null), Triple(0.45f, quiet, null))) {
+                        val state = app.siansa.ui.rememberHomeMenuState().also { it.open = true; it.highlighted = lit }
+                        app.siansa.ui.HomeTopBar(
+                            chips, onOpen = {}, menuOpen = open,
+                            menuBar = { app.siansa.ui.HomeMenuBar(state, info, app.siansa.data.HomeMenuItem.default, open = open, onPick = {}) },
+                        ) { app.siansa.ui.HomeMenuButton(state, casting = info.playOn.active, filterActive = info.filterActive, onPick = {}) }
+                    }
                 }
             },
             // Menu rows (issue #778): no badge on shuffle, a word badge where one says something.

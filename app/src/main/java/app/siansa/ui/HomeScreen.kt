@@ -286,8 +286,7 @@ fun HomeScreen(nav: NavController) {
     CompositionLocalProvider(LocalSectionGap provides homeGap(homeSettings.homeGap)) {
     Box(Modifier.fillMaxSize()) {
     LazyColumn(
-        // The page is kept as a picture while the menu is open, for the glass under the menu (the owner, 12 Nov).
-        Modifier.fillMaxSize().aboveKeyboard().homeMenuBackdrop(menu),
+        Modifier.fillMaxSize().aboveKeyboard(),
         state = listState,
         contentPadding = PaddingValues(bottom = if (keyboardOpen()) Space.Page else bottomBarPadding(Space.Section)),
     ) {
@@ -295,6 +294,8 @@ fun HomeScreen(nav: NavController) {
             // The top of Home (issue #872): the notices, then one round menu button for the dice, Play on…, the
             // source filter and arranging Home, in line with them. No greeting: the chips and the button are the header.
             val notices = rememberNotices(graph, homeSettings, shown = HomeSection.NOTICES !in homeHidden)
+            // The menu opens in this row (the owner, 12 Nov): the chips give way to a pill of its four places.
+            val menuOpen = rememberHomeMenuOpen(menu)
             HomeTopBar(
                 notices,
                 onOpen = { notice ->
@@ -303,6 +304,8 @@ fun HomeScreen(nav: NavController) {
                     nav.navigate(notice.route)
                 },
                 modifier = Modifier.statusBarsPadding().padding(top = Space.Medium),
+                menuOpen = menuOpen,
+                menuBar = { HomeMenuBar(menu, menuInfo, homeSettings.homeMenu, open = menuOpen, onPick = ::pick) },
             ) {
                 HomeMenuButton(
                     menu, casting = menuInfo.playOn.active, filterActive = menuInfo.filterActive, onPick = ::pick,
@@ -320,8 +323,6 @@ fun HomeScreen(nav: NavController) {
         val visibleSections = HomeSection.visible(homeOrder, homeHidden)
         for (section in visibleSections) {
             val look = homeSettings.homeLooks[section] ?: HomeLook.AS_IS
-            // The menu lies on the first section's tiles (the owner, 12 Nov): the second shortcut tile says where.
-            val first = section == visibleSections.firstOrNull { it != HomeSection.NOTICES }
             when (section) {
                 // The chips row (issue #784); its kinds are set in Settings › Notices and Cards › Notices.
                 // The notices are the top of Home now (issue #872), not a section of their own.
@@ -356,12 +357,12 @@ fun HomeScreen(nav: NavController) {
                             })
                         } else if (quick.isNotEmpty()) {
                             Column(Modifier.padding(horizontal = Space.Page, vertical = Space.Medium).testTag("quickShortcuts"), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
-                                quick.chunked(2).forEachIndexed { rowIndex, row ->
+                                quick.chunked(2).forEach { row ->
                                     Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
-                                        row.forEachIndexed { column, r ->
+                                        row.forEach { r ->
                                             QuickTile(
                                                 r.title, coverOf(r), colorsOf(r), { nav.navigate(r.route) },
-                                                Modifier.weight(1f).then(if (first && rowIndex == 0 && column == 1) Modifier.homeMenuCard(menu, QUICK_TILE_CORNER) else Modifier),
+                                                Modifier.weight(1f),
                                                 icon = iconOf(r),
                                             )
                                         }
@@ -620,7 +621,7 @@ fun HomeScreen(nav: NavController) {
             }
         }
     }
-    HomeMenuOverlay(menu, menuInfo, homeSettings.homeMenu, onPick = ::pick)
+    HomeMenuOverlay(menu)
     }
     }
     panel?.let { sources ->

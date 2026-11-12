@@ -10,24 +10,23 @@ With no notices, or notices turned off, the button sits on its own.
 
 ## Home's menu
 
-The round button opens one small card of frosted glass, lying on the shortcut tiles under the top row (it takes their
-width, edges and corners, each row on a tile): the page shows through it blurred, and nothing else on the page changes.
-Each row has its name and, under it, what's in use (before Android 12 the card is a plain dark one):
+The round button opens the menu in the top row itself: the notice chips fade and blur away and one see-through pill
+takes their place, exactly the chips' height, with the four options along it as small circles (in the order set under
+Settings › Style › Home Menu). Nothing on the page is covered, and nothing moves. The names are read out by TalkBack:
 
-- **Roll the dice** plays a song you've never played (see [Roll the dice](discovery.md)). While it finds one, the
-  dice tumbles in the menu button.
-- **Play on…** opens the list of TVs and speakers to play on: Chromecast, Google TV, Cast speakers and DLNA ones.
-  Its line says where ("This phone", or the TV or speaker); while something plays on one, the line is in the accent
-  colour (amber unless you picked another in Themes) and the menu button has a small dot in the same colour; to stop,
-  open Play on… and pick **This phone**.
-- **Sources** opens the Sources sheet. Its line says what shows ("All libraries", "Downloaded only", "2 users"), in the
-  accent colour while the filter hides something.
-- **Arrange Home** opens Arrange, for the order and looks of Home's sections.
+- **Roll the dice** (the dice) plays a song you've never played (see [Roll the dice](discovery.md)). While it finds
+  one, the dice tumbles in the menu button.
+- **Play on…** (the cast mark) opens the list of TVs and speakers to play on: Chromecast, Google TV, Cast speakers and
+  DLNA ones. While something plays on one, its circle has a ring in the accent colour (amber unless you picked another
+  in Themes) and the menu button has a small dot in the same colour; to stop, open Play on… and pick **This phone**.
+- **Sources** (the library mark) opens the Sources sheet. Its circle has a ring in the accent colour while the
+  filter hides something.
+- **Arrange Home** (the three lines) opens Arrange, for the order and looks of Home's sections.
 
-Tap the button and then one of them, or do it in one go: press the button, slide your finger down to one (it lights
-up, with a light tick as you pass each) and let go. Letting go anywhere else closes the menu, and so does a tap on the
-button (its lines become a cross while the menu is open). The button's three lines are always in the accent colour;
-the button has a thin ring in the same colour while the source filter hides something.
+Tap the button and then one of them, or do it in one go: press the button, slide your finger along the pill to one (it
+grows and fills, with a light tick as you pass each) and let go. Letting go anywhere else closes the menu, and so does
+a tap on the button (its lines become a cross while the menu is open) or anywhere on the page. The button's three lines
+are always in the accent colour; the button has a thin ring in the same colour while the source filter hides something.
 
 Their order is yours: **Settings › Style › Home Menu**, hold a row and drag it.
 

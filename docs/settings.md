@@ -120,8 +120,8 @@ not here.
 - **DJ Mix Bar**: the order of the places on the bar that opens over the seek bar when you slide up from the play
   button (Steady vibes, Steady build, Start or stop the mix, Euphoric, Wind down to start with): hold a row and drag it;
   top to bottom is left to right on the bar. See [Playback](playback.md).
-- **Home Menu**: the order of the options under the round button at the top of Home (Roll the dice, Play on…,
-  Sources, Arrange Home): hold a row and drag it. The mini player
+- **Home Menu**: the order of the options along Home's menu, the pill the round button at the top of Home opens
+  (Roll the dice, Play on…, Sources, Arrange Home): hold a row and drag it. The mini player
   starts with **Play or pause**, **Next song** and **Add to playlist**.
 - **Phone's top bar** (the clock and battery): **See-through** (the app shows behind it), **Black**, or **Hidden** for
   full screen. When it's hidden, swipe down from the top of the screen to see it for a moment; on phones with a camera hole at the top, pages stay just below it.
