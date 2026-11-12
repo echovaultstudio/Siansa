@@ -112,8 +112,8 @@ class ScrobbleToBeatsTest {
     @Test fun siansaBeatsOwnReasonIsSaidAndOnlyAMissingPathIsTooOld() {
         assertEquals("Siansa Beats: The sound of none of those songs is known yet",
             BeatsApi.message(404, "The sound of none of those songs is known yet"))
-        assertTrue("too old" in BeatsApi.message(404, "not found"))
-        assertTrue("too old" in BeatsApi.message(404, "no details"))
-        assertTrue("too old" in BeatsApi.message(404, "<html><body>404</body></html>"))
+        assertTrue("update it to the newest version" in BeatsApi.message(404, "not found"))
+        assertTrue("update it to the newest version" in BeatsApi.message(404, "no details"))
+        assertTrue("update it to the newest version" in BeatsApi.message(404, "<html><body>404</body></html>"))
     }
 }
