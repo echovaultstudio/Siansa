@@ -132,4 +132,13 @@ class SmartBlendTest {
             LastBlend.enabled = false
         }
     }
+
+    @Test fun aBlendIsPlannedEarlyEnoughForTheLongestOne() {
+        // The owner's log, 12 Nov: planned for his 16 bars, the 32-bar blend Smart picked was "too close to the end".
+        assertEquals(32, TechniquePicker.lookBars(smart = true, blendBars = 16))
+        assertEquals(32, TechniquePicker.lookBars(smart = true, blendBars = 4))
+        // Fixed uses the listener's bars and nothing longer.
+        assertEquals(16, TechniquePicker.lookBars(smart = false, blendBars = 16))
+        assertEquals(TechniquePicker.LONGEST_BARS, BeatMatch.BAR_CHOICES.max())
+    }
 }

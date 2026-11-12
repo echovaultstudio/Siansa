@@ -100,6 +100,9 @@ How Smart decides:
 
 ### Beat-matched blends
 
+A blend is planned early enough for the longest one (32 bars); when there's no time left for the one picked, because
+you moved near the end of the song, a quick one is made instead.
+
 DJ radio, Keep playing in DJ mode and the DJ mix of an album or playlist leave out songs longer than 15 minutes (a
 whole DJ set or a live recording in one file): they're mixes themselves. You can still start one from such a song.
 

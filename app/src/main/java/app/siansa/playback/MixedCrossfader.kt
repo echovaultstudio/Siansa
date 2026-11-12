@@ -164,7 +164,7 @@ internal class MixedCrossfader(
         val maxMs = blending.maxMs
         val beatMatch = Blending.beatMatched(s, inDjRadio())
         val cut = if (s.crossfade == CrossfadeMode.SMART) Crossfade.endCut(profiles.cached(item.mediaId), duration, maxMs).first else 0L
-        val beatLook = if (beatMatch) max(maxMs, profiles.cached(item.mediaId)?.outro?.let { BeatMatch.maxMsFor(it, blending.blendBars) } ?: 0L) else maxMs
+        val beatLook = if (beatMatch) max(maxMs, profiles.cached(item.mediaId)?.outro?.let { BeatMatch.maxMsFor(it, TechniquePicker.lookBars(s.crossfade == CrossfadeMode.SMART, blending.blendBars)) } ?: 0L) else maxMs
         // A blend after the last beat can be longer than the setting: it's planned early enough for that.
         val lookMs = if (s.crossfade == CrossfadeMode.SMART && profiles.cached(item.mediaId)?.beatsUntilMs != null) max(beatLook, Crossfade.AFTER_BEAT_MAX_MS) else beatLook
         if (duration - cut - position > lookMs + LEAD_MS + PREPARE_MS) {
@@ -196,15 +196,32 @@ internal class MixedCrossfader(
                 skipped = item.mediaId
                 return LOOK_MS
             }
-            val at = duration - planned.cutMs - planned.overlapMs
-            val handover = EngineFade.handoverAt(at, position)
+            var fade: FadePlan = planned
+            var at = duration - fade.cutMs - fade.overlapMs
+            var handover = EngineFade.handoverAt(at, position)
             if (handover - position < MIN_PREPARE_MS) {
-                AppLog.d("Crossfade", "Too close to the end of ${current.id} to get a fade ready")
-                skipped = item.mediaId
-                return LOOK_MS
+                // Too late for the blend picked (the listener moved near the end, or the song was only just known):
+                // a quick one that still fits, not no blend at all.
+                val quick = Crossfade.plan(
+                    mode = s.crossfade, maxMs = maxMs, current = current, next = next, currentDurationMs = duration,
+                    nextDurationMs = next.durationSec * 1000L, currentProfile = profiles.cached(current.id),
+                    nextProfile = profiles.cached(next.id), beatMatch = beatMatch, blendBars = blending.blendBars,
+                    sinceSeekMs = 0, lastTechnique = lastTechnique,
+                )
+                val quickAt = quick?.let { duration - it.cutMs - it.overlapMs }
+                val quickHandover = quickAt?.let { EngineFade.handoverAt(it, position) }
+                if (quick == null || quickHandover == null || quickHandover - position < MIN_PREPARE_MS) {
+                    AppLog.i("Crossfade", "Too close to the end of ${current.id} to get a fade ready (${fade.why}): the songs change without one")
+                    skipped = item.mediaId
+                    return LOOK_MS
+                }
+                AppLog.i("Crossfade", "Too close to the end of ${current.id} for the blend picked (${fade.why}): a quick one instead")
+                fade = quick
+                at = quickAt
+                handover = quickHandover
             }
             plannedWithNext = profiles.cached(next.id) != null
-            arm(item, planned, at, handover)
+            arm(item, fade, at, handover)
         }
         val speed = main.playbackParameters.speed.takeIf { it > 0f } ?: 1f
         val untilCue = ((handoverAt - CUE_AHEAD_MS - position) / speed).toLong()
