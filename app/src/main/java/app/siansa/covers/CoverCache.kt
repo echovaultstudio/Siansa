@@ -72,6 +72,8 @@ class KeepRealCovers : CacheStrategy {
             }
             return CacheStrategy.WriteResult.DISABLED
         }
+        // The real picture: its stand-in showings, if any, are over.
+        if (networkResponse.code in 200..299) options.diskCacheKey?.let { StandIns.real(CoverCache.cacheIdOf(it)) }
         // An id without a version: its ETag is kept, so Sync all can ask whether the picture changed.
         if (StandIns.isCoverArt(networkRequest.url)) options.diskCacheKey?.let { key -> headers["ETag"]?.let { CoverEtags.put(key, it) } }
         return CacheStrategy.DEFAULT.write(cacheResponse, networkRequest, networkResponse, options)

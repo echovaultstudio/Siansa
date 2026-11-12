@@ -44,11 +44,25 @@ class StandInsTest {
         assertFalse(StandIns.isStandIn("/rest/stream", "no-store", null))
     }
 
-    @Test fun aStandInIsAskedForAgainOnceAfterAWhile() {
+    @Test fun aStandInIsAskedForAgainSoonThenAfterAWhile() {
+        // The first time: after 5 s (the owner, 12 Nov: a song's picture the server has, sent as a stand-in under load).
         StandIns.shown("al-1", now = 1_000)
-        assertFalse("still fresh", StandIns.askAgain("al-1", now = 1_000 + StandIns.AGAIN_MS - 1))
-        assertTrue(StandIns.askAgain("al-1", now = 1_000 + StandIns.AGAIN_MS))
+        assertEquals(StandIns.SOON_MS[0], StandIns.dueIn("al-1", now = 1_000))
+        assertFalse("still fresh", StandIns.askAgain("al-1", now = 1_000 + StandIns.SOON_MS[0] - 1))
+        assertTrue(StandIns.askAgain("al-1", now = 1_000 + StandIns.SOON_MS[0]))
         assertFalse("only once: the new answer decides", StandIns.askAgain("al-1", now = 1_000 + 2 * StandIns.AGAIN_MS))
+        assertEquals(null, StandIns.dueIn("al-1", now = 2_000))
+        // Still a stand-in: 30 s, then two minutes each time.
+        StandIns.shown("al-1", now = 10_000)
+        assertFalse(StandIns.askAgain("al-1", now = 10_000 + StandIns.SOON_MS[1] - 1))
+        assertTrue(StandIns.askAgain("al-1", now = 10_000 + StandIns.SOON_MS[1]))
+        StandIns.shown("al-1", now = 50_000)
+        assertFalse(StandIns.askAgain("al-1", now = 50_000 + StandIns.AGAIN_MS - 1))
+        assertTrue(StandIns.askAgain("al-1", now = 50_000 + StandIns.AGAIN_MS))
+        // The real picture came: the next stand-in (a sync later) starts over at 5 s.
+        StandIns.real("al-1")
+        StandIns.shown("al-1", now = 90_000)
+        assertTrue(StandIns.askAgain("al-1", now = 90_000 + StandIns.SOON_MS[0]))
         assertFalse("a cover that never showed one", StandIns.askAgain("al-2", now = Long.MAX_VALUE))
     }
 

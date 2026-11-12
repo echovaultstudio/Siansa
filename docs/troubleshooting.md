@@ -63,8 +63,11 @@ Siansa shows the picture your server sends, and keeps it on the phone so it show
 
 - **A blue disc or a star** (Navidrome) is Navidrome's own stand-in for a cover it doesn't have right now: the
   library is still being scanned, an artist's photo hasn't been fetched yet, or the song has no picture. Siansa
-  shows it but never keeps it, and asks again the next time the cover is needed, so the real cover appears by
-  itself once Navidrome has it, in lists, the mini player, Now playing and the notification alike.
+  shows it but never keeps it, and asks again 5 seconds later, then after 30 seconds, then every two minutes while
+  it's on screen, so the real cover appears by itself once Navidrome has it (Navidrome sometimes sends the stand-in
+  for a picture it does have, when many covers are asked for at once), in lists, the mini player, Now playing and the
+  notification alike. A song whose picture stays a disc everywhere, in Navidrome's own web page too, needs a full
+  scan there (Navidrome only re-reads a file whose modification time changed).
 - **A cover you replaced on the server** shows after the next sync. **Sync all** (the music source at the top of
   Home) checks every cover kept on the phone: stand-ins kept by older versions are removed, and a cover that changed
   on Navidrome, Emby or Jellyfin is fetched fresh. Nothing else in the image cache is thrown away.
