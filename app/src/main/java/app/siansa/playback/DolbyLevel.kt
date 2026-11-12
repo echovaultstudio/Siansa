@@ -70,6 +70,31 @@ object DolbyLevel {
     }
 
     /**
+     * The dialogue level the Dolby Digital Plus frame at [buffer]'s position is marked with, in dB below 0 (1 to 31; 0
+     * is reserved, and read by decoders as 31). Null when what's there isn't a Dolby Digital Plus frame. For saying why
+     * a song wasn't played louder ([whyNot]).
+     */
+    fun marked(buffer: ByteBuffer): Int? {
+        val at = buffer.position()
+        if (at + 8 > buffer.limit() || byte(buffer, at) != SYNC_1 || byte(buffer, at + 1) != SYNC_2) return null
+        val b5 = byte(buffer, at + 5)
+        if (b5 ushr 3 !in 11..16) return null
+        return (b5 and 0x07) shl 2 or (byte(buffer, at + 6) ushr 6)
+    }
+
+    /**
+     * Why a song sent to the receiver wasn't played louder though it was asked for (issue #1078), for the log: it's
+     * not Dolby Digital Plus ([eac3] false), it's already at the receiver's full level ([marked] 31, or the reserved
+     * 0), or its frames couldn't be read ([marked] null).
+     */
+    fun whyNot(eac3: Boolean, marked: Int?): String = when {
+        !eac3 -> "only Dolby Digital Plus (Atmos in it included) can be: this format has no level Siansa can mark"
+        marked == null -> "its frames aren't Dolby Digital Plus frames Siansa can read"
+        marked == 0 || marked >= FULL -> "it's already marked at the receiver's full level (−31 dB), so the receiver doesn't turn it down and there's nothing to add"
+        else -> "its frames couldn't be marked (marked −$marked dB)"
+    }
+
+    /**
      * Writes a Dolby Digital Plus frame's checksum (crc2, its last two bytes): CRC-16 with x¹⁶+x¹⁵+x²+1 over everything
      * after the sync word, as the encoder writes it. One that would read as a sync word flips the spare bit before it
      * instead, as encoders do.
