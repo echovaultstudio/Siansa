@@ -146,6 +146,10 @@ tokens or API keys**. **Save backup** writes a file you pick; **Restore** brings
 **Debug logs** on or off, **Show the log**, and **Report a problem**, with the steps to a useful report. See
 [Privacy, logs and reporting problems](privacy-and-logs.md).
 
+**Bad blend button** shows or hides a **Bad blend** button on now playing. While on, it appears over the cover
+during a DJ blend and for a minute after it; tap it when a change between two songs sounded wrong, and it's written
+to the log and sent to Siansa Beats' list of bad blends. Off unless you turn it on (on in Siansa Dev).
+
 ## About
 
 The version, **What's new** (the changes in the version you have; tap it to see every version's changes), and links

@@ -211,6 +211,11 @@ data class AppSettings(
     val downloadedOnly: Boolean = false,
     /** The time machine lists songs that aren't in your library, marked (issue #234). */
     val timeMachineMissing: Boolean = true,
+    /**
+     * Now playing shows "Bad blend" during a DJ blend and for a minute after it, to mark a change that sounded wrong
+     * (Settings › Help; the owner, 12 Nov). On by default in Siansa Dev only.
+     */
+    val badBlendButton: Boolean = app.siansa.playback.LastBlend.onByDefault,
     /** How each kind of notice on Home shows (issue #784): pinned, automatic (the default) or off. */
     val notices: app.siansa.mix.NoticePrefs = app.siansa.mix.NoticePrefs(),
     /** Theme (issue #148): "AUTO", "LIGHT" or "DARK"; colours by name ("MONO", "OCEAN"…); pure black when dark. */
@@ -413,6 +418,11 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
     }
     private val _state = MutableStateFlow(load())
     val state: StateFlow<AppSettings> = _state.asStateFlow()
+
+    init {
+        // The Bad blend button's switch, where playback looks for it (it notes a blend only while the button is on).
+        app.siansa.playback.LastBlend.enabled = _state.value.badBlendButton
+    }
     val current: AppSettings get() = _state.value
 
     private fun secret(key: String) = SecretBox.decrypt(prefs.getString(key, "") ?: "")
@@ -506,6 +516,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         homeGap = prefs.getInt("home_gap", AppSettings.HOME_GAP_DEFAULT).coerceIn(0, AppSettings.HOME_GAP_MAX),
         downloadedOnly = prefs.getBoolean("downloaded_only", false),
         timeMachineMissing = prefs.getBoolean("time_machine_missing", true),
+        badBlendButton = prefs.getBoolean("bad_blend_button", app.siansa.playback.LastBlend.onByDefault),
         notices = app.siansa.mix.NoticePrefs.parse(prefs.getString("notices", null)),
         themeMode = prefs.getString("theme_mode", "AUTO") ?: "AUTO",
         themeColours = prefs.getString("theme_colours", null) ?: DEFAULT_THEME_COLOURS,
@@ -667,6 +678,12 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
     fun setTimeMachineMissing(on: Boolean) {
         prefs.edit().putBoolean("time_machine_missing", on).apply()
         _state.value = _state.value.copy(timeMachineMissing = on)
+    }
+
+    fun setBadBlendButton(on: Boolean) {
+        prefs.edit().putBoolean("bad_blend_button", on).apply()
+        _state.value = _state.value.copy(badBlendButton = on)
+        app.siansa.playback.LastBlend.enabled = on
     }
 
     fun setNoticeMode(kind: app.siansa.mix.NoticeKind, mode: app.siansa.mix.NoticeMode) {

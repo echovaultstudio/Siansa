@@ -10,13 +10,20 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 /**
- * The song change last made, for Siansa Dev's "Bad blend" button (the owner, 9 Nov): one tap sends it, with how it
- * was made, to Siansa Beats' list through the Siansa Beats (dev) plugin, and writes it to the log. Only in Siansa
- * Dev ([enabled]), and only for DJ playback's blends ([Report.dj]).
+ * The song change last made, for the "Bad blend" button (the owner, 9 Nov): one tap sends it, with how it was made,
+ * to Siansa Beats' list, and writes it to the log. Only while the button is turned on ([enabled], Settings › Help),
+ * and only for DJ playback's blends ([Report.dj]).
  */
 object LastBlend {
-    /** Siansa Dev only: the build the owner tests in. */
-    val enabled: Boolean get() = BuildConfig.BUILD_TYPE == "dev"
+    /** Whether the button starts turned on: in Siansa Dev, the build the owner tests in. Off in the normal app. */
+    val onByDefault: Boolean get() = BuildConfig.BUILD_TYPE == "dev"
+
+    /**
+     * Whether blends are noted and the button shows: Settings › Help's "Bad blend button" (the owner, 12 Nov), set
+     * when the app starts and when the switch is moved.
+     */
+    @Volatile
+    var enabled: Boolean = onByDefault
 
     /** The button shows from a blend's start until this long after it ends. */
     const val SHOWN_AFTER_MS = 60_000L
