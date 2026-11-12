@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -106,10 +107,11 @@ private fun ReportPage(nav: NavController, rangeId: String) {
 /**
  * A period's report: the big numbers, top artists, top songs, top albums, the listening clock and how the taste moved.
  * The time machine puts its own song list in [songs] (#578), with its Play, Create memory and songs not in the library;
- * when the report has no plays (only Last.fm has that time), just those songs show.
+ * when the report has no plays (only Last.fm has that time), just those songs show. With a [tint] (the time machine: its
+ * top artist's colour) the big numbers are washed in it instead of their own amber and violet.
  */
 @Composable
-internal fun ReportBody(r: ListeningReport, nav: NavController, songs: (@Composable () -> Unit)? = null) {
+internal fun ReportBody(r: ListeningReport, nav: NavController, songs: (@Composable () -> Unit)? = null, tint: Color? = null) {
     val graph = LocalGraph.current
     if (r.plays == 0) {
         if (songs != null) {
@@ -125,18 +127,7 @@ internal fun ReportBody(r: ListeningReport, nav: NavController, songs: (@Composa
     }
     val n = NumberFormat.getIntegerInstance()
 
-    // The big numbers.
-    Column(Modifier.padding(horizontal = Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
-        // Every tile the same size, with or without a line under its label (issue #325).
-        Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
-            StatTile(n.format(r.minutes), "minutes listened", "${n.format(r.minutes / 60)} hours", Modifier.weight(1f).fillMaxHeight(), Brand.AmberDeep)
-            StatTile(n.format(r.plays), "plays", null, Modifier.weight(1f).fillMaxHeight(), Brand.VioletDeep)
-        }
-        Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
-            StatTile(n.format(r.artistCount), "artists", r.newArtists?.let { "$it new to you" }, Modifier.weight(1f).fillMaxHeight(), MaterialTheme.colorScheme.surfaceContainerHighest)
-            StatTile(n.format(r.trackCount), "different songs", null, Modifier.weight(1f).fillMaxHeight(), MaterialTheme.colorScheme.surfaceContainerHighest)
-        }
-    }
+    StatTiles(r, tint)
 
     // Top artists: number one big, the rest with a bar of how close they came.
     if (r.topArtists.isNotEmpty()) {
@@ -273,16 +264,43 @@ internal fun ReportBody(r: ListeningReport, nav: NavController, songs: (@Composa
     )
 }
 
+/** How strongly the top artist's colour washes the first two big numbers, and the two under them. */
+internal const val TILE_WASH = 0.38f
+internal const val TILE_WASH_SOFT = 0.18f
+
+/**
+ * The four big numbers. In their own colours (amber, violet and two quiet ones), or with a [tint] all washed in that
+ * one colour over the page, the first two stronger, with a thin edge of it: quieter, and different for every artist.
+ */
+@Composable
+internal fun StatTiles(r: ListeningReport, tint: Color? = null) {
+    val n = NumberFormat.getIntegerInstance()
+    val quiet = MaterialTheme.colorScheme.surfaceContainerHighest
+    val edge = tint?.copy(alpha = 0.32f)
+    Column(Modifier.padding(horizontal = Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
+        // Every tile the same size, with or without a line under its label (issue #325).
+        Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
+            StatTile(n.format(r.minutes), "minutes listened", "${n.format(r.minutes / 60)} hours", Modifier.weight(1f).fillMaxHeight(), tint?.copy(alpha = TILE_WASH) ?: Brand.AmberDeep, edge)
+            StatTile(n.format(r.plays), "plays", null, Modifier.weight(1f).fillMaxHeight(), tint?.copy(alpha = TILE_WASH) ?: Brand.VioletDeep, edge)
+        }
+        Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
+            StatTile(n.format(r.artistCount), "artists", r.newArtists?.let { "$it new to you" }, Modifier.weight(1f).fillMaxHeight(), tint?.copy(alpha = TILE_WASH_SOFT) ?: quiet, edge)
+            StatTile(n.format(r.trackCount), "different songs", null, Modifier.weight(1f).fillMaxHeight(), tint?.copy(alpha = TILE_WASH_SOFT) ?: quiet, edge)
+        }
+    }
+}
+
 /**
  * One big number (issue #325): every tile has room for a line under its label, kept empty when there's none, so
  * tiles side by side and row under row are all the same size.
  */
 @Composable
-internal fun StatTile(value: String, label: String, extra: String?, modifier: Modifier, color: Color) {
+internal fun StatTile(value: String, label: String, extra: String?, modifier: Modifier, color: Color, edge: Color? = null) {
     Column(
         modifier
             .clip(RoundedCornerShape(16.dp))
-            .background(Brush.linearGradient(listOf(color, color.copy(alpha = 0.55f))))
+            .background(Brush.linearGradient(listOf(color, color.copy(alpha = color.alpha * 0.55f))))
+            .then(if (edge != null) Modifier.border(1.dp, edge, RoundedCornerShape(16.dp)) else Modifier)
             .padding(Space.Page)
             .testTag("statTile"),
     ) {

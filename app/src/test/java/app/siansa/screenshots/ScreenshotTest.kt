@@ -801,6 +801,27 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     app.siansa.ui.GenreAboutText("Kayōkyoku is Japanese popular music of the Shōwa era.", "Wikipedia", onSource = null)
                 }
             },
+            // The time machine: its title with the year's arrows, what was played, the months, and the big numbers washed
+            // in the top artist's colour. A long artist name is cut, not wrapped.
+            Scene("time_machine_header") {
+                Column(Modifier.background(Color(0xFF111111)).padding(vertical = Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Section)) {
+                    Column {
+                        app.siansa.ui.TimeMachineName()
+                        app.siansa.ui.TimePicker(
+                            2025, 10, java.time.LocalDate.of(2026, 11, 12), onYear = {}, onMonth = {},
+                            under = { app.siansa.ui.TimeMachineWords("1,461 plays · 94 hours", "Most played: The Presidents of the United States of America and friends") },
+                        )
+                    }
+                    app.siansa.ui.StatTiles(
+                        app.siansa.mix.ListeningReport(
+                            title = "", subtitle = "", minutes = 5699, plays = 1461, artistCount = 534, trackCount = 1176, newArtists = 223,
+                            topArtists = emptyList(), topTracks = emptyList(), topAlbums = emptyList(), byHour = IntArray(24),
+                            rising = emptyList(), fading = emptyList(), genresUp = emptyList(), genresDown = emptyList(), source = "",
+                        ),
+                        tint = Color(0xFF8C7A52),
+                    )
+                }
+            },
             // Custom card editor: a rule (issue #663).
             Scene("card_rule") {
                 Column(Modifier.padding(Space.Page)) {
