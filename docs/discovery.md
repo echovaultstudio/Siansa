@@ -129,6 +129,7 @@ then glides into the title bar, shrinking as it goes, to become the page's title
   Mix).
 - **Similar albums and artists** come from the Siansa Analysis plugin: albums and artists that *sound* alike.
   "Fans also like" lists those first, then the artists your server suggests.
+  An album you've only just added has none until its sound has been analysed: Siansa says so, and it works later.
 
 ## Song path
 
