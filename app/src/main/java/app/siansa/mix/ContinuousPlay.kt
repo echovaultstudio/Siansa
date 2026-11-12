@@ -299,12 +299,24 @@ fun energyOff(a: Double?, b: Double?): Double? {
 }
 
 /**
- * How far apart two songs' energies are ([energyOff]); null when either isn't known, or when they were measured by
+ * How far apart two songs' energies are; null when either isn't known, or when they were measured by
  * different services ([DjTrack.levelFrom]): Siansa Beats' own and the ones it took over from AudioMuse-AI aren't on
  * one scale (the owner's library, 12 Nov: alike house songs at about 0.7 and about 0.3), and a steady mix held to
  * the start's energy found nothing that fit.
  */
-fun energyOff(a: DjTrack, b: DjTrack): Double? = if (a.levelFrom != b.levelFrom) null else energyOff(a.level, b.level)
+fun energyOff(a: DjTrack, b: DjTrack): Double? = when {
+    a.levelFrom != b.levelFrom -> null
+    // Arousal (Siansa Beats 0.35) runs about 1 to 9, not from nothing: how far apart, against [AROUSAL_STEP].
+    a.levelFrom == app.siansa.net.TrackFeatures.AROUSAL -> a.level?.let { from -> b.level?.let { abs(it - from) / AROUSAL_STEP } }
+    else -> energyOff(a.level, b.level)
+}
+
+/**
+ * How far apart two arousals are for [energyOff] to say 1: two points of its nine. So "no surprises" (energy within
+ * 0.25) keeps a steady mix within half a point of the start, "a few" within about one, "some" within a point and a
+ * half. In the owner's trial library the songs of one kind spread about 0.65 either way.
+ */
+const val AROUSAL_STEP = 2.0
 
 /**
  * The kinds of music Siansa Beats' styles fall into, for telling a house song from a techno one in a mix. Electronic
@@ -636,11 +648,11 @@ class ContinuousPlay(private val graph: AppGraph) {
         // Each song's genres by its sound (Siansa Beats 0.32), for halftime drum and bass's tempo in a mix ([mixTempo]);
         // without them every tempo counts as read.
         val genres = graph.beatsGenres.ofSongs(all).orEmpty()
-        val energy = energyByRank(all.associateWith { features[it]?.energy }, all.associateWith { features[it]?.energySource })
+        val energy = energyByRank(all.associateWith { features[it]?.drive }, all.associateWith { features[it]?.driveScale })
         fun lift(f: app.siansa.net.TrackFeatures?): Double? = f?.moods?.let { m -> listOfNotNull(m["happy"], m["party"]).takeIf { it.isNotEmpty() }?.average()?.coerceIn(0.0, 1.0) }
         fun track(id: String, artist: String, likeness: Double): DjTrack {
             val f = features[id]
-            return DjTrack(id, artist, likeness, mixTempo(f?.tempo, genres[id]), f?.key, f?.scale, energy[id], lift(f), f?.energy, soundFamilies(genres[id]), f?.energySource)
+            return DjTrack(id, artist, likeness, mixTempo(f?.tempo, genres[id]), f?.key, f?.scale, energy[id], lift(f), f?.drive, soundFamilies(genres[id]), f?.driveScale)
         }
         val seed = track(last.id, last.artist, 1.0)
         val begun = start?.let { track(it.id, it.artist, 1.0) }

@@ -140,14 +140,14 @@ fun rankVibe(
         val scores = hits.associate { hit -> hit.id to (genres[hit.id]?.firstOrNull { it.name.equals(dial.term, ignoreCase = true) }?.score ?: 0.0) }
         Triple(dial, scores, spread(scores.values.toList()))
     }
-    val energy = spread(hits.mapNotNull { features[it.id]?.energy })
+    val energy = spread(hits.mapNotNull { features[it.id]?.drive })
     val tempo = spread(hits.mapNotNull { features[it.id]?.tempo })
     val most = familiarity.values.maxOrNull()?.coerceAtLeast(1) ?: 1
     val n = hits.size.toDouble()
     return hits.mapIndexed { i, hit ->
         val f = features[hit.id]
         var score = 1.0 - i / n + jitter(i)
-        score += SLIDER_PULL * pull(tuning.energy, f?.energy, energy)
+        score += SLIDER_PULL * pull(tuning.energy, f?.drive, energy)
         score += SLIDER_PULL * pull(tuning.tempo, f?.tempo, tempo)
         if (tuning.familiar != 0) {
             val known = (familiarity[hit.artist.lowercase()] ?: 0).toDouble() / most

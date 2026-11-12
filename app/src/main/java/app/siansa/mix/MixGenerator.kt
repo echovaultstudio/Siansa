@@ -543,7 +543,7 @@ class MixGenerator(private val graph: AppGraph) {
         val dots = runCatching { graph.audioMuse.features(ids) }
             .onFailure { AppLog.w("Vibe", "Couldn't load the songs' energy and tempo for the sound pad: ${it.message}") }
             .getOrDefault(emptyList())
-            .mapNotNull { padPlace(it.tempo, it.energy) }
+            .mapNotNull { padPlace(it.tempo, it.energy, it.arousal) }
         AppLog.i("Vibe", "A mix of ${ids.size} songs offers: ${sounds.joinToString { "${it.name} (${it.songs})" }.ifEmpty { "no sounds of its own" }} · ${dots.size} on the pad")
         return MixOffer(sounds, dots)
     }
