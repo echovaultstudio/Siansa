@@ -100,6 +100,9 @@ How Smart decides:
 
 ### Beat-matched blends
 
+DJ radio, Keep playing in DJ mode and the DJ mix of an album or playlist leave out songs longer than 15 minutes (a
+whole DJ set or a live recording in one file): they're mixes themselves. You can still start one from such a song.
+
 In DJ playback only: DJ radio, songs Keep playing adds in DJ mode, and the DJ mix of an album or playlist (slide
 Shuffle onto Play). An album or playlist playing on its own never beat-matches. Needs the Siansa plugin (in Siansa Dev,
 the Siansa Beats (dev) plugin). Two songs that both keep a beat can clash at the changeover when their beats land at different moments,
