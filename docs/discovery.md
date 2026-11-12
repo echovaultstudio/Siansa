@@ -59,7 +59,9 @@ play only when all of these hold; Surprises loosens them a place at a time:
   bass, hard dance, calm electronic and dance pop within electronic music, and each other genre (rock, hip hop,
   jazz…) as its own. A song that is clearly techno doesn't follow a house song. A song Siansa Beats isn't sure
   about, or has no genres for, is never held back for it.
-- **Energy** is AudioMuse-AI's, compared song with song, not with whatever else is on offer.
+- **Energy** is AudioMuse-AI's, compared song with song, not with whatever else is on offer. Songs Siansa Beats heard
+  itself and songs it took over from AudioMuse-AI aren't on one scale, so two songs' energies are compared only when
+  the same one measured both (Siansa Beats 0.34 says which).
 
 A steady mix picks from four times as many similar songs as it plays, to find enough that fit, and prefers a shorter
 mix to one that drifts. When hardly any fit, the nearest ones are let in so the music carries on (another kind of

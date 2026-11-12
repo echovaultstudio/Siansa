@@ -212,4 +212,43 @@ class SteadyRailsTest {
         assertEquals(88.0, mixTempo(88.0, null)!!, 1e-9)
         assertEquals(null, mixTempo(null, g("Drum n Bass" to 0.9)))
     }
+
+    private fun measured(id: String, level: Double, from: String?, tempo: Double = 124.0, likeness: Double = 0.9) =
+        DjTrack(id, tempo = tempo, likeness = likeness, level = level, levelFrom = from)
+
+    @Test
+    fun `energies measured by different services aren't held against a song`() {
+        // The owner's library, 12 Nov: alike house songs at 0.714 (heard by Siansa Beats) and 0.29 (taken over).
+        val rails = SteadyRails.of(0.0)
+        val start = measured("start", 0.714, "beats")
+        assertEquals(null, energyOff(start, measured("taken over", 0.29, "audiomuse")))
+        assertTrue(rails.allows(start, measured("taken over", 0.29, "audiomuse")))
+        // Within one service the rail holds as before.
+        assertEquals(false, rails.allows(start, measured("quiet", 0.29, "beats")))
+        assertTrue(rails.allows(start, measured("alike", 0.74, "beats")))
+        // An older Siansa Beats says nothing about who measured: compared as before.
+        assertEquals(false, rails.allows(measured("start", 0.714, null), measured("quiet", 0.29, null)))
+    }
+
+    @Test
+    fun `the log can say which rail kept a song out`() {
+        val rails = SteadyRails.of(0.0)
+        val start = measured("start", 0.7, "beats", tempo = 132.0)
+        assertEquals(emptyList<String>(), rails.keptOutBy(start, measured("fits", 0.7, "beats", tempo = 130.0)))
+        assertEquals(listOf("tempo"), rails.keptOutBy(start, measured("slow", 0.7, "beats", tempo = 121.0)))
+        assertEquals(listOf("tempo", "energy", "likeness"), rails.keptOutBy(start, measured("far", 0.2, "beats", tempo = 100.0, likeness = 0.1)))
+    }
+
+    @Test
+    fun `energy is ranked among the songs one service measured`() {
+        val ranked = energyByRank(
+            mapOf("a" to 0.60, "b" to 0.74, "c" to 0.27, "d" to 0.31, "e" to null),
+            mapOf("a" to "beats", "b" to "beats", "c" to "audiomuse", "d" to "audiomuse"),
+        )
+        assertEquals(0.0, ranked["a"]!!, 1e-9)
+        assertEquals(1.0, ranked["b"]!!, 1e-9)
+        assertEquals(0.0, ranked["c"]!!, 1e-9)
+        assertEquals(1.0, ranked["d"]!!, 1e-9)  // the loudest of its own, not under every song of the other
+        assertEquals(null, ranked["e"])
+    }
 }
