@@ -27,6 +27,17 @@ enum class Technique(val label: String) {
 data class TechniqueChoice(val technique: Technique, val bars: Int, val why: String, val dropAtMs: Long? = null)
 
 object TechniquePicker {
+    /** The most bars a blend can have ([Technique.LONG_BLEND]): a song's blend is planned early enough for these. */
+    const val LONGEST_BARS = 32
+
+    /**
+     * The bars to look ahead for when planning a blend out of a song: Smart may pick a long blend whatever the
+     * listener's own number of bars, so it's planned early enough for the longest. Planned for the listener's bars
+     * only (16 by default), a 32-bar blend was always found "too close to the end" and the songs changed with no
+     * blend at all (the owner's log, 12 Nov).
+     */
+    fun lookBars(smart: Boolean, blendBars: Int): Int = if (smart) maxOf(blendBars, LONGEST_BARS) else blendBars
+
     /** Ends this sure of their beat (Siansa Beats' share on the grid, inside the lock) can run long. */
     const val SURE = 0.95f
     /** Below this, a blend is kept quick. */
@@ -106,7 +117,7 @@ object TechniquePicker {
         val roomy = (outgoing.bassBars ?: 0) >= ROOMY_BARS || (incoming.bassBars ?: 0) >= ROOMY_BARS
         val cooling = (incoming.energyDb ?: 0.0) <= (outgoing.energyDb ?: 0.0) - COOLING_DB
         if (shift <= LONG_SHIFT && keysMix && sure >= SURE && roomy) {
-            fits(Technique.LONG_BLEND, 32, "close tempos, keys that mix, and room without bass at an end")
+            fits(Technique.LONG_BLEND, LONGEST_BARS, "close tempos, keys that mix, and room without bass at an end")
         }
         if (drop != null && !cooling) {
             fits(Technique.DROP_SWAP, drop.first, "the next song's drop lands where the old one goes", drop.second)

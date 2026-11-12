@@ -104,6 +104,9 @@ A song that winds down at its end (its last five seconds or more well under its 
 one over that stretch, up to 12 seconds, where the two beats can't be laid on each other and the keys don't clash.
 Whether two voices would clash isn't known: nothing measures where a song is sung.
 
+A blend is planned early enough for the longest one (32 bars); when there's no time left for the one picked, because
+you moved near the end of the song, a quick one is made instead.
+
 DJ radio, Keep playing in DJ mode and the DJ mix of an album or playlist leave out songs longer than 15 minutes (a
 whole DJ set or a live recording in one file): they're mixes themselves. You can still start one from such a song.
 
