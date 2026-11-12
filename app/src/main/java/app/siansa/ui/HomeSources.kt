@@ -368,7 +368,7 @@ internal fun SourceRow(
             }
             under?.let {
                 Spacer(Modifier.height(SOURCE_CARD_GAP))
-                Box(Modifier.padding(start = SOURCE_ICON + Space.Medium)) { it() }
+                Column(Modifier.padding(start = SOURCE_ICON + Space.Medium)) { it() }
             }
         }
         Spacer(Modifier.width(Space.Small))

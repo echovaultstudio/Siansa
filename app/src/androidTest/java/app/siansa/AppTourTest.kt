@@ -98,8 +98,9 @@ class AppTourTest {
                 waitText("Only downloaded music")
                 shot("01b-source-filter", popups = true)
                 // Issue #220: Sync here shows the sync running and its result (artists, albums, songs).
-                compose.onAllNodes(hasText("Sync") and hasClickAction()).fetchSemanticsNodes().firstOrNull()?.let {
-                    compose.onAllNodes(hasText("Sync") and hasClickAction()).onFirst().performClick()
+                // The sync button beside the server in use (the owner, 12 Nov: an icon with "Sync <name>").
+                compose.onAllNodesWithTag("source-sync").fetchSemanticsNodes().firstOrNull()?.let {
+                    compose.onAllNodesWithTag("source-sync").onFirst().performClick()
                     val until = SystemClock.elapsedRealtime() + 30_000
                     while (SystemClock.elapsedRealtime() < until && compose.onAllNodesWithTag("source-sync-progress").fetchSemanticsNodes().isEmpty()) SystemClock.sleep(200)
                     if (compose.onAllNodesWithTag("source-sync-progress").fetchSemanticsNodes().isEmpty()) problems += "source filter: Sync showed no progress"
@@ -111,11 +112,15 @@ class AppTourTest {
                     if (compose.onAllNodesWithTag("source-sync-done", useUnmergedTree = true).fetchSemanticsNodes().isEmpty()) problems += "source filter: no tick after Sync"
                     if (compose.onAllNodesWithText("artists", substring = true, useUnmergedTree = true).fetchSemanticsNodes().isEmpty()) problems += "source filter: no artists, albums and songs after Sync"
                 } ?: run { problems += "source filter: no Sync button" }
-                // The same panel's other tab (issue #152).
-                click("Arrange")
+                // Arrange Home, a sheet of its own from the menu (the owner, 12 Nov).
+                closeSheet()
+                idle(400)
+                compose.onAllNodesWithContentDescription("Home menu", substring = true).onFirst().performClick()
+                idle(400)
+                click("Arrange Home")
                 idle(600)
-                shot("01b2-arrange-tab", popups = true)
-                click("Sources")
+                shot("01b2-arrange", popups = true)
+                closeSheet()
                 idle(400)
                 // A second user (the same login here), shown alongside the first.
                 val second = 1
@@ -124,7 +129,6 @@ class AppTourTest {
                     SettingsRepository(app, second).save(graph.settings.current)
                 }
                 try {
-                    closeSheet()
                     graph.guests.setShown(second, true)
                     val end = SystemClock.elapsedRealtime() + 60_000
                     while (SystemClock.elapsedRealtime() < end && graph.guests.state.value[second]?.let { !it.running && (it.songs != null || it.error != null) } != true) SystemClock.sleep(300)
@@ -137,7 +141,7 @@ class AppTourTest {
                     idle(400)
                     click("Sources")
                     idle(1200)
-                    waitText("Servers and libraries")
+                    waitText("SERVERS")
                     shot("01d-source-filter-two-users", popups = true)
                     click("Only downloaded music")
                     idle(800)
