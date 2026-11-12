@@ -33,6 +33,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -189,7 +190,7 @@ private fun TimeMachinePage(nav: NavController) {
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomBarPadding(Space.Large))) {
             item {
-                TimeMachineHeader(nav, picture, tint) {
+                PictureHeader(nav, listOfNotNull(picture), tint) {
                     TimeMachineName()
                     TimePicker(
                         under = { TimeMachineWords(summary, mostPlayed) },
@@ -251,21 +252,26 @@ internal fun <T> rememberSettled(load: Load<T>): Load<T> {
 internal fun <T> settledLoad(load: Load<T>, last: Load<T>?): Load<T> = if (load is Load.Loading && last != null) last else load
 
 /**
- * The time machine's header: the top artist's [picture], soft and dark, fading into the page, with back and
- * [content] on it. Without a picture (nothing played, an artist not in the library, still loading) the header is
- * the plain dark page, so no other colours show before the picture does. Before Android 12, which can't blur, a wash
- * of the artist's colour.
+ * A listening page's header (the time machine, your sonic fingerprint): [pictures] side by side, soft and dark,
+ * fading into the page, with back and [content] on it. One picture fills it; several (a few covers) blur into a mix
+ * of their colours. Without any (nothing played, still loading) the header is the plain dark page, so no other
+ * colours show before the pictures do. Before Android 12, which can't blur, a wash of [tint].
+ *
+ * Give it pictures that are already in memory ([rememberLoadedPictures]): one put here before it's loaded shows an
+ * empty box, then pops in.
  */
 @Composable
-private fun TimeMachineHeader(nav: NavController, picture: String?, tint: Color, content: @Composable ColumnScope.() -> Unit) {
+internal fun PictureHeader(nav: NavController, pictures: List<String>, tint: Color, content: @Composable ColumnScope.() -> Unit) {
     val page = MaterialTheme.colorScheme.background
     Box(Modifier.fillMaxWidth().clipToBounds()) {
-        Crossfade(picture, Modifier.matchParentSize(), animationSpec = tween(HEADER_FADE), label = "time-machine-artist") { id ->
-            if (id != null) {
+        Crossfade(pictures, Modifier.matchParentSize(), animationSpec = tween(HEADER_FADE), label = "header-pictures") { ids ->
+            if (ids.isNotEmpty()) {
                 Box(Modifier.fillMaxSize()) {
                     if (Build.VERSION.SDK_INT >= 31) {
                         Box(Modifier.fillMaxSize().background(page))
-                        Cover(id, HEADER_PICTURE, Modifier.fillMaxSize().alpha(HEADER_PICTURE_ALPHA).blur(HEADER_BLUR), RectangleShape)
+                        Row(Modifier.fillMaxSize().alpha(HEADER_PICTURE_ALPHA).blur(HEADER_BLUR)) {
+                            ids.forEach { Cover(it, if (ids.size == 1) HEADER_PICTURE else HEADER_SMALL_PICTURE, Modifier.weight(1f).fillMaxHeight(), RectangleShape) }
+                        }
                     } else {
                         Box(Modifier.fillMaxSize().background(page).background(Brush.verticalGradient(listOf(tint, page))))
                     }
@@ -280,18 +286,44 @@ private fun TimeMachineHeader(nav: NavController, picture: String?, tint: Color,
     }
 }
 
-/** The time machine's name, small, above what it shows. */
+/** The size a cover is asked for when several share a header: the one lists already show, so it's on the phone. */
+internal const val HEADER_SMALL_PICTURE = 150
+
+/**
+ * [wanted] once every one of them is in memory at [size] (the ones that can't be loaded are left out); until then
+ * what it gave last. So a header's pictures fade in whole and never show an empty box first.
+ */
 @Composable
-internal fun TimeMachineName() {
+internal fun rememberLoadedPictures(wanted: List<String>, size: Int): List<String> {
+    val graph = LocalGraph.current
+    val context = LocalContext.current
+    var ready by remember { mutableStateOf(emptyList<String>()) }
+    LaunchedEffect(wanted, size) {
+        ready = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            wanted.filter { id ->
+                runCatching { coil3.SingletonImageLoader.get(context).execute(coverRequest(context, graph, id, size)) is coil3.request.SuccessResult }.getOrDefault(false)
+            }
+        }
+    }
+    return ready
+}
+
+/** A page's name, small and in the accent, above its title: "TIME MACHINE". */
+@Composable
+internal fun HeaderKicker(text: String, modifier: Modifier = Modifier) {
     Text(
-        "TIME MACHINE",
+        text,
         style = MaterialTheme.typography.labelMedium,
         fontWeight = FontWeight.Bold,
         color = Accent,
         letterSpacing = 2.sp,
-        modifier = Modifier.padding(horizontal = Space.Page).testTag("timeMachineName"),
+        modifier = modifier.padding(horizontal = Space.Page),
     )
 }
+
+/** The time machine's name, small, above what it shows. */
+@Composable
+internal fun TimeMachineName() = HeaderKicker("TIME MACHINE", Modifier.testTag("timeMachineName"))
 
 /** Under the time machine's title: what was played, and by whom most. */
 @Composable
