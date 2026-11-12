@@ -346,21 +346,17 @@ class ShowcaseTest {
                 waitText("How you listened, any month or year.")
                 compose.onAllNodesWithTag("month-0").onFirst().performSemanticsAction(SemanticsActions.OnClick)
                 idle(1500)
-                // From three years ago to this one, a picture a year.
-                repeat(2) {
-                    compose.onAllNodesWithContentDescription("Year before").onFirst().performSemanticsAction(SemanticsActions.OnClick)
-                    idle(1200)
-                }
+                // From three years ago to this one, a picture a year: each picked from the list under the title.
                 val year = LocalDate.now().year
                 for (y in year - 3..year) {
+                    compose.onAllNodesWithTag("timeMachineTitle").onFirst().performSemanticsAction(SemanticsActions.OnClick)
+                    compose.waitUntil(10_000) { compose.onAllNodesWithTag("year-$y").fetchSemanticsNodes().isNotEmpty() }
+                    compose.onAllNodesWithTag("year-$y").onFirst().performSemanticsAction(SemanticsActions.OnClick)
+                    idle(800)
                     waitText("$y")
                     compose.waitUntil(30_000) { exists("Top artists") }
                     idle(2500)
                     shot("timemachine-$y")
-                    if (y < year) {
-                        compose.onAllNodesWithContentDescription("Year after").onFirst().performSemanticsAction(SemanticsActions.OnClick)
-                        idle(800)
-                    }
                 }
                 back()
             }
