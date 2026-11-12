@@ -17,9 +17,12 @@ import kotlin.random.Random
  * stops adding. A song chosen on the genre's page plays first.
  *
  * The genre's songs are the ones Siansa Beats hears in it when it's there, the songs' genre tags otherwise ([songsOf]).
+ * The picks prefer the songs the sound is sure of (the owner, 12 Nov: a country album had crept into Electro House
+ * on a faint score): each song's chance is its score squared ([weightedPicks]), so a sure song comes up many times
+ * as often as a faint one, and by the tags (no scores) every song is as likely.
  */
 class GenreRadio(private val graph: AppGraph) {
-    private class Session(val name: String, val ids: List<String>, val used: MutableSet<String>, var lastId: String) {
+    private class Session(val name: String, val ids: List<String>, val weights: Map<String, Float>, val used: MutableSet<String>, var lastId: String) {
         /** The player has the radio's songs (until then, the queue before it is still showing). */
         var seen = false
     }
@@ -66,12 +69,13 @@ class GenreRadio(private val graph: AppGraph) {
     fun start(name: String, songs: List<Song>, first: Song? = null) {
         if (songs.isEmpty()) return
         val used = LinkedHashSet<String>()
-        val picks = firstPicks(songs, first, PICKS, Random.Default)
+        val weights = graph.beatsGenres.weightsOf(name)
+        val picks = firstPicks(songs, first, PICKS, Random.Default, weights)
         picks.forEach { used += it.id }
         graph.songRadio.stop()
-        session = Session(name, songs.map { it.id }, used, picks.last().id)
+        session = Session(name, songs.map { it.id }, weights, used, picks.last().id)
         graph.player.play(picks)
-        AppLog.i("Radio", "Genre radio $name: ${picks.size} of ${songs.size} songs" + (first?.let { ", from \"${it.title}\"" } ?: ""))
+        AppLog.i("Radio", "Genre radio $name: ${picks.size} of ${songs.size} songs" + (first?.let { ", from \"${it.title}\"" } ?: "") + scoresLine(picks.map { it.id }, weights))
     }
 
     /** Stops adding songs (something else was chosen to play). */
@@ -86,7 +90,7 @@ class GenreRadio(private val graph: AppGraph) {
         adding = true
         graph.scope.launch {
             try {
-                val ids = nextPicks(s.ids, s.used, PICKS, Random.Default)
+                val ids = nextPicks(s.ids, s.used, PICKS, Random.Default, s.weights)
                 if (ids.isEmpty()) return@launch
                 val songs = withContext(Dispatchers.IO) { graph.library.songs(ids) }.associateBy { it.id }
                 val next = ids.mapNotNull { songs[it] }
@@ -94,7 +98,7 @@ class GenreRadio(private val graph: AppGraph) {
                 next.forEach { s.used += it.id }
                 graph.player.addAll(next)
                 s.lastId = next.last().id
-                AppLog.i("Radio", "Genre radio ${s.name}: added ${next.size} more")
+                AppLog.i("Radio", "Genre radio ${s.name}: added ${next.size} more" + scoresLine(next.map { it.id }, s.weights))
             } finally {
                 adding = false
             }
@@ -109,24 +113,56 @@ class GenreRadio(private val graph: AppGraph) {
         /** The most songs of a genre read for its page and its radio: all of them, in any library there is. */
         const val MOST_SONGS = 50_000
 
-        /** [first] (when given), then random songs of [songs] to make [count]. */
-        fun firstPicks(songs: List<Song>, first: Song?, count: Int, random: Random): List<Song> {
-            val rest = songs.filter { it.id != first?.id }.shuffled(random)
-            return (listOfNotNull(first) + rest).distinctBy { it.id }.take(count)
+        /** [first] (when given), then random songs of [songs] to make [count], the sure ones ([weights]) more often. */
+        fun firstPicks(songs: List<Song>, first: Song?, count: Int, random: Random, weights: Map<String, Float> = emptyMap()): List<Song> {
+            val rest = songs.filter { it.id != first?.id }.distinctBy { it.id }
+            val byId = rest.associateBy { it.id }
+            val picked = weightedPicks(rest.map { it.id }, weights, count, random).mapNotNull { byId[it] }
+            return (listOfNotNull(first) + picked).distinctBy { it.id }.take(count)
         }
 
         /**
-         * The next [count] song ids from [ids] not [used] yet, at random. Once every song has been played, it starts over,
-         * leaving out the last few played so a song doesn't come straight back.
+         * The next [count] song ids from [ids] not [used] yet, at random, the sure ones ([weights]) more often. Once every
+         * song has been played, it starts over, leaving out the last few played so a song doesn't come straight back.
          */
-        fun nextPicks(ids: List<String>, used: MutableSet<String>, count: Int, random: Random): List<String> {
+        fun nextPicks(ids: List<String>, used: MutableSet<String>, count: Int, random: Random, weights: Map<String, Float> = emptyMap()): List<String> {
             var fresh = ids.filter { it !in used }
             if (fresh.isEmpty()) {
                 val recent = used.toList().takeLast(minOf(ids.size / 2, PICKS * 2)).toSet()
                 used.retainAll(recent)
                 fresh = ids.filter { it !in used }
             }
-            return fresh.shuffled(random).take(count)
+            return weightedPicks(fresh, weights, count, random)
         }
+
+        /**
+         * [count] of [ids] at random without repeats, each one's chance its score in [weights] squared (a song without
+         * a score counts as [NO_SCORE], so by the tags all are alike): a sure song at 0.6 comes up 16 times as often
+         * as a faint one at 0.15. Efraimidis–Spirakis: a random key per song, raised to 1/weight, the highest kept.
+         */
+        fun weightedPicks(ids: List<String>, weights: Map<String, Float>, count: Int, random: Random): List<String> =
+            ids.map { id -> id to Math.pow(random.nextDouble().coerceAtLeast(1e-12), 1.0 / weightOf(weights[id])) }
+                .sortedByDescending { it.second }
+                .take(count)
+                .map { it.first }
+
+        /** A song's chance against the others': its score squared, [NO_SCORE] without one. */
+        internal fun weightOf(score: Float?): Double {
+            val s = (score ?: NO_SCORE).toDouble().coerceIn(0.01, 1.0)
+            return s * s
+        }
+
+        /** The score a song counts as when the genre came without scores (the tags, or Siansa Beats before 0.36). */
+        const val NO_SCORE = 0.5f
+
+        /** For the log: the picks' scores, lowest and highest, when there are any. */
+        internal fun scoresLine(ids: List<String>, weights: Map<String, Float>): String {
+            val scores = ids.mapNotNull { weights[it] }
+            if (scores.isEmpty()) return ""
+            return " · scores %.2f to %.2f, %d sure".format(java.util.Locale.ROOT, scores.min(), scores.max(), scores.count { it >= SURE })
+        }
+
+        /** A score the sound is sure of (Siansa Beats' own line). */
+        const val SURE = 0.4f
     }
 }
