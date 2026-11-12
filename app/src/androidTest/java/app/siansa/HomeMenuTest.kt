@@ -19,6 +19,7 @@ import androidx.compose.ui.test.onRoot
 import app.siansa.ui.Space
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -78,12 +79,16 @@ class HomeMenuTest {
                     Box(Modifier.fillMaxSize()) {
                         // Home's page: long enough to scroll, the notices and the menu button at its top (issue #872).
                         Column(Modifier.fillMaxSize().verticalScroll(scroll)) {
-                            app.siansa.ui.HomeTopBar(listOf(app.siansa.mix.Notices.newAlbums(2, "a")!!), onOpen = {}) {
+                            val open = app.siansa.ui.rememberHomeMenuOpen(menu)
+                            app.siansa.ui.HomeTopBar(
+                                listOf(app.siansa.mix.Notices.newAlbums(2, "a")!!), onOpen = {}, menuOpen = open,
+                                menuBar = { app.siansa.ui.HomeMenuBar(menu, info, HomeMenuItem.default, open = open, onPick = ::pick) },
+                            ) {
                                 HomeMenuButton(menu, casting = casting, filterActive = false, onPick = ::pick)
                             }
                             Box(Modifier.fillMaxWidth().height(3000.dp))
                         }
-                        HomeMenuOverlay(menu, info, HomeMenuItem.default, onPick = ::pick)
+                        HomeMenuOverlay(menu)
                     }
                     panel?.let { sources -> HomeSettingsSheet(nav, startOnSources = sources) { panel = null } }
                 }
@@ -92,13 +97,13 @@ class HomeMenuTest {
         compose.waitForIdle()
     }
 
-    @Test fun glidingDownOntoSourcesOpensSources() {
+    @Test fun glidingAlongOntoSourcesOpensSources() {
         home()
         val button = compose.onNodeWithTag("homeMenu")
         val origin = button.getBoundsInRoot()
         button.performTouchInput { down(center) }
         compose.waitForIdle()
-        // The menu opens at once, under the finger.
+        // The menu opens at once, in the row the finger is on.
         compose.onNodeWithTag("homeMenuPanel").assertIsDisplayed()
         val row = compose.onNodeWithTag("homeMenu-sources").getBoundsInRoot()
         val target = with(compose.density) {
@@ -109,7 +114,8 @@ class HomeMenuTest {
             repeat(12) { i -> moveTo(from + (target - from) * ((i + 1) / 12f)) }
         }
         compose.waitForIdle()
-        compose.onNodeWithText("Let go to open").assertIsDisplayed()
+        // The place under the finger is lit: grown and filled.
+        compose.onNodeWithTag("homeMenuChosenCircle", useUnmergedTree = true).assertExists()
         button.performTouchInput { up() }
         compose.waitForIdle()
         assertEquals(listOf(HomeMenuItem.SOURCES), picked)
@@ -124,8 +130,8 @@ class HomeMenuTest {
         val button = compose.onNodeWithTag("homeMenu")
         button.performTouchInput { down(center) }
         compose.waitForIdle()
-        // Left and a little up, away from the menu (which hangs below), past the touch slop.
-        button.performTouchInput { repeat(10) { moveBy(Offset(-40f, -5f)) } }
+        // Down and away from the row (the menu is in the row itself), past the touch slop.
+        button.performTouchInput { repeat(10) { moveBy(Offset(-5f, 40f)) } }
         compose.waitForIdle()
         button.performTouchInput { up() }
         compose.waitForIdle()
@@ -134,24 +140,21 @@ class HomeMenuTest {
         assertEquals(0, scroll.value)
     }
 
-    @Test fun aTapOpensTheMenuAndItsRowsOpen() {
+    @Test fun aTapOpensTheMenuInTheRowAndItsPlacesOpen() {
         home()
         compose.onNodeWithTag("homeMenu").performClick()
         compose.waitForIdle()
-        // A tap leaves it open, with its four rows.
-        compose.onNodeWithText("Roll the dice").assertIsDisplayed()
-        compose.onNodeWithText("Play on…").assertIsDisplayed()
-        compose.onNodeWithText("Sources").assertIsDisplayed()
-        compose.onNodeWithText("Arrange Home").assertIsDisplayed()
-        // The card hangs under the button, its right edge on the button's (the page's edge), as wide as a tile column.
+        // A tap leaves it open, with its four places, their names read out.
+        for (id in listOf("dice", "play_on", "sources", "arrange")) compose.onNodeWithTag("homeMenu-$id").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Arrange Home").assertExists()
+        // The pill is in the row: the chips' height and top, from the page's edge to the room before the button.
         val button = compose.onNodeWithTag("homeMenu").getBoundsInRoot()
         val panel = compose.onNodeWithTag("homeMenuPanel").getBoundsInRoot()
-        assertTrue("The card's right edge is ${(panel.right - button.right).value} dp off the button's", kotlin.math.abs((panel.right - button.right).value) <= 1f)
-        assertTrue("The card hangs under the button", panel.top > button.bottom)
         val screen = compose.onRoot().getBoundsInRoot()
-        val column = ((screen.right - screen.left) - Space.Page * 2 - Space.Small) / 2
-        val width = panel.right - panel.left
-        assertTrue("The card is a tile column wide (${width.value} dp, column ${column.value} dp)", kotlin.math.abs((width - column).value) <= 1f)
+        assertTrue("The pill's top is the button's", kotlin.math.abs((panel.top - button.top).value) <= 1f)
+        assertTrue("The pill's height is the button's", kotlin.math.abs(((panel.bottom - panel.top) - (button.bottom - button.top)).value) <= 1f)
+        assertTrue("The pill starts at the page's edge", kotlin.math.abs((panel.left - screen.left - Space.Page).value) <= 1f)
+        assertTrue("The pill ends ${(button.left - panel.right).value} dp before the button", kotlin.math.abs((button.left - panel.right - Space.Small).value) <= 1f)
         compose.onNodeWithTag("homeMenu-arrange").performClick()
         compose.waitForIdle()
         assertEquals(listOf(HomeMenuItem.ARRANGE), picked)
@@ -163,10 +166,9 @@ class HomeMenuTest {
         compose.onNodeWithTag("homeMenuCastDot", useUnmergedTree = true).assertExists()
         compose.onNodeWithTag("homeMenu").performClick()
         compose.waitForIdle()
-        // The row keeps its plain name with where it plays under it; Stop and the rest are in the TVs and speakers menu it opens.
-        compose.onNodeWithText("Play on…").assertIsDisplayed()
-        compose.onNodeWithText("Playing on SHIELD").assertIsDisplayed()
-        assertTrue("No Stop in the rows", compose.onAllNodesWithTagCount("homeMenuStop") == 0)
+        // The place says where it plays; Stop and the rest are in the TVs and speakers menu it opens.
+        compose.onNodeWithContentDescription("Play on… Playing on SHIELD").assertExists()
+        assertTrue("No Stop in the places", compose.onAllNodesWithTagCount("homeMenuStop") == 0)
         compose.onNodeWithTag("homeMenu-play_on").performClick()
         compose.waitForIdle()
         assertEquals(listOf(HomeMenuItem.PLAY_ON), picked)
