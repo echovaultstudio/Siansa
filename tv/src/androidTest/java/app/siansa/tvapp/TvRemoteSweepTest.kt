@@ -119,20 +119,21 @@ class TvRemoteSweepTest {
                 path += here.first + " @${node.boundsInRoot.top.toInt()}"
             }
             last = here
-            // Along the row: right until the focus leaves the row's line or stops moving.
-            var row = node.boundsInRoot
-            repeat(30) {
-                press(KeyEvent.KEYCODE_DPAD_RIGHT)
-                val next = focused() ?: return@repeat
-                if (next.boundsInRoot == row || kotlin.math.abs(next.boundsInRoot.top - row.top) > 8f) {
-                    // Not along the row (nothing, or it moved to another line): back where it was.
-                    if (next.boundsInRoot != row) press(KeyEvent.KEYCODE_DPAD_LEFT)
-                    return@repeat
+            // Along the row, as the remote is used: left to its start, then right to its end. A press that moves to
+            // another line is where the remote went: the sweep goes on from there (no pressing back, which went
+            // elsewhere and left the sweep circling).
+            for (key in intArrayOf(KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT)) {
+                var row = node.boundsInRoot
+                repeat(30) {
+                    press(key)
+                    val next = focused() ?: return@repeat
+                    if (next.boundsInRoot == row) return@repeat
+                    reached += wordsOf(next)
+                    path += (if (key == KeyEvent.KEYCODE_DPAD_LEFT) "← " else "→ ") + label(next)
+                    node = next
+                    if (kotlin.math.abs(next.boundsInRoot.top - row.top) > 8f) return@repeat
+                    row = next.boundsInRoot
                 }
-                row = next.boundsInRoot
-                reached += wordsOf(next)
-                path += "→ " + label(next)
-                node = next
             }
             // A folded section (its heading ends in -header, its body in -body): opened, so its controls count.
             val tag = node.config.getOrNull(SemanticsProperties.TestTag)

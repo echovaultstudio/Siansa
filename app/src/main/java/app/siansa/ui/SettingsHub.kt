@@ -686,7 +686,7 @@ fun LogsScreen(nav: NavController) {
                     val all = entries.valueOrNull().orEmpty()
                     val errors = all.count { it.level == "E" }
                     val warnings = all.count { it.level == "W" }
-                    Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+                    Row(Modifier.tvFocusGroup(), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
                         FilterChip(selected = !problemsOnly, onClick = { problemsOnly = false }, label = { Text("Everything") })
                         FilterChip(
                             selected = problemsOnly,
