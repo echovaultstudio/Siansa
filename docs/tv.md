@@ -143,7 +143,8 @@ and play in stereo, with the centre and surround channels folded in.
   them down to the level they're marked with. **Settings › Playback › Dolby songs on your receiver** has them played
   3 to 12 dB louder: Siansa marks them nearer the receiver's full level on their way, without changing the sound. A
   song can't go past full level, so one already marked near it gets less. It works for Dolby Atmos and Dolby Digital
-  Plus, not for Dolby TrueHD, DTS or plain Dolby Digital.
+  Plus, not for Dolby TrueHD, DTS or plain Dolby Digital. If a song doesn't seem louder, send a report after playing
+  it (Settings › Help › Report a problem): the log says for every Dolby song how much louder it was sent, or why not.
 - Songs in the same format play one after another without a gap, a DJ mix or a live album included: the output to the
   receiver stays open from one song to the next. A file that says it's longer than it is (some DJ mixes do) plays to
   its real last frame, read from the file's own audio, so the next one still follows straight on. Most Atmos files
