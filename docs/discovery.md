@@ -42,22 +42,30 @@ stray further.
 #### Steady stays steady
 
 A Steady vibes mix is held to the song it **started** from, not only to the last song, so it can't walk step by step
-from a mellow house song into drum and bass. With Surprises at None, only songs within about 6 % of the first song's
-tempo and near its energy may play; half and double time don't count as the same tempo (a song at 87 doesn't follow
-one at 174). Surprises loosens this a place at a time:
+from a mellow house song into drum and bass, or jump to techno at the same tempo. With Surprises at None, a song may
+play only when all of these hold; Surprises loosens them a place at a time:
 
 | | None | A few | Some | Lots |
 |---|---|---|---|---|
 | **Tempo**, of the first song's | within 6 % | within 10 % | within 15 %, or half or double time | anywhere |
-| **Energy**, of the first song's | near | a step further | further still | free |
+| **Energy**, of the first song's | within a quarter | within about half | further still | free |
+| **How alike it sounds** | among the most alike half | a little less | less still | any |
+| **Kind of music** | the first song's | shares one with it | any | any |
 | **Held to the first song** | strongly | loosely | a little | not at all: the mix can travel |
 | **Keys** | count most | a lift up a tone counts too | as before | count least |
 
-A steady mix picks from four times as many similar songs as it plays, to find enough that fit. When hardly any do,
-the nearest ones are let in so the music carries on, and the radio may queue fewer songs at a time. Halftime drum and
-bass (drums that feel like 87, played in a 174 set) counts as 174 in a mix when Siansa Beats (0.32 or newer) hears
-it clearly as drum and bass or halftime; a slow song with only a trace of it stays slow. The other shapes (Steady
-build, Euphoric, Wind down) are as they were.
+- **Tempo:** half and double time don't count as the same tempo below Some (a song at 87 doesn't follow one at 174).
+- **Kind of music** comes from Siansa Beats' genres (0.32 or newer): house, techno, trance, drum and bass, breaks and
+  bass, hard dance, calm electronic and dance pop within electronic music, and each other genre (rock, hip hop,
+  jazz…) as its own. A song that is clearly techno doesn't follow a house song. A song Siansa Beats isn't sure
+  about, or has no genres for, is never held back for it.
+- **Energy** is AudioMuse-AI's, compared song with song, not with whatever else is on offer.
+
+A steady mix picks from four times as many similar songs as it plays, to find enough that fit, and prefers a shorter
+mix to one that drifts. When hardly any fit, the nearest ones are let in so the music carries on (another kind of
+music last), and the radio may queue fewer songs at a time. Halftime drum and bass (drums that feel like 87, played
+in a 174 set) counts as 174 in a mix when Siansa Beats hears it clearly as drum and bass or halftime; a slow song
+with only a trace of it stays slow. The other shapes (Steady build, Euphoric, Wind down) are as they were.
 
 **Surprises** (None, A few, Some, Lots): at None every song is a close neighbour of the last in tempo and how
 alike it is; the further right, the further a song may stray, though its key still has to go with the last

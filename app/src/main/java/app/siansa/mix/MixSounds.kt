@@ -7,7 +7,13 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlin.math.abs
 
 /** A genre a song is in by its sound, as Siansa Beats hears it, and how much ([score], 0 to 1). */
-data class SongGenre(val name: String, val score: Double)
+data class SongGenre(
+    val name: String,
+    val score: Double,
+    /** Discogs' genre the style is of ("Electronic", "Rock"), and the style itself; empty from a Siansa Beats that doesn't say. */
+    val genre: String = "",
+    val style: String = "",
+)
 
 /** A sound a mix has to offer: a genre [songs] of its songs are in, while others aren't. */
 data class MixSound(val name: String, val songs: Int)
@@ -123,7 +129,10 @@ fun songGenresOf(answer: JsonObject?): Map<String, List<SongGenre>> {
         (list as? JsonArray).orEmpty().mapNotNull { g ->
             val o = g as? JsonObject ?: return@mapNotNull null
             val name = (o["name"] as? JsonPrimitive)?.content?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
-            SongGenre(name, (o["score"] as? JsonPrimitive)?.content?.toDoubleOrNull() ?: 0.0)
+            SongGenre(
+                name, (o["score"] as? JsonPrimitive)?.content?.toDoubleOrNull() ?: 0.0,
+                (o["genre"] as? JsonPrimitive)?.content.orEmpty(), (o["style"] as? JsonPrimitive)?.content.orEmpty(),
+            )
         }
     }.filterValues { it.isNotEmpty() }
 }

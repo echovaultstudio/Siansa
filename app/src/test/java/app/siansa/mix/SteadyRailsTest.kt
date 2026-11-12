@@ -11,70 +11,104 @@ import kotlin.random.Random
  * and Surprises loosens them a place at a time.
  */
 class SteadyRailsTest {
-    private fun song(id: String, tempo: Double?, energy: Double? = 0.4, likeness: Double = 0.6, key: String? = "C#", scale: String? = "minor") =
-        DjTrack(id, "Artist $id", likeness, tempo, key, scale, energy)
+    private val house = mapOf("house" to 0.6)
+    private val techno = mapOf("techno" to 1.44)
 
-    /** The owner's mix of 11 Nov: "She Loves Me" (133 BPM, mellow) and what its radio had to pick from. */
-    private val start = song("she-loves-me", 133.0, energy = 0.40, likeness = 1.0)
-    private val pool = listOf(
-        song("of-joy", 136.0, 0.45, 0.9),
-        song("house-a", 128.0, 0.35, 0.5),
-        song("house-b", 131.0, 0.5, 0.45),
-        song("house-c", 138.0, 0.3, 0.4),
-        song("house-d", 126.5, 0.55, 0.35),
-        song("house-e", 140.0, 0.42, 0.3),
-        song("too-lively", 134.0, 0.95, 0.85),
-        song("water-and-fire", 174.0, 0.5, 0.95),
-        song("my-world", 172.0, 0.67, 0.9),
-        song("feel-so-high", 175.0, 0.7, 0.88),
-        song("slow-down", 174.0, 0.6, 0.86),
-        song("downtempo", 66.5, 0.38, 0.8),
+    private fun song(
+        id: String, tempo: Double?, level: Double? = 0.10, likeness: Double = 0.6, families: Map<String, Double> = house,
+        key: String? = "C#", scale: String? = "minor",
+    ) = DjTrack(id, "Artist $id", likeness, tempo, key, scale, energy = 0.5, level = level, families = families)
+
+    /** The owner's mixes of 11 and 12 Nov: a mellow house song at 133 BPM, and what its radio had to pick from. */
+    private val start = song("she-loves-me", 133.0, likeness = 1.0)
+    private val fits = listOf(
+        song("of-joy", 136.0, 0.11, 0.9),
+        song("house-a", 128.0, 0.09, 0.8),
+        song("house-b", 131.0, 0.12, 0.75),
+        song("house-c", 138.0, 0.085, 0.7),
+        song("house-d", 126.5, 0.10, 0.65),
+        song("house-e", 140.0, 0.105, 0.6),
+    )
+    private val pool = fits + listOf(
+        song("too-lively", 134.0, 0.20, 0.85),
+        // 11 Nov: drum and bass two songs in, and from there on.
+        song("water-and-fire", 174.0, 0.11, 0.95, mapOf("drum and bass" to 0.9)),
+        song("my-world", 172.0, 0.12, 0.9, mapOf("drum and bass" to 0.8)),
+        song("downtempo", 66.5, 0.10, 0.8),
+        // 12 Nov: the right tempo and energy, and alike by AudioMuse, but minimal techno after melodic house.
+        song("limits-of-real", 133.0, 0.10, 0.70, techno),
+        song("vert", 132.3, 0.11, 0.62, mapOf("techno" to 1.81)),
+        // 12 Nov: of the wider lot, one of the least alike, picked only because its tempo fit.
+        song("least-alike", 132.0, 0.10, 0.03),
     )
 
     private fun none() = SteadyRails.of(0.0)
+    private fun few() = SteadyRails.of(0.25)
+    private fun some() = SteadyRails.of(0.55)
+    private fun lots() = SteadyRails.of(0.85)
     private fun ids(surprise: Double, count: Int = 8) = djOrder(start, pool, count, MixShape.STEADY, surprise, Random(1), start = start).map { it.id }
 
-    @Test fun withNoSurprisesItNeverLeavesTheStartsTempoOrEnergy() {
+    @Test fun withNoSurprisesItStaysWhereTheMixStarted() {
         val picked = ids(0.0)
-        // Before: Of Joy, then Water & Fire at 174, and drum and bass from there on.
-        assertEquals(setOf("of-joy", "house-a", "house-b", "house-c", "house-d", "house-e"), picked.toSet())
+        assertEquals(fits.map { it.id }.toSet(), picked.toSet())
         assertEquals("of-joy", picked.first())
-        // Half time isn't the same tempo in a steady mix: 66.5 is 133's half, and stays out.
-        assertFalse("downtempo" in picked)
-        // Fewer than asked for come back when the rest are too far off.
+        // Fewer than asked for come back when the rest are too far off: a shorter mix, not one that drifts.
         assertEquals(6, picked.size)
+        // Each of the others, and why it's out.
+        assertFalse("half time isn't the same tempo in a steady mix", none().allows(start, pool.first { it.id == "downtempo" }))
+        assertFalse("drum and bass at 174", none().allows(start, pool.first { it.id == "water-and-fire" }))
+        assertFalse("twice the energy", none().allows(start, pool.first { it.id == "too-lively" }))
+        assertFalse("techno after house", none().allows(start, pool.first { it.id == "limits-of-real" }))
+        assertFalse("techno after house", none().allows(start, pool.first { it.id == "vert" }))
+        assertFalse("it doesn't sound alike", none().allows(start, pool.first { it.id == "least-alike" }))
     }
 
     @Test fun eachPlaceOfSurprisesLoosensTheRails() {
-        val few = SteadyRails.of(0.25)
-        val some = SteadyRails.of(0.55)
-        val lots = SteadyRails.of(0.85)
+        // Tempo.
         val at145 = song("x", 145.0)  // 9 % up
         assertFalse(none().allows(start, at145))
-        assertTrue(few.allows(start, at145))
+        assertTrue(few().allows(start, at145))
         val at152 = song("x", 152.0)  // 14 % up
-        assertFalse(few.allows(start, at152))
-        assertTrue(some.allows(start, at152))
+        assertFalse(few().allows(start, at152))
+        assertTrue(some().allows(start, at152))
         // Half and double time come back at Some; any tempo at Lots.
         val half = song("x", 66.5)
-        assertFalse(few.allows(start, half))
-        assertTrue(some.allows(start, half))
-        assertFalse(some.allows(start, song("x", 174.0)))
-        assertTrue(lots.allows(start, song("x", 174.0, energy = 1.0)))
-        // Energy: near the start at None, further at each place.
-        assertFalse(none().allows(start, song("x", 133.0, energy = 0.65)))
-        assertTrue(few.allows(start, song("x", 133.0, energy = 0.65)))
-        assertFalse(few.allows(start, song("x", 133.0, energy = 0.9)))
-        assertTrue(some.allows(start, song("x", 133.0, energy = 0.9)))
+        assertFalse(few().allows(start, half))
+        assertTrue(some().allows(start, half))
+        assertFalse(some().allows(start, song("x", 174.0)))
+        assertTrue(lots().allows(start, song("x", 174.0, level = 0.9, likeness = 0.0, families = techno)))
+        // Energy, on AudioMuse's own scale: a quarter more or less at None, further at each place.
+        assertTrue(none().allows(start, song("x", 133.0, level = 0.12)))
+        assertTrue(none().allows(start, song("x", 133.0, level = 0.081)))
+        assertFalse(none().allows(start, song("x", 133.0, level = 0.13)))
+        assertTrue(few().allows(start, song("x", 133.0, level = 0.13)))
+        assertFalse(few().allows(start, song("x", 133.0, level = 0.16)))
+        assertTrue(some().allows(start, song("x", 133.0, level = 0.16)))
+        // How alike it sounds: the most alike half at None.
+        assertFalse(none().allows(start, song("x", 133.0, likeness = 0.4)))
+        assertTrue(few().allows(start, song("x", 133.0, likeness = 0.4)))
+        assertFalse(few().allows(start, song("x", 133.0, likeness = 0.25)))
+        assertTrue(some().allows(start, song("x", 133.0, likeness = 0.25)))
+        // The kind of music: the start's at None; at A few, one that shares a kind with the start; any from Some.
+        val technoWithHouse = song("x", 133.0, families = mapOf("techno" to 0.6, "house" to 0.2))
+        assertFalse(none().allows(start, technoWithHouse))
+        assertTrue(few().allows(start, technoWithHouse))
+        assertFalse(few().allows(start, song("x", 133.0, families = techno)))
+        assertTrue(some().allows(start, song("x", 133.0, families = techno)))
         // The places are the queue's: 0, 25, 55 and 85 %.
         assertEquals(listOf(0.06, 0.10, 0.15, null), listOf(0.0, 0.25, 0.55, 0.85).map { SteadyRails.of(it).tempo })
     }
 
-    @Test fun aSongWithNoTempoOrEnergyKnown() {
-        // Tempo unknown: only where tempo is free. Energy unknown: never held against it.
+    @Test fun whatIsNotKnownIsNotHeldAgainstASong() {
+        // Tempo unknown: only where tempo is free.
         assertFalse(none().allows(start, song("x", null)))
-        assertTrue(SteadyRails.of(0.85).allows(start, song("x", null)))
-        assertTrue(none().allows(start, song("x", 133.0, energy = null)))
+        assertTrue(lots().allows(start, song("x", null)))
+        // Energy or the kind of music unknown (no Siansa Beats genres), on either side: allowed.
+        assertTrue(none().allows(start, song("x", 133.0, level = null)))
+        assertTrue(none().allows(start, song("x", 133.0, families = emptyMap())))
+        assertTrue(none().allows(song("s", 133.0, families = emptyMap()), song("x", 133.0, families = techno)))
+        // A song that's a bit of everything (nothing at half or more) isn't clearly another kind.
+        assertTrue(none().allows(start, song("x", 133.0, families = mapOf("techno" to 0.3, "trance" to 0.2))))
         // A start whose tempo isn't known has no tempo rail.
         assertTrue(none().allows(song("s", null), song("x", 174.0)))
     }
@@ -89,16 +123,21 @@ class SteadyRailsTest {
         val later = djOrder(song("a", 139.0), steps, 8, MixShape.STEADY, 0.0, start = start).map { it.id }
         assertEquals(setOf("d", "e", "f", "g", "h"), later.toSet())
         // And the start's tempo counts in the order too: from 139, the song at the start's own tempo beats one at 139's.
-        val two = listOf(song("at-start", 133.0, likeness = 0.5), song("at-last", 140.5, likeness = 0.5))
+        val two = listOf(song("at-start", 133.0), song("at-last", 140.5))
         assertEquals("at-start", djOrder(song("a", 139.0), two, 1, MixShape.STEADY, 0.0, start = start).single().id)
+        // So does its energy, on AudioMuse's own scale: of two at the same tempo, the one nearer the start's.
+        val levels = listOf(song("livelier", 133.0, level = 0.12), song("as-start", 133.0, level = 0.10))
+        assertEquals("as-start", djOrder(song("a", 139.0), levels, 1, MixShape.STEADY, 0.0, start = start).single().id)
     }
 
-    @Test fun whenTooFewFitTheNearestOutsideCarryTheMixOn() {
-        val far = listOf(song("a", 150.0), song("b", 174.0), song("c", 143.0), song("d", 100.0))
+    @Test fun whenTooFewFitTheNearestOutsideCarryTheMixOnAndAnotherKindComesLast() {
+        val far = listOf(song("a", 150.0), song("techno", 133.0, families = techno), song("c", 143.0), song("d", 100.0))
         val (allowed, outside) = onRails(start, far, 20, none())
         assertEquals(4, allowed.size)
         assertEquals(4, outside)
-        // Six are asked for but only five are let in at most, the nearest first; with enough on the rails, none.
+        // The nearest in tempo first; techno at the very tempo is still last: it's another kind of music.
+        assertEquals(listOf("c", "a", "d", "techno"), allowed.map { it.id })
+        // Five are let in at most; with enough on the rails, none.
         val many = (1..9).map { song("far$it", 150.0 + it) }
         assertEquals(listOf("far1", "far2", "far3", "far4", "far5"), onRails(start, many, 20, none()).first.map { it.id })
         assertEquals(0, onRails(start, pool, 20, none()).second)
@@ -111,6 +150,37 @@ class SteadyRailsTest {
         assertEquals(pool.size, djOrder(start, pool, 20, MixShape.BUILD, 0.0, start = start).size)
         assertEquals(pool.size, djOrder(start, pool, 20, MixShape.STEADY, 0.0).size)
         assertEquals(pool.size, djOrder(start, pool, 20, MixShape.STEADY, 0.85, Random(1), start = start).size)
+    }
+
+    @Test fun energyIsComparedOnItsOwnScale() {
+        assertEquals(0.25, energyOff(0.10, 0.125)!!, 1e-9)
+        assertEquals(0.25, energyOff(0.125, 0.10)!!, 1e-9)  // the same either way round
+        assertEquals(0.0, energyOff(0.3, 0.3)!!, 1e-9)
+        assertEquals(null, energyOff(null, 0.1))
+        assertEquals(null, energyOff(0.1, 0.0))
+    }
+
+    @Test fun theKindOfMusicASongIs() {
+        fun g(style: String, score: Double, genre: String = "Electronic") = SongGenre(style, score, genre, style)
+        // The owner's songs of 12 Nov, as Siansa Beats hears them.
+        val everythingU = soundFamilies(listOf(g("Bassline", 0.15)))
+        val limitsOfReal = soundFamilies(listOf(g("Techno", 0.84), g("Deep Techno", 0.43), g("Minimal Techno", 0.17)))
+        assertEquals(mapOf("house" to 0.15), everythingU)
+        assertEquals(setOf("techno"), limitsOfReal.keys)
+        assertEquals(1.44, limitsOfReal.getValue("techno"), 1e-9)
+        assertEquals("techno", mainFamily(limitsOfReal))
+        assertEquals(null, mainFamily(everythingU))  // Siansa Beats isn't sure of it; what it is still counts as the start's kind
+        assertFalse(none().sameKind(song("s", 132.0, families = everythingU), song("x", 133.0, families = limitsOfReal)))
+        assertTrue(none().sameKind(song("s", 132.0, families = everythingU), song("x", 126.0, families = soundFamilies(listOf(g("Deep House", 0.6), g("Tech House", 0.2))))))
+        // Electronic's styles are grouped; any other genre is its own kind; a style not listed is no kind.
+        assertEquals("hard dance", soundFamily(g("Hardcore", 0.5)))
+        assertEquals("rock", soundFamily(g("Hardcore", 0.5, genre = "Rock")))
+        assertEquals("hip hop", soundFamily(g("Trap", 0.5, genre = "Hip Hop")))
+        assertEquals(null, soundFamily(g("Experimental", 0.5)))
+        assertEquals("drum and bass", soundFamily(g("Halftime", 0.7)))
+        // An older Siansa Beats names the style only.
+        assertEquals("trance", soundFamily(SongGenre("Tech Trance", 0.4)))
+        assertTrue(soundFamilies(null).isEmpty())
     }
 
     @Test fun halfAndDoubleTimeAreTheSameTempoOnlyWhereAllowed() {

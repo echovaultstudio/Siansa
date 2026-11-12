@@ -94,6 +94,10 @@ data class DjTrack(
     val energy: Double? = null,
     /** How bright: AudioMuse's happy and party moods, 0..1; null when unknown. */
     val lift: Double? = null,
+    /** AudioMuse's energy as it is, on its own scale: two songs compare by it whatever else is on offer. */
+    val level: Double? = null,
+    /** The kinds of music it is by its sound ([soundFamilies]): each family and how much of it (Siansa Beats' genres). */
+    val families: Map<String, Double> = emptyMap(),
 )
 
 /**
@@ -158,28 +162,64 @@ fun tempoMatch(a: Double?, b: Double?, halfDouble: Boolean = true): Double {
  * them a steady mix had no say over energy, compared tempo with the last song only (half and double time counting
  * as the same), and so drifted: from a mellow 133 BPM song to drum and bass at 174 in two songs, and stayed there.
  *
+ * Tempo alone wasn't enough (the owner's next mix, the same day): from a melodic house song it played minimal techno
+ * at the same tempo, and of the wider lot of songs it picks from, some of the least alike, as only those fit the
+ * tempo. So a song must also sound alike enough, be of the start's kind of music, and near its energy on AudioMuse's
+ * own scale (by rank among the songs on offer, nearly every song was "near").
+ *
  * Surprises loosens them a place at a time, as a DJ taking more risks:
  *
- * |                    | None       | A few      | Some                 | Lots          |
- * |--------------------|------------|------------|----------------------|---------------|
- * | Tempo, of the start| within 6 % | within 10 %| within 15 %, or half or double time | anywhere |
- * | Energy, of the start| near (0.2)| 0.35       | 0.6                  | free          |
- * | Held to the start  | strongly   | loosely    | a little             | not at all    |
- * | Keys               | count most | a lift up counts | as before      | count least   |
+ * |                     | None        | A few       | Some                 | Lots          |
+ * |---------------------|-------------|-------------|----------------------|---------------|
+ * | Tempo, of the start | within 6 %  | within 10 % | within 15 %, or half or double time | anywhere |
+ * | Energy, of the start| within 25 % | within 45 % | within 80 %          | free          |
+ * | How alike it sounds | the most alike half | 0.35 | 0.2                 | any           |
+ * | Kind of music       | the start's | shares one with the start | any  | any           |
+ * | Held to the start   | strongly    | loosely     | a little             | not at all    |
+ * | Keys                | count most  | a lift up counts | as before       | count least   |
  *
  * - [tempo]: how far a song's tempo may be from the start's (a share of it); null for anywhere.
  * - [halfDouble]: whether half and double time count as the same tempo.
- * - [energy]: how far its energy (0..1 by rank) may be from the start's; null for free.
+ * - [energy]: how far its energy ([DjTrack.level]) may be from the start's, as a share ([energyOff]); null for free.
  * - [hold]: how much the start counts next to the last song (0..1): its tempo in the tempo score, and its energy.
  * - [keyWeight], [lift]: how much the keys count, and whether a step up counts as fair ([keyMatch]).
+ * - [likeness]: how alike a song must sound at least ([DjTrack.likeness], 0..1).
+ * - [family]: whether it must be of the start's kind of music ([Family]).
  */
-data class SteadyRails(val tempo: Double?, val halfDouble: Boolean, val energy: Double?, val hold: Double, val keyWeight: Double, val lift: Boolean) {
+data class SteadyRails(
+    val tempo: Double?,
+    val halfDouble: Boolean,
+    val energy: Double?,
+    val hold: Double,
+    val keyWeight: Double,
+    val lift: Boolean,
+    val likeness: Double = 0.0,
+    val family: Family = Family.ANY,
+) {
+    /** How a song's kind of music ([DjTrack.families]) must go with the start's. */
+    enum class Family {
+        /** What it mainly is ([mainFamily]) must be a kind the start is too: techno doesn't follow house. */
+        SAME,
+        /** As [SAME], unless it shares any kind with the start: a house song with some techno in it may follow techno. */
+        SHARED,
+        ANY,
+    }
+
     /** Whether [to] may follow in a mix that started with [start]. A song whose tempo isn't known only where tempo is free. */
     fun allows(start: DjTrack, to: DjTrack): Boolean = off(start, to) == 0.0
 
+    /** Whether [to]'s kind of music goes with [start]'s. Either unknown (no Siansa Beats genres): it does. */
+    fun sameKind(start: DjTrack, to: DjTrack): Boolean {
+        if (family == Family.ANY || start.families.isEmpty()) return true
+        val main = mainFamily(to.families) ?: return true
+        if (main in start.families) return true
+        return family == Family.SHARED && to.families.keys.any { it in start.families }
+    }
+
     /**
-     * How far outside the rails [to] is (0 inside them): what it's over by in tempo and in energy. When too few songs
-     * fit, the nearest outside come in, so the music carries on with the least jump.
+     * How far outside the rails [to] is (0 inside them): what it's over by in tempo and in energy, what it's short of
+     * in likeness, and a whole 1 for another kind of music. When too few songs fit, the nearest outside come in, so
+     * the music carries on with the least jump, and another kind of music comes last.
      */
     fun off(start: DjTrack, to: DjTrack): Double {
         var over = 0.0
@@ -188,29 +228,90 @@ data class SteadyRails(val tempo: Double?, val halfDouble: Boolean, val energy: 
             val there = to.tempo?.takeIf { it > 0 }
             over += if (there == null) 1.0 else (tempoOff(from, there, halfDouble) - tempo).coerceAtLeast(0.0)
         }
-        if (energy != null && start.energy != null && to.energy != null) over += (abs(to.energy - start.energy) - energy).coerceAtLeast(0.0)
+        if (energy != null) energyOff(start.level, to.level)?.let { over += (it - energy).coerceAtLeast(0.0) }
+        over += (likeness - to.likeness).coerceAtLeast(0.0)
+        if (!sameKind(start, to)) over += 1.0
         return over
     }
 
-    /** In a line of the log: "tempo within 6 % of the start, energy within 0.20". */
+    /** In a line of the log: "tempo within 6 % of the start, energy within 25 %, at least 0.50 alike, the start's kind of music". */
     fun inWords(): String = listOfNotNull(
         tempo?.let { "tempo within ${(it * 100).toInt()} % of the start" + if (halfDouble) " (or half or double time)" else "" },
-        energy?.let { "energy within %.2f".format(it) },
+        energy?.let { "energy within ${(it * 100).toInt()} %" },
+        likeness.takeIf { it > 0 }?.let { "at least %.2f alike".format(it) },
+        when (family) {
+            Family.SAME -> "the start's kind of music"
+            Family.SHARED -> "a kind of music shared with the start"
+            Family.ANY -> null
+        },
     ).joinToString().ifEmpty { "no rails" }
 
     companion object {
         /** The rails at a Surprises setting (0..1), by the four places the queue shows (None, A few, Some, Lots). */
         fun of(surprise: Double): SteadyRails = when {
-            surprise < 0.15 -> SteadyRails(0.06, false, 0.2, 1.0, 0.30, false)
-            surprise < 0.40 -> SteadyRails(0.10, false, 0.35, 0.6, 0.25, true)
-            surprise < 0.70 -> SteadyRails(0.15, true, 0.6, 0.25, 0.20, true)
-            else -> SteadyRails(null, true, null, 0.0, 0.10, true)
+            surprise < 0.15 -> SteadyRails(0.06, false, 0.25, 1.0, 0.30, false, 0.5, Family.SAME)
+            surprise < 0.40 -> SteadyRails(0.10, false, 0.45, 0.6, 0.25, true, 0.35, Family.SHARED)
+            surprise < 0.70 -> SteadyRails(0.15, true, 0.8, 0.25, 0.20, true, 0.2, Family.ANY)
+            else -> SteadyRails(null, true, null, 0.0, 0.10, true, 0.0, Family.ANY)
         }
 
         /** When fewer songs than this fit the rails, the nearest outside them fill up to it, so a mix never runs dry. */
         const val AT_LEAST = 5
     }
 }
+
+/**
+ * How far apart two energies are on AudioMuse's own scale, as a share of the lower one (0.25: a quarter more);
+ * null when either isn't known. The same either way round, and whatever the scale's units are.
+ */
+fun energyOff(a: Double?, b: Double?): Double? {
+    if (a == null || b == null || a <= 0 || b <= 0) return null
+    return maxOf(a / b, b / a) - 1
+}
+
+/**
+ * The kinds of music Siansa Beats' styles fall into, for telling a house song from a techno one in a mix. Electronic
+ * music is one genre to Discogs, so its styles are grouped here (the owner's library, 12 Nov: the styles with the
+ * most songs); a style not listed counts as no kind, and is never held against a song. Any other genre (Rock, Hip
+ * Hop, Jazz…) is its own kind.
+ */
+private val ELECTRONIC_FAMILIES: Map<String, String> = buildMap {
+    fun kind(name: String, vararg styles: String) = styles.forEach { put(it.lowercase(), name) }
+    kind("house", "House", "Deep House", "Tech House", "Progressive House", "Electro House", "Euro House", "Tropical House",
+        "Tribal House", "Hard House", "Garage House", "Acid House", "Italo House", "Ghetto House", "Hip-House", "UK Garage",
+        "Speed Garage", "Bassline", "Disco", "Nu-Disco")
+    kind("techno", "Techno", "Deep Techno", "Minimal Techno", "Minimal", "Hard Techno", "Dub Techno", "Schranz", "Acid",
+        "Industrial", "EBM", "Rhythmic Noise", "Bleep")
+    kind("trance", "Trance", "Tech Trance", "Hard Trance", "Progressive Trance", "Goa Trance", "Psy-Trance")
+    kind("drum and bass", "Drum n Bass", "Halftime", "Jungle", "Breakcore", "Juke")
+    kind("breaks and bass", "Dubstep", "Grime", "Breakbeat", "Breaks", "Progressive Breaks", "Big Beat", "Broken Beat", "Electro")
+    kind("hard dance", "Hardcore", "Happy Hardcore", "Hardstyle", "Jumpstyle", "Donk", "Hands Up", "Gabber")
+    kind("calm electronic", "Ambient", "Downtempo", "Drone", "Trip Hop", "Chillwave", "IDM", "Dub", "Abstract", "Glitch")
+    kind("dance pop", "Synth-pop", "Dance-pop", "Eurodance", "Europop", "Italodance", "Italo-Disco", "Euro-Disco", "Hi NRG",
+        "Synthwave", "Electroclash", "Freestyle")
+}
+
+/** The kind of music a genre of Siansa Beats is ([ELECTRONIC_FAMILIES]); null for one that's no kind. */
+fun soundFamily(genre: SongGenre): String? {
+    val style = genre.style.ifBlank { genre.name.substringAfterLast(" / ") }.trim().lowercase()
+    val top = genre.genre.trim()
+    return when {
+        top.isEmpty() || top.equals("Electronic", ignoreCase = true) -> ELECTRONIC_FAMILIES[style]
+        else -> top.lowercase()
+    }
+}
+
+/** A song's kinds of music and how much of each: its genres' scores added up by kind. Empty without genres. */
+fun soundFamilies(genres: List<SongGenre>?): Map<String, Double> {
+    val out = LinkedHashMap<String, Double>()
+    genres?.forEach { g -> soundFamily(g)?.let { out[it] = (out[it] ?: 0.0) + g.score } }
+    return out
+}
+
+/** What a song mainly is: its kind with the most to it, when that's clear ([MAIN_FAMILY] or more); null when it isn't. */
+fun mainFamily(families: Map<String, Double>): String? = families.maxByOrNull { it.value }?.takeIf { it.value >= MAIN_FAMILY }?.key
+
+const val MAIN_FAMILY = 0.5
 
 /**
  * The songs of [pool] a steady mix from [start] may pick from, and how many of them are outside [rails]: the ones
@@ -273,7 +374,12 @@ fun transition(
         (rails?.keyWeight ?: 0.20) * keyMatch(camelot(from.key, from.scale), camelot(to.key, to.scale), lift = rails?.lift ?: false) -
         (if (sameArtist) 0.15 else 0.0) +
         0.4 * s * wild.coerceIn(0.0, 1.0)
-    if (rails != null && start?.energy != null) score += ENERGY_WEIGHT * rails.hold * (to.energy?.let { 1 - abs(it - start.energy) } ?: 0.5)
+    // Pulled towards the start's energy: on AudioMuse's own scale when both are known, else by rank among the songs.
+    if (rails != null && start != null) {
+        val near = energyOff(start.level, to.level)?.let { (1 - it).coerceIn(0.0, 1.0) }
+            ?: start.energy?.let { from -> to.energy?.let { 1 - abs(it - from) } }
+        score += ENERGY_WEIGHT * rails.hold * (near ?: 0.5)
+    }
     if (target != null) score += ENERGY_WEIGHT * (to.energy?.let { 1 - abs(it - target) } ?: 0.5)
     if (bright) score += LIFT_WEIGHT * (to.lift ?: 0.3)
     return score
@@ -478,7 +584,7 @@ class ContinuousPlay(private val graph: AppGraph) {
         fun lift(f: app.siansa.net.TrackFeatures?): Double? = f?.moods?.let { m -> listOfNotNull(m["happy"], m["party"]).takeIf { it.isNotEmpty() }?.average()?.coerceIn(0.0, 1.0) }
         fun track(id: String, artist: String, likeness: Double): DjTrack {
             val f = features[id]
-            return DjTrack(id, artist, likeness, mixTempo(f?.tempo, genres[id]), f?.key, f?.scale, energy[id], lift(f))
+            return DjTrack(id, artist, likeness, mixTempo(f?.tempo, genres[id]), f?.key, f?.scale, energy[id], lift(f), f?.energy, soundFamilies(genres[id]))
         }
         val seed = track(last.id, last.artist, 1.0)
         val begun = start?.let { track(it.id, it.artist, 1.0) }
@@ -494,7 +600,9 @@ class ContinuousPlay(private val graph: AppGraph) {
             AppLog.i(
                 "KeepPlaying",
                 "Steady rails from \"${start?.title}\" (${begun.tempo?.let { "%.0f BPM".format(it) } ?: "tempo unknown"}" +
-                    "${begun.energy?.let { ", energy %.2f".format(it) } ?: ""}): ${allowed.size - outside} of ${pool.size} songs fit " +
+                    "${begun.level?.let { ", energy %.3f".format(it) } ?: ""}" +
+                    "${begun.families.takeIf { it.isNotEmpty() }?.let { f -> ", " + f.entries.joinToString(" and ") { "%s %.2f".format(it.key, it.value) } } ?: ", kind of music unknown"}" +
+                    "): ${allowed.size - outside} of ${pool.size} songs fit " +
                     "(${rails.inWords()})" + (if (outside > 0) ", $outside nearest outside let in so the mix carries on" else "") +
                     ", ${order.size} picked",
             )
@@ -505,7 +613,11 @@ class ContinuousPlay(private val graph: AppGraph) {
                 "${seed.energy?.let { " energy %.2f".format(it) } ?: ""}" +
                 // Where the shape aims the next song, and each song's likeness (issue #798): what decided the next one.
                 "${shape.target(seed.energy, 0)?.let { ", next aimed at energy %.2f".format(it) } ?: ""}: " +
-                order.joinToString { t -> "${t.tempo?.let { "%.0f".format(it) } ?: "?"} ${t.key.orEmpty()}${t.energy?.let { " e%.2f".format(it) } ?: ""} l%.2f".format(t.likeness) },
+                // Each pick's tempo, key, energy (by rank, and AudioMuse's own), likeness and what it mainly is.
+                order.joinToString { t ->
+                    "${t.tempo?.let { "%.0f".format(it) } ?: "?"} ${t.key.orEmpty()}${t.energy?.let { " e%.2f".format(it) } ?: ""}" +
+                        "${t.level?.let { " (%.3f)".format(it) } ?: ""} l%.2f".format(t.likeness) + (mainFamily(t.families)?.let { " $it" } ?: "")
+                },
         )
         return order.map { it.id }
     }
