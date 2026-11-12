@@ -180,6 +180,12 @@ class TvRemoteSweepTest {
                 val body = tag.removeSuffix("-header") + "-body"
                 if (compose.onAllNodesWithTag(body).fetchSemanticsNodes().isEmpty()) {
                     press(KeyEvent.KEYCODE_DPAD_CENTER)
+                    val opened = compose.onAllNodesWithTag(body).fetchSemanticsNodes().isNotEmpty()
+                    path += if (opened) "(opened $body)" else "($body didn't open on OK; focus now on ${focused()?.let(::label)})"
+                    if (!opened) {
+                        press(KeyEvent.KEYCODE_ENTER)
+                        path += if (compose.onAllNodesWithTag(body).fetchSemanticsNodes().isNotEmpty()) "(opened on Enter)" else "(nor on Enter)"
+                    }
                 }
             }
         }
