@@ -8,6 +8,7 @@ import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalDensity
 import android.os.Build
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -139,8 +140,14 @@ private fun TimeMachinePage(nav: NavController) {
             if (value !is Load.Ok) value = Load.Ok(null)
         }
     }
+    // Going to another month keeps the last one on the page, dimmed, until the new one is there: no spinner in
+    // between and nothing jumping (the owner, 12 Nov). The spinner only shows the first time.
+    val shownResult = rememberSettled(result)
+    val shownReport = rememberSettled(report)
+    val waiting = (result is Load.Loading && shownResult !is Load.Loading) || (report is Load.Loading && shownReport !is Load.Loading)
+    val bodyAlpha by animateFloatAsState(if (waiting) WAITING_ALPHA else 1f, tween(200), label = "time-machine-body")
     val songs: @Composable () -> Unit = {
-        LoadBox(result) { tm ->
+        LoadBox(shownResult) { tm ->
             Column {
                 TimeMachineSongs(tm, showMissing, onShowMissing = graph.settings::setTimeMachineMissing, onCreate = { creating = true })
                 TimeMachineSongRows(tm, showMissing)
@@ -151,9 +158,21 @@ private fun TimeMachinePage(nav: NavController) {
     // The top artist of the month or year, behind the header and in the big numbers. Nothing waits for it: the page
     // shows at once, and the picture and its colour fade in when the report (kept on the phone for a finished month)
     // and the picture (kept on the phone once seen) are there. The last one stays while the next month loads.
-    val shown = report.valueOrNull()
+    val shown = shownReport.valueOrNull()
+    // The picture is read into memory first and only then put behind the header, so it fades in whole: put there
+    // straight away it showed an empty box, then popped in (the flashing, 12 Nov).
+    val wanted = shown?.topArtists?.firstOrNull()?.artist?.picture
     var picture by remember { mutableStateOf<String?>(null) }
-    if (report is Load.Ok) picture = shown?.topArtists?.firstOrNull()?.artist?.picture
+    val context = LocalContext.current
+    LaunchedEffect(wanted, report is Load.Loading) {
+        if (report is Load.Loading) return@LaunchedEffect
+        if (wanted == null) { picture = null; return@LaunchedEffect }
+        val id = app.siansa.data.freshArtistCover(wanted, graph.artistPhotos.covers.value)
+        val there = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching { coil3.SingletonImageLoader.get(context).execute(coverRequest(context, graph, id, HEADER_PICTURE)) is coil3.request.SuccessResult }.getOrDefault(false)
+        }
+        picture = if (there) wanted else null
+    }
     val tint = rememberCoverColor(picture)
     val n = remember { java.text.NumberFormat.getIntegerInstance() }
     val summary = shown?.takeIf { it.plays > 0 }?.let { "${n.format(it.plays)} plays · ${n.format(it.minutes / 60)} hours" }
@@ -179,9 +198,9 @@ private fun TimeMachinePage(nav: NavController) {
                     )
                 }
             }
-            item(key = "report-$year-$month") {
-                LoadBox(report) { r ->
-                    Column(Modifier.padding(top = Space.Medium)) {
+            item(key = "report") {
+                LoadBox(shownReport) { r ->
+                    Column(Modifier.padding(top = Space.Medium).alpha(bodyAlpha)) {
                         if (r == null) songs() else ReportBody(r, nav, songs = songs, tint = tint.takeIf { picture != null })
                     }
                 }
@@ -193,8 +212,30 @@ private fun TimeMachinePage(nav: NavController) {
     }
 }
 
-/** How soft the top artist's picture is behind the time machine's header. */
+/** How soft the top artist's picture is behind the time machine's header, and the size it's asked for. */
 private val HEADER_BLUR = 48.dp
+private const val HEADER_PICTURE = 300
+
+/** How much of a bright picture shows behind the header: the rest is the page, so white words stay easy to read. */
+private const val HEADER_PICTURE_ALPHA = 0.7f
+
+/** How faint the last month is while the next one loads. */
+private const val WAITING_ALPHA = 0.4f
+
+/**
+ * [load], or while it's loading, what it was before: a page keeps showing the last thing it had instead of a spinner.
+ * Loading only shows through when there was nothing before.
+ */
+@Composable
+internal fun <T> rememberSettled(load: Load<T>): Load<T> {
+    val last = remember { arrayOfNulls<Any>(1) }
+    val settled = settledLoad(load, @Suppress("UNCHECKED_CAST") (last[0] as Load<T>?))
+    last[0] = settled
+    return settled
+}
+
+/** What [rememberSettled] shows: [load] itself, unless it's loading and there's a [last] one to keep. */
+internal fun <T> settledLoad(load: Load<T>, last: Load<T>?): Load<T> = if (load is Load.Loading && last != null) last else load
 
 /**
  * The time machine's header: the top artist's [picture], soft and dark, fading into the page, with back and
@@ -207,15 +248,16 @@ private fun TimeMachineHeader(nav: NavController, picture: String?, tint: Color,
     val page = MaterialTheme.colorScheme.background
     Box(Modifier.fillMaxWidth().clipToBounds()) {
         Box(Modifier.matchParentSize().listeningBackdrop(page))
-        Crossfade(picture, Modifier.matchParentSize(), animationSpec = tween(450), label = "time-machine-artist") { id ->
+        Crossfade(picture, Modifier.matchParentSize(), animationSpec = tween(600), label = "time-machine-artist") { id ->
             if (id != null) {
                 Box(Modifier.fillMaxSize()) {
                     if (Build.VERSION.SDK_INT >= 31) {
-                        Cover(id, 300, Modifier.fillMaxSize().blur(HEADER_BLUR), RectangleShape)
+                        Box(Modifier.fillMaxSize().background(page))
+                        Cover(id, HEADER_PICTURE, Modifier.fillMaxSize().alpha(HEADER_PICTURE_ALPHA).blur(HEADER_BLUR), RectangleShape)
                     } else {
                         Box(Modifier.fillMaxSize().background(page).background(Brush.verticalGradient(listOf(tint, page))))
                     }
-                    Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0f to page.copy(alpha = 0.30f), 0.45f to page.copy(alpha = 0.50f), 0.8f to page.copy(alpha = 0.88f), 1f to page)))
+                    Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0f to page.copy(alpha = 0.35f), 0.45f to page.copy(alpha = 0.55f), 0.8f to page.copy(alpha = 0.9f), 1f to page)))
                 }
             }
         }

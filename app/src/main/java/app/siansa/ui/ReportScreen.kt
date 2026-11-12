@@ -53,6 +53,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -226,7 +227,10 @@ internal fun ReportBody(r: ListeningReport, nav: NavController, songs: (@Composa
         }
     }
 
-    ListeningClock(r.byHour, r.peakHour)
+    // With a tint (the time machine), the clock's bars and "Less of" take the artist's colour, light enough to read,
+    // instead of violet: one colour down the whole page, with amber for what stands out.
+    val second = tint?.let { reportInk(it) } ?: Brand.Violet
+    ListeningClock(r.byHour, r.peakHour, second)
 
     // How your taste moved against the period before.
     if (r.rising.isNotEmpty() || r.fading.isNotEmpty() || r.genresUp.isNotEmpty() || r.genresDown.isNotEmpty()) {
@@ -251,8 +255,8 @@ internal fun ReportBody(r: ListeningReport, nav: NavController, songs: (@Composa
             Chips(r.genresUp, Accent.copy(alpha = 0.18f))
         }
         if (r.fading.isNotEmpty() || r.genresDown.isNotEmpty()) {
-            Label(Icons.AutoMirrored.Rounded.TrendingDown, "Less of", Brand.Violet)
-            Chips(r.fading + r.genresDown, Brand.Violet.copy(alpha = 0.16f))
+            Label(Icons.AutoMirrored.Rounded.TrendingDown, "Less of", second)
+            Chips(r.fading + r.genresDown, second.copy(alpha = 0.16f))
         }
     }
 
@@ -263,6 +267,12 @@ internal fun ReportBody(r: ListeningReport, nav: NavController, songs: (@Composa
         modifier = Modifier.padding(horizontal = Space.Page, vertical = Space.Section),
     )
 }
+
+/**
+ * The time machine's second colour, beside amber: the top artist's colour ([tint], often deep) made light enough
+ * for bars and words on the dark page, halfway to white.
+ */
+internal fun reportInk(tint: Color): Color = lerp(tint.copy(alpha = 1f), Color.White, 0.5f)
 
 /** How strongly the top artist's colour washes the first two big numbers, and the two under them. */
 internal const val TILE_WASH = 0.38f
@@ -327,7 +337,7 @@ private fun ArtistPhoto(a: RankedArtist, sizeDp: Int) {
 
 /** Plays across the day as 24 bars, with the busiest hour lit and a name for the habit. */
 @Composable
-private fun ListeningClock(byHour: IntArray, peak: Int?) {
+private fun ListeningClock(byHour: IntArray, peak: Int?, bars: Color) {
     if (byHour.sum() == 0) return
     SectionTitle("Your listening clock")
     val persona = when (peak) {
@@ -354,7 +364,7 @@ private fun ListeningClock(byHour: IntArray, peak: Int?) {
         byHour.forEachIndexed { hour, count ->
             val h = (count.toFloat() / max) * size.height
             drawRoundRect(
-                color = if (hour == peak) accent else if (count > 0) Brand.Violet.copy(alpha = 0.75f) else faint,
+                color = if (hour == peak) accent else if (count > 0) bars.copy(alpha = 0.75f) else faint,
                 topLeft = Offset(hour * (barWidth + gap), size.height - h.coerceAtLeast(2f)),
                 size = Size(barWidth, h.coerceAtLeast(2f)),
                 cornerRadius = CornerRadius(barWidth / 3, barWidth / 3),

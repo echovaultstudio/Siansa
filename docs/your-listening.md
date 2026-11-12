@@ -12,8 +12,8 @@ else Koito, your server's play counts and Siansa's own history. They don't need 
 Any month or year you played music, laid out like Your month: minutes, plays, artists and songs at the top, your
 top artists with their plays, your top songs, top albums, your listening clock and how your taste moved against
 the month or year before. The top shows the month or year in big letters, what you played and who you played most,
-on a soft picture of that artist; the four numbers take that artist's colour. The page opens at once and the picture
-fades in. The songs come from Siansa Beats, Koito and Last.fm (whichever you scrobble to),
+on a soft picture of that artist; the four numbers take that artist's colour. The listening clock and "Less of" take that colour too. The page opens at once and the picture
+fades in; going to another month keeps the last one on the page, dimmed, until the new one is there. The songs come from Siansa Beats, Koito and Last.fm (whichever you scrobble to),
 otherwise Siansa's own history; the rest comes from Siansa Beats, else Koito, else Siansa's own history, so with
 only Last.fm an older month may show just its songs. With **Scrobble to Siansa Beats** on, nothing else needs
 setting up: Siansa Beats keeps the history, including what you imported there from Koito or Last.fm. A song counts as in your library when its title and artist match, on any album: a remastered, mono, single
