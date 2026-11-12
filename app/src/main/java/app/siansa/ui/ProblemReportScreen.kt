@@ -123,7 +123,7 @@ fun ProblemReportScreen(nav: NavController) {
                         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                     }) { Text("Open the issue") }
                 }
-                OutlinedButton(onClick = { nav.popBackStack() }, modifier = Modifier.focusRing()) { Text("Done") }
+                OutlinedButton(onClick = { nav.popBackStack() }, modifier = Modifier.tvFocusGroup().focusRing()) { Text("Done") }
             } else {
                 ReportBody(
                     happened = happened,
@@ -216,7 +216,7 @@ internal fun ReportBody(
             Text("I made the problem happen a few times with debug logs on", style = MaterialTheme.typography.bodyMedium)
         }
         error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium) }
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.tvFocusGroup(), verticalAlignment = Alignment.CenterVertically) {
             Button(onClick = onSend, enabled = ready && !busy, modifier = Modifier.focusRing().testTag("report-send")) { Text("Send report") }
             if (busy) {
                 Spacer(Modifier.width(Space.Medium))

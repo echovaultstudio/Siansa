@@ -251,14 +251,15 @@ fun ConnectionsHub(nav: NavController, open: String? = null) {
                             )
                         }
                         Button(onClick = ::save, modifier = Modifier.focusRing().fillMaxWidth().testTag("saveUser-${user.id}")) { Text("Save") }
-                        Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+                        Row(Modifier.tvFocusGroup(), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
                             Button(onClick = { scope.launch { if (keysChecked() && saveOther(user)) Users.switchTo(context, user.id) } }, modifier = Modifier.focusRing()) { Text("Switch to it") }
                             OutlinedButton(onClick = { removing = user }, modifier = Modifier.focusRing()) { Text("Remove") }
                         }
                     }
                 }
             }
-            FoldCard(
+            // The TV has no books (issue #860; the owner, 12 Nov): Audiobookshelf is set up on the phone.
+            if (!app.siansa.BuildConfig.TV_APP) FoldCard(
                 icon = Icons.AutoMirrored.Rounded.MenuBook,
                 title = "Audiobookshelf",
                 subtitle = absLine(draft.booksReady),
@@ -457,7 +458,7 @@ private fun ServerFields(
         Field("Proxy username", draft.proxyUser, keyboard = KeyboardType.Text) { onChange(draft.copy(proxyUser = it)) }
         SecretField("Proxy password", draft.proxyPassword) { onChange(draft.copy(proxyPassword = it)) }
     } else {
-        TextButton(onClick = { showProxy = true }, modifier = Modifier.focusRing()) { Text("Server behind a login page? Add a proxy login") }
+        Box(Modifier.tvFocusGroup()) { TextButton(onClick = { showProxy = true }, modifier = Modifier.focusRing()) { Text("Server behind a login page? Add a proxy login") } }
     }
     TestRow(result) {
         test(graph, draft, scope, { result = it }, "the music server") { s -> testServer(graph, s, kind) }
@@ -679,7 +680,7 @@ internal fun AiFields(graph: AppGraph, draft: AppSettings, onChange: (AppSetting
     val scope = rememberCoroutineScope()
     var result by remember { mutableStateOf<String?>(null) }
     Hint("Optional: writes the mix titles and sound searches. Only the vibe's guidance, the time and your last 20 plays are sent.")
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.Small), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
+    FlowRow(Modifier.tvFocusGroup(), horizontalArrangement = Arrangement.spacedBy(Space.Small), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
         AiProvider.entries.forEach { p ->
             FilterChip(
                 selected = draft.aiProvider == p,
@@ -721,7 +722,7 @@ internal fun absLine(ready: Boolean): String = if (ready) "Audiobooks and podcas
 @Composable
 internal fun ServerKindChips(kind: SourceKind, onKind: (SourceKind) -> Unit) {
     Text("Server type", style = MaterialTheme.typography.bodyLarge)
-    FlowRow(Modifier.testTag("serverKinds"), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+    FlowRow(Modifier.tvFocusGroup().testTag("serverKinds"), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
         SourceKind.entries.filter { it.ready }.forEach { k ->
             FilterChip(selected = kind == k, onClick = { onKind(k) }, label = { Text(k.label) }, modifier = Modifier.testTag("serverKind-${k.name}"))
         }
@@ -732,7 +733,7 @@ internal fun ServerKindChips(kind: SourceKind, onKind: (SourceKind) -> Unit) {
 @Composable
 internal fun NewServerButtons(onSave: () -> Unit, onCancel: () -> Unit) {
     Hint("Saved, it shows above as another login. Switch to it there when you want to use it (Siansa restarts).")
-    Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+    Row(Modifier.tvFocusGroup(), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
         Button(onClick = onSave, modifier = Modifier.focusRing().testTag("saveNewServer")) { Text("Save") }
         OutlinedButton(onClick = onCancel, modifier = Modifier.focusRing()) { Text("Cancel") }
     }

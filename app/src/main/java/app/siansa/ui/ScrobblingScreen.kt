@@ -159,7 +159,7 @@ fun ScrobblingScreen(nav: NavController) {
             Secret("Shared secret", lfmSecret) { lfmSecret = it }
             Field("Last.fm username", lfmUser) { lfmUser = it }
             Secret("Last.fm password (used once to sign in, not stored)", lfmPassword) { lfmPassword = it }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
+            Row(Modifier.tvFocusGroup(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
                 Button(modifier = Modifier.focusRing(), onClick = {
                     result({ lfmStatus = it }) {
                         val session = graph.lastFm.mobileSession(lfmKey.trim(), lfmSecret.trim(), lfmUser.trim(), lfmPassword)
@@ -236,11 +236,14 @@ fun ScrobblingScreen(nav: NavController) {
             lbStatus?.let { Status(it) }
             }
 
-            HorizontalDivider()
             // Your listening's Time Machine (issue #780): its option was only on its own page; it stays there too.
-            FoldSection("Time Machine", if (settings.timeMachineMissing) "Shows songs not in your library" else "Only songs in your library") {
-                SwitchRow("Show songs not in your library", settings.timeMachineMissing) { graph.settings.setTimeMachineMissing(it) }
-                Hint("Songs you played back then that aren't in your library now are listed too, marked, so you can find them again.")
+            // The TV has no Time Machine (the owner, 12 Nov), so nothing to set.
+            if (!app.siansa.BuildConfig.TV_APP) {
+                HorizontalDivider()
+                FoldSection("Time Machine", if (settings.timeMachineMissing) "Shows songs not in your library" else "Only songs in your library") {
+                    SwitchRow("Show songs not in your library", settings.timeMachineMissing) { graph.settings.setTimeMachineMissing(it) }
+                    Hint("Songs you played back then that aren't in your library now are listed too, marked, so you can find them again.")
+                }
             }
         }
     }
@@ -292,7 +295,7 @@ private fun Secret(label: String, value: String, onChange: (String) -> Unit) {
 /** "25%" … "90%": how much of a song must be heard before it's sent (issue #270). */
 @Composable
 internal fun ScrobblePercentChips(selected: Int, onPick: (Int) -> Unit) {
-    Row(Modifier.horizontalScroll(rememberScrollState()).testTag("scrobblePercent"), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+    Row(Modifier.tvFocusGroup().horizontalScroll(rememberScrollState()).testTag("scrobblePercent"), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
         SCROBBLE_PERCENTS.forEach { p ->
             FilterChip(
                 selected = selected == p,

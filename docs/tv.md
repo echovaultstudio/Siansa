@@ -119,7 +119,9 @@ The TV has the settings that matter on a TV, each the same page as on the phone:
   player.
 - **Sign out** of the server on the TV; your phone stays signed in.
 
-Downloads, mobile data, Android Auto, the mini player, arranging Home, cards and backups are on the phone only.
+Downloads, mobile data, Android Auto, the mini player, arranging Home, cards and backups are on the phone only, and so
+are their settings: the TV's pages leave out what it can't use (the Time Machine's option, the book player's skips,
+Audiobookshelf, the mobile-data quality).
 
 ## Reporting a problem
 

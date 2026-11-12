@@ -269,11 +269,13 @@ fun PlaybackSettingsScreen(nav: NavController) {
             HorizontalDivider()
             // Each section folds (issue #776); open by default, folded ones stay folded (issue #780). Streaming quality
             // is here, as it's what you hear (v1.0, the owner); loading ahead and the caches are under Data.
-            FoldSection("Streaming quality", "Wi-Fi ${qualityLabel(settings.transcodeWifiKbps)} · mobile ${qualityLabel(settings.transcodeMobileKbps)}") {
+            // A TV has no mobile data (the owner, 12 Nov): only the Wi-Fi quality, without "On Wi-Fi".
+            val tv = app.siansa.BuildConfig.TV_APP
+            FoldSection("Streaming quality", if (tv) qualityLabel(settings.transcodeWifiKbps) else "Wi-Fi ${qualityLabel(settings.transcodeWifiKbps)} · mobile ${qualityLabel(settings.transcodeMobileKbps)}") {
                 Hint(ServerWords.streamingHint(settings.sourceKind))
-                QualityRow("On Wi-Fi", settings.transcodeWifiKbps) { graph.settings.save(graph.settings.current.copy(transcodeWifiKbps = it)) }
-                QualityRow("On mobile data", settings.transcodeMobileKbps) { graph.settings.save(graph.settings.current.copy(transcodeMobileKbps = it)) }
-                Hint("Siansa always plays the quality chosen here; it never switches on its own. On a slow connection, pick Opus for mobile data.")
+                QualityRow(if (tv) null else "On Wi-Fi", settings.transcodeWifiKbps) { graph.settings.save(graph.settings.current.copy(transcodeWifiKbps = it)) }
+                if (!tv) QualityRow("On mobile data", settings.transcodeMobileKbps) { graph.settings.save(graph.settings.current.copy(transcodeMobileKbps = it)) }
+                Hint(if (tv) "Siansa always plays the quality chosen here; it never switches on its own." else "Siansa always plays the quality chosen here; it never switches on its own. On a slow connection, pick Opus for mobile data.")
             }
             HorizontalDivider()
             FoldSection("Song radio", settings.radioDrift.label) {
@@ -295,15 +297,17 @@ fun PlaybackSettingsScreen(nav: NavController) {
                     WindDownChips(settings.windDownSongs) { graph.settings.save(graph.settings.current.copy(windDownSongs = it)) }
                 }
             }
-            HorizontalDivider()
             // The book player's skips (v1.0, the owner: was its own page, Audiobooks and podcasts). The Audiobookshelf
-            // server itself is under Connections.
+            // server itself is under Connections. The TV has no books (issue #860), so nothing to set there.
+            if (!tv) {
+            HorizontalDivider()
             FoldSection("Audiobooks and podcasts", "Back ${settings.bookSkipBackSec} s · forward ${settings.bookSkipForwardSec} s") {
                 Hint("How far the book player's skip buttons jump.")
                 Text("Back", style = MaterialTheme.typography.bodyMedium)
                 SkipChips(settings.bookSkipBackSec, "bookSkipBack") { graph.settings.save(graph.settings.current.copy(bookSkipBackSec = it)) }
                 Text("Forward", style = MaterialTheme.typography.bodyMedium)
                 SkipChips(settings.bookSkipForwardSec, "bookSkipForward") { graph.settings.save(graph.settings.current.copy(bookSkipForwardSec = it)) }
+            }
             }
         }
     }
@@ -312,7 +316,7 @@ fun PlaybackSettingsScreen(nav: NavController) {
 /** 10 to 90 seconds for a book player's skip (issue #521). */
 @Composable
 internal fun SkipChips(selected: Int, tag: String, onPick: (Int) -> Unit) {
-    Row(Modifier.horizontalScroll(rememberScrollState()).testTag(tag), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+    Row(Modifier.tvFocusGroup().horizontalScroll(rememberScrollState()).testTag(tag), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
         AppSettings.BOOK_SKIP_CHOICES.forEach { n ->
             FilterChip(
                 selected = selected == n,
@@ -327,7 +331,7 @@ internal fun SkipChips(selected: Int, tag: String, onPick: (Int) -> Unit) {
 /** "Stay close", "A little", "Wander": how far a song radio may go from its song (issue #256). */
 @Composable
 internal fun RadioDriftChips(selected: RadioDrift, onPick: (RadioDrift) -> Unit) {
-    Row(Modifier.horizontalScroll(rememberScrollState()).testTag("radioDrift"), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+    Row(Modifier.tvFocusGroup().horizontalScroll(rememberScrollState()).testTag("radioDrift"), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
         RadioDrift.entries.forEach { drift ->
             FilterChip(
                 selected = selected == drift,
@@ -342,7 +346,7 @@ internal fun RadioDriftChips(selected: RadioDrift, onPick: (RadioDrift) -> Unit)
 /** Off, Steady or DJ: what plays when the queue is about to end (issue #337). */
 @Composable
 internal fun ContinuousChips(selected: ContinuousMode, onPick: (ContinuousMode) -> Unit) {
-    Row(Modifier.horizontalScroll(rememberScrollState()).testTag("continuousPlay"), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+    Row(Modifier.tvFocusGroup().horizontalScroll(rememberScrollState()).testTag("continuousPlay"), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
         ContinuousMode.entries.forEach { mode ->
             FilterChip(
                 selected = selected == mode,
@@ -366,7 +370,7 @@ internal fun continuousHint(mode: ContinuousMode, audioMuseReady: Boolean, djPro
 /** 10, 20 or 30 calm songs for a wind down without a timer (issue #330). */
 @Composable
 internal fun WindDownChips(selected: Int, onPick: (Int) -> Unit) {
-    Row(Modifier.horizontalScroll(rememberScrollState()).testTag("windDownSongs"), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+    Row(Modifier.tvFocusGroup().horizontalScroll(rememberScrollState()).testTag("windDownSongs"), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
         AppSettings.WIND_DOWN_CHOICES.forEach { n ->
             FilterChip(
                 selected = selected == n,
@@ -382,7 +386,7 @@ internal fun WindDownChips(selected: Int, onPick: (Int) -> Unit) {
 @Composable
 internal fun PreloadRow(label: String, value: Int, tag: String, choices: IntRange = Preload.CHOICES, onPick: (Int) -> Unit) {
     Text(label, style = MaterialTheme.typography.bodyLarge)
-    Row(Modifier.horizontalScroll(rememberScrollState()).testTag(tag), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+    Row(Modifier.tvFocusGroup().horizontalScroll(rememberScrollState()).testTag(tag), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
         choices.forEach { n ->
             FilterChip(
                 selected = value == n,
@@ -402,9 +406,9 @@ private val qualities = listOf(0, 96, 128, 160, 192, 256, 320)
 internal fun qualityLabel(kbps: Int): String = if (kbps == 0) "Original" else "Opus $kbps"
 
 @Composable
-private fun QualityRow(label: String, value: Int, onPick: (Int) -> Unit) {
-    Text(label, style = MaterialTheme.typography.bodyLarge)
-    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+private fun QualityRow(label: String?, value: Int, onPick: (Int) -> Unit) {
+    if (label != null) Text(label, style = MaterialTheme.typography.bodyLarge)
+    Row(Modifier.tvFocusGroup().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
         qualities.forEach { kbps ->
             FilterChip(
                 selected = value == kbps,
@@ -475,7 +479,7 @@ fun StreamingDataScreen(nav: NavController) {
                 )
             }
             Text("Maximum size", style = MaterialTheme.typography.bodyLarge)
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+            Row(Modifier.tvFocusGroup().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
                 songCacheSizes.forEach { mb ->
                     FilterChip(
                         selected = settings.songCacheMb == mb,
@@ -600,6 +604,7 @@ fun LogsScreen(nav: NavController) {
                             "Share sends a ZIP with the log, the same entries as data for tools, and what's in it.",
                     )
                     androidx.compose.foundation.layout.FlowRow(
+                        Modifier.tvFocusGroup(),
                         horizontalArrangement = Arrangement.spacedBy(Space.Small),
                         verticalArrangement = Arrangement.spacedBy(Space.Small),
                     ) {
@@ -681,7 +686,7 @@ fun LogsScreen(nav: NavController) {
                     val all = entries.valueOrNull().orEmpty()
                     val errors = all.count { it.level == "E" }
                     val warnings = all.count { it.level == "W" }
-                    Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+                    Row(Modifier.tvFocusGroup(), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
                         FilterChip(selected = !problemsOnly, onClick = { problemsOnly = false }, label = { Text("Everything") })
                         FilterChip(
                             selected = problemsOnly,

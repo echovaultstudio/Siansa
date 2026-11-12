@@ -33,6 +33,7 @@ android {
         // The TV app plays through the new audio engine (issue #826), the engine v1.0 brings to everyone.
         buildConfigField("boolean", "MIXER_ENGINE", "true")
         buildConfigField("boolean", "TV_APP", "true")
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         val castReceiverId = (System.getenv("CAST_RECEIVER_ID")?.takeIf { it.isNotBlank() }
             ?: providers.gradleProperty("siansa.castReceiverId").orNull).orEmpty().filter { it.isLetterOrDigit() }
         buildConfigField("String", "CAST_RECEIVER_ID", "\"$castReceiverId\"")
@@ -151,6 +152,14 @@ dependencies {
     implementation("com.google.zxing:core:3.5.3")
 
     testImplementation("junit:junit:4.13.2")
+
+    // The remote sweep on a TV emulator (src/androidTest, .github/workflows/tv-tests.yml), at the phone app's versions.
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test:rules:1.6.1")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation(composeBom)
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
 
 kotlin {
