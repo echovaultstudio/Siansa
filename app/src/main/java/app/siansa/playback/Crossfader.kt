@@ -193,12 +193,13 @@ internal class Crossfader(
             return LOOK_MS
         }
         val position = main.currentPosition
-        val maxMs = s.crossfadeSeconds * 1000L
-        val beatMatch = s.crossfade == CrossfadeMode.SMART && s.beatMatch.appliesTo(inDjRadio())
+        val blending = Blending.of(s)
+        val maxMs = blending.maxMs
+        val beatMatch = Blending.beatMatched(s, inDjRadio())
         // The end a smart fade leaves out (silence, a long fade-out; issue #628) comes off the time left.
         val cut = if (s.crossfade == CrossfadeMode.SMART) Crossfade.endCut(profiles.cached(item.mediaId), duration, maxMs).first else 0L
         // A beat-matched blend has its own length in bars (issue #759), often longer than the crossfade length.
-        val beatLook = if (beatMatch) max(maxMs, profiles.cached(item.mediaId)?.outro?.let { BeatMatch.maxMsFor(it, s.blendBars) } ?: 0L) else maxMs
+        val beatLook = if (beatMatch) max(maxMs, profiles.cached(item.mediaId)?.outro?.let { BeatMatch.maxMsFor(it, TechniquePicker.lookBars(s.crossfade == CrossfadeMode.SMART, blending.blendBars)) } ?: 0L) else maxMs
         // A blend after the last beat can be longer than the setting: it's planned early enough for that.
         val lookMs = if (s.crossfade == CrossfadeMode.SMART && profiles.cached(item.mediaId)?.beatsUntilMs != null) max(beatLook, Crossfade.AFTER_BEAT_MAX_MS) else beatLook
         if (duration - cut - position > lookMs + PREPARE_MS) {
@@ -219,7 +220,7 @@ internal class Crossfader(
                 currentProfile = profiles.cached(current.id),
                 nextProfile = profiles.cached(next.id),
                 beatMatch = beatMatch,
-                blendBars = s.blendBars,
+                blendBars = blending.blendBars,
             )
             if (planned == null || planned.coldEnd) {
                 // A cold end's pause needs the new audio engine (issue #826): here the two songs play back to back.
@@ -399,7 +400,7 @@ internal class Crossfader(
         stopEasing()
         baseSpeed = main.playbackParameters.speed.takeIf { it > 0f } ?: 1f
         phase = Phase.FADING
-        if (planned.beat != null && settings().echoTail) openEcho(t)
+        if (planned.beat != null && Blending.of(settings()).echoTail) openEcho(t)
         val wasPrimed = primed && t.isPlaying
         val drift = t.currentPosition - main.currentPosition
         // Out of step at the handover, the two copies blend apart for a moment, heard as a smear or a wobble
@@ -419,6 +420,7 @@ internal class Crossfader(
             "Fading ${item.mediaId} into ${main.getMediaItemAt(nextIndex).mediaId}: ${planned.why} · " +
                 if (wasPrimed) "tail in step (${if (drift >= 0) "+" else ""}$drift ms)$catchUp" else "tail started now (not primed in time)",
         )
+        LastBlend.record(item.mediaId, main.getMediaItemAt(nextIndex).mediaId, t.currentPosition, planned, dj = inDjRadio())
         handler.post(fadeTick)
     }
 
@@ -452,7 +454,7 @@ internal class Crossfader(
                     if (beat != null) {
                         // The bass swap (issue #807) starts with the next song's low end held back; it comes in as
                         // the old song's goes, over the first half of the blend.
-                        if (settings().bassSwap) {
+                        if (Blending.of(settings()).bassSwap) {
                             mainDeck.shelfDb = DeckFilter.SHELF_START_DB
                             AppLog.d("Crossfade", "Bass swap over the first ${SWAP_FRACTION_PERCENT} % of the blend: next song's bass held back ${-DeckFilter.SHELF_START_DB.toInt()} dB, old song's cut up to ${DeckFilter.LOW_CUT_HZ.toInt()} Hz")
                         }
@@ -479,10 +481,10 @@ internal class Crossfader(
                 t.volume = if (tailDone) 0f else tailBase * sleep * Crossfade.fadeOut(out)
                 val beat = planned.beat
                 if (beat != null && reverb != null) echo(t, planned, beat, tailDone, tailBase * sleep)
-                if (beat != null && settings().bassSwap) swapBass(out)
+                if (beat != null && Blending.of(settings()).bassSwap) swapBass(out)
                 val heard = if (main.currentMediaItemIndex == incomingIndex) (main.currentPosition - (beat?.incomingStartMs ?: 0L)).coerceAtLeast(0L) else 0L
                 val fadedIn = (heard.toFloat() / planned.fadeInMs).coerceIn(0f, 1f)
-                level = Crossfade.fadeIn(fadedIn)
+                level = if (planned.buildUp) Crossfade.buildIn(fadedIn) else Crossfade.fadeIn(fadedIn)
                 onLevel()
                 if (beat != null && !tailDone) keepInStep(beat, t)
                 // Done when both are (and the echo has rung out); or anyway a while after the old song ended, if the
@@ -619,7 +621,7 @@ internal class Crossfader(
      * 1 for music) stays stretched, so only the blend's shift moves the pitch: at most 0.7 of a semitone at 4 %.
      */
     private fun setSpeed(player: ExoPlayer, speed: Float) {
-        val wanted = BeatMatch.parameters(speed, baseSpeed, settings().keepKey)
+        val wanted = BeatMatch.parameters(speed, baseSpeed, Blending.of(settings()).keepKey)
         if (player.playbackParameters != wanted) player.playbackParameters = wanted
     }
 

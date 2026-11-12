@@ -593,7 +593,13 @@ class EmbyApi(
 
     // ---- Reading Emby's items ----
 
-    private fun hasImage(o: JsonObject): Boolean = o.obj("ImageTags")?.containsKey("Primary") == true
+    private fun hasImage(o: JsonObject): Boolean {
+        val tag = o.obj("ImageTags")?.str("Primary") ?: return o.obj("ImageTags")?.containsKey("Primary") == true
+        // The picture's tag changes when the picture does: an album, artist or playlist seen with a new one has its
+        // kept covers fetched fresh (CoverVersions.seen). Songs follow their album's, below.
+        if (o.str("Type") != "Audio") app.siansa.covers.CoverVersions.seen(o.str("Id"), tag)
+        return true
+    }
 
     /**
      * The id whose picture is the song's cover: its own; else its album's, when the album has one
@@ -603,6 +609,7 @@ class EmbyApi(
     private fun songCover(o: JsonObject): String? = when {
         hasImage(o) -> o.str("Id")
         o.str("AlbumPrimaryImageTag") != null -> o.str("AlbumId")
+            .also { app.siansa.covers.CoverVersions.seen(it, o.str("AlbumPrimaryImageTag")) }
         else -> o.str("ParentId")?.takeIf { it != o.str("AlbumId") } ?: o.str("AlbumId")
     }
 

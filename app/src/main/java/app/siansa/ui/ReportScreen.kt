@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -46,6 +47,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -57,6 +61,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import app.siansa.mix.ListeningReport
+import app.siansa.data.picture
 import app.siansa.mix.RankedArtist
 import app.siansa.mix.ReportRange
 import java.text.NumberFormat
@@ -72,18 +77,24 @@ fun ReportScreen(nav: NavController, rangeId: String) {
 private fun ReportPage(nav: NavController, rangeId: String) {
     val graph = LocalGraph.current
     var range by rememberSaveable { mutableStateOf(ReportRange.of(rangeId)) }
-    // Another range shows the loading circle straight away, not the last report (like the time machine).
     val report by loadStateFresh(range) { graph.insights.report(range) }
+    // Another range keeps the last report on the page, dimmed, until the new one is there (like the time machine):
+    // no spinner in between and nothing jumping. The spinner only shows the first time.
+    val shownReport = rememberSettled(report)
+    val waiting = report is Load.Loading && shownReport !is Load.Loading
+    val bodyAlpha by animateFloatAsState(if (waiting) WAITING_ALPHA else 1f, tween(120), label = "report-body")
+
+    // The period's top artist behind the header, as on the time machine (the owner, 12 Nov: one look for all the
+    // listening pages). Nothing waits for it: the picture fades in when it's in memory, the last one staying meanwhile.
+    val r = shownReport.valueOrNull()
+    val picture = rememberHeaderPicture(r?.topArtists?.firstOrNull()?.artist?.picture, report is Load.Loading)
+    val tint = rememberHeaderTint(picture, "report-tint")
 
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomBarPadding(Space.Large))) {
             item {
-                val r = report.valueOrNull()
-                ListeningHeader(nav, r?.title ?: "Your listening", r?.subtitle.orEmpty()) {
-                    Row(
-                        Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = Space.Page).padding(top = Space.Medium),
-                        horizontalArrangement = Arrangement.spacedBy(Space.Small),
-                    ) {
+                PictureHeader(nav, listOfNotNull(picture), tint) {
+                    ReportTitle(r?.title ?: "Your listening", r?.subtitle.orEmpty()) {
                         listOf(
                             ReportRange.THIS_MONTH to "This month",
                             ReportRange.LAST_MONTH to "Last month",
@@ -96,10 +107,31 @@ private fun ReportPage(nav: NavController, rangeId: String) {
                     }
                 }
             }
-            item {
-                LoadBox(report) { r -> Column { ReportBody(r, nav) } }
+            item(key = "report") {
+                LoadBox(shownReport) { r -> Column(Modifier.padding(top = Space.Medium).alpha(bodyAlpha)) { ReportBody(r, nav) } }
             }
         }
+    }
+}
+
+/**
+ * Your listening's header words, laid out as the time machine's: the page's name small, the period big ("Your October")
+ * with its line under it, then the [ranges] chips, one even gap apart.
+ */
+@Composable
+internal fun ReportTitle(title: String, subtitle: String, ranges: @Composable RowScope.() -> Unit) {
+    Column(Modifier.fillMaxWidth().testTag("reportHeader"), verticalArrangement = Arrangement.spacedBy(TIME_MACHINE_GAP)) {
+        HeaderKicker("YOUR LISTENING", Modifier.testTag("reportName"))
+        Column(Modifier.fillMaxWidth().padding(horizontal = Space.Page).testTag("reportTitle"), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
+            Text(title, style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Black, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            // Always a line, also while it's empty, so the chips don't jump when the report arrives.
+            Text(subtitle, style = MaterialTheme.typography.titleMedium, color = Color.White.copy(alpha = 0.85f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        Row(
+            Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = Space.Page).testTag("ranges"),
+            horizontalArrangement = Arrangement.spacedBy(Space.Small),
+            content = ranges,
+        )
     }
 }
 
@@ -125,18 +157,7 @@ internal fun ReportBody(r: ListeningReport, nav: NavController, songs: (@Composa
     }
     val n = NumberFormat.getIntegerInstance()
 
-    // The big numbers.
-    Column(Modifier.padding(horizontal = Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
-        // Every tile the same size, with or without a line under its label (issue #325).
-        Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
-            StatTile(n.format(r.minutes), "minutes listened", "${n.format(r.minutes / 60)} hours", Modifier.weight(1f).fillMaxHeight(), Brand.AmberDeep)
-            StatTile(n.format(r.plays), "plays", null, Modifier.weight(1f).fillMaxHeight(), Brand.VioletDeep)
-        }
-        Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
-            StatTile(n.format(r.artistCount), "artists", r.newArtists?.let { "$it new to you" }, Modifier.weight(1f).fillMaxHeight(), MaterialTheme.colorScheme.surfaceContainerHighest)
-            StatTile(n.format(r.trackCount), "different songs", null, Modifier.weight(1f).fillMaxHeight(), MaterialTheme.colorScheme.surfaceContainerHighest)
-        }
-    }
+    StatTiles(r)
 
     // Top artists: number one big, the rest with a bar of how close they came.
     if (r.topArtists.isNotEmpty()) {
@@ -235,7 +256,9 @@ internal fun ReportBody(r: ListeningReport, nav: NavController, songs: (@Composa
         }
     }
 
-    ListeningClock(r.byHour, r.peakHour)
+    // Violet beside amber for the clock's bars and "Less of", the same on every listening page.
+    val second = Brand.Violet
+    ListeningClock(r.byHour, r.peakHour, second)
 
     // How your taste moved against the period before.
     if (r.rising.isNotEmpty() || r.fading.isNotEmpty() || r.genresUp.isNotEmpty() || r.genresDown.isNotEmpty()) {
@@ -260,8 +283,8 @@ internal fun ReportBody(r: ListeningReport, nav: NavController, songs: (@Composa
             Chips(r.genresUp, Accent.copy(alpha = 0.18f))
         }
         if (r.fading.isNotEmpty() || r.genresDown.isNotEmpty()) {
-            Label(Icons.AutoMirrored.Rounded.TrendingDown, "Less of", Brand.Violet)
-            Chips(r.fading + r.genresDown, Brand.Violet.copy(alpha = 0.16f))
+            Label(Icons.AutoMirrored.Rounded.TrendingDown, "Less of", second)
+            Chips(r.fading + r.genresDown, second.copy(alpha = 0.16f))
         }
     }
 
@@ -274,19 +297,33 @@ internal fun ReportBody(r: ListeningReport, nav: NavController, songs: (@Composa
 }
 
 /**
+ * The four big numbers, all in the listening pages' one faint tile (the owner, 12 Nov: one faded colour for them, only the
+ * header dynamic); the first number in the accent, so the eye has somewhere to start.
+ */
+@Composable
+internal fun StatTiles(r: ListeningReport) {
+    val n = NumberFormat.getIntegerInstance()
+    Column(Modifier.padding(horizontal = Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
+        // Every tile the same size, with or without a line under its label (issue #325).
+        Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
+            StatTile(n.format(r.minutes), "minutes listened", "${n.format(r.minutes / 60)} hours", Modifier.weight(1f).fillMaxHeight(), Accent)
+            StatTile(n.format(r.plays), "plays", null, Modifier.weight(1f).fillMaxHeight())
+        }
+        Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
+            StatTile(n.format(r.artistCount), "artists", r.newArtists?.let { "$it new to you" }, Modifier.weight(1f).fillMaxHeight())
+            StatTile(n.format(r.trackCount), "different songs", null, Modifier.weight(1f).fillMaxHeight())
+        }
+    }
+}
+
+/**
  * One big number (issue #325): every tile has room for a line under its label, kept empty when there's none, so
  * tiles side by side and row under row are all the same size.
  */
 @Composable
-internal fun StatTile(value: String, label: String, extra: String?, modifier: Modifier, color: Color) {
-    Column(
-        modifier
-            .clip(RoundedCornerShape(16.dp))
-            .background(Brush.linearGradient(listOf(color, color.copy(alpha = 0.55f))))
-            .padding(Space.Page)
-            .testTag("statTile"),
-    ) {
-        Text(value, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+internal fun StatTile(value: String, label: String, extra: String?, modifier: Modifier, number: Color = Color.White) {
+    Column(modifier.listeningTile(RoundedCornerShape(16.dp)).padding(Space.Page).testTag("statTile")) {
+        Text(value, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black, color = number, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Text(label, style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.85f), maxLines = 1, overflow = TextOverflow.Ellipsis)
         Text(extra.orEmpty(), style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.7f), maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
@@ -309,7 +346,7 @@ private fun ArtistPhoto(a: RankedArtist, sizeDp: Int) {
 
 /** Plays across the day as 24 bars, with the busiest hour lit and a name for the habit. */
 @Composable
-private fun ListeningClock(byHour: IntArray, peak: Int?) {
+private fun ListeningClock(byHour: IntArray, peak: Int?, bars: Color) {
     if (byHour.sum() == 0) return
     SectionTitle("Your listening clock")
     val persona = when (peak) {
@@ -336,7 +373,7 @@ private fun ListeningClock(byHour: IntArray, peak: Int?) {
         byHour.forEachIndexed { hour, count ->
             val h = (count.toFloat() / max) * size.height
             drawRoundRect(
-                color = if (hour == peak) accent else if (count > 0) Brand.Violet.copy(alpha = 0.75f) else faint,
+                color = if (hour == peak) accent else if (count > 0) bars.copy(alpha = 0.75f) else faint,
                 topLeft = Offset(hour * (barWidth + gap), size.height - h.coerceAtLeast(2f)),
                 size = Size(barWidth, h.coerceAtLeast(2f)),
                 cornerRadius = CornerRadius(barWidth / 3, barWidth / 3),

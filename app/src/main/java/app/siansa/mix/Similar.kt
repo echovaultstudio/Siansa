@@ -1,11 +1,14 @@
 package app.siansa.mix
 
+import app.siansa.net.BeatsSound
+import app.siansa.net.soundReady
 import app.siansa.AppGraph
 import app.siansa.data.Album
 import app.siansa.data.SimilarArtist
 import app.siansa.data.Song
 import app.siansa.data.normalizeKey
 import app.siansa.log.AppLog
+import app.siansa.net.BeatsApi
 import app.siansa.net.arr
 import app.siansa.net.dbl
 import app.siansa.net.str
@@ -22,8 +25,8 @@ data class SimilarArtistHit(val artist: String, val trackId: String, val score: 
 
 /** The Siansa plugin's similar albums and artists (`audiomuse-plugin/`, issue #223). */
 object SimilarPlugin {
-    const val ALBUMS_PATH = "/plugins/siansa_analysis/api/similar/albums"
-    const val ARTISTS_PATH = "/plugins/siansa_analysis/api/similar/artists"
+    const val ALBUMS_PATH = app.siansa.net.PLUGIN_PREFIX + "api/similar/albums"
+    const val ARTISTS_PATH = app.siansa.net.PLUGIN_PREFIX + "api/similar/artists"
 
     private fun enc(value: String) = URLEncoder.encode(value, "UTF-8")
 
@@ -99,7 +102,9 @@ class Similar(private val graph: AppGraph) {
 
     /** Artists that sound like [name], as "Fans also like" shows them; empty when the plugin isn't there. */
     suspend fun artists(name: String): List<SimilarArtist> {
-        if (!graph.settings.current.audioMuseReady || pluginKnownMissing()) return emptyList()
+        val settings = graph.settings.current
+        val fromBeats = settings.beatsReady && BeatsSound.available
+        if (!settings.soundReady || (pluginKnownMissing() && !fromBeats)) return emptyList()
         val hits = try {
             SimilarPlugin.parseArtists(ask(SimilarPlugin.artistsQuery(name)))
         } catch (e: CancellationException) {
@@ -127,20 +132,64 @@ class Similar(private val graph: AppGraph) {
         return out
     }
 
+    /**
+     * The plugin's answer to [query]: from Siansa Beats once it has the songs' sound, else from AudioMuse-AI itself
+     * (a Siansa Beats without the sound only passes the question on to AudioMuse-AI), each asked when the other
+     * isn't set up or can't answer ([askOrder]; the owner, 11 Nov).
+     */
     private suspend fun ask(query: String): JsonObject {
-        if (!graph.settings.current.audioMuseReady) throw IllegalStateException("Set up AudioMuse in Settings › Connections first")
-        val answer = try {
-            graph.audioMuse.plugin(query)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            AppLog.w("Similar", "Siansa plugin: ${e.message}")
-            throw IllegalStateException(ProfileStore.friendly(e.message), e)
+        val settings = graph.settings.current
+        val order = askOrder(settings.audioMuseReady, settings.beatsReady, BeatsSound.available)
+        if (order.isEmpty()) throw IllegalStateException("Set up AudioMuse in Settings › Connections first")
+        var failed: Exception? = null
+        for (from in order) {
+            try {
+                val answer = when (from) {
+                    AskFrom.AUDIOMUSE -> graph.audioMuse.plugin(query)
+                    AskFrom.BEATS -> graph.beats.get(BeatsApi.fromPlugin(query))
+                }
+                (answer as? JsonObject)?.let { return it }
+                failed = failed ?: IllegalStateException("The Siansa plugin sent an unexpected answer")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                AppLog.w("Similar", "${from.label} couldn't answer: ${e.message}")
+                // Siansa Beats with the songs' sound passes a question on to AudioMuse-AI only when its own sound
+                // can't answer it; that failing says nothing of use ("Couldn't reach AudioMuse-AI", issue #1071).
+                val said = if (from == AskFrom.BEATS && beatsCouldntSay(e.message, BeatsSound.available)) IllegalStateException(NOT_KNOWN_YET, e) else e
+                failed = failed ?: said
+            }
         }
-        return answer as? JsonObject ?: throw IllegalStateException("The Siansa plugin sent an unexpected answer")
+        throw IllegalStateException(ProfileStore.friendly(failed?.message), failed)
     }
 
+    /** Who can be asked for similar albums and artists. */
+    enum class AskFrom(val label: String) { AUDIOMUSE("The Siansa plugin"), BEATS("Siansa Beats") }
+
     companion object {
+        /**
+         * Who is asked for similar albums and artists, in turn. Siansa Beats first once it has the songs' sound
+         * ([beatsSound], Siansa Beats 0.25: it works them out itself); before that it only passes the question on
+         * to AudioMuse-AI, so AudioMuse-AI itself is asked first.
+         */
+        fun askOrder(audioMuseReady: Boolean, beatsReady: Boolean, beatsSound: Boolean = false): List<AskFrom> {
+            val order = listOfNotNull(AskFrom.AUDIOMUSE.takeIf { audioMuseReady }, AskFrom.BEATS.takeIf { beatsReady })
+            return if (beatsReady && beatsSound) order.reversed() else order
+        }
+
+        /**
+         * Whether Siansa Beats' failure [message] means its own sound couldn't answer (issue #1071). With the songs'
+         * sound ([beatsSound], Siansa Beats 0.25) it works similar albums and artists out itself, and asks AudioMuse-AI
+         * only for a song or album whose sound it doesn't have yet (one just added). When AudioMuse-AI isn't there
+         * either, it answers HTTP 502 with AudioMuse-AI's trouble ("Couldn't reach AudioMuse-AI: Connection refused"),
+         * which reads as if Siansa Beats were down. Without its sound, a 502 is AudioMuse-AI's own trouble: said as it is.
+         */
+        fun beatsCouldntSay(message: String?, beatsSound: Boolean): Boolean = beatsSound && message?.contains("HTTP 502") == true
+
+        /** What's shown instead when [beatsCouldntSay]. */
+        const val NOT_KNOWN_YET = "Siansa Beats doesn't know the sound of this music yet, so it can't say what's like it. " +
+            "It gets to new music as it analyses your library: try again later."
+
         const val SONGS = 50
         /** How long a missing plugin is taken as still missing before asking again. */
         const val PLUGIN_RECHECK_MS = 60L * 60 * 1000

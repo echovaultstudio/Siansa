@@ -84,7 +84,7 @@ enum class SelectionColour(val label: String, val argb: Long? = null) {
 }
 
 /**
- * The colour of pages, cards, sheets and menus (issue #761): neutral grey by default, like Spotify, instead of the
+ * The colour of pages, cards, sheets and menus (issue #761): neutral grey by default instead of the
  * theme's tinted backgrounds (Siansa's were plum). [hue] and [saturation] tint the greys a touch; [THEME] keeps the
  * theme's own.
  */
@@ -206,6 +206,9 @@ val OnSelected: Color
  */
 val Accent: Color
     @Composable @ReadOnlyComposable get() = LocalAccent.current
+
+/** A favourite artist's filled heart: red in every theme and with Dynamic colours, as a heart is expected to be. */
+val FavouriteRed = Color(0xFFE5534B)
 
 /** Text and icons on [Accent]. */
 val OnAccent: Color

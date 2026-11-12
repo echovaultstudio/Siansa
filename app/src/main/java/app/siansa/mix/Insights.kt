@@ -29,7 +29,7 @@ import java.util.Locale
 /** An album worth coming back to, and when it was last played. */
 data class Rediscovery(val album: Album, val lastPlayed: LocalDate?, val plays: Long)
 
-/** One period of listening, Spotify Wrapped style. */
+/** One period of listening, as a year in review shows it. */
 data class ListeningReport(
     val title: String,
     val subtitle: String,
@@ -143,6 +143,7 @@ internal suspend fun <T, R : Any> keepInLibrary(items: List<T>, limit: Int, find
 
 class Insights(private val graph: AppGraph) {
     private companion object {
+        const val BEATS = "Siansa Beats"
         const val KOITO = "Koito"
         const val LAST_FM = "Last.fm"
     }
@@ -177,18 +178,19 @@ class Insights(private val graph: AppGraph) {
                 .getOrDefault(emptyList())
                 .let { graph.library.keepSyncedAlbums(it, "Rediscover") }
         }
+        // The history: Siansa Beats' when listens go there, else Koito's.
+        val beatsOn = graph.beatsHistory.on
+        val historyFrom = if (beatsOn) BEATS else KOITO
         val koito = async {
-            if (!s.listenBrainzReady || !graph.historyApi.isKoito(s.listenBrainzUrl)) return@async null
+            if (!beatsOn && (!s.listenBrainzReady || !graph.historyApi.isKoito(s.listenBrainzUrl))) return@async null
+            suspend fun top(from: Long, to: Long, limit: Int): List<Played> =
+                if (beatsOn) graph.beatsHistory.top("albums", from, to, limit)
+                else graph.historyApi.koitoTop(s.listenBrainzUrl, s.listenBrainzToken, "albums", from, to, limit)
             runCatching {
-                val old = graph.historyApi.koitoTop(
-                    s.listenBrainzUrl, s.listenBrainzToken, "albums",
-                    now.minus(730, ChronoUnit.DAYS).epochSecond, cutoff.epochSecond, 100,
-                )
-                val recent = graph.historyApi.koitoTop(
-                    s.listenBrainzUrl, s.listenBrainzToken, "albums", cutoff.epochSecond, now.epochSecond, 500,
-                ).map { key(it.artist, it.title.orEmpty()) }.toSet()
+                val old = top(now.minus(730, ChronoUnit.DAYS).epochSecond, cutoff.epochSecond, 100)
+                val recent = top(cutoff.epochSecond, now.epochSecond, 500).map { key(it.artist, it.title.orEmpty()) }.toSet()
                 old.filter { key(it.artist, it.title.orEmpty()) !in recent }
-            }.onFailure { AppLog.w("Rediscover", "Koito history failed: ${it.message}") }.getOrNull()
+            }.onFailure { AppLog.w("Rediscover", "$historyFrom history failed: ${it.message}") }.getOrNull()
         }
 
         val found = LinkedHashMap<String, Rediscovery>()
@@ -207,7 +209,7 @@ class Insights(private val graph: AppGraph) {
                 val local = graph.library.album(album.id) ?: album
                 found.putIfAbsent(key(local.artist, local.name), Rediscovery(local, last.atZone(zone).toLocalDate(), album.playCount))
             }
-        // Koito: favourites from 6–24 months ago, matched to albums in the library.
+        // Siansa Beats or Koito: favourites from 6–24 months ago, matched to albums in the library.
         koito.await()?.forEach { played ->
             val title = played.title ?: return@forEach
             val k = key(played.artist, title)
@@ -219,7 +221,7 @@ class Insights(private val graph: AppGraph) {
         val result = found.values.filter { r ->
             runCatching { graph.library.songsOf(r.album) }.getOrDefault(emptyList()).none { it.id in recentlyPlayedIds }
         }.take(limit)
-        AppLog.i("Rediscover", "${result.size} albums (Navidrome ${navidrome.await().size} checked, Koito ${koito.await()?.size ?: "off"})")
+        AppLog.i("Rediscover", "${result.size} albums (Navidrome ${navidrome.await().size} checked, $historyFrom ${koito.await()?.size ?: "off"})")
         result
     }
 
@@ -262,11 +264,11 @@ class Insights(private val graph: AppGraph) {
                         .map { (p, song) -> RankedTrack(p.title.orEmpty(), p.artist, p.count, song) },
                     topAlbums = keepInLibrary(remote.albums, 10) { matchAlbum(it.artist, it.title.orEmpty()) }
                         .map { (p, album) -> RankedAlbum(p.title.orEmpty(), p.artist, p.count, album) },
-                    byHour = hours(remote.times.map { it * 1000 }),
+                    byHour = remote.hours?.takeIf { it.size == 24 }?.toIntArray() ?: hours(remote.times.map { it * 1000 }),
                     rising = rising(remote.artists, remote.previous).map { RankedArtist(it.artist, it.count, findArtist(it.artist)) },
                     fading = fading(remote.artists, remote.previous),
                     genresUp = genresUp, genresDown = genresDown,
-                    source = "From Koito, with genres from Siansa",
+                    source = "From ${remote.from}, with genres from Siansa",
                 )
             } else {
                 localReport(title, subtitle, inRange, before, genresUp, genresDown)
@@ -275,28 +277,33 @@ class Insights(private val graph: AppGraph) {
             return report
         }
 
+        // The history: Siansa Beats' when listens go there (the owner, 12 Nov), else Koito's, else the phone's own.
+        val beatsOn = graph.beatsHistory.on
         val koito = s.listenBrainzReady && graph.historyApi.isKoito(s.listenBrainzUrl)
-        if (!koito) {
+        if (!beatsOn && !koito) {
             send(build(null))
             return@channelFlow
         }
-        val key = reportKey(s.listenBrainzUrl, fromSec, toSec, prevSec)
+        val service = if (beatsOn) BEATS else KOITO
+        val key = reportKey(if (beatsOn) "siansa-beats:${s.beatsUrl}:${app.siansa.net.BeatsListens.listener(s)}" else s.listenBrainzUrl, fromSec, toSec, prevSec)
         val finished = reportIsFinished(window, LocalDate.now(zone))
         val kept = keptReport(key, finished)
         if (kept != null) {
-            AppLog.d("Report", "$tag: Koito data from the phone${if (kept.fresh) "" else ", asking again"}")
+            AppLog.d("Report", "$tag: $service data from the phone${if (kept.fresh) "" else ", asking again"}")
             send(build(kept.data))
             if (kept.fresh) return@channelFlow
         }
         val started = System.currentTimeMillis()
-        val remote = runCatching { koitoReport(s.listenBrainzUrl, s.listenBrainzToken, fromSec, toSec, prevSec) }
-            .onFailure { AppLog.w("Report", "Koito failed${if (kept != null) ", keeping what the phone had" else ", using Siansa history"}: ${it.message}") }
+        val remote = runCatching {
+            if (beatsOn) beatsReport(fromSec, toSec, prevSec) else koitoReport(s.listenBrainzUrl, s.listenBrainzToken, fromSec, toSec, prevSec)
+        }
+            .onFailure { AppLog.w("Report", "$service failed${if (kept != null) ", keeping what the phone had" else ", using Siansa history"}: ${it.message}") }
             .getOrNull()
         if (remote == null) {
             if (kept == null) send(build(null))
             return@channelFlow
         }
-        AppLog.d("Report", "$tag: Koito answered in ${System.currentTimeMillis() - started}ms (${remote.times.size} listens)")
+        AppLog.d("Report", "$tag: $service answered in ${System.currentTimeMillis() - started}ms (${remote.totals.plays} listens)")
         keepReport(key, finished, remote)
         send(build(remote))
     }
@@ -330,7 +337,23 @@ class Insights(private val graph: AppGraph) {
         val albums: List<Played>,
         val previous: List<Played>,
         val times: List<Long>,
+        /** Listens per hour of the day, when the service counts them itself (Siansa Beats); else from [times]. */
+        val hours: List<Int>? = null,
+        /** Which service this is from, for the report's last line. */
+        val from: String = KOITO,
     )
+
+    /** A report window's data from Siansa Beats (0.33): the same as Koito's, with the hours counted there. */
+    private suspend fun beatsReport(from: Long, to: Long, prev: Long): KoitoData = coroutineScope {
+        val api = graph.beatsHistory
+        val totals = async { api.totals(from, to, zone.id) }
+        val artists = async { api.top("artists", from, to, 40) }
+        val tracks = async { api.top("songs", from, to, TOP_FETCH) }
+        val albums = async { api.top("albums", from, to, TOP_FETCH) }
+        val previous = async { api.top("artists", prev, from, 40) }
+        val t = totals.await()
+        KoitoData(t.totals, artists.await(), tracks.await(), albums.await(), previous.await(), emptyList(), t.hours, BEATS)
+    }
 
     private suspend fun koitoReport(url: String, token: String, from: Long, to: Long, prev: Long): KoitoData = coroutineScope {
         val api = graph.historyApi
@@ -376,7 +399,7 @@ class Insights(private val graph: AppGraph) {
             rising = rising(artists, prevArtists).map { RankedArtist(it.artist, it.count, findArtist(it.artist)) },
             fading = fading(artists, prevArtists),
             genresUp = genresUp, genresDown = genresDown,
-            source = "From Siansa's own history (set up Koito under Scrobbling and history for the full picture)",
+            source = "From Siansa's own history (scrobble to Siansa Beats or Koito under Scrobbling and history for the full picture)",
         )
     }
 
@@ -449,7 +472,7 @@ class Insights(private val graph: AppGraph) {
     /**
      * Your most played songs in [month] of [year] (or the whole year when [month] is null), as they come in
      * (issue #319): what's already on the phone and the first service to answer show at once, then each further
-     * service's plays are added (the higher count for each song). From Koito and Last.fm, whichever are set up,
+     * service's plays are added (the higher count for each song). From Siansa Beats, Koito and Last.fm, whichever are set up,
      * else Siansa's own history. Songs not in your library are listed without a song (issue #234), up to [limit] in it.
      */
     fun timeMachineUpdates(year: Int, month: Int?, limit: Int = 50): Flow<TimeMachine> = channelFlow {
@@ -462,11 +485,11 @@ class Insights(private val graph: AppGraph) {
         val fetch = limit * 3
         val koitoOn = s.listenBrainzReady && graph.historyApi.isKoito(s.listenBrainzUrl)
         val lastFmOn = s.lastFmEnabled && s.lastFmApiKey.isNotBlank() && s.lastFmUser.isNotBlank()
-        val sources = listOfNotNull(KOITO.takeIf { koitoOn }, LAST_FM.takeIf { lastFmOn })
+        val sources = listOfNotNull(BEATS.takeIf { graph.beatsHistory.on }, KOITO.takeIf { koitoOn }, LAST_FM.takeIf { lastFmOn })
         val finished = periodFinished(window, LocalDate.now())
         val times = java.util.concurrent.ConcurrentHashMap<String, String>()
         if (sources.isEmpty()) {
-            send(fromHistory(window, fromSec, toSec, limit, "Set up Koito or Last.fm under Scrobbling and history for your full history", complete = true))
+            send(fromHistory(window, fromSec, toSec, limit, "Scrobble to Siansa Beats, Koito or Last.fm under Scrobbling and history for your full history", complete = true))
             return@channelFlow
         }
         val got = java.util.concurrent.ConcurrentHashMap<String, List<Played>>()
@@ -477,7 +500,7 @@ class Insights(private val graph: AppGraph) {
             val used = sources.filter { got.containsKey(it) }
             val waiting = if (final) emptyList() else sources.filter { !got.containsKey(it) && it !in failed }
             if (used.isEmpty()) {
-                if (final) send(fromHistory(window, fromSec, toSec, limit, "Koito and Last.fm couldn't be reached", complete = false))
+                if (final) send(fromHistory(window, fromSec, toSec, limit, "${sources.joinToString(" and ")} couldn't be reached", complete = false))
                 return@withLock
             }
             send(matched(window, mergePlays(*used.map { got.getValue(it) }.toTypedArray()), limit, used, waiting, complete = failed.isEmpty()))
@@ -491,8 +514,11 @@ class Insights(private val graph: AppGraph) {
                     launch {
                         val askStarted = System.currentTimeMillis()
                         val plays = runCatching {
-                            if (src == KOITO) graph.historyApi.koitoTop(s.listenBrainzUrl, s.listenBrainzToken, "tracks", fromSec, toSec, fetch)
-                            else graph.historyApi.lastFmTracks(s.lastFmApiKey, s.lastFmUser, fromSec, toSec, fetch)
+                            when (src) {
+                                BEATS -> graph.beatsHistory.top("songs", fromSec, toSec, fetch)
+                                KOITO -> graph.historyApi.koitoTop(s.listenBrainzUrl, s.listenBrainzToken, "tracks", fromSec, toSec, fetch)
+                                else -> graph.historyApi.lastFmTracks(s.lastFmApiKey, s.lastFmUser, fromSec, toSec, fetch)
+                            }
                         }.onFailure { AppLog.w("TimeMachine", "$src failed: ${it.message}") }.getOrNull()
                         times[src] = "${System.currentTimeMillis() - askStarted}ms"
                         if (plays == null) failed += src else {

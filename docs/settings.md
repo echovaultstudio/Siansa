@@ -34,6 +34,11 @@ to fold it open; they start folded. **Save** (at the top, or in any open card) k
 **Services**
 
 - **AudioMuse-AI**: address, and an API token or user name and password. See [AudioMuse-AI](audiomuse.md).
+- **Siansa Beats** (Siansa Dev): its address (port 8090) and, if it asks for one, its API key or password. With it
+  set, each song's beats, loudness, fades and key, and the genres, come straight from Siansa Beats instead of the
+  Siansa plugin on AudioMuse-AI; leave the address empty to keep using the plugin, or the songs' tags. **Test** says
+  how many songs it has analysed. It reads Navidrome, so it's for a Navidrome server. See
+  [AudioMuse-AI](audiomuse.md#siansa-beats-siansa-dev).
 - **AI** (optional): which service writes mix titles and sound searches (OpenRouter, OpenAI, Anthropic, Google
   Gemini, Mistral, Groq, Ollama or another), its key, its model, and **AI titles and sound searches**. See
   [AI features](ai.md).
@@ -45,7 +50,7 @@ How music plays.
 | Setting | What it does |
 |---|---|
 | **Equaliser** | Ten bands, presets and a pre-amp. |
-| **Crossfade and levelling** | Levelling (Track, Album, Off), where loudness comes from (tags or the Siansa plugin), the target (−18 or −14 LUFS), the crossfade (Off, fixed or Smart, 1–30 s), and beat-matched blends (Off, DJ radio or Everywhere, their length in bars and the bass swap; with Smart and the plugin). At the bottom, **How mixing works** opens these docs on crossfades and blends. |
+| **Crossfade and levelling** | Levelling (Track, Album, Off), where loudness comes from (tags or the Siansa plugin), the target (−18 or −14 LUFS), the crossfade (Off, Fixed or Smart). Smart has nothing to set: the phone decides every change. Fixed has its length (1–30 s) and, with the plugin, the blend length in bars for DJ radio and DJ mixes. At the bottom, **How mixing works** opens these docs on crossfades and blends. |
 | **Streaming quality** | Original or Opus 96–320 kbit/s, on Wi-Fi and on mobile data. |
 | **Song radio** | How far a radio may wander: Stay close, A little, Wander. |
 | **Keep playing** | Off, Steady or DJ, when the queue is about to end. A DJ mix's shape and surprises are set in the queue while a DJ radio plays (see [Discovery](discovery.md#shape-the-mix)). |
@@ -63,7 +68,7 @@ What's kept on the phone, what it costs in data, and how well Siansa plays on wi
 | **Load songs ahead** | How many songs to load ahead, on Wi-Fi and on mobile data (0–5). |
 | **Song cache** | Keeps songs as they play, up to the size chosen, with **Clear song cache**. **Off** keeps no song once it has played (from the next song); then up to 3 songs are loaded ahead, each held only until it plays. A new size applies after a restart. |
 | **Downloads** | **Your downloads** (what's on the phone, opening the list to add or remove music), **Download on Wi-Fi only**, the download quality, the storage limit and **Remove all downloads**. See [Playback](playback.md#downloads). |
-| **Covers on the phone** | **Download all covers**, and the **Image cache** (its size, a limit or none, and **Clear image cache**; a new size applies after a restart). |
+| **Covers on the phone** | **Download all covers** (every album, artist and playlist cover; it looks each artist up first, so their photo is downloaded even when Navidrome found it after your library was last read), and the **Image cache** (its size, a limit or none, and **Clear image cache**; a new size applies after a restart). |
 | **Other data on this phone** | What the library database and the logs take. |
 
 The downloads themselves are also in Your Library (the download button at the top), with **Add music**,
@@ -93,19 +98,28 @@ not here.
   (saves battery on OLED screens); a colour scheme, or **Your colour** (pick one colour and Siansa makes the rest,
   in light and dark), or colours from your wallpaper; and the accent colour for selected items and buttons. Siansa
   starts on its own **Siansa** colours, with the accent matching them (**Match theme**, Siansa's amber). **Pages and cards** sets the colour behind everything
-  (pages, cards, menus and sheets): **Grey** to start with, like Spotify, **Warm grey**, **Blue grey**, or **Match
+  (pages, cards, menus and sheets): **Grey** to start with, **Warm grey**, **Blue grey**, or **Match
   theme** for the colour scheme's own tinted backgrounds. Album, artist and now playing pages keep their colours from
   the cover.
-- **Now playing**: the lyrics, device and queue buttons, or the earlier look with the lyrics card peeking in.
-  **Dynamic colours** (off at first): the seek bar, the Play button, the heart of a liked song and where it plays take the colour of the cover
-  instead of your theme's, fading from song to song. It's the colour that fills most of the cover, so a sepia cover
-  with a red light in it gets tan, not red, and a muted colour stays muted; a cover in black and white gets silver. The
-  colour is lightened as much as it needs to be to stand out from the cover behind it, dark or light. **Play
+- **Dynamic colours** (off at first), one switch for the whole app: now playing's seek bar, Play button, the heart of
+  a liked song and where it plays, and the Play button on every page of songs (albums, playlists, artists, radios, mixes,
+  cards, books and podcasts) and in its title bar, and the book player's seek bar and buttons, take a soft colour from
+  the cover (an artist's picture; a radio's or mix's own drawn cover; a book's or podcast's) instead of your theme's,
+  fading from song to song. On those pages only Play takes it;
+  Shuffle and the other buttons keep your theme's, and an artist's heart is red once they're a favourite. It's the colour that fills most of the
+  cover, a little calmer than on the cover itself, so it sits with the cover rather than shouting over it: a sepia
+  cover with a red light in it gets tan, not red, and a muted colour stays muted; a cover in black and white gets
+  silver, and so does one with a few small spots of different colours. The colour is lightened or darkened as much as
+  it needs to be to stand out from what's behind it, in the light theme too.
+- **Now playing**: the lyrics, device and queue buttons, or the earlier look with the lyrics card peeking in. **Play
   button slides**: whether sliding from the play button does anything, what each way does (DJ mix, Steady radio,
   Song path, Sonic match, Start a mix… or Nothing), and **Record grooves** on the play button while a DJ mix plays.
 - **Mini player** and **bottom bar**: hold a row and drag it to reorder; tap the eye to show or hide it.
 - **Home**: how many shortcuts the top of Home shows, 2 to 8 (8 from the start). They're what you played last, newest
   first.
+- **DJ Mix Bar**: the order of the places on the bar that opens over the seek bar when you slide up from the play
+  button (Steady vibes, Steady build, Start or stop the mix, Euphoric, Wind down to start with): hold a row and drag it;
+  top to bottom is left to right on the bar. See [Playback](playback.md).
 - **Home Menu**: the order of the options under the round button at the top of Home (Roll the dice, Play on…,
   Sources, Arrange Home): hold a row and drag it. The mini player
   starts with **Play or pause**, **Next song** and **Add to playlist**.
@@ -117,7 +131,7 @@ not here.
 
 ## Scrobbling and history
 
-When a song counts, your server, Last.fm, ListenBrainz or Koito, and which users are sent. See
+When a song counts, your server, Siansa Beats (when it's set up), Last.fm, ListenBrainz or Koito, and which users are sent. See
 [Your listening](your-listening.md#scrobbling). **Time Machine**: whether it also lists songs you played that aren't
 in your library now (the same switch is on the Time Machine page).
 
@@ -131,6 +145,10 @@ tokens or API keys**. **Save backup** writes a file you pick; **Restore** brings
 
 **Debug logs** on or off, **Show the log**, and **Report a problem**, with the steps to a useful report. See
 [Privacy, logs and reporting problems](privacy-and-logs.md).
+
+**Bad blend button** shows or hides a **Bad blend** button on now playing. While on, it appears over the cover
+during a DJ blend and for a minute after it; tap it when a change between two songs sounded wrong, and it's written
+to the log and sent to Siansa Beats' list of bad blends. Off unless you turn it on (on in Siansa Dev).
 
 ## About
 

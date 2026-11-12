@@ -80,6 +80,8 @@ jobs:
           pip install --quiet numpy==2.4.6 scipy==1.16.3 av==17.1.0 Flask==3.1.3
           (cd audiomuse-plugin && python -m unittest discover -s tests -v)
           audiomuse-plugin/build.sh http://example.invalid
+          # Siansa Beats (dev), the experiment's plugin (experiment/siansa-beats only).
+          if [ -d audiomuse-plugin-beats ]; then (cd audiomuse-plugin-beats && python -m unittest discover -s tests -v); fi
 
   checks:
     name: Build, lint and unit tests

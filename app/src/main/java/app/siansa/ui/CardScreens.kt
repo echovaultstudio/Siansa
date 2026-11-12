@@ -1,5 +1,6 @@
 package app.siansa.ui
 
+import androidx.compose.material.icons.rounded.GridView
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -86,11 +87,11 @@ fun CardScreen(nav: NavController, id: String) {
         error = (card as? Load.Err)?.message ?: (songs as? Load.Err)?.message,
         saveAsPlaylist = true,
         cover = { m -> GeneratedCover(title, colors, m) },
+        // Its name is on its cover, and Play takes the cover's colour, as every page with a drawn cover (the owner, 10 Nov).
+        showTitle = false,
+        coverColour = colors.first,
         header = {
-            CollectionByline(null, null, null, listOfNotNull("Made for you", c?.detail, songs.valueOrNull()?.let { "${it.size} songs" }).joinToString(" · "))
-        },
-        actions = {
-            IconButton(onClick = { round++ }) { Icon(Icons.Rounded.Refresh, "New songs") }
+            PicksRow(listOfNotNull("Made for you", c?.detail, songs.valueOrNull()?.let { "${it.size} songs" }).joinToString(" · "), onNewPicks = { round++ })
         },
     )
 }
@@ -193,6 +194,7 @@ internal fun lookIcon(look: CardLook) = when (look) {
     CardLook.LIST -> Icons.Rounded.FormatListBulleted
     CardLook.BUTTON -> Icons.Rounded.PlayCircle
     CardLook.COVER_ROWS -> Icons.Rounded.ViewAgenda
+    CardLook.GRID -> Icons.Rounded.GridView
 }
 
 /** Picking what a new card shows: a kind, and a genre or years where it needs one. */

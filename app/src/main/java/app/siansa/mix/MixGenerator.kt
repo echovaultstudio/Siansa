@@ -1,5 +1,7 @@
 package app.siansa.mix
 
+import app.siansa.net.wordsReady
+import app.siansa.net.soundReady
 import app.siansa.data.daysLabel
 
 import app.siansa.data.fittingSelector
@@ -162,7 +164,7 @@ class MixGenerator(private val graph: AppGraph) {
         AppLog.i("Mix", "${selector.name}: \"${plan.title}\" · search \"${plan.query}\" · steer ${plan.steering.joinToString { (if (it.more) "+" else "-") + it.term }.ifEmpty { "none" }} · ai=${plan.ai}")
 
         // Without AudioMuse, the mix is picked from the music shown by genre (beta #25).
-        if (!settings.audioMuseReady) return fromLibrary(selector, plan, date, id, exclude, otherArtists, emptyList())
+        if (!settings.wordsReady) return fromLibrary(selector, plan, date, id, exclude, otherArtists, emptyList())
 
         val pool = LinkedHashMap<String, ClapHit>()
         graph.audioMuse.textSearch(plan.query, selector.length * 5, plan.steering).forEach { pool.putIfAbsent(it.id, it) }
@@ -397,7 +399,7 @@ class MixGenerator(private val graph: AppGraph) {
     /** AudioMuse's sonic fingerprint: the songs closest to the sound of what you play most. */
     private suspend fun soundMix(skipped: Set<String>): Pair<List<Song>, String> {
         val s = graph.settings.current
-        if (!s.audioMuseReady) throw MixException("Set up AudioMuse in Settings first")
+        if (!s.soundReady) throw MixException("Set up AudioMuse in Settings first")
         val recent = graph.history.playedSince(System.currentTimeMillis() - 2 * DAY_MS)
         val hits = graph.audioMuse.sonicFingerprint(150, s.fingerprintUser, s.fingerprintPassword)
             .filter { it.id !in skipped && it.id !in recent }
@@ -438,7 +440,7 @@ class MixGenerator(private val graph: AppGraph) {
      */
     private suspend fun discoverMix(taste: TasteProfile?, skipped: Set<String>): Pair<List<Song>, String> {
         val s = graph.settings.current
-        if (!s.audioMuseReady) throw MixException("Set up AudioMuse in Settings first")
+        if (!s.soundReady) throw MixException("Set up AudioMuse in Settings first")
         val heard = graph.history.all().map { it.id }.toSet()
         var seeds = taste?.favouriteSongs.orEmpty().shuffled().take(8)
         if (seeds.size < 3) {
@@ -475,7 +477,7 @@ class MixGenerator(private val graph: AppGraph) {
     suspend fun moodPlaylist(mood: String, size: Int = 50): MoodResult {
         val text = mood.trim()
         if (text.length < 3) throw MixException("Describe your mood in a few words")
-        if (!graph.settings.current.audioMuseReady) throw MixException("Set up AudioMuse in Settings first")
+        if (!graph.settings.current.wordsReady) throw MixException("Set up AudioMuse in Settings first")
         var plan = Plan(text.replaceFirstChar { it.uppercase() }, text, "From your description", ai = false)
         if (graph.settings.current.aiReady) {
             runCatching { aiMoodPlan(text) }
@@ -507,7 +509,7 @@ class MixGenerator(private val graph: AppGraph) {
      * set up, otherwise the words searched as they are. With no words, the sliders make the search ([tuning]).
      */
     suspend fun vibePlan(text: String, tuning: VibeTuning): VibePlan {
-        if (!graph.settings.current.audioMuseReady) throw MixException("Set up AudioMuse in Settings first")
+        if (!graph.settings.current.wordsReady) throw MixException("Set up AudioMuse in Settings first")
         val words = text.trim()
         if (words.isEmpty()) {
             val query = sliderQuery(tuning) ?: throw MixException("Describe your aura, or move a slider")
@@ -531,6 +533,22 @@ class MixGenerator(private val graph: AppGraph) {
         .getOrDefault(emptyList())
 
     /**
+     * What a vibe's [songs] have to offer for shaping it: the sounds some of them have and others don't (from Siansa
+     * Beats' genres; none without it), and where each song sits on the sound pad (its tempo and energy).
+     */
+    suspend fun mixOffer(songs: List<Song>): MixOffer {
+        val ids = songs.map { it.id }.distinct()
+        if (ids.isEmpty()) return MixOffer()
+        val sounds = mixSounds(graph.beatsGenres.ofSongs(ids).orEmpty())
+        val dots = runCatching { graph.audioMuse.features(ids) }
+            .onFailure { AppLog.w("Vibe", "Couldn't load the songs' energy and tempo for the sound pad: ${it.message}") }
+            .getOrDefault(emptyList())
+            .mapNotNull { padPlace(it.tempo, it.energy, it.arousal) }
+        AppLog.i("Vibe", "A mix of ${ids.size} songs offers: ${sounds.joinToString { "${it.name} (${it.songs})" }.ifEmpty { "no sounds of its own" }} · ${dots.size} on the pad")
+        return MixOffer(sounds, dots)
+    }
+
+    /**
      * The songs for a vibe: AudioMuse's sound search for [query] steered by the sound dials (or the AI's
      * concepts while no dial is set), re-ranked by the energy, tempo and familiar sliders (issue #339).
      */
@@ -549,7 +567,12 @@ class MixGenerator(private val graph: AppGraph) {
         val familiarity = if (tuning.familiar != 0) {
             graph.history.all().groupingBy { it.artist.lowercase() }.eachCount()
         } else emptyMap()
-        val ranked = rankVibe(hits, features, familiarity, tuning) { Random.nextDouble() * 0.05 }
+        // The mix's own sound dials go by each song's genres, as Siansa Beats hears them.
+        val genres = if (tuning.sounds.any { it.genre && it.value != 0 }) {
+            graph.beatsGenres.ofSongs(hits.map { it.id }).orEmpty()
+                .also { if (it.isEmpty()) AppLog.w("Vibe", "Siansa Beats didn't say the songs' genres, leaving the mix's sound dials out") }
+        } else emptyMap()
+        val ranked = rankVibe(hits, features, familiarity, tuning, genres) { Random.nextDouble() * 0.05 }
         val perArtist = HashMap<String, Int>()
         val picked = ranked.filter { hit ->
             val n = perArtist[hit.artist.lowercase()] ?: 0
@@ -558,7 +581,7 @@ class MixGenerator(private val graph: AppGraph) {
         AppLog.i(
             "Vibe",
             "Search \"$query\" · ${tuning.summary().ifEmpty { "no sliders moved" }} · ${hits.size} found, " +
-                "${features.size} with energy/tempo, ${picked.size} picked",
+                "${features.size} with energy/tempo, ${genres.size} with genres, ${picked.size} picked",
         )
         return spreadArtists(songsFor(picked, found)).ifEmpty { throw MixException(NOT_ON_THIS_SERVER) }
     }

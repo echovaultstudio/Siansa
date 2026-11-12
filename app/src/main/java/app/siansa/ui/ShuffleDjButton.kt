@@ -111,7 +111,8 @@ internal fun ShuffleDjButton(
             .testTag("shuffleAll"),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(Icons.Rounded.Shuffle, null, tint = if (active) OnAccent else Accent, modifier = Modifier.size(SHUFFLE_ICON))
+        // Plain at rest (only Play takes the page's colour, the owner, 10 Nov); lit while sliding to a DJ mix.
+        Icon(Icons.Rounded.Shuffle, null, tint = if (active) OnAccent else androidx.compose.material3.MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(SHUFFLE_ICON))
     }
 }
 

@@ -13,11 +13,17 @@ pull requests never conflict with each other over the changelog or the version n
            Without notes, version.txt's version is used with its existing CHANGELOG.md section.
   apply    Used by the release job: applies the same update to a fresh checkout for the files listed
            in notes/fragments.txt and deletes them, ready to commit.
+  dev      Used by the Siansa Dev and Siansa TV Dev builds: prints their release notes' changelog. With
+           --since <commit> (the previous build), only the notes added after it, under "New in this build", and
+           one line saying how many earlier ones wait for the next release (the owner, 12 Nov: the whole list was
+           too much to read). Without it (a release's first build), every note waiting in changelog.d/ that main
+           hasn't released yet, newest first. Needs the history of both branches (fetch-depth: 0).
 """
 import datetime
 import glob
 import os
 import re
+import subprocess
 import sys
 
 ORDER = ["Fixed", "Added", "Changed"]
@@ -137,10 +143,97 @@ def apply(listing):
     print(f"version={version}")
 
 
+def git(*args):
+    """git's answer, or None when it fails (an unknown commit, no history)."""
+    done = subprocess.run(["git", *args], capture_output=True, text=True)
+    return done.stdout.strip() if done.returncode == 0 else None
+
+
+def added_by(path):
+    """The commit that added a note and when (a Unix time), from the history of what's checked out."""
+    line = git("log", "--diff-filter=A", "--format=%H %ct", "-1", "--", path)
+    if not line:
+        return None, 0
+    sha, when = line.split()
+    return sha, int(when)
+
+
+def released_on(path, main):
+    """Whether [main] has released a note: a release takes its notes out of changelog.d/ on main."""
+    return bool(git("log", main, "--diff-filter=D", "--format=%H", "-1", "--", path))
+
+
+def note_lines(path):
+    """A note's lines, each marked with its kind: "- **Fixed** · …"."""
+    out, kind = [], "Changed"
+    for line in open(path, encoding="utf-8").read().splitlines():
+        if RELEASE_MARK.match(line) or not line.strip():
+            continue
+        heading = re.match(r"^#{2,4}\s+(\w+)", line)
+        if heading:
+            kind = heading[1].capitalize()
+            continue
+        bullet = re.match(r"^(\s*)[-*]\s+(.*)$", line)
+        if bullet and not bullet[1]:
+            out.append(f"- {kind} · {bullet[2]}")
+        else:
+            out.append(line.rstrip())
+    return out
+
+
+def dev_notes(main="origin/main", since=None, released=None, most=60):
+    """The changelog of a dev build. With [since] (the build before it), only the notes added after that build, and
+    how many earlier ones wait for the next release. Without it, everything changelog.d/ holds that [main] hasn't
+    released, newest first, grouped by the day each note was added. [released] is main's last version, for the
+    headings."""
+    notes = []
+    for path in fragments():
+        if released_on(path, main):
+            continue  # released on main already, and still here until main is merged into dev
+        sha, when = added_by(path)
+        new = since is not None and (sha is None or git("merge-base", "--is-ancestor", sha, since) is None)
+        notes.append((new, when, path))
+    notes.sort(key=lambda n: (not n[0], -n[1], n[2]))
+    after = f" since Siansa {released}" if released else ""
+    if not notes:
+        return f"## What's coming{after}\n\nNothing yet: this build is the same as the last release.\n"
+    fresh = [n for n in notes if n[0]]
+    if since is not None:
+        out = ["## New in this build", ""]
+        for _, _, path in fresh:
+            out += note_lines(path)
+        if not fresh:
+            out.append("Nothing new in the changelog since the last build.")
+        earlier = len(notes) - len(fresh)
+        if earlier:
+            out += ["", f"Also in this build, from earlier ones: {earlier} more change{'s' if earlier != 1 else ''}{after} "
+                        "([all of them](https://github.com/echovaultstudio/Siansa/tree/dev/changelog.d))."]
+        return "\n".join(out).strip() + "\n"
+    out = [f"## What's coming{after}", ""]
+    day = None
+    shown = [n for n in notes if not n[0]][: max(0, most - len(fresh))]
+    for _, when, path in shown:
+        on = datetime.datetime.fromtimestamp(when, datetime.timezone.utc).strftime("%-d %b %Y") if when else "Not yet committed"
+        if on != day:
+            out += ([""] if day else []) + [f"### {on}", ""]
+            day = on
+        out += note_lines(path)
+    left = len(notes) - len(fresh) - len(shown)
+    if left > 0:
+        out += ["", f"…and {left} earlier notes, in changelog.d/ on dev."]
+    return "\n".join(out).strip() + "\n"
+
+
 if __name__ == "__main__":
     if len(sys.argv) >= 2 and sys.argv[1] == "prepare":
         prepare()
     elif len(sys.argv) >= 3 and sys.argv[1] == "apply":
         apply(sys.argv[2])
+    elif len(sys.argv) >= 2 and sys.argv[1] == "dev":
+        args = dict(zip(sys.argv[2::2], sys.argv[3::2]))
+        main = args.get("--main", "origin/main")
+        since = args.get("--since") or None
+        released = (git("show", f"{main}:version.txt") or "").strip() or None
+        sys.stdout.write(dev_notes(main, since, released))
     else:
         sys.exit(__doc__)

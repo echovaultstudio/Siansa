@@ -1,5 +1,6 @@
 package app.siansa.ui
 
+import app.siansa.net.soundReady
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.ScrollState
 import app.siansa.data.Song
@@ -112,7 +113,7 @@ import java.time.format.TextStyle
 import java.util.Locale
 
 /*
- * Your Library, laid out like Spotify's: filter chips at the top (Playlists, Mixes, Albums, Artists, Your
+ * Your Library: filter chips at the top (Playlists, Mixes, Albums, Artists, Your
  * listening), each opening its own sub-filters, a sort menu (Recents first), a list/grid switch, and
  * everything in one list. "Recents" is built from what you actually play: Siansa's own history plus
  * Navidrome's recently played albums, so the things you listen to come to the top.
@@ -217,6 +218,7 @@ fun YourLibraryScreen(nav: NavController) {
 
     val favouriteIds by graph.favouriteAlbums.ids.collectAsStateWithLifecycle()
     val favouriteArtistIds by graph.favouriteArtists.ids.collectAsStateWithLifecycle()
+    val favouriteRadios by graph.favouriteRadios.all.collectAsStateWithLifecycle()
     // From the phone straight away, then again once Navidrome has answered (issue #161).
     // Built again when the connection comes back, for what only Navidrome has.
     val connection by graph.connection.state.collectAsStateWithLifecycle()
@@ -224,7 +226,7 @@ fun YourLibraryScreen(nav: NavController) {
     // Built again when a station or podcast is added, changed or removed, or a station's picture is found (issue #353).
     val ownStations by graph.stations.state.collectAsStateWithLifecycle()
     val stationPictures by graph.stations.pictures.collectAsStateWithLifecycle()
-    val data by produceState<Load<LibraryData>>(Load.Loading, version, mixes?.size, settings.navidromeUser, favouriteIds, favouriteArtistIds, online, ownStations, stationPictures) {
+    val data by produceState<Load<LibraryData>>(Load.Loading, version, mixes?.size, settings.navidromeUser, favouriteIds, favouriteArtistIds, favouriteRadios, online, ownStations, stationPictures) {
         val me = settings.navidromeUser
         value = loadLibrary(graph, me)
         if (refreshFromServer(graph, me)) value = loadLibrary(graph, me)
@@ -636,7 +638,7 @@ private fun LibraryHeader(
 }
 
 /**
- * Spotify's chip row: all chips (in the order last opened), or ✕ + the chosen chip + its own sub-chips, and under
+ * The chip row: all chips (in the order last opened), or ✕ + the chosen chip + its own sub-chips, and under
  * Music's Albums or Artists their tags. While chips are hidden off the right edge, the row fades there with a ›
  * that scrolls on (issue #497).
  */
@@ -743,35 +745,12 @@ internal fun LibraryPill(text: String, active: Boolean, outlined: Boolean = fals
 
 @Composable
 private fun SortBar(sort: Sort, grid: Boolean, onSort: (Sort) -> Unit, onGrid: () -> Unit) {
-    var open by remember { mutableStateOf(false) }
     Row(
         Modifier.fillMaxWidth().padding(start = Space.Small, end = Space.Tight, top = Space.Tight, bottom = Space.Tight),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.weight(1f)) {
-            Row(
-                Modifier.clip(RoundedCornerShape(8.dp)).clickable { open = true }.padding(Space.Small),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(Icons.Rounded.SwapVert, null, Modifier.size(20.dp))
-                Spacer(Modifier.width(Space.Small))
-                Text(sort.label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-            }
-            DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-                Text(
-                    "Sort by",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = Space.Page, vertical = Space.Small),
-                )
-                Sort.entries.forEach { s ->
-                    DropdownMenuItem(
-                        text = { Text(s.label, color = if (s == sort) Accent else MaterialTheme.colorScheme.onSurface) },
-                        trailingIcon = { if (s == sort) Icon(Icons.Rounded.Check, null, tint = Accent) },
-                        onClick = { open = false; onSort(s) },
-                    )
-                }
-            }
+            SortPicker(sort.label, Sort.entries.map { it to it.label }, sort, onPick = onSort)
         }
         IconButton(onClick = onGrid) {
             Icon(if (grid) Icons.Rounded.ViewList else Icons.Rounded.GridView, if (grid) "Show as list" else "Show as grid")
@@ -1216,7 +1195,7 @@ private suspend fun buildLibrary(graph: app.siansa.AppGraph, me: String): Librar
     )
 
     // Your sonic fingerprint (issue #255, was on Home): what you play most sounds like, with its numbers.
-    if (graph.settings.current.audioMuseReady) {
+    if (graph.settings.current.soundReady) {
         entries += Entry(
             key = "sonic-fingerprint",
             kind = Kind.LISTENING,
@@ -1352,6 +1331,23 @@ private suspend fun buildLibrary(graph: app.siansa.AppGraph, me: String): Librar
         recentAt = System.currentTimeMillis() - 5,
         favourite = true,
     )
+
+    // Favourite radios (the owner, 10 Nov): each its own entry, in its cover's colours, opening its page.
+    graph.favouriteRadios.all.value.forEach { r ->
+        entries += Entry(
+            key = "radio-${r.route}",
+            kind = null,
+            title = r.title,
+            subtitle = "Radio · Favourite",
+            route = r.route,
+            gradient = Color(r.from.toInt()) to Color(r.to.toInt()),
+            icon = Icons.Rounded.Radio,
+            recentAt = r.at,
+            addedAt = r.at,
+            creator = "Siansa",
+            favourite = true,
+        )
+    }
 
     // Artists.
     graph.library.artists().forEach { ar ->

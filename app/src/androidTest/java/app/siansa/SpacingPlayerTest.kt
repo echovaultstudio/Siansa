@@ -1,6 +1,7 @@
 package app.siansa
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,6 +17,7 @@ import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performTouchInput
@@ -110,34 +112,32 @@ class SpacingPlayerTest : SpacingCheck() {
         assertEquals(1, removed)
     }
 
-    /** Shape the mix (issue #649): the shape chips sit evenly between their title and the hint under them. */
-    @Test fun mixShapeChipsAreEvenlySpaced() {
-        compose.setContent {
-            SiansaTheme {
-                app.siansa.ui.MixShapeControls(app.siansa.mix.MixShape.STEADY, 20) { _, _ -> }
-            }
-        }
-        val title = compose.onNodeWithText("Shape the mix").getBoundsInRoot()
-        val chips = compose.onNode(hasClickAction() and hasAnyDescendant(hasText("Euphoric")), useUnmergedTree = true).getBoundsInRoot()
-        val hint = compose.onNodeWithText(app.siansa.mix.MixShape.STEADY.hint).getBoundsInRoot()
-        assertEven("Mix shape chips", chips.top - title.bottom, hint.top - chips.bottom)
-    }
-
-    /** Shape the mix: "Surprises" stays on one line beside its slider (issue #677), as tall as one line of text. */
-    @Test fun mixSurpriseLabelIsOneLine() {
+    /**
+     * Shape your mix (the owner, 10 Nov): open, the glide bar sits as far under the heading as the hint under it, and
+     * the Surprises bar is the glide bar's height, under its label.
+     */
+    @Test fun mixShapePanelIsEvenlySpaced() {
         compose.setContent {
             SiansaTheme {
                 androidx.compose.foundation.layout.Box(Modifier.width(360.dp)) {
-                    app.siansa.ui.MixShapeControls(app.siansa.mix.MixShape.STEADY, 50) { _, _ -> }
+                    app.siansa.ui.MixShapePanel(
+                        app.siansa.ui.DjBarPlaces(app.siansa.ui.DjBarSpot.default, starting = false),
+                        app.siansa.mix.MixShape.BUILD, 55, open = true, onOpen = {}, onPlace = {}, onSurprise = {},
+                    )
                 }
             }
         }
+        val heading = compose.onNodeWithTag("mixShapeHeading").getBoundsInRoot()
+        val bar = compose.onNodeWithTag("djBar").getBoundsInRoot()
+        val hint = compose.onNodeWithTag("mixShapeHint").getBoundsInRoot()
         val label = compose.onNodeWithTag("mixSurpriseLabel").getBoundsInRoot()
-        val value = compose.onNodeWithText("Some").getBoundsInRoot()
-        val labelHeight = label.bottom - label.top
-        assertTrue("\"Surprises\" wraps: $labelHeight tall", labelHeight < (value.bottom - value.top) * 1.6f)
-        val slider = compose.onNodeWithTag("mixSurprise").getBoundsInRoot()
-        assertEven("Surprise label and slider centres", (label.top + label.bottom) / 2, (slider.top + slider.bottom) / 2)
+        val surprises = compose.onNodeWithTag("mixSurprise").getBoundsInRoot()
+        assertEven("Glide bar under the heading", bar.top - heading.bottom, 0.dp)
+        assertEven("Surprises bar as tall as the glide bar", surprises.bottom - surprises.top, bar.bottom - bar.top)
+        assertEven("Hint and Surprises label gaps", hint.top - bar.bottom, surprises.top - label.bottom)
+        // Some surprises: its place is the chosen one.
+        compose.onNodeWithContentDescription("Surprises: Some").assertExists()
+        compose.onNodeWithTag("surpriseChosen", useUnmergedTree = true).assertExists()
     }
 
     /** Now playing (issue #370): an active button's dot sits centred under its icon, a small step above the edge. */
@@ -312,5 +312,45 @@ class SpacingPlayerTest : SpacingCheck() {
         val gap = (button.top + button.bottom) / 2 - (up.top + up.bottom) / 2
         val expected = with(compose.density) { reachPx.toDp() }
         assertEven("Up choice above the button's centre", gap, expected, 1.dp)
+    }
+
+    /** Now playing (the owner, 9 Nov): the top row sits exactly halfway between the top and the cover's top edge. */
+    @Test fun topRowSitsHalfwayToTheCover() {
+        compose.setContent {
+            SiansaTheme {
+                Column(Modifier.height(700.dp).width(360.dp)) {
+                    app.siansa.ui.PlayerTop(
+                        topGap = 20.dp,
+                        row = { Box(Modifier.fillMaxWidth().height(48.dp).testTag("row")) },
+                        cover = { Box(Modifier.fillMaxWidth().aspectRatio(1f).testTag("cover")) },
+                        belowCover = {},
+                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                    )
+                }
+            }
+        }
+        val top = compose.onNodeWithTag("playerTop").getBoundsInRoot()
+        val row = compose.onNodeWithTag("row").getBoundsInRoot()
+        val cover = compose.onNodeWithTag("cover").getBoundsInRoot()
+        assertEven("Gap above the row and gap below it", row.top - top.top, cover.top - row.bottom, 1.dp)
+        assertTrue("The row is clear of the cover", row.bottom <= cover.top)
+    }
+
+    /**
+     * The DJ mix bar (issues #1033, #1035): open, as tall as it's meant to be, slim, with symbols only, and the place under
+     * the finger centred in it, the same room above and below.
+     */
+    @Test fun djMixBarIsEvenlySpaced() {
+        compose.setContent {
+            SiansaTheme {
+                Box(Modifier.width(312.dp)) {
+                    app.siansa.ui.DjBar(app.siansa.ui.DjBarSpot.default, chosen = 1, now = app.siansa.ui.DjBarSpot.EUPHORIC, starting = false, open = 1f)
+                }
+            }
+        }
+        val bar = compose.onNodeWithTag("djBarPill").getBoundsInRoot()
+        assertEven("DJ mix bar's height", bar.bottom - bar.top, app.siansa.ui.DJ_BAR_HEIGHT, 1.dp)
+        val chosen = compose.onNodeWithTag("djBarChosenCircle", useUnmergedTree = true).getBoundsInRoot()
+        assertEven("Room above and below the chosen place", chosen.top - bar.top, bar.bottom - chosen.bottom, 1.dp)
     }
 }

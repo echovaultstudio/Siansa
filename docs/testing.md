@@ -55,7 +55,7 @@ Open Siansa, go to **Settings**, enter these, use **Test** next to each, then **
 
 1. In AudioMuse-AI, open **Plugins › Repositories** and add this address:
    ```
-   https://raw.githubusercontent.com/echovaultstudio/siansa-audiomuse-plugin/main/manifest.json
+   https://raw.githubusercontent.com/echovaultstudio/siansa-beats/main/manifest.json
    ```
 2. On the **Catalog** tab, install **Siansa Analysis** and apply the restart.
 3. Open **Plugins › Siansa Analysis › Settings** and use **Measure all songs** to measure your library.

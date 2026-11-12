@@ -39,7 +39,29 @@ data class TrackFeatures(
     val genres: Map<String, Double>,
     /** AudioMuse's energy for the song (higher is more energetic), when it sends one (issue #339). */
     val energy: Double? = null,
-)
+    /**
+     * Who measured [energy]: "beats" (Siansa Beats heard the song) or "audiomuse" (taken over from AudioMuse-AI); null
+     * from AudioMuse-AI itself or a Siansa Beats before 0.34. The two can be on different scales, so energies compare
+     * only within one.
+     */
+    val energySource: String? = null,
+    /**
+     * How energetic the song is to a listener, about 1 (calm) to 9: Siansa Beats' arousal (0.35, Essentia's emoMusic
+     * model), null from AudioMuse-AI or an older Siansa Beats. The owner's trial (12 Nov) found it follows what he
+     * hears far better than [energy], which is a song's loudness.
+     */
+    val arousal: Double? = null,
+) {
+    /** What to order and match songs' energy by: [arousal] where there is one, else [energy]. */
+    val drive: Double? get() = arousal ?: energy
+
+    /** The scale [drive] is on: two songs' drives compare only when it's the same. */
+    val driveScale: String? get() = if (arousal != null) AROUSAL else energySource
+
+    companion object {
+        const val AROUSAL = "arousal"
+    }
+}
 
 /**
  * One concept to steer the Sound search with (issue #208): [more] or less of it. [weight] is how strongly
@@ -81,8 +103,51 @@ class AudioMuseApi(
      * Without it, the settings' own name.
      */
     private val serverFor: ((ids: List<String>) -> String)? = null,
+    /**
+     * Siansa Beats' answer to one of AudioMuse's own paths ([BeatsSound]): a GET of the path and query, or a POST of
+     * the body. Asked first for the paths it answers; AudioMuse itself when it can't, or for the rest.
+     */
+    private val beats: (suspend (pathAndQuery: String, body: String?) -> JsonElement)? = null,
     private val settings: () -> AppSettings,
 ) {
+    /**
+     * What songs sound like, asked of Siansa Beats when it answers [path] (the owner, 11 Nov), else of AudioMuse:
+     * [query] for a GET, [payload] (a JSON object) for a POST, about the songs [about]. When Siansa Beats fails and
+     * AudioMuse is set up, AudioMuse is asked; without AudioMuse, Siansa Beats' reason is the answer.
+     */
+    private suspend fun sound(
+        path: String,
+        query: List<Pair<String, String?>> = emptyList(),
+        payload: String? = null,
+        about: List<String> = emptyList(),
+        /** Siansa Beats' answer or none: AudioMuse isn't asked (a DJ mix's tempos are never AudioMuse's). */
+        beatsOnly: Boolean = false,
+    ): JsonElement {
+        val s = settings()
+        val asked = query.filter { it.second != null }
+        if (beatsOnly && !(beats != null && s.beatsReady && BeatsSound.answers(path))) {
+            throw ApiException("Siansa Beats doesn't have the songs' sound yet (it needs 0.25)")
+        }
+        if (beats != null && s.beatsReady && BeatsSound.answers(path)) {
+            val pathAndQuery = path + if (asked.isEmpty()) "" else "?" + asked.joinToString("&") { (k, v) ->
+                java.net.URLEncoder.encode(k, "UTF-8") + "=" + java.net.URLEncoder.encode(v, "UTF-8")
+            }
+            try {
+                return beats.invoke(BeatsSound.path(pathAndQuery), payload)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (beatsOnly || !s.audioMuseReady) throw e
+                AppLog.w("AudioMuse", "Siansa Beats couldn't answer $path (${e.message}); asking AudioMuse")
+            }
+        }
+        if (payload != null) {
+            return executeElement { request(path, about).post(serverInBody(payload, server(about)).toRequestBody(JSON_TYPE)).build() }
+        }
+        val url = apiUrl(path.removePrefix("/")).apply { asked.forEach { (k, v) -> addQueryParameter(k, v) } }.build()
+        return executeElement { request("", about, at = url).get().build() }
+    }
+
     private fun server(ids: List<String>): String =
         serverFor?.invoke(ids.filter { it.isNotBlank() }) ?: settings().audioMuseServer
     private val loginLock = Mutex()
@@ -181,6 +246,10 @@ class AudioMuseApi(
         return executeElement { request(path, songIdsIn(pathAndQuery)).get().build() }
     }
 
+    /** POSTs [body] (JSON) to a plugin's [path] on the AudioMuse server (Siansa Dev's bad blends). */
+    suspend fun pluginPost(path: String, body: String): JsonElement =
+        executeElement { request(path).post(body.toRequestBody(JSON_TYPE)).build() }
+
     /** Per AudioMuse address: whether only the plugin's earlier version (before the rename, issue #360) is installed. */
     private val legacyPlugin = java.util.concurrent.ConcurrentHashMap<String, Boolean>()
 
@@ -230,7 +299,7 @@ class AudioMuseApi(
                 })
             }
         }.toString()
-        val root = execute { request("/api/clap/search").post(serverInBody(payload, server(emptyList())).toRequestBody(JSON_TYPE)).build() }
+        val root = sound("/api/clap/search", payload = payload) as? JsonObject ?: throw ApiException("AudioMuse sent an unexpected answer")
         val hits = root.arr("results").mapNotNull { r ->
             val id = r.str("item_id") ?: return@mapNotNull null
             ClapHit(
@@ -253,18 +322,17 @@ class AudioMuseApi(
      * SIMILARITY_RADIUS_DEFAULT): Siansa only sends [sameMood] when the listener chose it (issue #208).
      */
     suspend fun similarTracks(itemId: String, count: Int, sameMood: Boolean? = null): List<ClapHit> {
-        val url = apiUrl("api/similar_tracks")
-            .addQueryParameter("item_id", itemId)
-            .addQueryParameter("n", count.toString())
-            .apply { sameMood?.let { addQueryParameter("mood_similarity", it.toString()) } }
-            .build()
-        return neighbours(executeElement { request("", listOf(itemId), at = url).get().build() })
+        return neighbours(sound(
+            "/api/similar_tracks",
+            listOf("item_id" to itemId, "n" to count.toString(), "mood_similarity" to sameMood?.toString()),
+            about = listOf(itemId),
+        ))
     }
 
     /** AudioMuse's mood centres (happy, relaxed…), each with the tags that describe it (issue #208). */
     suspend fun moodCentres(): List<MoodCentre> {
         centres?.let { return it }
-        val root = execute { request("/api/mood_centroids").get().build() }
+        val root = sound("/api/mood_centroids") as? JsonObject ?: throw ApiException("AudioMuse sent an unexpected answer")
         return parseMoodCentres(root).also { centres = it }
     }
 
@@ -272,12 +340,10 @@ class AudioMuseApi(
 
     /** Tracks around one of AudioMuse's mood centres: a radio for that mood (issue #208). */
     suspend fun moodRadio(centre: MoodCentre, count: Int): List<ClapHit> {
-        val url = apiUrl("api/similar_tracks")
-            .addQueryParameter("mood", centre.mood)
-            .addQueryParameter("centroid_index", centre.index.toString())
-            .addQueryParameter("n", count.toString())
-            .build()
-        return neighbours(executeElement { request("", at = url).get().build() })
+        return neighbours(sound(
+            "/api/similar_tracks",
+            listOf("mood" to centre.mood, "centroid_index" to centre.index.toString(), "n" to count.toString()),
+        ))
     }
 
     /**
@@ -292,11 +358,16 @@ class AudioMuseApi(
             })
             count?.let { put("n", it) }
         }.toString()
-        val root = execute { request("/api/alchemy", blend + avoid).post(serverInBody(payload, server(blend + avoid)).toRequestBody(JSON_TYPE)).build() }
+        val root = sound("/api/alchemy", payload = payload, about = blend + avoid) as? JsonObject
+            ?: throw ApiException("AudioMuse sent an unexpected answer")
         return neighbours(root["results"] ?: JsonArray(emptyList()))
     }
 
-    private fun apiUrl(path: String) = settings().audioMuseUrl.trimEnd('/').toHttpUrl().newBuilder().addPathSegments(path)
+    private fun apiUrl(path: String): okhttp3.HttpUrl.Builder {
+        val base = settings().audioMuseUrl.trimEnd('/')
+        if (base.isBlank()) throw ApiException("AudioMuse isn't set up yet")
+        return base.toHttpUrl().newBuilder().addPathSegments(path)
+    }
 
     /** AudioMuse's track rows ({item_id, title, author, album, distance}); closer is a higher similarity. */
     private fun neighbours(root: JsonElement): List<ClapHit> {
@@ -318,7 +389,16 @@ class AudioMuseApi(
             if (navidromeUser.isNotBlank()) put("navidrome_user", navidromeUser)
             if (navidromePassword.isNotBlank()) put("navidrome_password", navidromePassword)
         }.toString()
-        val root = executeElement { request("/api/sonic_fingerprint/generate").post(serverInBody(payload, server(emptyList())).toRequestBody(JSON_TYPE)).build() }
+        // Siansa Beats reads the most played songs with its own sign-in to the music server: it gets no login.
+        val forBeats = buildJsonObject { put("n", count) }.toString()
+        val root = if (settings().beatsReady && BeatsSound.answers("/api/sonic_fingerprint/generate")) {
+            runCatching { sound("/api/sonic_fingerprint/generate", payload = forBeats) }.getOrElse { e ->
+                if (e is kotlinx.coroutines.CancellationException || !settings().audioMuseReady) throw e
+                executeElement { request("/api/sonic_fingerprint/generate").post(serverInBody(payload, server(emptyList())).toRequestBody(JSON_TYPE)).build() }
+            }
+        } else {
+            executeElement { request("/api/sonic_fingerprint/generate").post(serverInBody(payload, server(emptyList())).toRequestBody(JSON_TYPE)).build() }
+        }
         val rows = (root as? JsonArray) ?: JsonArray(emptyList())
         return rows.mapNotNull { element ->
             val r = element as? JsonObject ?: return@mapNotNull null
@@ -341,18 +421,17 @@ class AudioMuseApi(
         endMood: PathMood? = null,
         lyrics: Boolean = false,
     ): List<ClapHit> {
-        val url = apiUrl("api/find_path")
-            .apply {
-                startId?.let { addQueryParameter("start_song_id", it) }
-                endId?.let { addQueryParameter("end_song_id", it) }
-                startMood?.let { addQueryParameter("start_mood", it.id) }
-                endMood?.let { addQueryParameter("end_mood", it.id) }
-                if (lyrics) addQueryParameter("path_space", "lyrics")
-            }
-            .addQueryParameter("max_steps", length.toString())
-            .addQueryParameter("path_fix_size", "true")
-            .build()
-        val root = executeElement { request("", listOfNotNull(startId, endId), at = url).get().build() }
+        val asked = listOf(
+            "start_song_id" to startId, "end_song_id" to endId, "start_mood" to startMood?.id, "end_mood" to endMood?.id,
+            "max_steps" to length.toString(), "path_fix_size" to "true",
+        )
+        // A path through the lyrics' meaning is AudioMuse's own: Siansa Beats has the sound alone.
+        val root = if (lyrics) {
+            val url = apiUrl("api/find_path").apply { (asked + ("path_space" to "lyrics")).forEach { (k, v) -> v?.let { addQueryParameter(k, it) } } }.build()
+            executeElement { request("", listOfNotNull(startId, endId), at = url).get().build() }
+        } else {
+            sound("/api/find_path", asked, about = listOfNotNull(startId, endId))
+        }
         val rows = (root as? JsonArray) ?: (root as? JsonObject)?.let { it["path"] as? JsonArray } ?: JsonArray(emptyList())
         return rows.mapNotNull { element ->
             val r = element as? JsonObject ?: return@mapNotNull null
@@ -367,7 +446,7 @@ class AudioMuseApi(
      */
     suspend fun conceptCatalogue(): ConceptCatalogue {
         catalogue?.let { return it }
-        val root = execute { request("/api/clap/concepts").get().build() }
+        val root = sound("/api/clap/concepts") as? JsonObject ?: throw ApiException("AudioMuse sent an unexpected answer")
         return parseCatalogue(root).also { if (it.categories.isNotEmpty()) catalogue = it }
     }
 
@@ -377,19 +456,19 @@ class AudioMuseApi(
      * AudioMuse's analysis of songs (tempo, key, moods, genres) from its read-only export for apps
      * (`/api/sync`), at most 500 at a time, without the large sound data (issue #216).
      */
-    suspend fun features(ids: List<String>): List<TrackFeatures> = ids.distinct().chunked(SYNC_BATCH).flatMap { batch ->
-        val url = apiUrl("api/sync")
-            .addQueryParameter("ids", batch.joinToString(","))
-            .addQueryParameter("include_embeddings", "false")
-            .addQueryParameter("limit", batch.size.toString())
-            .build()
-        val root = execute { request("", batch, at = url).get().build() }
+    suspend fun features(ids: List<String>, beatsOnly: Boolean = false): List<TrackFeatures> = syncBatches(ids.distinct()).flatMap { batch ->
+        val root = sound(
+            "/api/sync",
+            listOf("ids" to batch.joinToString(","), "include_embeddings" to "false", "limit" to batch.size.toString()),
+            about = batch,
+            beatsOnly = beatsOnly,
+        ) as? JsonObject ?: throw ApiException("AudioMuse sent an unexpected answer")
         root.arr("tracks").mapNotNull(::parseFeatures)
     }
 
     /** Sound concepts this library's search understands well, to steer the AI's wording. */
     suspend fun concepts(): List<String> {
-        val root = execute { request("/api/clap/concepts").get().build() }
+        val root = sound("/api/clap/concepts") as? JsonObject ?: throw ApiException("AudioMuse sent an unexpected answer")
         if (root.bool("available") == false) return emptyList()
         return root.arr("categories")
             .flatMap { category -> category.arr("terms").mapNotNull { it.str("term") } }
@@ -412,6 +491,34 @@ class AudioMuseApi(
 
         val JSON_TYPE = "application/json".toMediaType()
         const val SYNC_BATCH = 500
+
+        /**
+         * AudioMuse's web server turns away a request line over about 4 KB (HTTP 400, an HTML page): 251 songs'
+         * ids in one /api/sync asked for 6 KB, and a playlist's DJ mix lost its tempo and key and was only shuffled
+         * (the owner's log, 8 Nov). Batches of at most [SYNC_BATCH] ids whose list stays within [budget] bytes,
+         * leaving room for the address and the other parameters.
+         */
+        fun syncBatches(ids: List<String>, budget: Int = SYNC_IDS_BUDGET): List<List<String>> {
+            val out = ArrayList<List<String>>()
+            var current = ArrayList<String>()
+            var length = 0  // of the ids as sent: each encoded, "%2C" between them
+            for (id in ids) {
+                val size = java.net.URLEncoder.encode(id, "UTF-8").length
+                val added = if (current.isEmpty()) size else size + 3
+                if (current.isNotEmpty() && (length + added > budget || current.size >= SYNC_BATCH)) {
+                    out += current
+                    current = ArrayList()
+                    length = 0
+                }
+                length += if (current.isEmpty()) size else size + 3
+                current += id
+            }
+            if (current.isNotEmpty()) out += current
+            return out
+        }
+
+        /** The ids' share of a 4 KB request line, after the address and the other parameters. */
+        const val SYNC_IDS_BUDGET = 3_000
 
         fun parseCatalogue(root: JsonObject): ConceptCatalogue {
             if (root.bool("available") == false) return ConceptCatalogue(emptyList(), 0)
@@ -448,6 +555,9 @@ class AudioMuseApi(
                 moods = parseScores(o.str("other_features")),
                 genres = parseScores(o.str("mood_vector")),
                 energy = o.dbl("energy"),
+                // "converted" (0.35) is an old energy put on today's scale: the same scale as "beats".
+                energySource = o.str("energy_source")?.let { if (it == "converted") "beats" else it },
+                arousal = o.dbl("arousal"),
             )
         }
 
@@ -470,11 +580,14 @@ class AudioMuseApi(
     }
 }
 
-/** Where the Siansa plugin's API is on an AudioMuse server. */
-const val PLUGIN_PREFIX = "/plugins/siansa_analysis/"
+/**
+ * Where the plugin's API is on an AudioMuse server. Siansa Dev (the owner, 9 Nov): Siansa Beats (dev), which does
+ * all the Siansa plugin does, with Siansa Beats' beat grids, and is the one plugin going forward.
+ */
+const val PLUGIN_PREFIX = "/plugins/siansa_beats/"
 
-/** Where it was before the rename (issue #360), used while only that version is installed. */
-const val LEGACY_PLUGIN_PREFIX = "/plugins/musix_analysis/"
+/** The Siansa plugin, used while Siansa Beats (dev) isn't installed (the same API). */
+const val LEGACY_PLUGIN_PREFIX = "/plugins/siansa_analysis/"
 
 /**
  * AudioMuse 3 serves several media servers; each request names which one with `server` (its name in AudioMuse),

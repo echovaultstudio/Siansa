@@ -69,6 +69,11 @@ import app.siansa.data.movesFirstVisible
  */
 @Composable
 fun HomeSettingsSheet(nav: androidx.navigation.NavController, startOnSources: Boolean, onDismiss: () -> Unit) {
+    // Sources is a sheet of its own (the owner, 12 Nov): Arrange isn't part of it.
+    if (startOnSources) {
+        SourcesSheet(onDismiss)
+        return
+    }
     val graph = LocalGraph.current
     val s by graph.settings.state.collectAsStateWithLifecycle()
     // The notices are the top of Home (issue #872), not a section to move: shown or not in Settings › Notices and Cards › Notices.
@@ -82,7 +87,7 @@ fun HomeSettingsSheet(nav: androidx.navigation.NavController, startOnSources: Bo
     }, onHiddenChange = {
         AppLog.i("Home", "Hidden: ${HomeSection.formatHidden(it).ifEmpty { "none" }}")
         graph.settings.setHomeHidden(it)
-    }, onDismiss = onDismiss, startOnSources = startOnSources,
+    }, onDismiss = onDismiss,
         looks = s.homeLooks,
         untitled = s.homeUntitled,
         onTitleShownChange = { section, shown ->
@@ -92,6 +97,11 @@ fun HomeSettingsSheet(nav: androidx.navigation.NavController, startOnSources: Bo
         onLookChange = { section, look ->
             AppLog.i("Home", "${section.label} looks: ${look.label}")
             graph.settings.setHomeLook(section, look)
+        },
+        gridSizes = s.homeGridSizes,
+        onGridSizeChange = { section, size ->
+            AppLog.i("Home", "${section.label}: $size tiles in its grid")
+            graph.settings.setHomeGridSize(section, size)
         },
         onResetLooks = {
             AppLog.i("Home", "Every row back in its own look")
@@ -105,7 +115,7 @@ fun HomeSettingsSheet(nav: androidx.navigation.NavController, startOnSources: Bo
 }
 
 /**
- * Home settings, behind Home's top-right buttons: Sources (whose music shows, see [SourcesPanel]) and Arrange.
+ * Arrange Home, from Home's menu (Sources has a sheet of its own, [SourcesSheet]).
  *
  * Arrange is a short list of Home's sections to drag into a new order: hold a row, or grab its handle, and move it.
  * Only the row being dragged follows the finger; the others slide out of the way. The order is saved
@@ -118,7 +128,6 @@ fun ArrangeHomeSheet(
     onChange: (List<HomeSection>) -> Unit,
     onHiddenChange: (Set<HomeSection>) -> Unit,
     onDismiss: () -> Unit,
-    startOnSources: Boolean = false,
     // The gap between Home's sections, a step of the spacing scale (#554).
     gap: Int = AppSettings.HOME_GAP_DEFAULT,
     onGapChange: (Int) -> Unit = {},
@@ -130,6 +139,9 @@ fun ArrangeHomeSheet(
     onTitleShownChange: (HomeSection, Boolean) -> Unit = { _, _ -> },
     onLookChange: (HomeSection, HomeLook) -> Unit = { _, _ -> },
     onResetLooks: () -> Unit = {},
+    // Tiles of a row shown as the shortcut grid (the owner, 10 Nov), picked in its look's dialog.
+    gridSizes: Map<HomeSection, Int> = emptyMap(),
+    onGridSizeChange: (HomeSection, Int) -> Unit = { _, _ -> },
     onOpenSettings: (HomeSection) -> Unit = {},
     // The sections listed here, in Reset's order: all but the notices, which are the top of Home (issue #872).
     sections: List<HomeSection> = HomeSection.default - HomeSection.NOTICES,
@@ -140,11 +152,13 @@ fun ArrangeHomeSheet(
             section, looks[section] ?: HomeLook.AS_IS,
             titleShown = section !in untitled,
             onTitleShown = { onTitleShownChange(section, it) },
-            onPick = { onLookChange(section, it); picking = null },
+            // The grid stays open, so how many tiles it has can be picked there.
+            onPick = { onLookChange(section, it); if (it != HomeLook.GRID) picking = null },
             onDismiss = { picking = null },
+            gridSize = gridSizes[section] ?: HomeLook.GRID_MOST,
+            onGridSize = { onGridSizeChange(section, it) },
         )
     }
-    var sources by remember { mutableStateOf(startOnSources) }
     var items by remember { mutableStateOf(order) }
     var hiddenItems by remember { mutableStateOf(hidden) }
     var dragging by remember { mutableStateOf<HomeSection?>(null) }
@@ -207,14 +221,14 @@ fun ArrangeHomeSheet(
         Column(Modifier.navigationBarsPadding().padding(bottom = Space.Small)) {
             Row(Modifier.fillMaxWidth().padding(start = Space.Page, end = Space.Small), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text(if (sources) "Source filter" else "Arrange Home", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text("Arrange Home", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     Text(
-                        if (sources) "Whose music shows, everywhere in the app" else "Hold a row and drag it. Tap the eye to hide it, the cog to change its look or hide its title.",
+                        "Hold a row to move it. The eye hides it, the cog changes its look or hides its title.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                if (!sources) TextButton(
+                TextButton(
                     onClick = {
                         if (items != sections) {
                             list.requestScrollToItem(0)  // the reset order shows from its top (#614)
@@ -232,19 +246,16 @@ fun ArrangeHomeSheet(
                     enabled = items != sections || hiddenItems.any { it in sections } || gap != AppSettings.HOME_GAP_DEFAULT || looks.isNotEmpty(),
                 ) { Text("Reset") }
             }
-            SheetTabs(sources) { sources = it }
-            Spacer(Modifier.height(Space.Medium))
-            if (sources) {
-                SourcesPanel()
-                return@Column
-            }
+            Spacer(Modifier.height(Space.Small))
             SpacingRow(gap, onGapChange)
+            androidx.compose.material3.HorizontalDivider(Modifier.padding(horizontal = Space.Page, vertical = Space.Tight), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
             LazyColumn(state = list, userScrollEnabled = dragging == null) {
                 items(items, key = { it.id }) { section ->
                     val lifted = section == dragging
                     val isHidden = section in hiddenItems
+                    // Plain rows (the owner, 12 Nov): only the one being held is a lifted card.
                     Surface(
-                        color = if (lifted) MaterialTheme.colorScheme.surfaceContainerHighest else MaterialTheme.colorScheme.surfaceContainerLow,
+                        color = if (lifted) MaterialTheme.colorScheme.surfaceContainerHighest else androidx.compose.ui.graphics.Color.Transparent,
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
                             .then(
@@ -253,7 +264,7 @@ fun ArrangeHomeSheet(
                             )
                             .zIndex(if (lifted) 1f else 0f)
                             .graphicsLayer { translationY = if (lifted) offset else 0f }
-                            .padding(horizontal = Space.Page, vertical = Space.Tight)
+                            .padding(horizontal = Space.Small)
                             .then(if (lifted) Modifier.shadow(6.dp, RoundedCornerShape(12.dp)) else Modifier)
                             .fillMaxWidth()
                             .pointerInput(section) {
@@ -265,18 +276,44 @@ fun ArrangeHomeSheet(
                                 )
                             },
                     ) {
-                        Row(Modifier.height(52.dp).padding(start = Space.Page), verticalAlignment = Alignment.CenterVertically) {
+                        Row(Modifier.height(52.dp).padding(start = Space.Small), verticalAlignment = Alignment.CenterVertically) {
+                            // The handle moves straight away, without the hold.
+                            Icon(
+                                Icons.Rounded.DragIndicator,
+                                contentDescription = "Move ${section.label}",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier
+                                    .pointerInput(section) {
+                                        detectDragGestures(
+                                            onDragStart = { start(section) },
+                                            onDrag = { change, amount -> change.consume(); dragBy(amount.y) },
+                                            onDragEnd = { end() },
+                                            onDragCancel = { end() },
+                                        )
+                                    }
+                                    .padding(horizontal = Space.Small, vertical = Space.Page)
+                                    .size(24.dp),
+                            )
                             // Hidden rows stay in the list, dimmed, so they keep their place and can come back.
-                            Column(Modifier.weight(1f).alpha(if (isHidden) 0.6f else 1f)) {
+                            Column(Modifier.weight(1f).padding(start = Space.Tight).alpha(if (isHidden) 0.6f else 1f)) {
                                 Text(
                                     section.label,
                                     style = MaterialTheme.typography.bodyLarge,
                                     color = if (isHidden) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
                                 )
-                                // A row in another look says which (issue #655).
-                                looks[section]?.let { look ->
-                                    Text(look.label, style = MaterialTheme.typography.bodySmall, color = Accent, modifier = Modifier.testTag("homeLookLabel"))
-                                }
+                                // A row in another look says which (issue #655); a hidden one says so.
+                                val line = if (isHidden) "Hidden" else looks[section]?.label
+                                if (line != null) Text(line, style = MaterialTheme.typography.bodySmall, color = if (isHidden) MaterialTheme.colorScheme.onSurfaceVariant else Accent, modifier = Modifier.testTag("homeLookLabel"))
+                            }
+                            IconButton(onClick = {
+                                hiddenItems = if (isHidden) hiddenItems - section else hiddenItems + section
+                                onHiddenChange(hiddenItems)
+                            }) {
+                                Icon(
+                                    if (isHidden) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
+                                    contentDescription = if (isHidden) "Show ${section.label}" else "Hide ${section.label}",
+                                    tint = if (isHidden) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurface,
+                                )
                             }
                             IconButton(
                                 onClick = { if (section.lookable) picking = section else onOpenSettings(section) },
@@ -292,33 +329,6 @@ fun ArrangeHomeSheet(
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
-                            IconButton(onClick = {
-                                hiddenItems = if (isHidden) hiddenItems - section else hiddenItems + section
-                                onHiddenChange(hiddenItems)
-                            }) {
-                                Icon(
-                                    if (isHidden) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
-                                    contentDescription = if (isHidden) "Show ${section.label}" else "Hide ${section.label}",
-                                    tint = if (isHidden) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                            // The handle moves straight away, without the hold.
-                            Icon(
-                                Icons.Rounded.DragIndicator,
-                                contentDescription = "Move ${section.label}",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier
-                                    .pointerInput(section) {
-                                        detectDragGestures(
-                                            onDragStart = { start(section) },
-                                            onDrag = { change, amount -> change.consume(); dragBy(amount.y) },
-                                            onDragEnd = { end() },
-                                            onDragCancel = { end() },
-                                        )
-                                    }
-                                    .padding(horizontal = Space.Page, vertical = Space.Page)
-                                    .size(24.dp),
-                            )
                         }
                     }
                 }
@@ -336,9 +346,13 @@ private fun HomeLookDialog(
     onTitleShown: (Boolean) -> Unit,
     onPick: (HomeLook) -> Unit,
     onDismiss: () -> Unit,
+    gridSize: Int = HomeLook.GRID_MOST,
+    onGridSize: (Int) -> Unit = {},
 ) {
     // The switch shows its change at once: the dialog stays open for the look.
     var shown by remember(section) { mutableStateOf(titleShown) }
+    var look by remember(section) { mutableStateOf(current) }
+    var tiles by remember(section) { mutableStateOf(gridSize) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(section.label) },
@@ -350,17 +364,21 @@ private fun HomeLookDialog(
                     onTitleShown(it)
                 }
                 HorizontalDivider(Modifier.padding(vertical = Space.Small))
-                HomeLook.entries.forEach { look ->
+                // Shortcuts is the grid already: its size is set in Settings › Style › Home.
+                HomeLook.entries.filter { it != HomeLook.GRID || section != HomeSection.QUICK }.forEach { option ->
                     Row(
-                        Modifier.fillMaxWidth().clickable { onPick(look) }.padding(vertical = Space.Small).testTag("homeLook-${look.id}"),
+                        Modifier.fillMaxWidth().clickable { look = option; onPick(option) }.padding(vertical = Space.Small).testTag("homeLook-${option.id}"),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        RadioButton(selected = look == current, onClick = { onPick(look) })
+                        RadioButton(selected = option == look, onClick = { look = option; onPick(option) })
                         Spacer(Modifier.width(Space.Small))
                         Column(Modifier.weight(1f)) {
-                            Text(look.label, style = MaterialTheme.typography.bodyLarge)
-                            Text(look.hint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(option.label, style = MaterialTheme.typography.bodyLarge)
+                            Text(option.hint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
+                    }
+                    if (option == HomeLook.GRID && look == HomeLook.GRID) {
+                        GridSizeChips(tiles, Modifier.padding(start = Space.Section, bottom = Space.Small)) { tiles = it; onGridSize(it) }
                     }
                 }
             }
@@ -406,35 +424,6 @@ internal fun SpacingRow(gap: Int, onChange: (Int) -> Unit) {
     }
 }
 
-/** Sources | Arrange, as two halves of one rounded bar (from Ratty's #124). */
-@Composable
-private fun SheetTabs(sources: Boolean, onSources: (Boolean) -> Unit) {
-    Surface(
-        shape = RoundedCornerShape(50),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        modifier = Modifier.fillMaxWidth().padding(start = Space.Page, end = Space.Page, top = Space.Medium),
-    ) {
-        Row(Modifier.padding(3.dp)) {  // spacing: exact (the segmented control's inset)
-            listOf(true to "Sources", false to "Arrange").forEach { (isSources, label) ->
-                val on = sources == isSources
-                Surface(
-                    onClick = { onSources(isSources) },
-                    shape = RoundedCornerShape(50),
-                    color = if (on) Accent else androidx.compose.ui.graphics.Color.Transparent,
-                    contentColor = if (on) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text(
-                        label,
-                        style = MaterialTheme.typography.labelLarge,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                        modifier = Modifier.padding(vertical = Space.Small),
-                    )
-                }
-            }
-        }
-    }
-}
 
 /** How close to the list's edge a held row starts scrolling it, and how fast it scrolls at most (px a frame). */
 private val AUTO_SCROLL_EDGE = 56.dp
@@ -468,5 +457,21 @@ internal fun SectionTitleSwitch(shown: Boolean, onChange: (Boolean) -> Unit) {
         }
         Spacer(Modifier.width(Space.Medium))
         androidx.compose.material3.Switch(checked = shown, onCheckedChange = onChange, modifier = Modifier.testTag("homeTitleSwitch"))
+    }
+}
+
+/** How many tiles a shortcut grid has (the owner, 10 Nov): 2, 4, 6 or 8, two to a row. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+internal fun GridSizeChips(size: Int, modifier: Modifier = Modifier, onPick: (Int) -> Unit) {
+    androidx.compose.foundation.layout.FlowRow(modifier.testTag("gridSize"), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(Space.Small)) {
+        HomeLook.GRID_SIZES.forEach { n ->
+            androidx.compose.material3.FilterChip(
+                selected = size == n,
+                onClick = { onPick(n) },
+                label = { Text("$n tiles") },
+                modifier = Modifier.testTag("gridSize-$n"),
+            )
+        }
     }
 }

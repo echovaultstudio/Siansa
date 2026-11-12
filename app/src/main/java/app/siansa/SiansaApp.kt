@@ -101,7 +101,8 @@ class SiansaApp : Application(), SingletonImageLoader.Factory {
         }
         return ImageLoader.Builder(context)
             .components {
-                add(OkHttpNetworkFetcherFactory(callFactory = { graph.imageHttp }))
+                // Every picture is kept on the phone except the server's stand-in for one it doesn't have right now.
+                add(OkHttpNetworkFetcherFactory(callFactory = { graph.imageHttp }, cacheStrategy = { app.siansa.covers.KeepRealCovers() }))
                 // Animated covers shown as stills: their first frame (Android's still decoder fails on some).
                 add(app.siansa.covers.FirstFrameDecoder.Factory())
             }
@@ -137,9 +138,9 @@ class SiansaApp : Application(), SingletonImageLoader.Factory {
             .eventListener(object : coil3.EventListener() {
                 override fun onError(request: coil3.request.ImageRequest, result: coil3.request.ErrorResult) {
                     val data = request.data.toString()
-                    val what = Regex("[?&]id=([^&]+)").find(data)?.groupValues?.get(1)?.let { id ->
-                        "cover $id (size ${Regex("[?&]size=(\\d+)").find(data)?.groupValues?.get(1) ?: "original"})"
-                    } ?: data.substringAfterLast('/').take(60)
+                    // Never the address itself: Emby's and Jellyfin's carry the sign-in.
+                    val what = app.siansa.covers.CoverAddress.of(data)?.let { "cover ${it.id} (size ${it.size ?: "original"})" }
+                        ?: data.substringBefore('?').substringAfterLast('/').take(60)
                     val e = result.throwable
                     AppLog.w("Image", "Couldn't show $what: ${e.javaClass.simpleName}: ${e.message}")
                     // A cover that can't be read may be an error message Navidrome sent once and the cache
@@ -172,7 +173,7 @@ class SiansaApp : Application(), SingletonImageLoader.Factory {
             "crossfade ${s.crossfade.name.lowercase()} ${s.crossfadeSeconds} s, beat-matched ${s.beatMatch.name.lowercase()}, ${s.blendBars} bars, bass swap ${if (s.bassSwap) "on" else "off"}",
             "song cache ${mb(s.songCacheMb)}, image cache ${mb(s.imageCacheMb)}",
             "animated covers ${if (s.animatedCovers) "on" else "off"}, download all covers ${if (s.coverDownload) (if (s.coverDownloadAnyWifi) "any Wi-Fi" else "home") else "off"}",
-            "scrobbling: " + listOfNotNull("Navidrome".takeIf { s.scrobbleNavidrome }, "Last.fm".takeIf { s.lastFmReady }, "ListenBrainz/Koito".takeIf { s.listenBrainzReady }).joinToString(", ").ifEmpty { "off" },
+            "scrobbling: " + listOfNotNull("Navidrome".takeIf { s.scrobbleNavidrome }, "Siansa Beats".takeIf { with(app.siansa.net.BeatsListens) { s.scrobbleBeats && s.beatsReady } }, "Last.fm".takeIf { s.lastFmReady }, "ListenBrainz/Koito".takeIf { s.listenBrainzReady }).joinToString(", ").ifEmpty { "off" },
         ).joinToString(" · ")
     }
 

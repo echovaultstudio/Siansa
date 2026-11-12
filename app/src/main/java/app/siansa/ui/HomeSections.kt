@@ -82,7 +82,7 @@ fun HomeSectionScreen(nav: NavController, id: String) {
 
     val items by loadState(version to section) { loadSection(graph, section) }
     // A grid of three or a list, switched at the top and kept per kind of page (issue #289). Playlists start
-    // as a list, like Spotify; the rest as a grid.
+    // as a list; the rest as a grid.
     var grid by rememberGridMode("section-${section.id}", default = section != HomeSection.Playlists)
     val gridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
     Screen(section.title, nav) { padding ->
@@ -128,7 +128,7 @@ private fun SectionRow(item: SectionItem, nav: NavController, launch: PlayLaunch
             })
         }
         is SectionItem.Radio -> MediaRow(item.radio.name, "Sound radio", null, colors = Color(item.radio.colors.first) to Color(item.radio.colors.second), onClick = { nav.openMoodRadio(item.radio.id) })
-        is SectionItem.GenreItem -> MediaRow(item.genre.name, "${item.genre.songCount} songs", null, colors = tileColors(item.genre.name), onClick = { nav.openGenreRadio(item.genre.name) })
+        is SectionItem.GenreItem -> MediaRow(item.genre.name, "${item.genre.songCount} songs", null, colors = genreColors(item.genre.name), onClick = { nav.openGenreRadio(item.genre.name) })
     }
 }
 
@@ -155,7 +155,10 @@ private suspend fun loadSection(graph: AppGraph, section: HomeSection): List<Sec
             if (synced) graph.library.albums("newest").take(200)
             else graph.source.albums("newest", 200, 0).distinctBy { it.name + "|" + it.artist }
             ).map { SectionItem.AlbumItem(it, it.artist) }
-        HomeSection.Genres -> (if (synced) graph.library.genres(500) else emptyList()).map { SectionItem.GenreItem(it) }
+        // The genres Siansa Beats hears, as last saved, or the songs' tags: every one (Search's All genres opens this).
+        // A to Z (the owner, 10 Nov): the row on Home and Search's tiles are most songs first, the page of all is a list to look up.
+        HomeSection.Genres -> (if (synced) graph.browseGenres(ALL_GENRES) else emptyList())
+            .sortedBy { app.siansa.data.normalizeKey(it.name) }.map { SectionItem.GenreItem(it) }
         HomeSection.RandomPicks -> (
             if (synced) graph.library.randomAlbums(100)
             else graph.source.albums("random", 100, 0).distinctBy { it.name + "|" + it.artist }
@@ -202,7 +205,7 @@ private fun SectionTile(item: SectionItem, nav: NavController, launch: PlayLaunc
         is SectionItem.GenreItem -> BoxWithConstraints(fill.padding(Space.Small)) {
             GradientTile(
                 title = item.genre.name,
-                colors = tileColors(item.genre.name),
+                colors = genreColors(item.genre.name),
                 size = maxWidth,
                 onClick = { nav.openGenreRadio(item.genre.name) },
             )

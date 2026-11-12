@@ -1,6 +1,7 @@
 package app.siansa.playback
 
 import app.siansa.data.AppJson
+import app.siansa.data.AppSettings
 import app.siansa.net.arr
 import app.siansa.net.dbl
 import app.siansa.net.int
@@ -22,6 +23,12 @@ enum class LoudnessSource(val label: String, val detail: String) {
         fun parse(value: String?): LoudnessSource = entries.firstOrNull { it.name == value } ?: TAGS
     }
 }
+
+/** Who measures the songs: "Siansa Beats" when it's set up (Siansa Dev), "the Siansa plugin" otherwise. */
+val AppSettings.measurer: String get() = if (beatsReady) "Siansa Beats" else "the Siansa plugin"
+
+/** [measurer]'s, said right: "Siansa Beats'" or "the Siansa plugin's". */
+val AppSettings.measurers: String get() = if (beatsReady) "Siansa Beats'" else "the Siansa plugin's"
 
 /** One level on a ramp: the song is at [db] relative to its own loudness at [ms] (see [TrackProfile]). */
 data class RampPoint(val db: Int, val ms: Long)
@@ -49,20 +56,41 @@ data class BeatEnd(
      * that number, and its beat counts as steady though the plugin's reading of it wandered a little.
      */
     val grid: Boolean = false,
+    /**
+     * Siansa Beats (Siansa Dev): where the beat locks onto the song's grid, the first and last 4 bars it all sits
+     * on it. An intro's is where its first locked bar starts, an outro's where its last locked bar starts (the lock
+     * ends a bar later). A track cut from a mixed CD carries the DJ's own transitions outside it, so a blend stays
+     * inside. Null from the Siansa plugin, which doesn't measure it.
+     */
+    val lockMs: Double? = null,
+    /** Siansa Beats: how many bars from the lock the bass stays out (an intro of drums alone) or is already gone. */
+    val bassBars: Int? = null,
+    /** Siansa Beats: how loud this end is next to the song's loud part, in dB (0 as loud, −6 quieter). */
+    val energyDb: Double? = null,
 ) {
     val beatLengthMs: Double get() = 60_000.0 / bpm
+
+    /** Where the locked stretch ends, at an outro: a bar after its last locked bar starts. */
+    val lockEndMs: Double? get() = lockMs?.let { it + BeatMatch.BEATS_PER_BAR * beatLengthMs }
+
+    /**
+     * How beat-driven an end has to be to blend beat on beat: with Siansa Beats' lock ([lockMs]) the rhythm is
+     * measured inside it, and a stricter bar holds (the owner, 9 Nov: a mix-CD track at 56 % trainwrecked).
+     */
+    val minRhythm: Float get() = if (lockMs != null) BeatMatch.MIN_LOCKED_RHYTHM else BeatMatch.MIN_RHYTHM
 
     /** A phrase's length in ms, when the phrases are clear. */
     val phraseLengthMs: Double? get() = phraseBars?.let { it * BeatMatch.BEATS_PER_BAR * beatLengthMs }
 
     /** A beat-driven, steady end: one a blend can be laid on, beat for beat. */
-    val matchable: Boolean get() = bpm > 0 && rhythm >= BeatMatch.MIN_RHYTHM && (steady >= BeatMatch.MIN_STEADY || grid)
+    val matchable: Boolean get() = bpm > 0 && rhythm >= minRhythm &&
+        (if (lockMs != null) steady >= BeatMatch.MIN_LOCKED_STEADY else steady >= BeatMatch.MIN_STEADY || grid)
 
     /**
      * As the start of the next song (issue #759): a quiet build-up that keeps a steady beat with clear bars can be
      * laid on the old song's beats too, so when its drums come in they're in step; it needn't be beat-driven yet.
      */
-    val matchableAsIntro: Boolean get() = matchable || (bpm > 0 && (steady >= BeatMatch.MIN_STEADY || grid) && barMs != null)
+    val matchableAsIntro: Boolean get() = matchable || (lockMs == null && bpm > 0 && (steady >= BeatMatch.MIN_STEADY || grid) && barMs != null)
 
     /**
      * The same grid counted the way a DJ counts (issue #807): a tempo the plugin read at half time (drum and bass at
@@ -79,8 +107,9 @@ data class BeatEnd(
     }
 
     /** For the log (issue #744): "128.0 BPM, beat 0.82, steady 0.91, bars found". */
-    fun describe(): String = "%.1f BPM%s, beat %.2f, steady %.2f, %s".format(
+    fun describe(): String = "%.1f BPM%s, beat %.2f, steady %.2f, %s%s".format(
         java.util.Locale.ROOT, bpm, if (grid) " (taken as a grid's)" else "", rhythm, steady,
+        lockMs?.let { "locked from %.1f s, ".format(java.util.Locale.ROOT, it / 1000.0) }.orEmpty(),
         when {
             assumed && phraseBars != null -> "bars and $phraseBars-bar phrases assumed from the first beat"
             assumed -> "bars assumed from the first beat"
@@ -114,7 +143,18 @@ data class TrackProfile(
      * outro (plugin 0.5.0); null when it beats to the end, has no beat, or wasn't measured for it.
      */
     val beatsUntilMs: Long? = null,
+    /** Siansa Beats: a track cut from a mixed CD (full volume at both ends: the DJ's transitions are in it). */
+    val mixTrack: Boolean = false,
+    /** Siansa Beats: where the bass comes back after being out (ms from the start), and where it drops out. */
+    val dropsMs: List<Long> = emptyList(),
+    val breakdownsMs: List<Long> = emptyList(),
+    /** AudioMuse-AI's key and scale (Siansa Beats (dev) plugin 0.3.0), for blends in key. */
+    val key: String? = null,
+    val scale: String? = null,
 ) {
+    /** Siansa Beats has its grid for this song (a lock at either end), not only the plugin's own reading. */
+    val fromBeats: Boolean get() = intro?.lockMs != null || outro?.lockMs != null
+
     /** How long after the start the song first gets up to [db] (relative), or null if it never does. */
     fun reachesAfterMs(db: Int): Long? = startRamp.firstOrNull { it.db >= db }?.ms
 
@@ -147,7 +187,9 @@ object RampCodec {
 
 /** Reading the Siansa plugin's `GET /plugins/siansa_analysis/api/profiles?ids=…` answers. */
 object PluginProfiles {
-    const val PATH = "/plugins/siansa_analysis/api/profiles"
+    // Siansa Dev's experiment (experiment/siansa-beats): Siansa Beats (dev), the plugin that hands on the Siansa
+    // plugin's loudness and fades with Siansa Beats' beat grids. The Siansa app asks the Siansa plugin itself.
+    const val PATH = "/plugins/siansa_beats/api/profiles"
 
     /** The AudioMuse host rejects request lines over ~4 KB, and the plugin reads at most 500 ids. */
     const val URL_BUDGET_BYTES = 3_500
@@ -199,6 +241,11 @@ object PluginProfiles {
             intro = beatEnd(p, "intro"),
             outro = beatEnd(p, "outro"),
             beatsUntilMs = p.dbl("beats_until_ms")?.takeIf { it.isFinite() && it > 0 }?.toLong(),
+            mixTrack = (p["mix_track"] as? kotlinx.serialization.json.JsonPrimitive)?.content == "true",
+            dropsMs = times(p, "drops_ms"),
+            breakdownsMs = times(p, "breakdowns_ms"),
+            key = p.str("key")?.takeIf { it.isNotBlank() },
+            scale = p.str("scale")?.takeIf { it.isNotBlank() },
         )
     }
 
@@ -214,8 +261,16 @@ object PluginProfiles {
             steady = (p.dbl("${prefix}_steady") ?: 0.0).toFloat().coerceIn(0f, 1f),
             phraseMs = p.dbl("${prefix}_phrase_ms")?.takeIf { it.isFinite() },
             phraseBars = p.dbl("${prefix}_phrase_bars")?.takeIf { it.isFinite() && it >= 1 }?.toInt(),
+            lockMs = p.dbl("${prefix}_lock_ms")?.takeIf { it.isFinite() && it >= 0 },
+            bassBars = p.dbl("${prefix}_bass_bars")?.takeIf { it.isFinite() && it >= 0 }?.toInt(),
+            energyDb = p.dbl("${prefix}_energy")?.takeIf { it.isFinite() },
         ).inDjRange()
     }
+
+    /** A list of ms (Siansa Beats' drops and breakdowns), empty when it isn't one. */
+    private fun times(p: JsonObject, key: String): List<Long> =
+        ((p[key] as? kotlinx.serialization.json.JsonArray) ?: return emptyList())
+            .mapNotNull { (it as? kotlinx.serialization.json.JsonPrimitive)?.content?.toDoubleOrNull()?.takeIf(Double::isFinite)?.toLong() }
 
     fun parse(text: String): List<TrackProfile> =
         (runCatching { AppJson.parseToJsonElement(text) }.getOrNull() as? JsonObject)?.let(::parse) ?: emptyList()

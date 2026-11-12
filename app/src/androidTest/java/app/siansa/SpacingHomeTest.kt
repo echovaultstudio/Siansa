@@ -169,16 +169,15 @@ class SpacingHomeTest : SpacingCheck() {
     }
 
     /**
-     * Home's menu (issue #872): the bubbles are one size and perfectly in line (their centres on one vertical line),
-     * the same room between each, and each label centred on its bubble. Checked narrow, while casting and with the
-     * source filter on.
+     * Home's menu (the owner, 12 Nov): one card of rows, each a shortcut tile's height with the tiles' gap between,
+     * their names on one line at the left, whatever's in use (a long cast name, the source filter on).
      */
-    @Test fun homeMenuBubblesSitInLine() {
+    @Test fun homeMenuRowsLieOnTheTiles() {
         compose.setContent {
             SiansaTheme {
-                // Narrow, as on a small phone with big text: no bubble may be squeezed.
+                // Narrow, as the right column of the tiles: no row may be squeezed.
                 app.siansa.ui.HomeMenuPanel(
-                    modifier = Modifier.widthIn(max = 280.dp),
+                    modifier = Modifier.widthIn(max = 180.dp),
                     info = app.siansa.ui.HomeMenuInfo(
                         app.siansa.ui.PlayOnLine("Playing on Living Room SHIELD with an uncharacteristically long name", "Chromecast", true),
                         "Downloaded only · 2 users", true,
@@ -187,18 +186,15 @@ class SpacingHomeTest : SpacingCheck() {
                 )
             }
         }
-        val bubbles = listOf("dice", "play_on", "sources", "arrange").map { compose.onNodeWithTag("homeMenuBubble-$it", useUnmergedTree = true).getBoundsInRoot() }
+        val rows = listOf("dice", "play_on", "sources", "arrange").map { compose.onNodeWithTag("homeMenu-$it", useUnmergedTree = true).getBoundsInRoot() }
         val labels = listOf("dice", "play_on", "sources", "arrange").map { compose.onNodeWithTag("homeMenuLabel-$it", useUnmergedTree = true).getBoundsInRoot() }
-        val centre = (bubbles[0].left + bubbles[0].right) / 2
-        bubbles.forEachIndexed { i, b ->
-            assertEven("Menu: bubble $i on the same centre line", (b.left + b.right) / 2, centre, 0.5.dp)
-            assertEven("Menu: bubble $i is round and the button's size", b.right - b.left, app.siansa.ui.MENU_CIRCLE, 0.5.dp)
-            assertEven("Menu: bubble $i height", b.bottom - b.top, app.siansa.ui.MENU_CIRCLE, 0.5.dp)
-            assertEven("Menu: label $i centred on its bubble", (labels[i].top + labels[i].bottom) / 2, (b.top + b.bottom) / 2, 1.dp)
-            assertEven("Menu: label $i a step from its bubble", b.left - labels[i].right, Space.Small, 1.dp)
+        rows.forEachIndexed { i, r ->
+            assertEven("Menu: row $i a tile's height", r.bottom - r.top, app.siansa.ui.MENU_ROW, 0.5.dp)
+            assertEven("Menu: label $i starts where the first does", labels[i].left, labels[0].left, 0.5.dp)
+            assertEven("Menu: row $i the panel's width", r.right - r.left, rows[0].right - rows[0].left, 0.5.dp)
         }
-        for (i in 1 until bubbles.size - 1) {
-            assertEven("Menu: room between the bubbles ($i)", bubbles[i].top - bubbles[i - 1].bottom, bubbles[i + 1].top - bubbles[i].bottom, 0.5.dp)
+        for (i in 1 until rows.size) {
+            assertEven("Menu: the tiles' gap between rows ($i)", rows[i].top - rows[i - 1].bottom, app.siansa.ui.MENU_ROW_GAP, 0.5.dp)
         }
     }
 
@@ -211,6 +207,24 @@ class SpacingHomeTest : SpacingCheck() {
         val banner = compose.onNodeWithTag("pinnedBanner").getBoundsInRoot()
         assertEven("Banner margins", banner.left - screen.left, screen.right - banner.right, 1.dp)
         assertEven("Banner left margin is the page margin", banner.left - screen.left, Space.Page, 1.dp)
+    }
+
+    /**
+     * The shortcut grid look (the owner, 10 Nov): two tiles a row a page margin from both edges, the same small gap
+     * between the two of a row as between rows.
+     */
+    @Test fun tileGridHasEvenMarginsAndGaps() {
+        val tiles = (1..4).map { i -> app.siansa.ui.GridTile("t$i", "Tile $i with a long name to cut", null, Color.Red to Color.Blue, onClick = {}) }
+        compose.setContent { SiansaTheme { Column { app.siansa.ui.TileGrid("Recently played", tiles, 4) } } }
+        val screen = compose.onRoot().getBoundsInRoot()
+        val boxes = compose.onAllNodesWithTag("tileGridTile").fetchSemanticsNodes().map { it.boundsInRoot }
+        assertEquals(4, boxes.size)
+        val d = compose.density
+        fun dp(px: Float) = with(d) { px.toDp() }
+        assertEven("Grid margins", dp(boxes[0].left) - screen.left, screen.right - dp(boxes[1].right), 1.dp)
+        assertEven("Grid left margin is the page margin", dp(boxes[0].left) - screen.left, Space.Page, 1.dp)
+        assertEven("Gap across and gap down", dp(boxes[1].left - boxes[0].right), dp(boxes[2].top - boxes[0].bottom), 1.dp)
+        assertEven("The gap is a small step", dp(boxes[1].left - boxes[0].right), Space.Small, 1.dp)
     }
 
     /** Custom cards (issue #622): the play button card sits a page margin from both edges of the screen. */
@@ -295,14 +309,15 @@ class SpacingHomeTest : SpacingCheck() {
         assertEven("Rule chips", chip.top - name.bottom, value.top - chip.bottom, 12.dp)
     }
 
-    /** Source filter: a user's libraries sit as far below their name as they sit above the card's edge. */
-    @Test fun sourceCardLibrariesAreEvenlySpaced() {
+    /** Sources: a user's libraries sit their gap below the name, and start under it, past the round mark (the owner, 12 Nov). */
+    @Test fun sourceRowLibrariesSitUnderTheName() {
         compose.setContent { SiansaTheme { app.siansa.ui.SourceCardForTest() } }
-        val name = compose.onNodeWithTag("source-name").getBoundsInRoot()
+        val name = compose.onNodeWithText("anna on music.example.com").getBoundsInRoot()
+        val nameRow = compose.onNodeWithTag("source-name").getBoundsInRoot()
         // The chip merges its tick and name, so its text node is the whole chip.
         val chipBox = compose.onNodeWithText("albums").getBoundsInRoot()
-        val card = compose.onNodeWithTag("source-card").getBoundsInRoot()
-        assertEven("Source card libraries", chipBox.top - name.bottom, card.bottom - chipBox.bottom)
+        assertEven("Libraries below the name", chipBox.top - nameRow.bottom, app.siansa.ui.SOURCE_CARD_GAP)
+        assertEven("Libraries start under the name", chipBox.left - name.left, 0.dp)
     }
 
     /** Source filter (issue #693): the sync line starts under the source's name, and its libraries keep their gap below it. */
@@ -348,19 +363,27 @@ class SpacingHomeTest : SpacingCheck() {
         assertEven("Path mood chips", chip.top - label.bottom, lyrics.top - chip.bottom)
     }
 
-    /** Dscvr's sliders (issue #339): the same gap between each slider and the next. */
+    /** Shape your sound (issue #339; the pad, 11 Nov): the same gap between the pad, each pill and the sounds' title. */
     @Test fun vibeSlidersAreEvenlySpaced() {
         compose.setContent {
             SiansaTheme {
-                VibeSliders(VibeTuning(sounds = listOf(SoundDial("piano", 2))), onChange = { })
+                VibeSliders(
+                    VibeTuning(sounds = listOf(SoundDial("piano", 2), SoundDial("Drone", 0, genre = true))),
+                    onChange = { },
+                    more = listOf(app.siansa.mix.MixSound("Strings", 4)),
+                )
             }
         }
-        val energy = compose.onNodeWithTag("sliderEnergy").getBoundsInRoot()
-        val tempo = compose.onNodeWithTag("sliderTempo").getBoundsInRoot()
+        val pad = compose.onNodeWithTag("soundPadBlock").getBoundsInRoot()
         val familiar = compose.onNodeWithTag("sliderFamiliar").getBoundsInRoot()
-        val sound = compose.onNodeWithTag("sliderSound").getBoundsInRoot()
-        assertEven("Vibe sliders", tempo.top - energy.bottom, familiar.top - tempo.bottom, 1.dp)
-        assertEven("Vibe sliders", familiar.top - tempo.bottom, sound.top - familiar.bottom, 1.dp)
+        val title = compose.onNodeWithTag("soundsTitle").getBoundsInRoot()
+        val sounds = compose.onAllNodesWithTag("sliderSound")
+        val first = sounds[0].getBoundsInRoot()
+        val second = sounds[1].getBoundsInRoot()
+        val more = compose.onNodeWithTag("soundsToAdd").getBoundsInRoot()
+        assertEven("Pad to Niche and Familiar", familiar.top - pad.bottom, title.top - familiar.bottom, 1.dp)
+        assertEven("Sound dials", first.top - title.bottom, second.top - first.bottom, 1.dp)
+        assertEven("Dials to the sounds to add", second.top - first.bottom, more.top - second.bottom, 1.dp)
     }
 
     /** Vibes panel (issue #247): the "Use the moment" switch rows are the same distance apart. */

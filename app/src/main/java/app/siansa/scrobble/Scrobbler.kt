@@ -6,7 +6,9 @@ import app.siansa.data.SettingsRepository
 import app.siansa.data.Song
 import app.siansa.data.Users
 import app.siansa.log.AppLog
+import app.siansa.net.BeatsListens
 import app.siansa.net.LastFmApi
+import app.siansa.net.beatsScrobbleReady
 import app.siansa.net.ListenBrainzApi
 import app.siansa.net.MusicSource
 import kotlinx.coroutines.CoroutineScope
@@ -22,7 +24,7 @@ import java.io.File
 data class PendingListen(val song: Song, val startedAtSec: Long, val targets: Set<String>)
 
 /**
- * Sends "now playing" and finished listens to Navidrome, Last.fm and ListenBrainz/Koito.
+ * Sends "now playing" and finished listens to the music server, Siansa Beats, Last.fm and ListenBrainz/Koito.
  * A listen counts after half the song or four minutes, for songs longer than 30 seconds (Last.fm's rule).
  * Listens that fail (offline, server down) are kept and retried with the next one.
  */
@@ -33,6 +35,8 @@ class Scrobbler(
     private val lastFm: LastFmApi,
     private val listenBrainz: ListenBrainzApi,
     private val scope: CoroutineScope,
+    /** Posts [body] to Siansa Beats' [path] ("Scrobble to Siansa Beats"); null where there's no Siansa Beats to ask. */
+    private val beats: (suspend (path: String, body: String) -> Unit)? = null,
     /** Whose library a song is from: the user in use, or another user whose music shows with theirs (issue #356). */
     private val sourceOf: suspend (songId: String) -> Int = { Users.active },
 ) {
@@ -45,6 +49,8 @@ class Scrobbler(
         scope.launch {
             if (!scrobbles(song, s.scrobbleOffUsers)) return@launch
             if (s.scrobbleNavidrome) runCatching { source.scrobble(song.id, submission = false) }
+            if (s.beatsScrobbleReady) runCatching { beats?.invoke(BeatsListens.NOW, BeatsListens.now(BeatsListens.listener(s), song)) }
+                .onFailure { AppLog.w("Scrobble", "Siansa Beats now playing failed: ${it.message}") }
             if (s.lastFmReady) runCatching { lastFm.nowPlaying(lastFmKeys(), song) }
                 .onFailure { AppLog.w("Scrobble", "Last.fm now playing failed: ${it.message}") }
             if (s.listenBrainzReady) runCatching { listenBrainz.nowPlaying(s.listenBrainzUrl, s.listenBrainzToken, song) }
@@ -76,17 +82,14 @@ class Scrobbler(
         if (!scrobblesSong(song.id)) return
         val durationMs = song.durationSec * 1000L
         val percent = settings.current.scrobblePercent
-        val needed = scrobbleNeededMs(durationMs, percent)
-        if (durationMs in 1..30_000 || listenedMs < needed || listenedMs < 10_000) {
+        // One rule for every place a listen goes (the server, Siansa Beats, Last.fm, ListenBrainz): Settings ›
+        // Scrobbling › When a song counts.
+        if (!listenCounts(durationMs, listenedMs, percent)) {
             AppLog.i("Scrobble", "Not counted: ${song.title} (heard ${listenedMs / 1000}s of ${song.durationSec}s, needs $percent% or 4 min)")
             return
         }
         val s = settings.current
-        val targets = buildSet {
-            if (s.scrobbleNavidrome) add(NAVIDROME)
-            if (s.lastFmReady) add(LASTFM)
-            if (s.listenBrainzReady) add(LISTENBRAINZ)
-        }
+        val targets = scrobbleTargets(s)
         if (targets.isEmpty()) return
         scope.launch {
             if (!scrobbles(song, s.scrobbleOffUsers)) {
@@ -109,7 +112,9 @@ class Scrobbler(
         }
         // Keep at most a few thousand, so a long offline stretch can't grow the file without limit.
         pending.update { current -> (left + current.drop(queue.size)).takeLast(5000) }
-        AppLog.i("Scrobble", "Sent ${queue.size - left.size} listen(s), ${left.size} waiting")
+        // Where they went, so the log answers "is it still sending there?".
+        val places = queue.flatMap { it.targets }.distinct().sorted().joinToString()
+        AppLog.i("Scrobble", "Sent ${queue.size - left.size} listen(s) to $places, ${left.size} waiting")
     }
 
     private suspend fun send(target: String, item: PendingListen): Boolean {
@@ -117,12 +122,20 @@ class Scrobbler(
         return runCatching {
             when (target) {
                 NAVIDROME -> source.scrobble(item.song.id, submission = true, timeMs = item.startedAtSec * 1000)
+                // Still set up when it's sent (perhaps days later): a listen kept for a Siansa Beats that's gone is dropped.
+                BEATS -> if (s.beatsScrobbleReady) {
+                    beats?.invoke(BeatsListens.PATH, BeatsListens.listen(BeatsListens.listener(s), item.song, item.startedAtSec))
+                } else Unit
                 LASTFM -> if (s.lastFmReady) lastFm.scrobble(lastFmKeys(), item.song, item.startedAtSec) else Unit
                 LISTENBRAINZ -> if (s.listenBrainzReady) listenBrainz.listen(s.listenBrainzUrl, s.listenBrainzToken, item.song, item.startedAtSec) else Unit
                 else -> Unit
             }
         }.onFailure {
-            val name = if (target == NAVIDROME) "Your server (${source.kind.name.lowercase()})" else target
+            val name = when (target) {
+                NAVIDROME -> "Your server (${source.kind.name.lowercase()})"
+                BEATS -> "Siansa Beats"
+                else -> target
+            }
             AppLog.w("Scrobble", "$name failed for ${item.song.title}: ${it.message}")
         }.isSuccess
     }
@@ -138,10 +151,33 @@ class Scrobbler(
 
     companion object {
         const val NAVIDROME = "navidrome"
+        const val BEATS = "beats"
         const val LASTFM = "lastfm"
         const val LISTENBRAINZ = "listenbrainz"
     }
 }
+
+/** Where a finished listen goes, by what's switched on and set up: any of [Scrobbler]'s targets. */
+fun scrobbleTargets(s: app.siansa.data.AppSettings): Set<String> = buildSet {
+    if (s.scrobbleNavidrome) add(Scrobbler.NAVIDROME)
+    if (s.beatsScrobbleReady) add(Scrobbler.BEATS)
+    if (s.lastFmReady) add(Scrobbler.LASTFM)
+    if (s.listenBrainzReady) add(Scrobbler.LISTENBRAINZ)
+}
+
+/**
+ * These settings with the listen server (ListenBrainz or Koito) set to [url] and [token], as "Test and save" keeps
+ * them. An empty token takes the server away and switches sending off. A new one switches sending on the first time
+ * only: changing the address or token later leaves "Send listens" as it was set (the owner, 11 Nov: saving switched it
+ * back on, and an emptied token couldn't be saved at all).
+ */
+fun app.siansa.data.AppSettings.withListenServer(url: String, token: String): app.siansa.data.AppSettings =
+    if (token.isBlank()) copy(listenBrainzEnabled = false, listenBrainzUrl = "", listenBrainzToken = "")
+    else copy(
+        listenBrainzEnabled = listenBrainzEnabled || listenBrainzToken.isBlank(),
+        listenBrainzUrl = url.trim(),
+        listenBrainzToken = token.trim(),
+    )
 
 /** The choices for how much of a song must be heard before it counts (issue #270). */
 val SCROBBLE_PERCENTS = listOf(25, 40, 50, 60, 75, 90)
@@ -152,6 +188,13 @@ val SCROBBLE_PERCENTS = listOf(25, 40, 50, 60, 75, 90)
  */
 fun scrobbleNeededMs(durationMs: Long, percent: Int): Long =
     minOf(durationMs * percent.coerceIn(10, 100) / 100, 240_000L)
+
+/**
+ * Whether a song of [durationMs] heard for [listenedMs] counts as a listen, by "When a song counts" ([percent]): the
+ * share of it, or four minutes, and at least 10 seconds; a song of 30 seconds or less never does.
+ */
+fun listenCounts(durationMs: Long, listenedMs: Long, percent: Int): Boolean =
+    durationMs !in 1..30_000 && listenedMs >= scrobbleNeededMs(durationMs, percent) && listenedMs >= 10_000
 
 /** Whether songs from [user]'s library are scrobbled, given the users set not to be (issue #356). */
 fun scrobblesFrom(user: Int, off: Set<Int>): Boolean = user !in off

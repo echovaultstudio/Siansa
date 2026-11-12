@@ -1,7 +1,9 @@
 package app.siansa.ui
 
+import app.siansa.net.soundReady
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.background
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.LazyColumn
@@ -44,7 +46,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
@@ -52,6 +53,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.siansa.mix.FingerprintProfile
 import kotlinx.coroutines.launch
+
+/** How many of the songs' covers blur together behind the header. */
+private const val FINGERPRINT_COVERS = 4
 
 /**
  * Your sonic fingerprint (issue #216), a page of its own under Your Library → Your listening (issue #255):
@@ -69,7 +73,7 @@ private fun FingerprintPage(nav: NavController) {
     val scope = rememberCoroutineScope()
     var round by rememberSaveable { mutableIntStateOf(0) }
     val profile by loadStateFresh("fingerprint-$round") {
-        if (!graph.settings.current.audioMuseReady) error("Set up AudioMuse in Settings to see your sonic fingerprint.")
+        if (!graph.settings.current.soundReady) error("Set up AudioMuse in Settings to see your sonic fingerprint.")
         graph.fingerprint.today(force = round > 0)
     }
     val p = profile.valueOrNull()
@@ -78,10 +82,33 @@ private fun FingerprintPage(nav: NavController) {
     }
     val list = songs.valueOrNull().orEmpty()
 
+    // The header, as the time machine's (the owner, 12 Nov): the covers of the songs played most, blurred into a mix
+    // of their colours. A few small covers the lists already show, read
+    // into memory first, so it costs next to nothing and fades in whole; plain dark until then.
+    val covers = remember(list) { list.mapNotNull { it.coverArt }.distinct().take(FINGERPRINT_COVERS) }
+    val pictures = rememberLoadedPictures(covers, HEADER_SMALL_PICTURE)
+    val tint = rememberHeaderTint(pictures.firstOrNull(), "fingerprint-tint")
+
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         LazyColumn(Modifier.fillMaxSize().testTag("fingerprint"), contentPadding = PaddingValues(bottom = bottomBarPadding(Space.Large))) {
             item {
-                ListeningHeader(nav, "Your sonic fingerprint", "What the music you play most sounds like. Made once a day.") {
+                PictureHeader(nav, pictures, tint) {
+                    HeaderKicker("YOUR LISTENING")
+                    Text(
+                        "Sonic fingerprint",
+                        style = MaterialTheme.typography.displaySmall,
+                        fontWeight = FontWeight.Black,
+                        color = Color.White,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(horizontal = Space.Page).testTag("fingerprintTitle"),
+                    )
+                    Text(
+                        "What the music you play most sounds like. Made once a day.",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = Color.White.copy(alpha = 0.85f),
+                        modifier = Modifier.padding(horizontal = Space.Page).padding(top = Space.Tight),
+                    )
                     Row(
                         Modifier.fillMaxWidth().padding(horizontal = Space.Page).padding(top = Space.Page),
                         verticalAlignment = Alignment.CenterVertically,
@@ -135,11 +162,13 @@ private fun FingerprintPage(nav: NavController) {
 internal fun FingerprintStats(p: FingerprintProfile) {
     val tiles = fingerprintStats(p)
     if (tiles.isEmpty()) return
+    // The listening pages' one faint tile, as the time machine's numbers.
+    val shape = RoundedCornerShape(12.dp)
     // The same height side by side, whatever their words (issue #325).
     Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
         tiles.forEach { (value, label) ->
             Column(
-                Modifier.weight(1f).fillMaxHeight().testTag("fingerprint-stat").clip(RoundedCornerShape(12.dp)).background(Color.White.copy(alpha = 0.12f)).padding(Space.Medium),
+                Modifier.weight(1f).fillMaxHeight().testTag("fingerprint-stat").listeningTile(shape).padding(Space.Medium),
             ) {
                 FitText(value, MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.ExtraBold, color = Color.White))
                 Text(label, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.8f))

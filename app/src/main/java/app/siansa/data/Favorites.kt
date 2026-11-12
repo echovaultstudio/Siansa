@@ -1,6 +1,7 @@
 package app.siansa.data
 
 import app.siansa.log.AppLog
+import app.siansa.net.beatsScrobbleReady
 import app.siansa.net.LastFmApi
 import app.siansa.net.MusicSource
 import app.siansa.net.SubsonicApi
@@ -33,6 +34,8 @@ class Favorites(
     private val settings: SettingsRepository,
     private val library: LibraryRepository,
     private val scope: CoroutineScope,
+    /** Posts to Siansa Beats (hearts go on to Last.fm through it, when it sends listens on: the owner, 11 Nov). */
+    private val beats: (suspend (path: String, body: String) -> Unit)? = null,
 ) {
     // Changes made in the app since the last sync, on top of what the synced songs say.
     private val overrides = MutableStateFlow<Map<String, Boolean>>(emptyMap())
@@ -84,6 +87,13 @@ class Favorites(
             runCatching { library.setStarred(song.id, liked) }
             _saved.update { it + 1 }
             val s = settings.current
+            // Siansa Beats takes the heart too when listens go to it: it loves the song on Last.fm for a listener who
+            // has it send their listens on (Siansa Beats 0.29.2), and keeps nothing else.
+            if (s.beatsScrobbleReady) {
+                runCatching { beats?.invoke(app.siansa.net.BeatsListens.LOVES, app.siansa.net.BeatsListens.love(app.siansa.net.BeatsListens.listener(s), song, liked)) }
+                    .onSuccess { AppLog.i("Favorites", "Siansa Beats: ${if (liked) "loved" else "unloved"} ${song.artist} – ${song.title}") }
+                    .onFailure { AppLog.w("Favorites", "Siansa Beats love failed: ${it.message}") }
+            }
             if (s.lastFmReady) {
                 runCatching { lastFm.love(LastFmApi.Keys(s.lastFmApiKey, s.lastFmSecret, s.lastFmSession), song, liked) }
                     .onSuccess { AppLog.i("Favorites", "Last.fm: ${if (liked) "loved" else "unloved"} ${song.artist} – ${song.title}") }

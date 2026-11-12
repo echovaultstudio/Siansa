@@ -1,5 +1,6 @@
 package app.siansa.ui
 
+import app.siansa.net.soundReady
 import androidx.compose.material.icons.rounded.SwapVert
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.ui.text.font.FontWeight
@@ -12,6 +13,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -85,6 +87,7 @@ import app.siansa.log.AppLog
 import app.siansa.playback.CrossfadeMode
 import app.siansa.playback.EqSettings
 import app.siansa.playback.LoudnessSource
+import app.siansa.playback.measurer
 import app.siansa.log.logForClipboard
 import app.siansa.log.problemsForClipboard
 import app.siansa.log.logEntries
@@ -178,6 +181,19 @@ fun HelpScreen(nav: NavController) {
                 Spacer(Modifier.width(Space.Small))
                 Text("Report a problem")
             }
+            HorizontalDivider()
+            // Marking a DJ blend that sounded wrong (the owner, 12 Nov): the button on now playing, shown or hidden.
+            Heading("DJ blends")
+            Box(Modifier.testTag("helpBadBlend")) {
+                SwitchRow("Bad blend button", settings.badBlendButton) { on ->
+                    graph.settings.setBadBlendButton(on)
+                    AppLog.i("Help", "Bad blend button ${if (on) "shown" else "hidden"}")
+                }
+            }
+            Hint(
+                "While on, now playing shows Bad blend during a DJ blend and for a minute after it. Tap it when a change " +
+                    "sounded wrong: it goes to the log and to Siansa Beats' list of bad blends.",
+            )
         }
     }
 }
@@ -207,10 +223,10 @@ internal fun crossfadeSummary(s: AppSettings): String {
     val fade = when (s.crossfade) {
         CrossfadeMode.OFF -> "No crossfade"
         CrossfadeMode.FIXED -> "Crossfade ${s.crossfadeSeconds} s"
-        CrossfadeMode.SMART -> "Smart crossfade up to ${s.crossfadeSeconds} s"
+        CrossfadeMode.SMART -> "Smart crossfade"
     }
     val levelling = if (s.replayGain == ReplayGainMode.OFF) "no levelling" else
-        "levelling ${s.replayGain.label.lowercase()} by " + if (s.loudnessSource == LoudnessSource.PLUGIN) "the Siansa plugin" else "ReplayGain tags"
+        "levelling ${s.replayGain.label.lowercase()} by " + if (s.loudnessSource == LoudnessSource.PLUGIN) s.measurer else "ReplayGain tags"
     return "$fade · $levelling"
 }
 
@@ -269,7 +285,7 @@ fun PlaybackSettingsScreen(nav: NavController) {
             FoldSection("Keep playing", settings.continuousPlay.label) {
                 Hint("When the queue is about to end, should Siansa add more songs?")
                 ContinuousChips(settings.continuousPlay) { graph.settings.setContinuousPlay(it) }
-                Hint(continuousHint(settings.continuousPlay, settings.audioMuseReady))
+                Hint(continuousHint(settings.continuousPlay, settings.soundReady, graph.djProblem()))
             }
             // The TV app has no sleep timer (issue #860), so nothing to wind down.
             if (!app.siansa.BuildConfig.TV_APP) {
@@ -338,9 +354,14 @@ internal fun ContinuousChips(selected: ContinuousMode, onPick: (ContinuousMode) 
     }
 }
 
-/** The line under the keep playing choices; DJ says when it can't order songs without AudioMuse. */
-internal fun continuousHint(mode: ContinuousMode, audioMuseReady: Boolean): String =
-    if (mode == ContinuousMode.DJ && !audioMuseReady) "${mode.hint} AudioMuse isn't set up, so songs are added as in Steady." else mode.hint
+/** The line under the keep playing choices; DJ says when it can't run (no AudioMuse or Siansa Beats), and songs come as in Steady. */
+internal fun continuousHint(mode: ContinuousMode, audioMuseReady: Boolean, djProblem: String? = null): String = when {
+    mode != ContinuousMode.DJ -> mode.hint
+    !audioMuseReady -> "${mode.hint} Neither Siansa Beats nor AudioMuse is set up, so songs are added as in Steady."
+    djProblem == "Needs Siansa Beats" -> "${mode.hint} Siansa Beats isn't set up or isn't answering, so songs are added as in Steady."
+    djProblem == app.siansa.mix.DjReady.NEEDS_SOUND -> "${mode.hint} Siansa Beats doesn't have the songs' sound yet (it needs 0.25), so songs are added as in Steady."
+    else -> mode.hint
+}
 
 /** 10, 20 or 30 calm songs for a wind down without a timer (issue #330). */
 @Composable

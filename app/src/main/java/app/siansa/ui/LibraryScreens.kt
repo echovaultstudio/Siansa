@@ -1,5 +1,7 @@
 package app.siansa.ui
 
+import app.siansa.net.soundReady
+import androidx.compose.foundation.layout.offset
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -152,7 +154,7 @@ fun LikedScreen(nav: NavController) {
         },
         header = {
             CollectionByline(null, null, null, "${songs.valueOrNull()?.size ?: 0} songs")
-            SortChips(sort, defaultLabel = "Recently liked") { sort = it; graph.listSort.set("liked", it) }
+            SongSortPicker(sort, defaultLabel = "Recently liked") { sort = it; graph.listSort.set("liked", it) }
         },
         offline = remember { likedOfflineItem() },
         // The quick-scroll handle says the letter or month of the order shown; liked first by when (beta testers #24).
@@ -241,6 +243,8 @@ fun PlaylistScreen(nav: NavController, id: String) {
         nav = nav,
         title = d?.playlist?.name ?: "Playlist",
         color = rememberCoverColor(d?.playlist?.coverArt),
+        // Its buttons in the cover's colour, with Dynamic colours on pages (issue #1028).
+        coverId = d?.playlist?.coverArt,
         songs = d?.let { pl -> order?.map { pl.songs[it] } ?: pl.songs },
         error = (detail as? Load.Err)?.message,
         cover = { m -> Cover(d?.playlist?.coverArt, LARGE_COVER, m, RoundedCornerShape(6.dp)) },
@@ -255,7 +259,7 @@ fun PlaylistScreen(nav: NavController, id: String) {
                 null,
                 if (d == null) "" else "Playlist · ${d.songs.size} songs · ${formatDuration(d.songs.sumOf { it.durationSec.toLong() })}",
             )
-            SortChips(sort, defaultLabel = "Playlist order") { sort = it; graph.listSort.set("playlist", it) }
+            SongSortPicker(sort, defaultLabel = "Playlist order") { sort = it; graph.listSort.set("playlist", it) }
         },
         // A phone playlist's songs download one by one (from their ⋮ menu); Downloads keeps Navidrome's playlists.
         offline = if (onPhone) null else d?.playlist?.offlineItem(),
@@ -301,7 +305,7 @@ fun SyncPrompt(nav: NavController) {
 
 /**
  * An album from the synced library (all merged copies together), or straight from Navidrome before a
- * sync, in the Spotify layout with the cover's colour behind the header.
+ * sync, with the cover's colour behind the header.
  */
 @Composable
 fun AlbumScreen(nav: NavController, id: String) {
@@ -328,9 +332,12 @@ fun AlbumScreen(nav: NavController, id: String) {
     val pickUp by loadState(d to playingId) { d?.let { PickUps.find(it.songs, graph.history.all(), System.currentTimeMillis()) } }
     val pick = pickUp.valueOrNull()?.takeIf { d != null && d.songs.none { it.id == playingId } }
     CollectionPage(
+        // An album slides to its DJ mix only with AudioMuse, as similar albums (issue #965).
+        djMix = false,
         nav = nav,
         title = d?.album?.name ?: "Album",
         color = rememberCoverColor(d?.album?.coverArt),
+        coverId = d?.album?.coverArt,
         songs = d?.songs,
         error = (detail as? Load.Err)?.message,
         numbered = true,
@@ -367,7 +374,7 @@ fun AlbumScreen(nav: NavController, id: String) {
         // A heart for favourite albums, starred in Navidrome (issue #275).
         actions = { d?.album?.let { FavouriteAlbumButton(it) } },
         // "Find similar albums" beside Shuffle (issue #228), through any of its songs; needs AudioMuse.
-        onSimilar = d?.songs?.firstOrNull()?.id?.takeIf { graph.settings.current.audioMuseReady }?.let { id -> { nav.openSimilarAlbums(id) } },
+        onSimilar = d?.songs?.firstOrNull()?.id?.takeIf { graph.settings.current.soundReady }?.let { id -> { nav.openSimilarAlbums(id) } },
         // Genres, labels, the version and the length at the foot of the page (#558).
         footer = {
             if (d != null) item(key = "album-foot") {
@@ -501,22 +508,20 @@ private suspend fun lastHeard(graph: app.siansa.AppGraph): Map<String, Long> {
     return at
 }
 
-/** "Recently liked · Last played · Date added · Title · Artist" as chips under a list's title (issue #257). */
+/**
+ * How a list of songs is sorted, under its title (issue #257): the same arrows and menu as Your Library (the owner,
+ * 10 Nov; chips until then). Its arrows sit on the page's left edge, so the touch area reaches a step past it.
+ */
 @Composable
-internal fun SortChips(selected: ListSort, defaultLabel: String, onPick: (ListSort) -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(top = Space.Small).testTag("sortChips"),
-        horizontalArrangement = Arrangement.spacedBy(Space.Small),
-    ) {
-        ListSort.entries.forEach { sort ->
-            FilterChip(
-                selected = selected == sort,
-                onClick = { onPick(sort) },
-                label = { Text(if (sort == ListSort.DEFAULT) defaultLabel else sort.label) },
-                modifier = Modifier.testTag("sort-${sort.name}"),
-            )
-        }
-    }
+internal fun SongSortPicker(selected: ListSort, defaultLabel: String, onPick: (ListSort) -> Unit) {
+    fun name(sort: ListSort) = if (sort == ListSort.DEFAULT) defaultLabel else sort.label
+    SortPicker(
+        name(selected),
+        ListSort.entries.map { it to name(it) },
+        selected,
+        Modifier.padding(top = Space.Tight).offset(x = -Space.Small),
+        onPick,
+    )
 }
 
 /** The heart on an album page (issue #275): marks it as a favourite, in Navidrome too. */
@@ -540,16 +545,35 @@ internal fun FavouriteAlbumButton(album: Album) {
  * the artist's picture, like the back arrow beside it; the accent colour when on.
  */
 @Composable
-internal fun FavouriteArtistButton(artist: Artist) {
+internal fun FavouriteArtistButton(
+    artist: Artist,
+    modifier: Modifier = Modifier,
+    offTint: Color = Color.White,
+    iconSize: androidx.compose.ui.unit.Dp = 24.dp,
+) {
     val graph = LocalGraph.current
     val launcher = rememberPlayLauncher()
     val ids by graph.favouriteArtists.ids.collectAsStateWithLifecycle()
-    val on = artist.id in ids
-    IconButton(onClick = { graph.favouriteArtists.toggle(artist) { launcher.notify(it) } }, modifier = Modifier.testTag("favouriteArtist")) {
+    FavouriteHeart(on = artist.id in ids, modifier = modifier, offTint = offTint, iconSize = iconSize) {
+        graph.favouriteArtists.toggle(artist) { launcher.notify(it) }
+    }
+}
+
+/** The heart itself, filled red when [on] (a favourite), otherwise an outline in [offTint]; drawn on its own for the spacing tests. */
+@Composable
+internal fun FavouriteHeart(
+    on: Boolean,
+    modifier: Modifier = Modifier,
+    offTint: Color = Color.White,
+    iconSize: androidx.compose.ui.unit.Dp = 24.dp,
+    onClick: () -> Unit,
+) {
+    IconButton(onClick = onClick, modifier = modifier.testTag("favouriteArtist")) {
         Icon(
             if (on) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
             if (on) "Remove from favourite artists" else "Add to favourite artists",
-            tint = if (on) Accent else Color.White,
+            tint = if (on) FavouriteRed else offTint,
+            modifier = Modifier.size(iconSize),
         )
     }
 }

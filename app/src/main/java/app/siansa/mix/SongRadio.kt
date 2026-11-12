@@ -95,14 +95,22 @@ class SongRadio(private val graph: AppGraph) {
      * follows; otherwise it plays first. Only the radio's songs follow it, marked in the queue as added by the
      * radio, and more are added as it nears the end, so the music doesn't stop.
      */
-    fun start(song: Song, mode: ContinuousMode = ContinuousMode.STEADY, onError: (String) -> Unit = {}) {
+    fun start(song: Song, mode: ContinuousMode = ContinuousMode.STEADY, shape: MixShape? = null, onError: (String) -> Unit = {}) {
         stop()
         // Each new radio starts as Steady vibes with no surprises; a shape picked for the last one doesn't carry over.
         if (graph.settings.resetMixShape()) AppLog.i("SongRadio", "Mix shape back to Steady vibes, no surprises, for the new radio")
+        // Started from the DJ mix bar on a shape (issue #1035): the mix has that shape from its first songs.
+        if (shape != null && mode == ContinuousMode.DJ) {
+            graph.settings.setMixShape(shape)
+            AppLog.i("SongRadio", "Starts as ${shape.label}")
+        }
         val picked = if (mode == ContinuousMode.OFF) ContinuousMode.STEADY else mode
         graph.scope.launch {
             val started = System.currentTimeMillis()
-            val similar = runCatching { arrange(picked, song, find(song, 30)) }
+            // A steady DJ mix picks its songs from a wider lot (the owner, 12 Nov): on its rails, only the ones near
+            // the first song in tempo and energy may play, and 30 alike held too few of them.
+            val wide = steadyDj(picked)
+            val similar = runCatching { arrange(picked, song, find(song, if (wide) START * DJ_WIDER else START), count = START, start = song) }
                 .onFailure { AppLog.w("SongRadio", "Couldn't find similar songs: ${it.message}") }
                 .getOrDefault(emptyList())
             if (similar.isEmpty()) {
@@ -197,7 +205,7 @@ class SongRadio(private val graph: AppGraph) {
             .distinctBy { it.id }
             .take(RESHAPE_POOL)
         val rank = reshapeLikeness(like.map { it.id })
-        val arranged = graph.continuousPlay.djArrange(after, queued + fresh, count = queued.size) { id -> rank(id) }
+        val arranged = graph.continuousPlay.djArrange(after, queued + fresh, count = queued.size, start = _seed.value) { id -> rank(id) }
         return arranged to fresh.size
     }
 
@@ -224,10 +232,10 @@ class SongRadio(private val graph: AppGraph) {
                         val seed = _seed.value ?: return@collectLatest
                         val drift = graph.settings.current.radioDrift
                         val anchor = radioAnchor(drift, topUps++)
-                        val found = topUp(seed, current, anchor).filter { it.id !in heard }
+                        val found = topUp(seed, current, anchor, if (steadyDj(mode)) TOP_UP * DJ_WIDER else TOP_UP).filter { it.id !in heard }
                         // DJ carries on from the last song queued, for a smooth change into the new ones.
                         val tail = graph.player.state.value.queue.lastOrNull() ?: current
-                        val more = arrange(mode, tail, found)
+                        val more = arrange(mode, tail, found, count = TOP_UP, start = seed)
                         AppLog.i(
                             "SongRadio",
                             "Topped up with ${more.size} songs (${drift.label.lowercase()}, ${anchor.name.lowercase()}) " +
@@ -245,23 +253,29 @@ class SongRadio(private val graph: AppGraph) {
     }
 
     /** The next songs, by [anchor]; when the playing song has little left near the first, the first song's. */
-    private suspend fun topUp(seed: Song, current: Song, anchor: RadioAnchor): List<Song> = when (anchor) {
-        RadioAnchor.CURRENT -> find(current, TOP_UP)
+    private suspend fun topUp(seed: Song, current: Song, anchor: RadioAnchor, count: Int = TOP_UP): List<Song> = when (anchor) {
+        RadioAnchor.CURRENT -> find(current, count)
         // Everything like the first song heard already: carry on from the one playing rather than stop.
-        RadioAnchor.SEED -> find(seed, TOP_UP).ifEmpty { find(current, TOP_UP) }
+        RadioAnchor.SEED -> find(seed, count).ifEmpty { find(current, count) }
         RadioAnchor.CURRENT_NEAR_SEED -> {
             // Wide enough around the first song to still find new ones after a long listen.
             val likeSeed = graph.sonic.similar(seed.id, (heard.size + 200).coerceAtMost(MAX_POOL))
-            val likeCurrent = graph.sonic.similar(current.id, 80)
+            val likeCurrent = graph.sonic.similar(current.id, maxOf(80, count * 2))
             val byId = (likeSeed + likeCurrent).associateBy { it.id }
-            val ids = nearSeed(likeCurrent.map { it.id }, likeSeed.map { it.id }, heard + current.id, TOP_UP)
-            if (ids != null) graph.generator.resolveHits(ids.mapNotNull { byId[it] }) else find(seed, TOP_UP)
+            val ids = nearSeed(likeCurrent.map { it.id }, likeSeed.map { it.id }, heard + current.id, count)
+            if (ids != null) graph.generator.resolveHits(ids.mapNotNull { byId[it] }) else find(seed, count)
         }
     }
 
-    /** [songs] in DJ order after [after] when the radio is in DJ mode; otherwise as found (most alike first). */
-    private suspend fun arrange(mode: ContinuousMode, after: Song, songs: List<Song>): List<Song> =
-        if (mode == ContinuousMode.DJ) graph.continuousPlay.djArrange(after, songs) else songs
+    /**
+     * At most [count] of [songs], in DJ order after [after] when the radio is in DJ mode, held to [start] (the radio's
+     * first song) while the mix is Steady vibes; otherwise as found (most alike first).
+     */
+    private suspend fun arrange(mode: ContinuousMode, after: Song, songs: List<Song>, count: Int = songs.size, start: Song? = null): List<Song> =
+        if (mode == ContinuousMode.DJ) graph.continuousPlay.djArrange(after, songs, count, start) else songs.take(count)
+
+    /** Whether the radio is a DJ mix in Steady vibes: the one that stays on its rails, and so picks from more songs. */
+    private fun steadyDj(mode: ContinuousMode): Boolean = mode == ContinuousMode.DJ && graph.settings.current.mixShape == MixShape.STEADY
 
     private suspend fun find(song: Song, count: Int): List<Song> {
         // Asks for enough to have [count] left after leaving out what's been heard (the seed's list repeats).
@@ -273,7 +287,11 @@ class SongRadio(private val graph: AppGraph) {
     }
 
     private companion object {
+        /** Songs a radio starts with, and adds each time it's running low. */
+        const val START = 30
         const val TOP_UP = 20
+        /** A steady DJ mix looks at this many times as many songs as it adds, to find enough on its rails. */
+        const val DJ_WIDER = 4
         const val MAX_POOL = 500
         /** New songs a reshape looks at, beside the ones queued (issue #786). */
         const val RESHAPE_POOL = 30

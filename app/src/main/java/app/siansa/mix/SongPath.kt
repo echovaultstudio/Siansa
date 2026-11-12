@@ -1,5 +1,6 @@
 package app.siansa.mix
 
+import app.siansa.net.soundReady
 import app.siansa.AppGraph
 import app.siansa.net.SourceKind
 import app.siansa.data.Song
@@ -50,7 +51,7 @@ class SongPath(private val graph: AppGraph) {
         val (toSong, toMood) = pathEnd(toId)
         val started = System.currentTimeMillis()
         val ids: List<String> = when {
-            graph.settings.current.audioMuseReady -> {
+            graph.settings.current.soundReady -> {
                 val steps = graph.audioMuse.findPath(fromSong, toSong, length, fromMood, toMood, lyrics).map { it.id }
                 if (steps.isEmpty()) throw MixException("AudioMuse found no path between these")
                 // A mood end is whichever song AudioMuse picked for it: the path is used as it comes.

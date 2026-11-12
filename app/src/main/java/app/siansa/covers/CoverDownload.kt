@@ -46,7 +46,8 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * Downloads every album, artist and playlist cover ahead of time, as an automatic image
+ * Downloads every album, artist and playlist cover ahead of time (artists' photos looked up first, so they're the
+ * photos and not Navidrome's placeholder), as an automatic image
  * cache: in the background, after a library sync and once a day, only on Wi-Fi and (unless set
  * otherwise) only when the phone is on the same local network as Navidrome, so it never uses mobile data
  * or a slow link from outside. Covers already on the phone are skipped, so later runs only fetch new ones.
@@ -300,9 +301,20 @@ object CoverDownload {
             return@withContext
         }
         val disk = SingletonImageLoader.get(context).diskCache ?: return@withContext
+        // Artist photos first (the owner, 10 Nov): Navidrome only fetches an artist's photo when they're looked up, and
+        // gives it a new picture id then; the library's id from its sync may still stand for the placeholder star. Each
+        // artist is looked up once a run (ArtistPhotos), so the photos themselves are what's downloaded below.
+        val artists = graph.library.artists()
+        update { Progress(running = true, note = "Looking up artist photos…") }
+        graph.artistPhotos.refresh(artists) { done, of ->
+            if (done == of || done % 10 == 0) update { it.copy(running = true, note = "Looking up artist photos: $done of $of") }
+        }
+        update { it.copy(note = null) }
         val main = buildList {
             graph.library.albums("name").forEach { it.coverArt?.let(::add) }
-            graph.library.artists().forEach { add(it.coverArt ?: "ar-${it.id}") }
+            // The ids just looked up, else the library's (it keeps the new ones too, for the next sync's sake).
+            val fresh = graph.artistPhotos.covers.value
+            graph.library.artists().forEach { add(fresh[it.id] ?: it.coverArt ?: "ar-${it.id}") }
             graph.library.playlists().forEach { it.coverArt?.let(::add) }
         }.distinctBy { CoverStore.canonical(it) }
         val songCovers = songCoversToFetch(graph.library.songCoverIds(), main)
@@ -387,7 +399,7 @@ object CoverDownload {
                 if (kind != null && kind != AnimatedCovers.Kind.Still) break
                 if (CoverStore.has(id)) break
             }
-            val key = "cover:${CoverVersions.cacheId(id)}:$size"
+            val key = CoverCache.diskKey(id, size)
             if (disk.openSnapshot(key)?.use { true } == true) continue
             when (fetch(graph, disk, id, size, key)) {
                 null -> return Outcome.FAILED
@@ -412,6 +424,8 @@ object CoverDownload {
                 AppLog.w("Covers", "Cover $id ($size px): HTTP ${response.code}")
                 return@executeCancellable if (response.code == 404) false else null
             }
+            // The server's stand-in for a cover it doesn't have right now: nothing to keep (StandIns).
+            if (StandIns.isStandIn(response)) return@executeCancellable false
             val body = response.body ?: return@executeCancellable null
             val head = response.peekBody(32).bytes()
             val image = CoverStore.sniff(head)
@@ -429,6 +443,7 @@ object CoverDownload {
                 editor.abort()
                 throw e
             }
+            if (StandIns.isCoverArt(response.request.url.encodedPath)) response.header("ETag")?.let { CoverEtags.put(key, it) }
             true
         }
     }.onFailure {

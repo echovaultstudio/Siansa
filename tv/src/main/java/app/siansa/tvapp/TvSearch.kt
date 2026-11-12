@@ -140,10 +140,8 @@ fun TvSearch(fromSystem: String?, onDone: () -> Unit) {
 @Composable
 private fun SearchBrowse(recent: List<app.siansa.data.RecentSearch>, radios: Boolean, onPick: (String) -> Unit, onClear: () -> Unit) {
     val graph = LocalGraph.current
-    val version by graph.library.version.collectAsStateWithLifecycle()
-    val genres by produceState(emptyList<app.siansa.data.Genre>(), version) {
-        value = runCatching { if (graph.library.isSynced) graph.library.genres(BROWSE_GENRES) else emptyList() }.getOrDefault(emptyList())
-    }
+    // Siansa Beats' genres as last saved (at once), brought up to date when old; the songs' tags without it.
+    val genres = app.siansa.ui.rememberBrowseGenres(BROWSE_GENRES).value.orEmpty()
     LazyColumn(
         Modifier.fillMaxSize().testTag("tvSearchBrowse"),
         contentPadding = PaddingValues(bottom = Space.Large),

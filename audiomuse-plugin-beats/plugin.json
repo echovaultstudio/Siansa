@@ -1,0 +1,73 @@
+{
+  "id": "siansa_beats",
+  "name": "Siansa Beats (dev)",
+  "author": "Siansa",
+  "description": "For Siansa Dev: each song's loudness, how it starts and ends, similar albums and artists, with its tempo, beats, bars and phrases from Siansa Beats (Beat This!).",
+  "requirements": [],
+  "versions": [
+    {
+      "version": "0.5.2",
+      "min_core_version": "3.6.4",
+      "changelog": "Genre descriptions from Siansa Beats (0.19 and later), for Siansa Dev's genre pages.",
+      "imageUrl": "",
+      "sourceUrl": "",
+      "checksum": ""
+    },
+    {
+      "version": "0.5.1",
+      "min_core_version": "3.6.4",
+      "changelog": "The genre list by Siansa Beats' vote, for Siansa Dev's search page.",
+      "imageUrl": "",
+      "sourceUrl": "",
+      "checksum": ""
+    },
+    {
+      "version": "0.5.0",
+      "min_core_version": "3.6.4",
+      "changelog": "Genre radios: the songs of a genre by Siansa Beats' vote (each song's sound first, its tags second), for Siansa Dev.",
+      "imageUrl": "",
+      "sourceUrl": "",
+      "checksum": ""
+    },
+    {
+      "version": "0.4.1",
+      "min_core_version": "3.6.4",
+      "changelog": "No longer reads the Siansa plugin's tables: everything it uses is its own. Its data stays as it is.",
+      "imageUrl": "",
+      "sourceUrl": "",
+      "checksum": ""
+    },
+    {
+      "version": "0.4.0",
+      "min_core_version": "3.6.4",
+      "changelog": "Stands on its own: measures loudness and fades and builds similar albums and artists itself, as the Siansa plugin does, and takes what that one already measured on install (nothing is measured again). The beat grids still come from Siansa Beats.",
+      "imageUrl": "",
+      "sourceUrl": "",
+      "checksum": ""
+    },
+    {
+      "version": "0.3.0",
+      "min_core_version": "3.6.4",
+      "changelog": "Adds each song's key and scale, as AudioMuse-AI analysed them, for Siansa Dev's smart blends.",
+      "imageUrl": "",
+      "sourceUrl": "",
+      "checksum": ""
+    },
+    {
+      "version": "0.2.0",
+      "min_core_version": "3.6.4",
+      "changelog": "Passes on Siansa Beats' lock-in points, bass, energy, drops and breakdowns, and sends song changes marked as bad in Siansa Dev to Siansa Beats' list.",
+      "imageUrl": "",
+      "sourceUrl": "",
+      "checksum": ""
+    },
+    {
+      "version": "0.1.0",
+      "min_core_version": "3.6.4",
+      "changelog": "First version: profiles from the Siansa plugin's measurements with the beat grids from Siansa Beats.",
+      "imageUrl": "",
+      "sourceUrl": "",
+      "checksum": ""
+    }
+  ]
+}

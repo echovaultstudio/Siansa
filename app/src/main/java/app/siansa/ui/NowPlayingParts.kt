@@ -1,5 +1,6 @@
 package app.siansa.ui
 
+import app.siansa.net.soundReady
 import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.ui.graphics.drawscope.clipPath
 
@@ -128,7 +129,7 @@ fun editablePlaylists(playlists: List<Playlist>, user: String): List<Playlist> =
 // ---- Now playing's ⋮ menu ----
 
 /**
- * The ⋮ menu in now playing, a sheet like Spotify's: the song at the top, then what you can do with it.
+ * The ⋮ menu in now playing, a sheet: the song at the top, then what you can do with it.
  * Share isn't offered (the music is on your own server), and the queue opens from its own button.
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -191,19 +192,19 @@ fun PlayerMenu(
                     if (radioSeed != null) {
                         graph.songRadio.stop()
                         notify("Mix off")
-                    } else if (graph.connection.current.aiProblem(graph.settings.current) != null && graph.settings.current.audioMuseReady) {
-                        notify("AI backend is currently not available :( ${graph.connection.current.aiProblem(graph.settings.current)}")
+                    } else if (graph.connection.current.soundProblem(graph.settings.current) != null && graph.settings.current.soundReady) {
+                        notify("AI backend is currently not available :( ${graph.connection.current.soundProblem(graph.settings.current)}")
                     } else {
                         // Steady or DJ first (issue #337); the chooser starts the radio.
                         RadioChooser.ask(song)
                     }
                     onDismiss()
                 }
-                if (graph.settings.current.audioMuseReady) {
+                if (graph.settings.current.soundReady) {
                     MenuRow(Icons.Rounded.AltRoute, "Song path…") { onDismiss(); onOpenSongPath() }
                 }
                 MenuRow(Icons.Rounded.GraphicEq, "Similar songs") { onDismiss(); onOpenSimilarSongs() }
-                if (graph.settings.current.audioMuseReady && song.albumId != null) {
+                if (graph.settings.current.soundReady && song.albumId != null) {
                     MenuRow(rememberSimilarAlbumsIcon(), "Similar albums") { onDismiss(); onOpenSimilarAlbums() }
                 }
                 MenuDivider()
@@ -504,13 +505,16 @@ fun LyricsScreen(song: Song?, tint: Color, onClose: () -> Unit, menu: () -> Unit
  * when the song has no lyrics (#294).
  */
 @Composable
-fun LyricsButton(enabled: Boolean, onClick: () -> Unit) {
-    val color = Color.White.copy(alpha = if (enabled) 0.9f else 0.3f)
+fun LyricsButton(enabled: Boolean, open: Boolean = false, onClick: () -> Unit) {
+    // While the lyrics are open, the same button in the accent colour closes them.
+    val color = if (open) Accent else Color.White.copy(alpha = if (enabled) 0.9f else 0.3f)
     Box(
-        Modifier.size(48.dp).clip(CircleShape).clickable(enabled = enabled, onClickLabel = "Show lyrics", onClick = onClick),
+        Modifier.size(48.dp).clip(CircleShape)
+            .clickable(enabled = enabled, onClickLabel = if (open) "Close lyrics" else "Show lyrics", onClick = onClick)
+            .testTag(if (open) "closeLyricsButton" else "lyricsButton"),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(Icons.Rounded.ChatBubble, if (enabled) "Lyrics" else "No lyrics for this song", tint = color)
+        Icon(Icons.Rounded.ChatBubble, if (open) "Close lyrics" else if (enabled) "Lyrics" else "No lyrics for this song", tint = color)
         // The quote marks, cut out of the bubble in the player's dark colour, a little above centre where the
         // bubble's body is.
         Icon(

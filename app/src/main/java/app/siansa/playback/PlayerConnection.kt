@@ -159,13 +159,16 @@ class PlayerConnection(
         playNow(songs, startIndex, shuffle, startMs, picked)
     }
 
-    private fun playNow(songs: List<Song>, startIndex: Int, shuffle: Boolean, startMs: Long = 0L, picked: Set<String> = emptySet()) {
+    private fun playNow(all: List<Song>, startIndex: Int, shuffle: Boolean, startMs: Long = 0L, picked: Set<String> = emptySet()) {
         queueGeneration++
         onPlayStarted()
         onNewQueue?.invoke()
+        // A new list starts at the song picked: the ones before it aren't queued (the owner, 12 Nov).
+        val songs = QueueRules.fromStart(all, startIndex, shuffle)
+        if (songs.size < all.size) AppLog.d("Player", "New list from song ${startIndex + 1} of ${all.size}: ${songs.size} songs queued")
         SongRegistry.register(songs)
         val items = songs.map { it.toMediaItem(api, auto = it.id in picked) }
-        val start = if (shuffle) Random.nextInt(songs.size) else startIndex.coerceIn(0, songs.size - 1)
+        val start = if (shuffle) Random.nextInt(songs.size) else 0
         withController { c ->
             c.shuffleModeEnabled = shuffle
             // Repeat belongs to the list it was set on: a new list starts with it off, like shuffle. The player
@@ -196,7 +199,7 @@ class PlayerConnection(
     }
 
     /**
-     * Spotify's "Add to queue": the song plays after the current one and after songs queued before it,
+     * "Add to queue": the song plays after the current one and after songs queued before it,
      * ahead of the rest of the album or playlist. With nothing playing, it starts playing.
      */
     fun addToQueue(song: Song) {
@@ -347,6 +350,7 @@ class PlayerConnection(
     }
 
     fun hasNext(): Boolean = controller?.hasNextMediaItem() == true
+    fun hasPrevious(): Boolean = controller?.hasPreviousMediaItem() == true
 
     fun next() = withController { it.seekToNext() }
     fun previous() = withController { it.seekToPrevious() }

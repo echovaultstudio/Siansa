@@ -104,6 +104,7 @@ fun StyleScreen(nav: NavController) {
             HubRow(Icons.Rounded.Dashboard, "Nav Bar") { nav.navigate("settings/style/nav-bar") }
             HubRow(Icons.Rounded.Home, "Home") { nav.navigate("settings/style/home") }
             HubRow(Icons.Rounded.FilterList, "Home Menu") { nav.navigate("settings/style/home-menu") }
+            HubRow(SiansaIcons.Turntable, "DJ Mix Bar") { nav.navigate("settings/style/dj-bar") }
             Spacer(Modifier.height(Space.Section))
             TopBarChoice(settings.topBar) {
                 AppLog.i("Style", "Phone's top bar: ${it.name.lowercase()}")
@@ -113,6 +114,14 @@ fun StyleScreen(nav: NavController) {
             Column(Modifier.padding(start = Space.Page, end = Space.Page, top = Space.Section, bottom = Space.Section), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
                 SwitchRow("Animated covers", settings.animatedCovers) { on -> graph.settings.setAnimatedCovers(on) }
                 Hint("When an album folder has an animated cover (cover.gif or cover.webp), it moves on the album page and in now playing; lists show its first frame. Your server may not shrink an animated WebP (Navidrome can't), so it's downloaded once in full and kept on the phone.")  // server-name: ok (an example of a server that can't)
+            }
+            // Dynamic colours, one switch for now playing and the pages (issues #970, #1028; the owner, 10 Nov).
+            Column(Modifier.padding(start = Space.Page, end = Space.Page, bottom = Space.Section), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
+                SwitchRow("Dynamic colours", settings.dynamicColours) { on ->
+                    AppLog.i("Style", "Dynamic colours ${if (on) "on" else "off"}")
+                    graph.settings.setDynamicColours(on)
+                }
+                Hint("Now playing and the album, artist and playlist pages take a soft colour from the cover, or from the artist's picture, always easy to see. On an artist's page, only Play.")
             }
         }
     }
@@ -165,16 +174,6 @@ fun NowPlayingStyleScreen(nav: NavController) {
                     onCheckedChange = { setLyricsButton(graph, it) },
                     modifier = Modifier.testTag("lyricsButtonSwitch"),
                 )
-            }
-            // The cover's colours for the seek bar, Play, the liked heart and the device name (issues #970, #998).
-            StyleSwitchRow(
-                "Dynamic colours",
-                "The seek bar, Play, the heart and where it plays take the colour of the cover, always easy to see",
-                settings.dynamicPlayerColours,
-                "dynamicColoursSwitch",
-            ) { on ->
-                AppLog.i("Style", "Now playing: dynamic colours ${if (on) "on" else "off"}")
-                graph.settings.setDynamicPlayerColours(on)
             }
             Spacer(Modifier.height(Space.Section))
             PlaySlidesSettings(settings.playSlides) { slides ->
@@ -396,6 +395,41 @@ internal fun ShortcutCountRow(count: Int, onDone: (Int) -> Unit) {
  * Home Menu (issue #872): the options in Home's menu, top to bottom as they hang under its button. Hold a row or grab
  * its 6-dot handle to move it. All of them always show: each is the only way to it from Home.
  */
+/**
+ * DJ Mix Bar (issue #1033): the places on the bar that comes in over the seek bar when you slide up from the play button
+ * while a DJ mix plays, in order, left to right. Hold a row and drag it. Every place is always on the bar.
+ */
+@Composable
+fun DjBarStyleScreen(nav: NavController) {
+    val graph = LocalGraph.current
+    val settings by graph.settings.state.collectAsStateWithLifecycle()
+    val order = settings.djBarOrder
+    fun save(places: List<DjBarSpot>) {
+        AppLog.i("Style", "DJ mix bar: ${DjBarSpot.format(places)}")
+        graph.settings.setDjBarOrder(places)
+    }
+    Screen(
+        title = "DJ Mix Bar",
+        nav = nav,
+        actions = { TextButton(onClick = { save(DjBarSpot.default) }, enabled = order != DjBarSpot.default) { Text("Reset") } },
+    ) { padding ->
+        Column(Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState())) {
+            StyleHint("Slide up from the play button and the seek bar opens into this bar: let go on a place to start a DJ mix, stop the one playing, or give it that shape. Hold a row and drag it: top to bottom is left to right on the bar.")
+            ArrangeList(
+                order = order,
+                shown = order.toSet(),
+                label = { it.arrangeLabel },
+                icon = { it.icon(starting = true) },
+                key = { it.id },
+                canHide = { false },
+                canShowMore = false,
+                onChange = { places, _ -> save(places) },
+                eyes = false,
+            )
+        }
+    }
+}
+
 @Composable
 fun HomeMenuStyleScreen(nav: NavController) {
     val graph = LocalGraph.current

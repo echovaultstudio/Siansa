@@ -57,6 +57,20 @@ none of its own, Siansa shows the first song's on the album page, so the page an
 a grey square means Emby or Jellyfin has no cover on that album: give the album one there (Identify, or a
 `cover.jpg` in its folder) and it shows everywhere.
 
+## A cover is missing or old
+
+Siansa shows the picture your server sends, and keeps it on the phone so it shows at once the next time.
+
+- **A blue disc or a star** (Navidrome) is Navidrome's own stand-in for a cover it doesn't have right now: the
+  library is still being scanned, an artist's photo hasn't been fetched yet, or the song has no picture. Siansa
+  shows it but never keeps it, and asks again the next time the cover is needed, so the real cover appears by
+  itself once Navidrome has it, in lists, the mini player, Now playing and the notification alike.
+- **A cover you replaced on the server** shows after the next sync. **Sync all** (the music source at the top of
+  Home) checks every cover kept on the phone: stand-ins kept by older versions are removed, and a cover that changed
+  on Navidrome, Emby or Jellyfin is fetched fresh. Nothing else in the image cache is thrown away.
+- Still wrong? **Settings › Data › Covers on the phone › Clear image cache** starts over, and the log (lines marked `Covers`) says
+  what was removed and replaced.
+
 ## Songs show the wrong length, or the seek bar jumps
 
 Some files carry a wrong length in their header (often Dolby E-AC3 .m4a). Siansa uses your server's length when
