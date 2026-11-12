@@ -90,10 +90,11 @@ class AppTourTest {
             }
             step("source filter") {
                 tab("Home")
-                // Home's menu (issue #872), then its row.
+                // Home's menu (issue #872), then its place in the top row (the owner, 12 Nov: icons, named for TalkBack).
                 compose.onAllNodesWithContentDescription("Home menu", substring = true).onFirst().performClick()
                 idle(400)
-                click("Sources")
+                compose.onNodeWithTag("homeMenu-sources").performClick()
+                idle()
                 idle(1200)
                 waitText("Only downloaded music")
                 shot("01b-source-filter", popups = true)
@@ -117,7 +118,8 @@ class AppTourTest {
                 idle(400)
                 compose.onAllNodesWithContentDescription("Home menu", substring = true).onFirst().performClick()
                 idle(400)
-                click("Arrange Home")
+                compose.onNodeWithTag("homeMenu-arrange").performClick()
+                idle()
                 idle(600)
                 shot("01b2-arrange", popups = true)
                 closeSheet()
@@ -139,7 +141,7 @@ class AppTourTest {
                     // Home's menu (issue #872), then its row.
                     compose.onAllNodesWithContentDescription("Home menu", substring = true).onFirst().performClick()
                     idle(400)
-                    click("Sources")
+                    compose.onNodeWithTag("homeMenu-sources").performClick()
                     idle(1200)
                     waitText("SERVERS")
                     shot("01d-source-filter-two-users", popups = true)

@@ -6,6 +6,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.layout.positionInRoot
+import kotlin.math.roundToInt
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -285,15 +288,19 @@ fun rememberHomeMenuOpen(state: HomeMenuState): Float {
 
 /**
  * Over Home while the menu is open: a clear layer that closes it on a tap (nothing dims or blurs the page), and Back
- * closes it too. The menu itself is in the top row ([HomeMenuBar]).
+ * closes it too. The layer starts under the top row, where the menu itself is ([HomeMenuBar]), so the row's places
+ * and button stay tappable.
  */
 @Composable
 fun HomeMenuOverlay(state: HomeMenuState) {
     androidx.activity.compose.BackHandler(enabled = state.open) { state.close() }
     if (state.open) {
+        var top by remember { mutableStateOf(0f) }
         Box(
             Modifier
                 .fillMaxSize()
+                .onGloballyPositioned { top = it.positionInRoot().y }
+                .offset { IntOffset(0, ((state.anchor?.bottom ?: 0f) - top).roundToInt().coerceAtLeast(0)) }
                 .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClickLabel = "Close the menu") { state.close() }
                 .testTag("homeMenuClose"),
         )
@@ -359,12 +366,13 @@ fun HomeMenuBar(
                         val scale = placeScale(open, index)
                         scaleX = scale
                         scaleY = scale
-                    }
-                    .testTag("homeMenu-${item.id}"),
+                    },
             ) {
+                // The tag goes on the place itself (the node a tap and TalkBack see); its circle is "homeMenuCircle",
+                // "homeMenuChosenCircle" lit.
                 GlidePlace(
                     icon, spoken, chosen = state.highlighted == item, now = lit, tag = "homeMenu",
-                    onTap = { state.close(); onPick(item) }, modifier = Modifier.fillMaxSize(),
+                    onTap = { state.close(); onPick(item) }, modifier = Modifier.fillMaxSize().testTag("homeMenu-${item.id}"),
                 )
             }
         }

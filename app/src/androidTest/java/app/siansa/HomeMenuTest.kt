@@ -115,7 +115,7 @@ class HomeMenuTest {
         }
         compose.waitForIdle()
         // The place under the finger is lit: grown and filled.
-        compose.onNodeWithTag("homeMenuChosen", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("homeMenuChosenCircle", useUnmergedTree = true).assertExists()
         button.performTouchInput { up() }
         compose.waitForIdle()
         assertEquals(listOf(HomeMenuItem.SOURCES), picked)
