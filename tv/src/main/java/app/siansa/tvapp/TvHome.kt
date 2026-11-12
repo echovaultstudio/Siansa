@@ -60,6 +60,9 @@ import app.siansa.ui.recentlyPlayedAlbums
 import app.siansa.ui.rediscoverSubtitle
 import app.siansa.ui.tileColors
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import app.siansa.data.HomeSection as Section
@@ -95,20 +98,46 @@ private const val ROW_SIZE = 24
  */
 suspend fun homeRows(graph: AppGraph): List<TvRow> {
     val settings = graph.settings.current
-    val rows = mutableListOf<TvRow>()
-    for (section in Section.visible(settings.homeOrder, settings.homeHidden)) {
-        val row = try {
-            homeRow(graph, section)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            AppLog.w("Tv", "Home row ${section.id} failed: ${e.message}")
-            null
-        }
-        if (row != null && row.items.isNotEmpty()) rows += row
+    val started = android.os.SystemClock.elapsedRealtime()
+    // All at once (issue #1074): read one after another, Home waited for the sum of them, and a slow one (Rediscover
+    // asking a listen server that doesn't answer, artist radios asking for similar artists) held up the rest.
+    val rows = coroutineScope {
+        Section.visible(settings.homeOrder, settings.homeHidden).map { section ->
+            async {
+                try {
+                    homeRow(graph, section)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    AppLog.w("Tv", "Home row ${section.id} failed: ${e.message}")
+                    null
+                }
+            }
+        }.awaitAll().filterNotNull().filter { it.items.isNotEmpty() }
     }
+    AppLog.d("Tv", "Home: ${rows.size} rows read in ${android.os.SystemClock.elapsedRealtime() - started} ms")
     return rows
 }
+
+/**
+ * Home's rows as last shown (issue #1074), kept while the app runs: Home is left and come back to all the time on the
+ * TV (an album, now playing, Back), and each time it started empty, with a spinner for the second or more the rows
+ * take to read. Coming back, the rows shown last are there at once, and are read again behind them. Kept for the
+ * [AppGraph] they were read from, so nothing of another session shows.
+ */
+internal class HomeRowsKept {
+    private var from: Any? = null
+    private var rows: List<TvRow>? = null
+
+    fun of(graph: Any): List<TvRow>? = rows.takeIf { from === graph }
+
+    fun keep(graph: Any, shown: List<TvRow>) {
+        from = graph
+        rows = shown
+    }
+}
+
+private val homeKept = HomeRowsKept()
 
 private suspend fun homeRow(graph: AppGraph, section: Section): TvRow? {
     val library = graph.library
@@ -162,7 +191,9 @@ fun TvHome() {
     val version by graph.library.version.collectAsStateWithLifecycle()
     val sync by graph.sync.progress.collectAsStateWithLifecycle()
     val settings by graph.settings.state.collectAsStateWithLifecycle()
-    var rows by remember { mutableStateOf<List<TvRow>?>(null) }
+    // The rows shown last time are there at once (issue #1074), and read again behind them.
+    var rows by remember { mutableStateOf(homeKept.of(graph)) }
+    var readHere by remember { mutableStateOf(false) }
     // Read again when the library changes, but only once it has stopped changing for a moment: a sync changes it many
     // times a minute, and reading Home again each time made the rows jump and the remote lose its place.
     // While a sync runs, nothing is read again (issue #953): Home is read once it's done, and rows that didn't change
@@ -170,10 +201,13 @@ fun TvHome() {
     LaunchedEffect(version, settings.homeOrder, settings.homeHidden, sync.running) {
         if (rows != null) {
             if (sync.running) return@LaunchedEffect
-            delay(RELOAD_PAUSE_MS)
+            // Coming back to Home, the kept rows are read again straight away; after that, only once things settle.
+            if (readHere) delay(RELOAD_PAUSE_MS)
         }
         val next = steadyRows(rows, homeRows(graph))
+        readHere = true
         if (next !== rows) rows = next
+        homeKept.keep(graph, next)
     }
     // Siansa Beats' genre list brought up to date now and then, as on the phone (Home reads the saved one).
     LaunchedEffect(Unit) { if (graph.library.isSynced && graph.beatsGenres.stale()) graph.beatsGenres.refresh() }

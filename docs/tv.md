@@ -47,7 +47,8 @@ Settings) always open that tab's own page, wherever you are.
   Notices). Then the rows of your phone's Home, in the same order
   and with the same rows hidden: Today's mixes (the daily mixes made today), Jump back in, Your mixes, Rediscover, Radios, Your playlists, Recently played, Artist
   radios, Recently added, Your genres and Random picks. A radio starts playing straight away. Rows fill the screen: a
-  row of only two or three is wide cards, a third of the screen each, with the cover beside the name.
+  row of only two or three is wide cards, a third of the screen each, with the cover beside the name. Coming back to
+  Home, its rows are there at once, and brought up to date a moment later.
 - **Library**: the shelves in a bar of pills at the top; albums, artists, playlists and genres as covers, six across, your liked songs, favourite albums and
   favourite artists. Time machine is on the phone only for now. Similar albums and the other pages with many albums
   (a genre, a label, Appears on) are six across too.
