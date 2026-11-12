@@ -10,27 +10,31 @@ With no notices, or notices turned off, the button sits on its own.
 
 ## Home's menu
 
-The round button opens a short column of round buttons straight under it, each with its name beside it. The page
-behind blurs a little and darkens while it's open, so the names are easy to read (before Android 12 it only darkens):
+The round button opens one small card of frosted glass, lying on the shortcut tiles under the top row (it takes their
+width, edges and corners, each row on a tile): the page shows through it blurred, and nothing else on the page changes.
+Each row has its name and, under it, what's in use (before Android 12 the card is a plain dark one):
 
 - **Roll the dice** plays a song you've never played (see [Roll the dice](discovery.md)). While it finds one, the
   dice tumbles in the menu button.
 - **Play on…** opens the list of TVs and speakers to play on: Chromecast, Google TV, Cast speakers and DLNA ones.
-  While something plays on one, the bubble is in the accent colour (amber unless you picked another in Themes) and
-  the menu button has a small dot in the same colour; to stop, open Play on… and pick **This phone**.
-- **Sources** opens the source filter. Its bubble is in the accent colour while the filter hides something.
+  Its line says where ("This phone", or the TV or speaker); while something plays on one, the line is in the accent
+  colour (amber unless you picked another in Themes) and the menu button has a small dot in the same colour; to stop,
+  open Play on… and pick **This phone**.
+- **Sources** opens the Sources sheet. Its line says what shows ("All libraries", "Downloaded only", "2 users"), in the
+  accent colour while the filter hides something.
 - **Arrange Home** opens Arrange, for the order and looks of Home's sections.
 
 Tap the button and then one of them, or do it in one go: press the button, slide your finger down to one (it lights
-up, with a light tick as you pass each) and let go. Letting go anywhere else closes the menu. The button's three
-lines are always in the accent colour; the button has a thin ring in the same colour while the source filter hides
-something.
+up, with a light tick as you pass each) and let go. Letting go anywhere else closes the menu, and so does a tap on the
+button (its lines become a cross while the menu is open). The button's three lines are always in the accent colour;
+the button has a thin ring in the same colour while the source filter hides something.
 
 Their order is yours: **Settings › Style › Home Menu**, hold a row and drag it.
 
 ## Arrange Home
 
-Arrange's **Spacing** slider sets the gap between every section at once, from Tight to Airy; **Reset** puts the order,
+Arrange is a sheet of its own (the Sources sheet is another): a row per section, with the handle at the left to move it,
+the eye to hide it and the cog for its look. Arrange's **Spacing** slider sets the gap between every section at once, from Tight to Airy; **Reset** puts the order,
 the hidden sections, the spacing and the looks back.
 
 The **cog** on a section changes its look, to any of the custom cards' looks:

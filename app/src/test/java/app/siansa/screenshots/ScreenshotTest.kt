@@ -8,6 +8,8 @@ import androidx.compose.material.icons.rounded.Equalizer
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import android.app.Application
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.Alignment
@@ -372,20 +374,24 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     }
                 }
             },
-            // Home's menu (issue #872), its bubbles in line: Sources lit under the finger of a glide; and while casting
-            // with the source filter on, Play on… and Sources in the accent colour, each with only its name.
+            // Home's menu (the owner, 12 Nov): one card of rows, a tile column wide, with what's in use under each name:
+            // Sources lit under the finger of a glide; and while casting with the source filter on, Play on… and
+            // Sources' lines in the accent colour, a long cast name cut.
             Scene("home_menu") {
+                val card = Modifier.width(180.dp).clip(RoundedCornerShape(app.siansa.ui.QUICK_TILE_CORNER))
+                    .background(Color(0xFF2C2C2C).copy(alpha = app.siansa.ui.glassAlpha(true)))
+                    .border(1.dp, Color.White.copy(alpha = 0.14f), RoundedCornerShape(app.siansa.ui.QUICK_TILE_CORNER))
                 Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Page)) {
                     app.siansa.ui.HomeMenuPanel(
                         app.siansa.ui.HomeMenuInfo(app.siansa.ui.PlayOnLine("Play on…", "TV or speaker", false), "All libraries", false),
-                        highlighted = app.siansa.data.HomeMenuItem.SOURCES, onPick = {},
+                        highlighted = app.siansa.data.HomeMenuItem.SOURCES, onPick = {}, modifier = card,
                     )
                     app.siansa.ui.HomeMenuPanel(
                         app.siansa.ui.HomeMenuInfo(
                             app.siansa.ui.PlayOnLine("Playing on Living Room SHIELD with an uncharacteristically long name", "Chromecast", true),
                             "Downloaded only · 2 users · 2 of 3 libraries", true,
                         ),
-                        highlighted = null, onPick = {},
+                        highlighted = null, onPick = {}, modifier = card,
                     )
                 }
             },

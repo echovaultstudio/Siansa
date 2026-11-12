@@ -14,6 +14,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.BluetoothAudio
@@ -238,12 +239,11 @@ internal fun CastSheet(onDismiss: () -> Unit) {
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(bottom = Space.Page)) {
-            Text(
-                "Play on",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(horizontal = Space.Section, vertical = Space.Small),
-            )
+            // The title and one line under it, as the Sources sheet (the owner, 12 Nov).
+            Column(Modifier.padding(start = Space.Page, end = Space.Page, bottom = Space.Small)) {
+                Text("Play on", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text("Where the music comes out", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
             val onPhone = status.device == null && !status.connecting && dlna == null
             TargetRow(Icons.Rounded.PhoneAndroid, "This phone", null, selected = onPhone) {
                 if (status.device != null || status.connecting) Cast.disconnect()
@@ -407,18 +407,21 @@ internal fun DlnaSettingsContent(device: DlnaDevice) {
 @Composable
 internal fun TargetRow(icon: ImageVector, name: String, detail: String?, selected: Boolean, onSettings: (() -> Unit)? = null, onClick: () -> Unit) {
     Row(
-        // The cog's touch area brings its own room on the right, so the cog lines up with the tick.
+        // A row as the Sources sheet's (the owner, 12 Nov): a round mark with the icon, the name and its line, the tick
+        // or the cog at the right. The cog's touch area brings its own room on the right, so it lines up with the tick.
         Modifier.fillMaxWidth().clickable(onClick = onClick)
-            .padding(start = Space.Section, end = if (onSettings != null) Space.Page else Space.Section, top = Space.Page, bottom = Space.Page),
+            .padding(start = Space.Page, end = if (onSettings != null) Space.Small else Space.Page, top = Space.Medium, bottom = Space.Medium),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Space.Page),
+        horizontalArrangement = Arrangement.spacedBy(Space.Medium),
     ) {
-        Icon(icon, null, tint = if (selected) Accent else MaterialTheme.colorScheme.onSurface)
+        Box(Modifier.size(SOURCE_ICON).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceContainerHighest), contentAlignment = Alignment.Center) {
+            Icon(icon, null, tint = MaterialTheme.colorScheme.onSurface)
+        }
         Column(Modifier.weight(1f)) {
             Text(
                 name,
                 style = MaterialTheme.typography.bodyLarge,
-                color = if (selected) Accent else MaterialTheme.colorScheme.onSurface,
+                color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -426,7 +429,7 @@ internal fun TargetRow(icon: ImageVector, name: String, detail: String?, selecte
                 Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
-        if (selected) Icon(Icons.Rounded.Check, null, tint = Accent)
+        if (selected) Icon(Icons.Rounded.Check, null, tint = Accent, modifier = Modifier.padding(end = Space.Small))
         onSettings?.let {
             // Not an IconButton: its 48 dp would make this row taller than the others.
             Box(
