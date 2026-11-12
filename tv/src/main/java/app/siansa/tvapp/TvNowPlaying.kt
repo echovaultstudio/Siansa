@@ -54,7 +54,9 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.foundation.focusable
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.Player
@@ -146,6 +148,19 @@ fun TvNowPlaying() {
                         Box(Modifier.size(COVER_SIZE).background(Color.Black.copy(alpha = PAUSED_SHADE), RoundedCornerShape(Space.Page)))
                         Icon(Icons.Rounded.Pause, "Paused", Modifier.size(PAUSE_SIGN).testTag("tvPaused"), tint = Color.White)
                     }
+                    // What the remote does here, centred under the cover (issue #1076): a section's gap below it, in
+                    // two lines no wider than the cover. Drawn below the box without taking room in it, so the cover
+                    // stays in the middle of the page.
+                    Text(
+                        REMOTE_HINT,
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = HINT_ALPHA),
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.align(Alignment.BottomCenter).layout { measurable, constraints ->
+                            val hint = measurable.measure(constraints.copy(minWidth = 0, minHeight = 0))
+                            layout(hint.width, 0) { hint.place(0, HINT_GAP.roundToPx()) }
+                        }.testTag("tvRemoteHint"),
+                    )
                 }
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Space.Section)) {
@@ -174,13 +189,16 @@ fun TvNowPlaying() {
                 Panel.NONE -> Unit
             }
         }
-        // What the remote does here, quietly at the foot of the page, and Siansa's logo in the corner.
-        Text(
-            if (queue) "Right  into the list  ·  Back  closes it  ·  ▼  more" else "OK  play / pause   ·   ◀ ▶  previous / next   ·   ▼  more",
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = HINT_ALPHA),
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = Space.Section).testTag("tvRemoteHint"),
-        )
+        // With the list of songs open there's no cover to sit under: what the remote does there stays at the foot of the
+        // page. Siansa's logo is in the corner.
+        if (queue) {
+            Text(
+                "Right  into the list  ·  Back  closes it  ·  ▼  more",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = HINT_ALPHA),
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = Space.Section).testTag("tvRemoteHint"),
+            )
+        }
         TvBrand(Modifier.align(Alignment.BottomEnd).padding(end = TV_EDGE * 2, bottom = Space.Section))
     }
     val snack = app.siansa.ui.LocalSnack.current
@@ -422,6 +440,10 @@ private val PROGRESS_HEIGHT = 4.dp
 private const val PAUSED_SHADE = 0.45f
 private val PAUSE_SIGN = 96.dp
 private const val HINT_ALPHA = 0.7f
+/** Between the cover and what the remote does, under it: a section's gap, clear of the cover without drifting off. */
+private val HINT_GAP = Space.Section
+/** What the remote does on now playing, in two lines that fit under the cover. */
+internal const val REMOTE_HINT = "OK  play / pause   ·   ▼  more\n◀ ▶  previous / next"
 private const val BRAND_ALPHA = 0.75f
 private val BRAND_ICON = 44.dp
 /** The launcher icon's drawing fills the middle two thirds of its square. */
