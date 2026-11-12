@@ -9,9 +9,9 @@
 | **AudioMuse-AI** (recommended) | [AudioMuse-AI](https://github.com/NeptuneHub/AudioMuse-AI) 3.6.4 or newer, connected to your music server, with text search (CLAP) on. It powers the mixes, radios, search by sound and more. See [AudioMuse-AI](audiomuse.md). |
 | **[Siansa Analysis plugin](https://github.com/echovaultstudio/siansa-beats)** (recommended) | Installed in AudioMuse-AI ([how](audiomuse.md#install-the-siansa-analysis-plugin)). Needed for loudness levelling from measured audio, smart crossfades, DJ blends that keep to the beat, and similar albums and artists. |
 | **An AI service** (optional) | For mix titles and sound searches written by an AI model: OpenRouter, OpenAI, Anthropic, Google Gemini, Mistral, Groq, or Ollama on your own network. See [AI features](ai.md). |
-| **Last.fm or Koito** (optional) | Where Siansa sends your listens (scrobbling) and reads your history back from. [Last.fm](https://www.last.fm) with your own API key, or [Koito](https://github.com/gabehf/Koito), a ListenBrainz-compatible history server you run yourself. They keep your full listening history, which powers **Time Machine**, **Your month and year** and your history. Set them up in **Settings › Scrobbling and history**. See [Your listening](your-listening.md#scrobbling). |
+| **Last.fm or Koito** (optional) | Where Siansa sends your listens (scrobbling) and reads your history back from. [Last.fm](https://www.last.fm) with your own API key, or [Koito](https://github.com/gabehf/Koito), a ListenBrainz-compatible history server you run yourself. They keep your full listening history, which powers **Time Machine**, **Your month and year** and your history. Siansa Beats keeps it too, when you scrobble there. Set them up in **Settings › Scrobbling and history**. See [Your listening](your-listening.md#scrobbling). |
 
-Siansa works as a plain player with only a music server. Everything "smart" needs AudioMuse-AI. Without Last.fm or Koito, Time Machine and your history use only what Siansa and your server have recorded.
+Siansa works as a plain player with only a music server. Everything "smart" needs AudioMuse-AI. Without Siansa Beats, Last.fm or Koito, Time Machine and your history use only what Siansa and your server have recorded.
 
 ## Install
 

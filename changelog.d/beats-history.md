@@ -1,0 +1,2 @@
+### Fixed
+- **Time Machine was empty with listens going to Siansa Beats alone.** It said "Nothing was played" and asked for Koito or Last.fm. With **Scrobble to Siansa Beats** on, Siansa now reads your history back from Siansa Beats: Time Machine, Your month and your year (with Siansa Beats 0.33 or newer), Rediscover and the taste your mixes are made from. Koito or Last.fm needn't be set up for those, and the texts name Siansa Beats.

@@ -75,6 +75,13 @@ class Taste(private val graph: AppGraph) {
                 .onFailure { AppLog.w("Taste", "Listen history from ${s.listenBrainzUrl.ifBlank { "ListenBrainz" }} failed: ${it.message}") }
                 .getOrNull()
         }
+        // The last month's most listened artists from Siansa Beats, when listens go there.
+        val beats = async {
+            if (!graph.beatsHistory.on) return@async null
+            runCatching { graph.beatsHistory.top("artists", now / 1000 - 30 * 86_400L, now / 1000 + 86_400L, 50) }
+                .onFailure { AppLog.w("Taste", "Listen history from Siansa Beats failed: ${it.message}") }
+                .getOrNull()
+        }
         val lastFm = async {
             if (s.lastFmApiKey.isBlank() || s.lastFmUser.isBlank()) return@async null
             runCatching { graph.historyApi.lastFmTop(s.lastFmApiKey, s.lastFmUser) }
@@ -114,6 +121,10 @@ class Taste(private val graph: AppGraph) {
         addSource(local, 1.0)
         remote.await()?.let { (artists, _) ->
             if (artists.isNotEmpty()) sources += if (s.listenBrainzUrl.contains("listenbrainz.org") || s.listenBrainzUrl.isBlank()) "ListenBrainz" else "Koito"
+            addSource(artists.byArtist(), 0.9)
+        }
+        beats.await()?.let { artists ->
+            if (artists.isNotEmpty()) sources += "Siansa Beats"
             addSource(artists.byArtist(), 0.9)
         }
         lastFm.await()?.let { (artists, _) ->
