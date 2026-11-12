@@ -64,6 +64,43 @@ fun <T> rankByName(query: String, items: List<T>, name: (T) -> String): List<T> 
 }
 
 /**
+ * How well [name] answers a search for [query], 0 the best (the owner, 12 Nov: "Gita" listed "Digital Bath" above the
+ * song called Gita, and "The right" listed "Why the Bright Stars Glow" above "The Right"):
+ *
+ * 0. the name is exactly what was typed;
+ * 1. the name starts with it;
+ * 2. a word of the name starts with it;
+ * 3. every word of the name was typed, with more besides ("dj seinfeld the right" for "The Right");
+ * 4. every word typed starts a word of the name or of [also] (the artist and album: "moderat gita");
+ * 5. the rest: a word typed is only inside another word ("gita" in "Digital").
+ */
+fun searchRank(query: String, name: String, also: String = ""): Int {
+    val q = normalizeKey(query)
+    val key = normalizeKey(name)
+    if (q.isEmpty() || key.isEmpty()) return 5
+    val terms = q.split(' ').filter { it.isNotEmpty() }
+    val words = key.split(' ').filter { it.isNotEmpty() }
+    return when {
+        key == q -> 0
+        key.startsWith(q) -> 1
+        " $key".contains(" $q") -> 2
+        terms.containsAll(words) -> 3
+        (words + normalizeKey(also).split(' ')).let { all -> terms.all { term -> all.any { it.startsWith(term) } } } -> 4
+        else -> 5
+    }
+}
+
+/** [items] with the ones that answer [query] best first ([searchRank]); ties keep their order. */
+fun <T> bestFirst(query: String, items: List<T>, name: (T) -> String, also: (T) -> String = { "" }): List<T> =
+    items.withIndex().sortedWith(compareBy({ searchRank(query, name(it.value), also(it.value)) }, { it.index })).map { it.value }
+
+/** Songs by their title (with their artist and album for the words that aren't in it), albums by their name (with their artist). */
+fun SearchResults.bestFirst(query: String): SearchResults = copy(
+    albums = bestFirst(query, albums, { it.name }) { it.artist },
+    songs = bestFirst(query, songs, { it.title }) { "${it.artist} ${it.album}" },
+)
+
+/**
  * An artist's albums from the server split into their own and the ones they only appear on (beta testers #34):
  * Navidrome lists every album an artist takes part in, so "DJ Fresh" got a Flava D mixtape as a release.
  */
