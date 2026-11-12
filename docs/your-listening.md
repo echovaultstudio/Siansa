@@ -4,21 +4,22 @@
 
 Wrapped-style pages for this month, last month, this year and this month a year ago: your top songs, albums and
 artists, artists rising into your rotation and dropping out, genres you played more or less than before, and the
-time of day you listen most. Built from Koito (if you scrobble there), your server's play counts and Siansa's own
-history. They don't need AudioMuse-AI or AI.
+time of day you listen most. Built from Siansa Beats (if you scrobble there; it needs Siansa Beats 0.33 or newer),
+else Koito, your server's play counts and Siansa's own history. They don't need AudioMuse-AI or AI.
 
 ## Time Machine
 
 Any month or year you played music, laid out like Your month: minutes, plays, artists and songs at the top, your
 top artists with their plays, your top songs, top albums, your listening clock and how your taste moved against
-the month or year before. The songs come from Koito and Last.fm (whichever you set up), otherwise Siansa's own
-history; the rest comes from Koito or Siansa's own history, so with only Last.fm an older month may show just its
-songs. A song counts as in your library when its title and artist match, on any album: a remastered, mono, single
+the month or year before. The songs come from Siansa Beats, Koito and Last.fm (whichever you scrobble to),
+otherwise Siansa's own history; the rest comes from Siansa Beats, else Koito, else Siansa's own history, so with
+only Last.fm an older month may show just its songs. With **Scrobble to Siansa Beats** on, nothing else needs
+setting up: Siansa Beats keeps the history, including what you imported there from Koito or Last.fm. A song counts as in your library when its title and artist match, on any album: a remastered, mono, single
 or "feat." version, a title with or without its apostrophe ("I'm", "Im"), and "The Beatles" for "Beatles" all
 count. Songs not in your library are listed too, marked "Not in your library" (you can hide them). **Create memory** saves the list as a playlist, named like "Time Machine - March 2019".
 
-When you scrobble to both Koito and Last.fm, the same listen usually reached both, so a song's count is the
-higher of the two, never the sum. Months and years that are over are kept on the phone, so they open at once;
+When you scrobble to more than one of them, the same listen usually reached each, so a song's count is the
+highest of them, never the sum. Months and years that are over are kept on the phone, so they open at once;
 the current one shows what the phone had and then updates with your latest plays (within 15 minutes).
 
 ## Sonic fingerprint
@@ -37,6 +38,8 @@ from AudioMuse-AI's analysis of the songs closest to the sound of your most play
   or plays count twice.
 - **Siansa Beats** (**Scrobble to Siansa Beats**; shown when Siansa Beats 0.29 or newer is set up in Settings ›
   Connections): keeps your listening history in Siansa Beats, under the name you sign in to your music server with.
+  Siansa reads it back from there for **Time Machine**, **Your month and your year**, **Rediscover** and the taste
+  your mixes are made from, so Koito or Last.fm needn't be set up for those.
   A listen reaches it by the same rules as everywhere else: **When a song counts**, and **Users**.
   Its **Listening** page shows any month or year: your top songs, artists and albums, hours, when you listen. You
   can bring in an export of Koito or Last.fm there, and have it send your listens on to Last.fm; turn **Last.fm**

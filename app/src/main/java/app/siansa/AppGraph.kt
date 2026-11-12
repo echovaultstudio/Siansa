@@ -1,6 +1,7 @@
 package app.siansa
 
 import kotlinx.serialization.json.JsonElement
+import app.siansa.net.BeatsHistory
 import app.siansa.net.BeatsApi
 import app.siansa.data.StationRepository
 import app.siansa.net.OutsideSource
@@ -433,6 +434,8 @@ class AppGraph(val app: Application) {
     }
 
     val historyApi = HistoryApi(http)
+    /** The listening history kept by Siansa Beats, read back for the Time machine, the reports, Rediscover and taste. */
+    val beatsHistory = BeatsHistory({ path -> beats.get(path) }, { settings.current })
     val taste = Taste(this)
     val generator = MixGenerator(this)
     val insights = Insights(this)
