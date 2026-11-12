@@ -10,6 +10,8 @@ import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.isFocusable
 import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.requestFocus
@@ -98,6 +100,13 @@ class TvRemoteSweepTest {
         return compose.onAllNodes(isFocused()).fetchSemanticsNodes().firstOrNull()
     }
 
+    /** Where the control with [words] is now (the one nearest to where it was, when there are several alike). */
+    private fun nowAt(words: String, was: androidx.compose.ui.geometry.Rect): androidx.compose.ui.geometry.Rect =
+        compose.onAllNodes(hasClickAction() or isFocusable()).fetchSemanticsNodes()
+            .filter { label(it) == words }
+            .minByOrNull { kotlin.math.abs(it.boundsInRoot.left - was.left) + kotlin.math.abs(it.boundsInRoot.top - was.top) }
+            ?.boundsInRoot ?: was
+
     /** Puts the focus back on the control at [bounds] (the row a left or right press just left). */
     private fun refocus(bounds: androidx.compose.ui.geometry.Rect) {
         runCatching {
@@ -126,7 +135,14 @@ class TvRemoteSweepTest {
             reached += wordsOf(node)
             if (here == last) {
                 still++
-                if (still >= 3) return reached
+                if (still >= 3) {
+                    // What the remote never got to, by position, so a stall can be traced.
+                    val below = compose.onAllNodes(hasClickAction()).fetchSemanticsNodes()
+                        .filter { it.boundsInRoot.top > node.boundsInRoot.bottom }
+                        .sortedBy { it.boundsInRoot.top }
+                    path += "(stopped; below: " + below.take(5).joinToString("; ") { label(it) + " @" + it.boundsInRoot.top.toInt() } + ")"
+                    return reached
+                }
             } else {
                 still = 0
                 path += here.first + " @${node.boundsInRoot.top.toInt()}"
@@ -138,11 +154,14 @@ class TvRemoteSweepTest {
             for (key in intArrayOf(KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT)) {
                 val arrow = if (key == KeyEvent.KEYCODE_DPAD_LEFT) "← " else "→ "
                 var row = node.boundsInRoot
+                var rowLabel = label(node)
                 var steps = 0
                 while (steps++ < 30) {
                     press(key)
                     val next = focused() ?: break
                     if (next.boundsInRoot == row) break
+                    // The page may have scrolled to show what the focus landed on: the row is measured where it is now.
+                    row = nowAt(rowLabel, row)
                     if (kotlin.math.abs(next.boundsInRoot.top - row.top) > 8f) {
                         path += "($arrow${label(next)}, back)"
                         refocus(row)
@@ -152,6 +171,7 @@ class TvRemoteSweepTest {
                     path += arrow + label(next)
                     node = next
                     row = next.boundsInRoot
+                    rowLabel = label(next)
                 }
             }
             // A folded section (its heading ends in -header, its body in -body): opened, so its controls count.
@@ -169,7 +189,7 @@ class TvRemoteSweepTest {
     /** Every control on the page (a click or toggle action and some words) that the sweep never had the focus on. */
     private fun missed(reached: Set<String>): List<String> {
         val controls = compose.onAllNodes(
-            androidx.compose.ui.test.hasClickAction() or SemanticsMatcher.keyIsDefined(SemanticsActions.OnClick),
+            hasClickAction() or SemanticsMatcher.keyIsDefined(SemanticsActions.OnClick),
         ).fetchSemanticsNodes()
         return controls.mapNotNull { node ->
             val words = wordsOf(node).filter { it.isNotBlank() }
