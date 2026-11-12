@@ -46,8 +46,11 @@ object AlbumDjMix {
             return
         }
         // A long playlist or a liked list mixes a random [MAX_MIX_SONGS] of its songs: hours of music, ordered quickly.
-        val album = mixPortion(list, Random.Default)
-        if (album.size < list.size) AppLog.i("AlbumMix", "\"$title\" has ${list.size} songs: the mix takes ${album.size} of them")
+        // Without the songs too long for a DJ mix (a continuous mix of an hour on the album of its songs).
+        val fitting = djMixSongs(list)
+        if (fitting.size < list.size) AppLog.i("AlbumMix", "\"$title\": left out ${list.size - fitting.size} songs longer than ${DJ_LONGEST_SEC / 60} minutes")
+        val album = mixPortion(fitting, Random.Default)
+        if (album.size < fitting.size) AppLog.i("AlbumMix", "\"$title\" has ${list.size} songs: the mix takes ${album.size} of them")
         val ordered = withContext(Dispatchers.Default) { arrange(graph, album) }
         songs.value = ordered.map { it.id }
         // The player takes commands on the main thread only: started from the background it refused, and nothing played
@@ -97,12 +100,12 @@ object AlbumDjMix {
 
 /**
  * Whether the album page of [songs] has its DJ mix [mix] playing (issue #965): the queue starts with the mix, in the
- * mix's order, and the mix is that album's songs. Then its Play button keeps the record grooves. Playing the album
+ * mix's order, and the mix is that album's songs (the ones that fit a DJ mix, [djMixSongs]). Then its Play button keeps the record grooves. Playing the album
  * any other way, or anything else, ends it.
  */
 fun albumMixPlaying(queue: List<Song>, songs: List<Song>, mix: List<String>): Boolean =
     mix.isNotEmpty() && queue.size >= mix.size && queue.take(mix.size).map { it.id } == mix &&
-        songs.map { it.id }.toSet().let { page -> page.containsAll(mix) && (page.size == mix.size || mix.size == MAX_MIX_SONGS) }
+        songs.map { it.id }.toSet().let { page -> page.containsAll(mix) && (djMixSongs(songs).map { it.id }.toSet().size == mix.size || mix.size == MAX_MIX_SONGS) }
 
 /**
  * Every DJ order of an album's [tracks] (issue #965): from each song in turn, through the rest, each next song the best

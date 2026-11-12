@@ -81,6 +81,19 @@ enum class MixShape(val label: String, val hint: String) {
     }
 }
 
+/** The longest song a DJ mix takes, in seconds: a quarter of an hour. Longer ones are whole DJ sets or live recordings in one file. */
+const val DJ_LONGEST_SEC = 15 * 60
+
+/**
+ * Whether a song of [durationSec] can go into a DJ mix (the owner, 12 Nov): not one longer than [DJ_LONGEST_SEC], such
+ * as a continuous mix of an hour, which is a mix itself and would take the DJ mix over. A length that isn't known
+ * (0) passes. The song a mix is started from is the listener's choice and isn't asked.
+ */
+fun fitsDjMix(durationSec: Int): Boolean = durationSec <= DJ_LONGEST_SEC
+
+/** The songs of an album or playlist that its DJ mix takes: those that fit ([fitsDjMix]), or all of them when none does. */
+fun djMixSongs(list: List<app.siansa.data.Song>): List<app.siansa.data.Song> = list.filter { fitsDjMix(it.durationSec) }.ifEmpty { list }
+
 /** A song DJ mode may pick, with what it knows of its sound (null when AudioMuse hasn't analysed it). */
 data class DjTrack(
     val id: String,
@@ -511,9 +524,18 @@ class ContinuousPlay(private val graph: AppGraph) {
             }
             // The mix began at the first song it carried on from; after one of its own songs, it's still that mix.
             val start = if (dj) (mixStart?.takeIf { last.id in addedDj } ?: last).also { mixStart = it } else null
-            val ids = if (dj) djIds(last, hits, start = start) ?: hits.take(TOP_UP).map { it.id } else hits.take(TOP_UP).map { it.id }
-            val byId = hits.associateBy { it.id }
+            // A whole DJ set in one file has no place inside a DJ mix ([fitsDjMix]): the phone's library knows how long each is.
+            val fitting = if (!dj) hits else {
+                val tooLong = graph.library.songs(hits.map { it.id }).filter { !fitsDjMix(it.durationSec) }.map { it.id }.toSet()
+                if (tooLong.isNotEmpty()) AppLog.i("KeepPlaying", "DJ: left out ${tooLong.size} songs longer than ${DJ_LONGEST_SEC / 60} minutes")
+                hits.filter { it.id !in tooLong }
+            }
+            if (fitting.isEmpty()) return
+            val ids = if (dj) djIds(last, fitting, start = start) ?: fitting.take(TOP_UP).map { it.id } else fitting.take(TOP_UP).map { it.id }
+            val byId = fitting.associateBy { it.id }
             var songs = graph.generator.resolveHits(ids.mapNotNull { byId[it] })
+            // Also the ones only the server knew the length of.
+            if (dj) songs = songs.filter { fitsDjMix(it.durationSec) }
             // Offline, or with "Only downloaded music" on, only songs on the phone can play.
             if (graph.connection.current.offline || graph.settings.current.downloadedOnly) {
                 songs = songs.filter { graph.downloads.isDownloaded(it.id) }
@@ -552,6 +574,11 @@ class ContinuousPlay(private val graph: AppGraph) {
      * fewer than [count] songs may come back, when the rest are too far from where it started.
      */
     suspend fun djArrange(last: Song, songs: List<Song>, count: Int = songs.size, start: Song? = null, likeness: ((String) -> Double)? = null): List<Song> {
+        // A whole DJ set in one file has no place inside a DJ mix ([fitsDjMix]).
+        @Suppress("NAME_SHADOWING")
+        val songs = songs.filter { fitsDjMix(it.durationSec) }.also {
+            if (it.size < songs.size) AppLog.i("KeepPlaying", "DJ: left out ${songs.size - it.size} songs longer than ${DJ_LONGEST_SEC / 60} minutes")
+        }
         if (songs.size < 2) return songs.take(count)
         val byId = songs.associateBy { it.id }
         val hits = songs.map { app.siansa.net.ClapHit(it.id, it.title, it.artist, it.album, 0.0) }
