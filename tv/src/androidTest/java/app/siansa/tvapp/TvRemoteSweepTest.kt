@@ -85,21 +85,24 @@ class TvRemoteSweepTest {
 
     private fun focused(): SemanticsNode? = compose.onAllNodes(isFocused()).fetchSemanticsNodes().firstOrNull()
 
-    /** Presses down until the focus stops moving; the words of every control the focus was on. */
-    private fun sweep(): Set<String> {
+    /** Presses down until the focus stops moving; the words of every control the focus was on, and the path it took. */
+    private fun sweep(path: MutableList<String>): Set<String> {
         val reached = LinkedHashSet<String>()
         var last: Pair<String, androidx.compose.ui.geometry.Rect>? = null
         var still = 0
         repeat(120) {
             press(KeyEvent.KEYCODE_DPAD_DOWN)
-            val node = focused() ?: return@repeat
+            val node = focused() ?: run { path += "(nothing focused)"; return@repeat }
             val words = wordsOf(node)
             val here = words.joinToString(" | ") to node.boundsInRoot
             reached += words
             if (here == last) {
                 still++
                 if (still >= 3) return reached
-            } else still = 0
+            } else {
+                still = 0
+                path += here.first.ifBlank { node.config.getOrNull(SemanticsProperties.TestTag) ?: "(no words)" } + " @${node.boundsInRoot.top.toInt()}"
+            }
             last = here
             // A folded section (its heading ends in -header, its body in -body): opened, so its controls count.
             val tag = node.config.getOrNull(SemanticsProperties.TestTag)
@@ -127,9 +130,11 @@ class TvRemoteSweepTest {
 
     private fun check(name: String, content: @Composable () -> Unit) {
         page(content)
-        val reached = sweep()
+        val path = mutableListOf<String>()
+        val reached = sweep(path)
         val missed = missed(reached)
         println("Sweep $name: reached ${reached.size} controls; missed: ${missed.ifEmpty { listOf("none") }}")
+        println("Sweep $name path: ${path.joinToString(" → ")}")
         assertTrue("$name: the remote never reaches ${missed.joinToString("; ")}", missed.isEmpty())
     }
 
