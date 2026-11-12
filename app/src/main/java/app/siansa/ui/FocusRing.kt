@@ -11,6 +11,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.focusGroup
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
@@ -29,6 +30,19 @@ fun Modifier.focusRing(shape: Shape = ButtonDefaults.shape): Modifier {
     var focused by remember { mutableStateOf(false) }
     val ring = if (focused) MaterialTheme.colorScheme.primary else Color.Transparent
     return this.onFocusChanged { focused = it.hasFocus }.border(FOCUS_RING_WIDTH, ring, shape)
+}
+
+/**
+ * On the TV app, a row of chips or buttons the remote can't miss (the owner, 12 Nov: the Remove button for Koito and
+ * others didn't register at all). The remote moves by distance, weighted 13:1 towards the direction it moves in but
+ * from the middle of each control: on a wide page a narrow button or chip at the left counts as further away than a
+ * full-width row below it, so down went past it. As a focus group the row is one candidate the whole width of the
+ * page, and once the remote is in it the nearest chip or button takes the focus. On a phone it does nothing.
+ */
+@Composable
+fun Modifier.tvFocusGroup(): Modifier {
+    if (!app.siansa.BuildConfig.TV_APP) return this
+    return this.fillMaxWidth().focusGroup()
 }
 
 /** As thick as the TV's own focus ring. */

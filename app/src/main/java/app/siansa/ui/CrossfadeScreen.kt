@@ -82,7 +82,7 @@ fun CrossfadeScreen(nav: NavController) {
                 if (!settings.audioMuseReady && !settings.beatsReady) {
                     Hint("Set up Siansa Beats or AudioMuse in Settings › Connections first. Until then, song tags are used.")
                 } else {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
+                    Row(Modifier.tvFocusGroup(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
                         OutlinedButton(modifier = Modifier.focusRing(), onClick = {
                             test = "Testing…"
                             scope.launch {
@@ -262,7 +262,7 @@ internal fun BeatMatchRow(selected: BeatMatchMode, onPick: (BeatMatchMode) -> Un
 /** The choice of where loudness and fades come from. */
 @Composable
 internal fun LoudnessSourceRow(selected: LoudnessSource, beats: Boolean = false, onPick: (LoudnessSource) -> Unit) {
-    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+    Row(Modifier.tvFocusGroup().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
         LoudnessSource.entries.forEach { source ->
             FilterChip(selected = selected == source, onClick = { onPick(source) }, label = { Text(if (source == LoudnessSource.PLUGIN && beats) "Siansa Beats" else source.label) })
         }

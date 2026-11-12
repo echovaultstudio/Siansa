@@ -83,7 +83,7 @@ fun NoticesSettingsScreen(nav: NavController) {
                             Heading(kind.label)
                             Hint(kind.hint)
                         }
-                        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+                        Row(Modifier.tvFocusGroup().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
                             NoticeMode.entries.forEach { mode ->
                                 FilterChip(
                                     selected = settings.notices.modeOf(kind) == mode,
