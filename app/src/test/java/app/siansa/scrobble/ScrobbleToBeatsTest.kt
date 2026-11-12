@@ -90,6 +90,22 @@ class ScrobbleToBeatsTest {
         }
     }
 
+    @Test fun theAlbumsArtistGoesWithAListenWhenKnown() {
+        // Last.fm finds a collaboration's or a compilation's album, and its cover, by the album artist (the owner, 12 Nov).
+        val song = Song(id = "s1", title = "Honey", artist = "Moby • Sinéad O'Connor", album = "Play", durationSec = 200)
+        val listen = ((AppJson.parseToJsonElement(BeatsListens.listen("max", song, 1_762_862_400, "Moby")) as JsonObject)["listens"] as JsonArray).single() as JsonObject
+        assertEquals(JsonPrimitive("Moby"), listen["album_artist"])
+        val now = AppJson.parseToJsonElement(BeatsListens.now("max", song, "Moby")) as JsonObject
+        assertEquals(JsonPrimitive("Moby"), now["album_artist"])
+        // Unknown or blank: left out, as before.
+        val bare = ((AppJson.parseToJsonElement(BeatsListens.listen("max", song, 1_762_862_400, " ")) as JsonObject)["listens"] as JsonArray).single() as JsonObject
+        assertNull(bare["album_artist"])
+        // Last.fm itself gets it as albumArtist.
+        val params = app.siansa.net.LastFmApi(okhttp3.OkHttpClient()).trackParams(song, "Moby")
+        assertEquals("Moby", params["albumArtist"])
+        assertNull(app.siansa.net.LastFmApi(okhttp3.OkHttpClient()).trackParams(song)["albumArtist"])
+    }
+
     @Test fun aHeartCarriesTheSongOnEveryServer() {
         for (server in EveryServer.all) {
             val song = Song(id = server.songId, title = "Kerala", artist = "Bonobo")
