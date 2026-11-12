@@ -59,6 +59,11 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.material.icons.rounded.Sync
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.siansa.data.MusicFolder
 import app.siansa.data.Users
@@ -66,18 +71,26 @@ import kotlinx.coroutines.launch
 import app.siansa.log.AppLog
 
 /*
- * The source filter (issues #56, #124 and #141), under Sources in the panel behind Home's top-right buttons,
- * laid out as: only downloaded music, and a card per user with an eye to show or hide their
- * music, a Sync button and their libraries to tick. What's hidden is hidden everywhere in the app.
+ * The source filter (issues #56, #124 and #141): the Sources sheet from Home's menu, laid out as rows (the owner,
+ * 12 Nov): only downloaded music with a switch, then a row per server with a switch to show or hide its music, a
+ * sync button and its libraries to tick. What's hidden is hidden everywhere in the app.
  */
 
-/** The eye (or a source's icon) at the start of a card: the name and the sync line start past it. */
-internal val SOURCE_ICON = 48.dp
+/** The round mark at the start of a row (an initial, or a source's icon): the libraries and the sync line start past it. */
+internal val SOURCE_ICON = 40.dp
 
-/** The gap between a user's name and their libraries, and between the libraries and the card's edge. */
-internal val SOURCE_CARD_GAP = Space.Medium
+/** The gap between a row's words and its libraries. */
+internal val SOURCE_CARD_GAP = Space.Small
 
-/** The Sources tab of the Home settings panel. */
+/** The Sources sheet, from Home's menu and Settings › Home (issue #780): [SourcesPanel] in a sheet of its own. */
+@Composable
+fun SourcesSheet(onDismiss: () -> Unit) {
+    androidx.compose.material3.ModalBottomSheet(onDismissRequest = onDismiss, sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+        SourcesPanel(Modifier.navigationBarsPadding().padding(bottom = Space.Small))
+    }
+}
+
+/** The Sources sheet's rows: its title and Sync all, only downloaded music, and a row per server. */
 @Composable
 internal fun SourcesPanel(modifier: Modifier = Modifier) {
     val graph = LocalGraph.current
@@ -121,40 +134,35 @@ internal fun SourcesPanel(modifier: Modifier = Modifier) {
         }
     }
 
-    Column(modifier.verticalScroll(rememberScrollState()).padding(horizontal = Space.Page)) {
-        Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .toggleable(settings.downloadedOnly, role = Role.Switch) { on ->
-                        AppLog.i("Sources", "Only downloaded music: $on")
-                        graph.settings.setDownloadedOnly(on)
-                    }
-                    .padding(start = Space.Page, end = Space.Page, top = Space.Page, bottom = Space.Page),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text("Only downloaded music", style = MaterialTheme.typography.bodyLarge)
-                    Text(
-                        "Everything that isn't on your phone is hidden. Handy on a flight.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Spacer(Modifier.width(Space.Medium))
-                Switch(checked = settings.downloadedOnly, onCheckedChange = null)
+    Column(modifier.verticalScroll(rememberScrollState())) {
+        // The title, one line under it, and Sync all as a quiet action on the right (the owner, 12 Nov).
+        Row(Modifier.fillMaxWidth().padding(start = Space.Page, end = Space.Small).testTag("sourcesTitle"), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Sources", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text("Whose music shows, everywhere in the app", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            TextButton(onClick = ::syncAll, enabled = !anySyncing, modifier = Modifier.testTag("syncAll")) {
+                Icon(Icons.Rounded.Sync, null, Modifier.size(18.dp))
+                Spacer(Modifier.width(Space.Tight))
+                Text(if (anySyncing) "Syncing…" else "Sync all")
             }
         }
-
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.weight(1f)) { PanelLabel("Servers and libraries") }
-            FilledTonalButton(
-                onClick = ::syncAll,
-                enabled = !anySyncing,
-                modifier = Modifier.padding(top = Space.Medium).testTag("syncAll"),
-            ) { Text("Sync all") }
-        }
-        Column(verticalArrangement = Arrangement.spacedBy(Space.Small)) {
+        Spacer(Modifier.height(Space.Small))
+        SourceRow(
+            name = "Only downloaded music",
+            status = "Everything that isn't on your phone is hidden. Handy on a flight.",
+            icon = Icons.Rounded.DownloadForOffline,
+            trailing = {
+                Switch(checked = settings.downloadedOnly, onCheckedChange = null, modifier = Modifier.testTag("downloadedOnly"))
+            },
+            modifier = Modifier.toggleable(settings.downloadedOnly, role = Role.Switch) { on ->
+                AppLog.i("Sources", "Only downloaded music: $on")
+                graph.settings.setDownloadedOnly(on)
+            },
+        )
+        androidx.compose.material3.HorizontalDivider(Modifier.padding(horizontal = Space.Page, vertical = Space.Tight), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        PanelLabel("SERVERS")
+        Column {
             users.forEach { user ->
                 val inUse = user.id == Users.active
                 val isShown = if (inUse) !ownHidden else user.id in shown
@@ -261,14 +269,15 @@ internal fun SourcesPanel(modifier: Modifier = Modifier) {
             else "Add another user in Settings › Connections to show their music here too.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = Space.Medium, bottom = Space.Page, start = Space.Tight, end = Space.Tight),
+            modifier = Modifier.padding(top = Space.Medium, bottom = Space.Page, start = Space.Page, end = Space.Page),
         )
     }
 }
 
 /**
- * One user's card: the eye shows or hides their music, Sync loads it again, and their libraries can be
- * ticked on and off (shown only while their music is).
+ * One source's row (the owner, 12 Nov): a round mark (its initial, or [icon]), the name with its status under it and
+ * the libraries to tick below (shown only while its music is); at the right, Sync and the switch that shows or hides
+ * its music. A hidden source's words are dimmed.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -282,81 +291,115 @@ internal fun SourceCard(
     onToggle: () -> Unit,
     onSync: () -> Unit,
     onLibrary: (Int) -> Unit = {},
-    // A source that can't be hidden from here (Audiobookshelf) shows its own icon instead of the eye.
+    // A source that can't be hidden from here (Audiobookshelf) shows its own icon instead of an initial, and no switch.
     icon: ImageVector? = null,
     canSync: Boolean = true,
     // A small line under the name while it syncs, and once when it's done (issue #693).
     progress: (@Composable () -> Unit)? = null,
 ) {
-    Surface(
-        shape = RoundedCornerShape(20.dp),
-        color = if (shown) MaterialTheme.colorScheme.surfaceContainerHighest else MaterialTheme.colorScheme.surfaceContainerLow,
-        modifier = Modifier.fillMaxWidth().testTag("source-card"),
-    ) {
-        Column(Modifier.padding(start = Space.Tight, end = Space.Medium, top = Space.Tight, bottom = if (libraries.isEmpty()) Space.Tight else SOURCE_CARD_GAP)) {
-            Row(Modifier.fillMaxWidth().testTag("source-name"), verticalAlignment = Alignment.CenterVertically) {
-                if (icon != null) {
-                    Box(Modifier.size(SOURCE_ICON), contentAlignment = Alignment.Center) { Icon(icon, null, tint = Accent) }
-                } else IconButton(onClick = onToggle, enabled = canToggle) {
-                    Icon(
-                        if (shown) Icons.Rounded.Visibility else Icons.Rounded.VisibilityOff,
-                        if (shown) "Hide $name" else "Show $name",
-                        tint = if (shown) Accent else MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Column(Modifier.weight(1f).alpha(if (shown) 1f else 0.6f).padding(vertical = Space.Small)) {
-                    Text(name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(status, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
-                }
-                if (shown) {
-                    Spacer(Modifier.width(Space.Small))
-                    OutlinedButton(onClick = onSync, enabled = !syncing && canSync) { Text(if (syncing) "Syncing" else "Sync") }
-                }
+    SourceRow(
+        name = name,
+        status = status,
+        icon = icon,
+        dimmed = !shown,
+        modifier = Modifier.testTag("source-card"),
+        trailing = {
+            IconButton(onClick = onSync, enabled = shown && !syncing && canSync, modifier = Modifier.testTag("source-sync")) {
+                Icon(Icons.Rounded.Sync, if (syncing) "Syncing $name" else "Sync $name")
             }
-            progress?.let {
-                it()
-                // Room under the line when nothing follows it (with libraries, their gap below does it).
-                if (libraries.isEmpty()) Spacer(Modifier.height(Space.Small))
-            }
-            if (libraries.isNotEmpty()) {
-                Spacer(Modifier.height(SOURCE_CARD_GAP))
-                FlowRow(
-                    Modifier.padding(start = Space.Medium),
-                    horizontalArrangement = Arrangement.spacedBy(Space.Small),
-                    verticalArrangement = Arrangement.spacedBy(Space.Small),
-                ) {
-                    libraries.forEachIndexed { i, (library, on) ->
-                        LibraryChip(library, on, enabled = !syncing) { onLibrary(i) }
+            if (icon == null) Switch(
+                checked = shown,
+                onCheckedChange = { onToggle() },
+                enabled = canToggle,
+                modifier = Modifier.semantics { contentDescription = if (shown) "Hide $name" else "Show $name" }.testTag("source-shown"),
+            )
+        },
+        under = if (progress == null && libraries.isEmpty()) null else {
+            {
+                progress?.invoke()
+                if (libraries.isNotEmpty()) {
+                    if (progress != null) Spacer(Modifier.height(SOURCE_CARD_GAP))
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(Space.Small),
+                        verticalArrangement = Arrangement.spacedBy(Space.Small),
+                    ) {
+                        libraries.forEachIndexed { i, (library, on) ->
+                            LibraryChip(library, on, enabled = !syncing) { onLibrary(i) }
+                        }
                     }
                 }
             }
+        },
+    )
+}
+
+/**
+ * A row of the Sources sheet: the mark, [name] and [status], [trailing] controls at the right, and [under] them the
+ * libraries or the sync line, lined up under the name.
+ */
+@Composable
+internal fun SourceRow(
+    name: String,
+    status: String,
+    icon: ImageVector?,
+    trailing: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit,
+    modifier: Modifier = Modifier,
+    dimmed: Boolean = false,
+    under: (@Composable () -> Unit)? = null,
+) {
+    Row(
+        modifier.fillMaxWidth().padding(start = Space.Page, end = Space.Small, top = Space.Medium, bottom = Space.Medium),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Row(Modifier.fillMaxWidth().testTag("source-name"), verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier.size(SOURCE_ICON).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (icon != null) Icon(icon, null, tint = MaterialTheme.colorScheme.onSurface)
+                    else Text(name.take(1).uppercase(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                }
+                Spacer(Modifier.width(Space.Medium))
+                Column(Modifier.weight(1f).alpha(if (dimmed) 0.6f else 1f)) {
+                    Text(name, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(status, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
+                }
+            }
+            under?.let {
+                Spacer(Modifier.height(SOURCE_CARD_GAP))
+                Box(Modifier.padding(start = SOURCE_ICON + Space.Medium)) { it() }
+            }
         }
+        Spacer(Modifier.width(Space.Small))
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Space.Tight)) { trailing() }
     }
 }
 
 /** A library to tick on or off: a tick and the name in a rounded box. */
 @Composable
 private fun LibraryChip(name: String, on: Boolean, enabled: Boolean, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(10.dp)
+    // The listening pages' faint tile when it's on, only an edge when it's off (the owner, 12 Nov).
+    val shape = RoundedCornerShape(50)
     Row(
         Modifier
             .clip(shape)
-            .background(if (on) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerLow)
-            .border(1.dp, if (on) Accent.copy(alpha = 0.6f) else MaterialTheme.colorScheme.outlineVariant, shape)
+            .then(if (on) Modifier.background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f)) else Modifier)
+            .border(1.dp, if (on) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.14f) else MaterialTheme.colorScheme.outlineVariant, shape)
             .toggleable(on, enabled = enabled, role = Role.Checkbox) { onClick() }
-            .height(36.dp)
+            .height(32.dp)
             .padding(horizontal = Space.Medium)
             .alpha(if (enabled) 1f else 0.6f),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (on) {
-            Icon(Icons.Rounded.Check, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSecondaryContainer)
-            Spacer(Modifier.width(Space.Small))
+            Icon(Icons.Rounded.Check, null, Modifier.size(16.dp), tint = Accent)
+            Spacer(Modifier.width(Space.Tight))
         }
         Text(
             name,
-            style = MaterialTheme.typography.labelLarge,
-            color = if (on) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.labelMedium,
+            color = if (on) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
@@ -365,9 +408,11 @@ private fun LibraryChip(name: String, on: Boolean, enabled: Boolean, onClick: ()
 private fun PanelLabel(text: String) {
     Text(
         text,
-        style = MaterialTheme.typography.titleSmall,
-        fontWeight = FontWeight.SemiBold,
-        modifier = Modifier.padding(start = Space.Tight, top = Space.Section, bottom = Space.Medium),
+        style = MaterialTheme.typography.labelMedium,
+        fontWeight = FontWeight.Bold,
+        letterSpacing = 2.sp,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(start = Space.Page, top = Space.Medium),
     )
 }
 
@@ -478,13 +523,13 @@ internal fun inUseStatus(syncing: Boolean, status: LibraryStatus?, now: Long = S
 @Composable
 internal fun SyncStrip(text: String, running: Boolean, fraction: Float?, done: Boolean, failed: Boolean) {
     Column(
-        // Lined up under the source's name, past the eye.
-        Modifier.fillMaxWidth().padding(start = SOURCE_ICON, end = Space.Tight).testTag("source-sync-progress"),
+        // Under the source's name (the row puts it past the mark).
+        Modifier.fillMaxWidth().testTag("source-sync-progress"),
         verticalArrangement = Arrangement.spacedBy(Space.Tight),
     ) {
         if (running) {
-            if (fraction != null) LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth())
-            else LinearProgressIndicator(Modifier.fillMaxWidth())
+            if (fraction != null) LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth().height(3.dp), color = Accent, trackColor = MaterialTheme.colorScheme.surfaceContainerHighest)
+            else LinearProgressIndicator(Modifier.fillMaxWidth().height(3.dp), color = Accent, trackColor = MaterialTheme.colorScheme.surfaceContainerHighest)
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (done) {

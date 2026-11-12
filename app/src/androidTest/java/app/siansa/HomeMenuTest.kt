@@ -15,6 +15,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onRoot
+import app.siansa.ui.Space
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -141,13 +143,15 @@ class HomeMenuTest {
         compose.onNodeWithText("Play on…").assertIsDisplayed()
         compose.onNodeWithText("Sources").assertIsDisplayed()
         compose.onNodeWithText("Arrange Home").assertIsDisplayed()
-        // The bubbles hang straight down from the button: each one's centre on the button's centre line.
+        // The card hangs under the button, its right edge on the button's (the page's edge), as wide as a tile column.
         val button = compose.onNodeWithTag("homeMenu").getBoundsInRoot()
-        for (tag in listOf("dice", "play_on", "sources", "arrange")) {
-            val bubble = compose.onNodeWithTag("homeMenuBubble-$tag", useUnmergedTree = true).getBoundsInRoot()
-            val off = ((bubble.left + bubble.right) / 2 - (button.left + button.right) / 2).value
-            assertTrue("Bubble $tag is ${off} dp off the button's centre line", kotlin.math.abs(off) <= 0.5f)
-        }
+        val panel = compose.onNodeWithTag("homeMenuPanel").getBoundsInRoot()
+        assertTrue("The card's right edge is ${(panel.right - button.right).value} dp off the button's", kotlin.math.abs((panel.right - button.right).value) <= 1f)
+        assertTrue("The card hangs under the button", panel.top > button.bottom)
+        val screen = compose.onRoot().getBoundsInRoot()
+        val column = ((screen.right - screen.left) - Space.Page * 2 - Space.Small) / 2
+        val width = panel.right - panel.left
+        assertTrue("The card is a tile column wide (${width.value} dp, column ${column.value} dp)", kotlin.math.abs((width - column).value) <= 1f)
         compose.onNodeWithTag("homeMenu-arrange").performClick()
         compose.waitForIdle()
         assertEquals(listOf(HomeMenuItem.ARRANGE), picked)
@@ -159,9 +163,10 @@ class HomeMenuTest {
         compose.onNodeWithTag("homeMenuCastDot", useUnmergedTree = true).assertExists()
         compose.onNodeWithTag("homeMenu").performClick()
         compose.waitForIdle()
-        // The bubble keeps its plain name; Stop and the rest are in the TVs and speakers menu it opens.
+        // The row keeps its plain name with where it plays under it; Stop and the rest are in the TVs and speakers menu it opens.
         compose.onNodeWithText("Play on…").assertIsDisplayed()
-        assertTrue("No Stop in the bubbles", compose.onAllNodesWithTagCount("homeMenuStop") == 0)
+        compose.onNodeWithText("Playing on SHIELD").assertIsDisplayed()
+        assertTrue("No Stop in the rows", compose.onAllNodesWithTagCount("homeMenuStop") == 0)
         compose.onNodeWithTag("homeMenu-play_on").performClick()
         compose.waitForIdle()
         assertEquals(listOf(HomeMenuItem.PLAY_ON), picked)

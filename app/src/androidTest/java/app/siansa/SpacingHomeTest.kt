@@ -169,16 +169,15 @@ class SpacingHomeTest : SpacingCheck() {
     }
 
     /**
-     * Home's menu (issue #872): the bubbles are one size and perfectly in line (their centres on one vertical line),
-     * the same room between each, and each label centred on its bubble. Checked narrow, while casting and with the
-     * source filter on.
+     * Home's menu (the owner, 12 Nov): one card of rows, each a shortcut tile's height with the tiles' gap between,
+     * their names on one line at the left, whatever's in use (a long cast name, the source filter on).
      */
-    @Test fun homeMenuBubblesSitInLine() {
+    @Test fun homeMenuRowsLieOnTheTiles() {
         compose.setContent {
             SiansaTheme {
-                // Narrow, as on a small phone with big text: no bubble may be squeezed.
+                // Narrow, as the right column of the tiles: no row may be squeezed.
                 app.siansa.ui.HomeMenuPanel(
-                    modifier = Modifier.widthIn(max = 280.dp),
+                    modifier = Modifier.widthIn(max = 180.dp),
                     info = app.siansa.ui.HomeMenuInfo(
                         app.siansa.ui.PlayOnLine("Playing on Living Room SHIELD with an uncharacteristically long name", "Chromecast", true),
                         "Downloaded only · 2 users", true,
@@ -187,18 +186,15 @@ class SpacingHomeTest : SpacingCheck() {
                 )
             }
         }
-        val bubbles = listOf("dice", "play_on", "sources", "arrange").map { compose.onNodeWithTag("homeMenuBubble-$it", useUnmergedTree = true).getBoundsInRoot() }
+        val rows = listOf("dice", "play_on", "sources", "arrange").map { compose.onNodeWithTag("homeMenu-$it", useUnmergedTree = true).getBoundsInRoot() }
         val labels = listOf("dice", "play_on", "sources", "arrange").map { compose.onNodeWithTag("homeMenuLabel-$it", useUnmergedTree = true).getBoundsInRoot() }
-        val centre = (bubbles[0].left + bubbles[0].right) / 2
-        bubbles.forEachIndexed { i, b ->
-            assertEven("Menu: bubble $i on the same centre line", (b.left + b.right) / 2, centre, 0.5.dp)
-            assertEven("Menu: bubble $i is round and the button's size", b.right - b.left, app.siansa.ui.MENU_CIRCLE, 0.5.dp)
-            assertEven("Menu: bubble $i height", b.bottom - b.top, app.siansa.ui.MENU_CIRCLE, 0.5.dp)
-            assertEven("Menu: label $i centred on its bubble", (labels[i].top + labels[i].bottom) / 2, (b.top + b.bottom) / 2, 1.dp)
-            assertEven("Menu: label $i a step from its bubble", b.left - labels[i].right, Space.Small, 1.dp)
+        rows.forEachIndexed { i, r ->
+            assertEven("Menu: row $i a tile's height", r.bottom - r.top, app.siansa.ui.MENU_ROW, 0.5.dp)
+            assertEven("Menu: label $i starts where the first does", labels[i].left, labels[0].left, 0.5.dp)
+            assertEven("Menu: row $i the panel's width", r.right - r.left, rows[0].right - rows[0].left, 0.5.dp)
         }
-        for (i in 1 until bubbles.size - 1) {
-            assertEven("Menu: room between the bubbles ($i)", bubbles[i].top - bubbles[i - 1].bottom, bubbles[i + 1].top - bubbles[i].bottom, 0.5.dp)
+        for (i in 1 until rows.size) {
+            assertEven("Menu: the tiles' gap between rows ($i)", rows[i].top - rows[i - 1].bottom, app.siansa.ui.MENU_ROW_GAP, 0.5.dp)
         }
     }
 
@@ -313,14 +309,15 @@ class SpacingHomeTest : SpacingCheck() {
         assertEven("Rule chips", chip.top - name.bottom, value.top - chip.bottom, 12.dp)
     }
 
-    /** Source filter: a user's libraries sit as far below their name as they sit above the card's edge. */
-    @Test fun sourceCardLibrariesAreEvenlySpaced() {
+    /** Sources: a user's libraries sit their gap below the name, and start under it, past the round mark (the owner, 12 Nov). */
+    @Test fun sourceRowLibrariesSitUnderTheName() {
         compose.setContent { SiansaTheme { app.siansa.ui.SourceCardForTest() } }
-        val name = compose.onNodeWithTag("source-name").getBoundsInRoot()
+        val name = compose.onNodeWithText("anna on music.example.com").getBoundsInRoot()
+        val nameRow = compose.onNodeWithTag("source-name").getBoundsInRoot()
         // The chip merges its tick and name, so its text node is the whole chip.
         val chipBox = compose.onNodeWithText("albums").getBoundsInRoot()
-        val card = compose.onNodeWithTag("source-card").getBoundsInRoot()
-        assertEven("Source card libraries", chipBox.top - name.bottom, card.bottom - chipBox.bottom)
+        assertEven("Libraries below the name", chipBox.top - nameRow.bottom, app.siansa.ui.SOURCE_CARD_GAP)
+        assertEven("Libraries start under the name", chipBox.left - name.left, 0.dp)
     }
 
     /** Source filter (issue #693): the sync line starts under the source's name, and its libraries keep their gap below it. */

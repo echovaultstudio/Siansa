@@ -860,6 +860,10 @@ fun GradientTile(
     }
 }
 
+/** A quick access tile's height and corners: Home's menu takes them too, so it lies on the tiles (the owner, 12 Nov). */
+val QUICK_TILE_HEIGHT = 56.dp
+val QUICK_TILE_CORNER = 6.dp
+
 /** A compact "quick access" tile: small cover on the left, name on the right. */
 @Composable
 fun QuickTile(
@@ -872,8 +876,8 @@ fun QuickTile(
 ) {
     Row(
         modifier
-            .height(56.dp)
-            .clip(RoundedCornerShape(6.dp))
+            .height(QUICK_TILE_HEIGHT)
+            .clip(RoundedCornerShape(QUICK_TILE_CORNER))
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
             .clickable(onClick = onClick),
         verticalAlignment = Alignment.CenterVertically,

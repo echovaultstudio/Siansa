@@ -286,8 +286,8 @@ fun HomeScreen(nav: NavController) {
     CompositionLocalProvider(LocalSectionGap provides homeGap(homeSettings.homeGap)) {
     Box(Modifier.fillMaxSize()) {
     LazyColumn(
-        // The page blurs a little behind the open menu, so its labels read clearly (issue #959).
-        Modifier.fillMaxSize().aboveKeyboard().blurBehindMenu(menu),
+        // The page is kept as a picture while the menu is open, for the glass under the menu (the owner, 12 Nov).
+        Modifier.fillMaxSize().aboveKeyboard().homeMenuBackdrop(menu),
         state = listState,
         contentPadding = PaddingValues(bottom = if (keyboardOpen()) Space.Page else bottomBarPadding(Space.Section)),
     ) {
@@ -317,8 +317,11 @@ fun HomeScreen(nav: NavController) {
         }
 
         // The rest in the order chosen under Arrange Home, without the hidden ones, each in its look (issue #655).
-        for (section in HomeSection.visible(homeOrder, homeHidden)) {
+        val visibleSections = HomeSection.visible(homeOrder, homeHidden)
+        for (section in visibleSections) {
             val look = homeSettings.homeLooks[section] ?: HomeLook.AS_IS
+            // The menu lies on the first section's tiles (the owner, 12 Nov): the second shortcut tile says where.
+            val first = section == visibleSections.firstOrNull { it != HomeSection.NOTICES }
             when (section) {
                 // The chips row (issue #784); its kinds are set in Settings › Notices and Cards › Notices.
                 // The notices are the top of Home now (issue #872), not a section of their own.
@@ -353,11 +356,12 @@ fun HomeScreen(nav: NavController) {
                             })
                         } else if (quick.isNotEmpty()) {
                             Column(Modifier.padding(horizontal = Space.Page, vertical = Space.Medium).testTag("quickShortcuts"), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
-                                quick.chunked(2).forEach { row ->
+                                quick.chunked(2).forEachIndexed { rowIndex, row ->
                                     Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
-                                        row.forEach { r ->
+                                        row.forEachIndexed { column, r ->
                                             QuickTile(
-                                                r.title, coverOf(r), colorsOf(r), { nav.navigate(r.route) }, Modifier.weight(1f),
+                                                r.title, coverOf(r), colorsOf(r), { nav.navigate(r.route) },
+                                                Modifier.weight(1f).then(if (first && rowIndex == 0 && column == 1) Modifier.homeMenuCard(menu, QUICK_TILE_CORNER) else Modifier),
                                                 icon = iconOf(r),
                                             )
                                         }
