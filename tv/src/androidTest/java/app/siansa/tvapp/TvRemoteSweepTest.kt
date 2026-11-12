@@ -9,7 +9,10 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.isFocused
+import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.requestFocus
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.navigation.compose.rememberNavController
@@ -95,6 +98,14 @@ class TvRemoteSweepTest {
         return compose.onAllNodes(isFocused()).fetchSemanticsNodes().firstOrNull()
     }
 
+    /** Puts the focus back on the control at [bounds] (the row a left or right press just left). */
+    private fun refocus(bounds: androidx.compose.ui.geometry.Rect) {
+        runCatching {
+            compose.onAllNodes(SemanticsMatcher("at $bounds") { it.boundsInRoot == bounds }).onFirst().requestFocus()
+        }
+        compose.waitForIdle()
+    }
+
     private fun label(node: SemanticsNode): String =
         wordsOf(node).joinToString(" | ").ifBlank { node.config.getOrNull(SemanticsProperties.TestTag) ?: "(no words)" }
 
@@ -106,6 +117,8 @@ class TvRemoteSweepTest {
         val reached = LinkedHashSet<String>()
         var last: Pair<String, androidx.compose.ui.geometry.Rect>? = null
         var still = 0
+        // Where the page puts the remote first (the user in use on the hub) counts before any press.
+        focused()?.let { reached += wordsOf(it); path += label(it) + " @${it.boundsInRoot.top.toInt()} (first)" }
         repeat(120) {
             press(KeyEvent.KEYCODE_DPAD_DOWN)
             var node = focused() ?: run { path += "(nothing focused)"; return@repeat }
@@ -119,19 +132,25 @@ class TvRemoteSweepTest {
                 path += here.first + " @${node.boundsInRoot.top.toInt()}"
             }
             last = here
-            // Along the row, as the remote is used: left to its start, then right to its end. A press that moves to
-            // another line is where the remote went: the sweep goes on from there (no pressing back, which went
-            // elsewhere and left the sweep circling).
+            // Along the row, as the remote is used: left to its start, then right to its end. A press that lands on
+            // another line (the Back arrow above the first row, say) is undone by putting the focus back on the row,
+            // so the sweep carries on down from where it was rather than circling.
             for (key in intArrayOf(KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT)) {
+                val arrow = if (key == KeyEvent.KEYCODE_DPAD_LEFT) "← " else "→ "
                 var row = node.boundsInRoot
-                repeat(30) {
+                var steps = 0
+                while (steps++ < 30) {
                     press(key)
-                    val next = focused() ?: return@repeat
-                    if (next.boundsInRoot == row) return@repeat
+                    val next = focused() ?: break
+                    if (next.boundsInRoot == row) break
+                    if (kotlin.math.abs(next.boundsInRoot.top - row.top) > 8f) {
+                        path += "($arrow${label(next)}, back)"
+                        refocus(row)
+                        break
+                    }
                     reached += wordsOf(next)
-                    path += (if (key == KeyEvent.KEYCODE_DPAD_LEFT) "← " else "→ ") + label(next)
+                    path += arrow + label(next)
                     node = next
-                    if (kotlin.math.abs(next.boundsInRoot.top - row.top) > 8f) return@repeat
                     row = next.boundsInRoot
                 }
             }
@@ -150,7 +169,7 @@ class TvRemoteSweepTest {
     /** Every control on the page (a click or toggle action and some words) that the sweep never had the focus on. */
     private fun missed(reached: Set<String>): List<String> {
         val controls = compose.onAllNodes(
-            androidx.compose.ui.test.hasClickAction() or androidx.compose.ui.test.SemanticsMatcher.keyIsDefined(SemanticsActions.OnClick),
+            androidx.compose.ui.test.hasClickAction() or SemanticsMatcher.keyIsDefined(SemanticsActions.OnClick),
         ).fetchSemanticsNodes()
         return controls.mapNotNull { node ->
             val words = wordsOf(node).filter { it.isNotBlank() }
