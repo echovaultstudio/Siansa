@@ -6,6 +6,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material.icons.rounded.AddCircle
 import androidx.compose.material.icons.rounded.AddCircleOutline
 
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import android.os.SystemClock
 import app.siansa.log.AppLog
@@ -44,6 +45,9 @@ import androidx.compose.ui.unit.Velocity
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.gestures.FlingBehavior
+import androidx.compose.foundation.gestures.ScrollScope
+import androidx.compose.foundation.gestures.ScrollableDefaults
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -361,7 +365,13 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                         },
                     ) { queueOpen = true }
                 }
-                Column(Modifier.fillMaxSize().verticalScroll(scroll)) {
+                // The cards under the player are either shut or properly open, never a sliver left by a brush of the thumb.
+                val density = LocalDensity.current
+                val opensAt = with(density) { (maxHeight * PLAYER_OPENS_AT).toPx() }
+                val flick = with(density) { PLAYER_FLICK.toPx() }
+                val glide = ScrollableDefaults.flingBehavior()
+                val settle = remember(scroll, glide, opensAt, flick) { PlayerSettle(scroll, glide, opensAt, flick) }
+                Column(Modifier.fillMaxSize().verticalScroll(scroll, flingBehavior = settle)) {
                     Column(
                         Modifier
                             .height(pageHeight)
@@ -1183,6 +1193,43 @@ internal fun surpriseLabel(surprise: Int): String = when {
     else -> "Lots"
 }
 
+
+/** How far down now playing has to be scrolled, as a part of the screen's height, for the cards under the player to stay open. */
+private const val PLAYER_OPENS_AT = 0.25f
+
+/** A swipe up at least this fast (a second) is meant: it opens the cards even when it ends short. */
+private val PLAYER_FLICK = 500.dp
+
+/**
+ * Where now playing comes to rest once the finger lifts at [value] pixels down the page. Short of [opensAt] it goes
+ * back to the top, so the cards under the player never peek in by accident; a [flicked] swipe up carries on to
+ * [opensAt] instead, so opening them stays easy. Further down, the page stays where it is and scrolls freely.
+ */
+internal fun playerRest(value: Int, opensAt: Int, flicked: Boolean): Int = when {
+    value <= 0 || value >= opensAt -> value
+    flicked -> opensAt
+    else -> 0
+}
+
+/** Now playing's scrolling: the usual glide, then on to where [playerRest] says, with a soft spring. */
+private class PlayerSettle(
+    private val scroll: androidx.compose.foundation.ScrollState,
+    private val glide: FlingBehavior,
+    private val opensAt: Float,
+    private val flick: Float,
+) : FlingBehavior {
+    override suspend fun ScrollScope.performFling(initialVelocity: Float): Float {
+        val left = with(glide) { performFling(initialVelocity) }
+        val to = playerRest(scroll.value, opensAt.toInt(), flicked = initialVelocity > flick)
+        if (to == scroll.value) return left
+        var last = scroll.value.toFloat()
+        animate(last, to.toFloat(), animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) { now, _ ->
+            scrollBy(now - last)
+            last = now
+        }
+        return 0f
+    }
+}
 
 /** In the classic now playing style, how much of the lyrics card shows under the player before scrolling (issue #346). */
 private val PLAYER_PEEK = 44.dp

@@ -252,7 +252,8 @@ queue as playlist** (the filled circle) keeps the whole queue.
 
 Scroll down in now playing for **About the artist** and **About this song**. The whole page scrolls as one, in the
 colours of the cover, and the cards take a deep shade of the cover's colour too (a dark grey for a black-and-white
-cover). Scroll back up for the controls.
+cover). Scroll back up for the controls. A small slip of the thumb doesn't leave the cards
+peeking in: now playing glides back unless you swipe up or scroll a quarter of the way down.
 
 ## Lyrics
 
