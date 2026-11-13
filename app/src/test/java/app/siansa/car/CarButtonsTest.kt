@@ -9,10 +9,12 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
 /** Like, Shuffle and Repeat in Android Auto's player (issue #1042). */
 @OptIn(UnstableApi::class)
 @RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35], application = android.app.Application::class)
 class CarButtonsTest {
     @Test fun theButtonsAreLikeShuffleRepeatInThatOrder() {
         val looks = CarButtons.looks(liked = false, shuffle = false, repeat = Player.REPEAT_MODE_OFF)
