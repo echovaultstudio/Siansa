@@ -136,7 +136,8 @@ internal fun SourcesPanel(modifier: Modifier = Modifier) {
 
     Column(modifier.verticalScroll(rememberScrollState())) {
         // The title, one line under it, and Sync all as a quiet action on the right (the owner, 12 Nov).
-        Row(Modifier.fillMaxWidth().padding(start = Space.Page, end = Space.Small).testTag("sourcesTitle"), verticalAlignment = Alignment.CenterVertically) {
+        // On the TV the title row lands the remote and passes it to Sync all (the owner, 12 Nov).
+        Row(Modifier.tvFocusGroup().padding(start = Space.Page, end = Space.Small).testTag("sourcesTitle"), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("Sources", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Text("Whose music shows, everywhere in the app", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -302,7 +303,8 @@ internal fun SourceCard(
         status = status,
         icon = icon,
         dimmed = !shown,
-        modifier = Modifier.testTag("source-card"),
+        // On the TV the row lands the remote and passes it to Sync; right from there is the switch.
+        modifier = Modifier.tvFocusGroup().testTag("source-card"),
         trailing = {
             IconButton(onClick = onSync, enabled = shown && !syncing && canSync, modifier = Modifier.testTag("source-sync")) {
                 Icon(Icons.Rounded.Sync, if (syncing) "Syncing $name" else "Sync $name")
@@ -342,7 +344,7 @@ internal fun SourceRow(
     name: String,
     status: String,
     icon: ImageVector?,
-    trailing: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit,
+    trailing: @Composable () -> Unit,
     modifier: Modifier = Modifier,
     dimmed: Boolean = false,
     under: (@Composable () -> Unit)? = null,
@@ -372,7 +374,9 @@ internal fun SourceRow(
             }
         }
         Spacer(Modifier.width(Space.Small))
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Space.Tight)) { trailing() }
+        // Sync over the switch on a phone; side by side on the TV, where the remote goes right from one to the other.
+        if (app.siansa.BuildConfig.TV_APP) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.Small)) { trailing() }
+        else Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Space.Tight)) { trailing() }
     }
 }
 

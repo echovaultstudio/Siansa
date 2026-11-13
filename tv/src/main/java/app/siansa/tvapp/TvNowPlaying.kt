@@ -54,9 +54,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.foundation.focusable
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.Player
@@ -148,19 +146,6 @@ fun TvNowPlaying() {
                         Box(Modifier.size(COVER_SIZE).background(Color.Black.copy(alpha = PAUSED_SHADE), RoundedCornerShape(Space.Page)))
                         Icon(Icons.Rounded.Pause, "Paused", Modifier.size(PAUSE_SIGN).testTag("tvPaused"), tint = Color.White)
                     }
-                    // What the remote does here, centred under the cover (issue #1076): a section's gap below it, in
-                    // two lines no wider than the cover. Drawn below the box without taking room in it, so the cover
-                    // stays in the middle of the page.
-                    Text(
-                        REMOTE_HINT,
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = HINT_ALPHA),
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.align(Alignment.BottomCenter).layout { measurable, constraints ->
-                            val hint = measurable.measure(constraints.copy(minWidth = 0, minHeight = 0))
-                            layout(hint.width, 0) { hint.place(0, HINT_GAP.roundToPx()) }
-                        }.testTag("tvRemoteHint"),
-                    )
                 }
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Space.Section)) {
@@ -182,6 +167,9 @@ fun TvNowPlaying() {
                     }
                 }
                 ProgressBlock(progress, details(state.codec, state.transcodeKbps), windTo, windForward)
+                // What the remote does here, on one line centred under the bar (the owner, 12 Nov; was under the
+                // cover, #1077): the keys bold, the words soft, the three an even gap apart.
+                RemoteGuide(Modifier.fillMaxWidth().testTag("tvRemoteHint"))
             }
             when (panel) {
                 Panel.QUEUE -> UpNext(state.queue, state.index, state.auto)
@@ -441,9 +429,25 @@ private const val PAUSED_SHADE = 0.45f
 private val PAUSE_SIGN = 96.dp
 private const val HINT_ALPHA = 0.7f
 /** Between the cover and what the remote does, under it: a section's gap, clear of the cover without drifting off. */
-private val HINT_GAP = Space.Section
 /** What the remote does on now playing, in two lines that fit under the cover. */
-internal const val REMOTE_HINT = "OK  play / pause   ·   ▼  more\n◀ ▶  previous / next"
+/** The remote's keys and what they do on the now playing page, in the order shown. */
+internal val REMOTE_GUIDE = listOf("OK" to "play / pause", "◀ ▶" to "previous / next", "▼" to "more")
+
+/** [REMOTE_GUIDE] on one line, centred, the keys bold and the words softer, [GUIDE_GAP] apart. */
+@Composable
+internal fun RemoteGuide(modifier: Modifier = Modifier) {
+    Row(modifier, horizontalArrangement = Arrangement.spacedBy(GUIDE_GAP, Alignment.CenterHorizontally), verticalAlignment = Alignment.CenterVertically) {
+        REMOTE_GUIDE.forEach { (key, does) ->
+            Row(horizontalArrangement = Arrangement.spacedBy(Space.Small), verticalAlignment = Alignment.CenterVertically) {
+                Text(key, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                Text(does, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = HINT_ALPHA))
+            }
+        }
+    }
+}
+
+/** The room between the guide's three parts. */
+private val GUIDE_GAP = Space.Large
 private const val BRAND_ALPHA = 0.75f
 private val BRAND_ICON = 44.dp
 /** The launcher icon's drawing fills the middle two thirds of its square. */

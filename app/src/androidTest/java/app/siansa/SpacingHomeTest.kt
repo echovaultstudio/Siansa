@@ -169,33 +169,36 @@ class SpacingHomeTest : SpacingCheck() {
     }
 
     /**
-     * Home's menu (the owner, 12 Nov): one card of rows, each a shortcut tile's height with the tiles' gap between,
-     * their names on one line at the left, whatever's in use (a long cast name, the source filter on).
+     * Home's menu (the owner, 12 Nov): a pill in the top row, exactly the chips' and the button's height, the four places
+     * along it an even distance apart and centred on the row.
      */
-    @Test fun homeMenuRowsLieOnTheTiles() {
+    @Test fun homeMenuPillIsTheRowsHeightWithEvenPlaces() {
         compose.setContent {
             SiansaTheme {
-                // Narrow, as the right column of the tiles: no row may be squeezed.
-                app.siansa.ui.HomeMenuPanel(
-                    modifier = Modifier.widthIn(max = 180.dp),
-                    info = app.siansa.ui.HomeMenuInfo(
-                        app.siansa.ui.PlayOnLine("Playing on Living Room SHIELD with an uncharacteristically long name", "Chromecast", true),
-                        "Downloaded only · 2 users", true,
-                    ),
-                    highlighted = app.siansa.data.HomeMenuItem.SOURCES, onPick = {},
-                )
+                val state = app.siansa.ui.rememberHomeMenuState().also { it.open = true }
+                val info = app.siansa.ui.HomeMenuInfo(app.siansa.ui.PlayOnLine("Playing on SHIELD", "Chromecast", true), "Downloaded only", true)
+                app.siansa.ui.HomeTopBar(
+                    listOf(app.siansa.mix.Notices.newAlbums(24, "a")!!), onOpen = {}, menuOpen = 1f,
+                    menuBar = { app.siansa.ui.HomeMenuBar(state, info, app.siansa.data.HomeMenuItem.default, open = 1f, onPick = {}) },
+                ) { app.siansa.ui.HomeMenuButton(state, casting = true, filterActive = true, onPick = {}) }
             }
         }
-        val rows = listOf("dice", "play_on", "sources", "arrange").map { compose.onNodeWithTag("homeMenu-$it", useUnmergedTree = true).getBoundsInRoot() }
-        val labels = listOf("dice", "play_on", "sources", "arrange").map { compose.onNodeWithTag("homeMenuLabel-$it", useUnmergedTree = true).getBoundsInRoot() }
-        rows.forEachIndexed { i, r ->
-            assertEven("Menu: row $i a tile's height", r.bottom - r.top, app.siansa.ui.MENU_ROW, 0.5.dp)
-            assertEven("Menu: label $i starts where the first does", labels[i].left, labels[0].left, 0.5.dp)
-            assertEven("Menu: row $i the panel's width", r.right - r.left, rows[0].right - rows[0].left, 0.5.dp)
+        val button = compose.onNodeWithTag("homeMenu").getBoundsInRoot()
+        val pill = compose.onNodeWithTag("homeMenuPanel").getBoundsInRoot()
+        assertEven("Menu: the pill's height is the button's", pill.bottom - pill.top, button.bottom - button.top, 0.5.dp)
+        assertEven("Menu: the pill's top is the button's", pill.top, button.top, 0.5.dp)
+        assertEven("Menu: the room before the button", button.left - pill.right, Space.Small, 0.5.dp)
+        val places = listOf("dice", "play_on", "sources", "arrange").map { compose.onNodeWithTag("homeMenu-$it", useUnmergedTree = true).getBoundsInRoot() }
+        val circles = compose.onAllNodesWithTag("homeMenuCircle", useUnmergedTree = true).fetchSemanticsNodes()
+        assertTrue("The four pills are drawn", circles.size == 4)
+        val width = places[0].right - places[0].left
+        places.forEachIndexed { i, p ->
+            assertEven("Menu: place $i as wide as the first", p.right - p.left, width, 0.5.dp)
+            assertEven("Menu: place $i the pill's height", p.bottom - p.top, pill.bottom - pill.top, 0.5.dp)
         }
-        for (i in 1 until rows.size) {
-            assertEven("Menu: the tiles' gap between rows ($i)", rows[i].top - rows[i - 1].bottom, app.siansa.ui.MENU_ROW_GAP, 0.5.dp)
-        }
+        // A pill each (the owner, 13 Nov): a small step between them, the four filling the chips' room.
+        for (i in 1 until places.size) assertEven("Menu: the gap after place ${i - 1}", places[i].left - places[i - 1].right, Space.Small, 0.5.dp)
+        assertEven("Menu: the pills fill the room", places.last().right - places.first().left, pill.right - pill.left, 0.5.dp)
     }
 
     /** Custom cards (issue #622): the banner sits a page margin from both edges of the screen. */
@@ -283,6 +286,23 @@ class SpacingHomeTest : SpacingCheck() {
             assertEven("$label margins", card.left - screen.left, screen.right - card.right, 1.dp)
             assertEven("$label left margin is the page margin", card.left - screen.left, Space.Page, 1.dp)
         }
+    }
+
+    /** Arrange Home's Cards (the owner, 13 Nov): four small cards of one size, an even gap apart, page margins at the ends. */
+    @Test fun cardLookChooserIsFourEvenCards() {
+        compose.setContent {
+            SiansaTheme {
+                app.siansa.ui.CardLookChooser(app.siansa.data.CardLook.SOFT, app.siansa.data.CardLook.forHome, Modifier.padding(horizontal = Space.Page)) {}
+            }
+        }
+        val screen = compose.onRoot().getBoundsInRoot()
+        val cards = app.siansa.data.CardLook.forHome.map { compose.onNodeWithTag("cardLook-${it.id}").getBoundsInRoot() }
+        assertEven("Cards: left margin", cards.first().left - screen.left, Space.Page, 1.dp)
+        assertEven("Cards: right margin", screen.right - cards.last().right, Space.Page, 1.dp)
+        val width = cards[0].right - cards[0].left
+        cards.forEach { assertEven("Cards: each as wide as the first", it.right - it.left, width, 1.dp) }
+        val gaps = cards.zipWithNext { a, b -> b.left - a.right }
+        gaps.forEach { assertEven("Cards: the gap between them", it, Space.Medium, 1.dp) }
     }
 
     /** Home's rows as a list (issue #655): five rows of one height, evenly spaced. */

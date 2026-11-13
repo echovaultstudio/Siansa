@@ -81,6 +81,7 @@ import app.siansa.ui.SiansaTheme
 import app.siansa.ui.SourceCardForTest
 import app.siansa.ui.Space
 import app.siansa.ui.SpacingRow
+import app.siansa.ui.cardFill
 import app.siansa.ui.SyncStrip
 import app.siansa.ui.ThemeChoice
 import app.siansa.ui.ThemeMode
@@ -309,6 +310,25 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
             },
             // Arrange Home's spacing ("Compact", issue #694).
             Scene("arrange_spacing") { SpacingRow(gap = 1) {} },
+            // The cards' colour (the owner, 13 Nov): the four small cards to pick from, Soft chosen; and Today's mix in each
+            // look, as the cog's dialog shows it.
+            Scene("card_looks") {
+                Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Page)) {
+                    app.siansa.ui.CardLookChooser(app.siansa.data.CardLook.SOFT, app.siansa.data.CardLook.forHome) {}
+                    app.siansa.data.CardLook.forHome.forEach { app.siansa.ui.CardLookSample(it, Modifier.fillMaxWidth(), big = true) }
+                }
+            },
+            // A card painted after its own padding, as Today's mix is (the owner, 13 Nov: the wash sat a padding inside
+            // the solid, a grey frame): the colour must reach the rounded edge.
+            Scene("card_fill_edge") {
+                androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalCardLook provides app.siansa.data.CardLook.SOFT) {
+                    val paint = app.siansa.ui.cardPaint(Color(0xFFD6338A) to Color(0xFF4A1470))
+                    Box(
+                        Modifier.fillMaxWidth().padding(horizontal = Space.Page, vertical = Space.Medium)
+                            .clip(RoundedCornerShape(16.dp)).cardFill(paint, RoundedCornerShape(16.dp)),
+                    ) { Text("To the edge", Modifier.padding(Space.Page), color = paint.text) }
+                }
+            },
             // A list to rearrange (Nav Bar, Mini Player; issue #701).
             Scene("arrange_list") {
                 ArrangeList(
@@ -374,25 +394,21 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     }
                 }
             },
-            // Home's menu (the owner, 12 Nov): one card of rows, a tile column wide, with what's in use under each name:
-            // Sources lit under the finger of a glide; and while casting with the source filter on, Play on… and
-            // Sources' lines in the accent colour, a long cast name cut.
+            // Home's menu (the owner, 12 Nov): the top row's chips give way to one pill of glass with the four places as
+            // circles, Sources lit under the finger of a glide; and while casting with the source filter on, Play on…
+            // and Sources ringed in the accent colour. Fully open, and half way with the chips still fading under it.
             Scene("home_menu") {
-                val card = Modifier.width(180.dp).clip(RoundedCornerShape(app.siansa.ui.QUICK_TILE_CORNER))
-                    .background(Color(0xFF2C2C2C).copy(alpha = app.siansa.ui.glassAlpha(true)))
-                    .border(1.dp, Color.White.copy(alpha = 0.14f), RoundedCornerShape(app.siansa.ui.QUICK_TILE_CORNER))
-                Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Page)) {
-                    app.siansa.ui.HomeMenuPanel(
-                        app.siansa.ui.HomeMenuInfo(app.siansa.ui.PlayOnLine("Play on…", "TV or speaker", false), "All libraries", false),
-                        highlighted = app.siansa.data.HomeMenuItem.SOURCES, onPick = {}, modifier = card,
-                    )
-                    app.siansa.ui.HomeMenuPanel(
-                        app.siansa.ui.HomeMenuInfo(
-                            app.siansa.ui.PlayOnLine("Playing on Living Room SHIELD with an uncharacteristically long name", "Chromecast", true),
-                            "Downloaded only · 2 users · 2 of 3 libraries", true,
-                        ),
-                        highlighted = null, onPick = {}, modifier = card,
-                    )
+                val quiet = app.siansa.ui.HomeMenuInfo(app.siansa.ui.PlayOnLine("Play on…", "TV or speaker", false), "All libraries", false)
+                val busy = app.siansa.ui.HomeMenuInfo(app.siansa.ui.PlayOnLine("Playing on Living Room SHIELD", "Chromecast", true), "Downloaded only · 2 users", true)
+                val chips = listOf(app.siansa.mix.Notices.newAlbums(24, "a")!!)
+                Column(Modifier.padding(vertical = Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Page)) {
+                    for ((open, info, lit) in listOf(Triple(1f, quiet, app.siansa.data.HomeMenuItem.SOURCES), Triple(1f, busy, null), Triple(0.45f, quiet, null))) {
+                        val state = app.siansa.ui.rememberHomeMenuState().also { it.open = true; it.highlighted = lit }
+                        app.siansa.ui.HomeTopBar(
+                            chips, onOpen = {}, menuOpen = open,
+                            menuBar = { app.siansa.ui.HomeMenuBar(state, info, app.siansa.data.HomeMenuItem.default, open = open, onPick = {}) },
+                        ) { app.siansa.ui.HomeMenuButton(state, casting = info.playOn.active, filterActive = info.filterActive, onPick = {}) }
+                    }
                 }
             },
             // Menu rows (issue #778): no badge on shuffle, a word badge where one says something.
@@ -704,20 +720,60 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     app.siansa.ui.MixingDocsLink()
                 }
             },
-            // The Settings start page in groups (issue #780, renamed for v1.0), and Settings › Notices and Cards' rows.
-            Scene("settings_groups") {
-                Column {
-                    app.siansa.ui.HubGroup("Sources", first = true)
-                    app.siansa.ui.HubRow(androidx.compose.material.icons.Icons.Rounded.Dns, "Connections") {}
-                    app.siansa.ui.HubGroup("Listening")
-                    app.siansa.ui.HubRow(androidx.compose.material.icons.Icons.Rounded.Equalizer, "Playback") {}
-                    app.siansa.ui.HubRow(androidx.compose.material.icons.Icons.Rounded.SwapVert, "Data") {}
-                    app.siansa.ui.HubGroup("Home")
-                    app.siansa.ui.HubRow(androidx.compose.material.icons.Icons.Rounded.Home, "Notices and Cards") {}
-                    app.siansa.ui.HubRow(androidx.compose.material.icons.Icons.Rounded.Schedule, "Auto Generated Mixes") {}
-                    Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
-                        app.siansa.ui.PageLink("Notices", app.siansa.ui.noticesLine(true, app.siansa.mix.NoticePrefs()), "n") {}
-                        app.siansa.ui.PageLink("Cards", "Made for you and your own cards", "c") {}
+            // The Settings start page (the owner, 13 Nov): you and your server, the services with their dots, and the
+            // first group of tiles; a long server name and a service that doesn't answer.
+            Scene("settings_start") {
+                val s = app.siansa.data.AppSettings(
+                    navidromeUrl = "https://music.home.example", navidromeUser = "maximilian-the-longest-login", navidromePassword = "x",
+                    beatsUrl = "http://beats:8090", audiobookshelfUrl = "http://abs", audiobookshelfToken = "t",
+                    lastFmEnabled = true, lastFmApiKey = "k", lastFmSecret = "s", lastFmUser = "max",
+                    listenBrainzEnabled = true, listenBrainzToken = "lb",
+                )
+                val health = mapOf(
+                    app.siansa.ui.ServiceHealth.SERVER to app.siansa.ui.ServiceCheck(true, "Connected to Navidrome 0.64.2"),
+                    "beats" to app.siansa.ui.ServiceCheck(true, "Siansa Beats 0.40.1: 46,033 songs analysed"),
+                    "books" to app.siansa.ui.ServiceCheck(true, "Connected to Audiobookshelf 2.19"),
+                    "lastfm" to app.siansa.ui.ServiceCheck(false, "Not signed in · 12 listens waiting"),
+                    "listenbrainz" to app.siansa.ui.ServiceCheck(true, "Set up"),
+                )
+                Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
+                    app.siansa.ui.YouCard(
+                        s,
+                        listOf(app.siansa.data.UserEntry(0, "maximilian-the-longest-login", true), app.siansa.data.UserEntry(1, "Kids", true, serverName = "Kids on the Unbelievably Long Server Name")),
+                        app.siansa.data.LibraryStatus(1_762_000_000_000L, 2_100, 5_300, 46_033),
+                        app.siansa.data.SyncProgress(),
+                        health[app.siansa.ui.ServiceHealth.SERVER],
+                    ) {}
+                    app.siansa.ui.ServicesCard(s, health) {}
+                    app.siansa.ui.HubGroupLabel("Playing")
+                    app.siansa.ui.HubTiles(listOf(
+                        app.siansa.ui.HubTile(androidx.compose.material.icons.Icons.Rounded.Equalizer, "Sound", "a"),
+                        app.siansa.ui.HubTile(androidx.compose.material.icons.Icons.Rounded.Schedule, "Radios & mixes", "b"),
+                        app.siansa.ui.HubTile(androidx.compose.material.icons.Icons.Rounded.SwapVert, "Streaming & storage", "c"),
+                        app.siansa.ui.HubTile(androidx.compose.material.icons.Icons.AutoMirrored.Rounded.MenuBook, "Audiobooks & podcasts", "d"),
+                    )) {}
+                }
+            },
+            // Settings › Services' "For the best Siansa" (the owner, 13 Nov): every kind of line, with Siansa Beats on and
+            // AudioMuse-AI on too, so it offers to turn AudioMuse-AI off.
+            Scene("settings_services_best") {
+                val s = app.siansa.data.AppSettings(
+                    navidromeUrl = "https://music.home.example", navidromeUser = "max", navidromePassword = "x",
+                    beatsUrl = "http://beats:8090", audioMuseUrl = "http://am:8000", audiobookshelfUrl = "http://abs", audiobookshelfToken = "t",
+                    lastFmEnabled = true, lastFmApiKey = "k", lastFmSecret = "s", lastFmUser = "max",
+                )
+                val health = mapOf("lastfm" to app.siansa.ui.ServiceCheck(false, "Not signed in · 12 listens waiting"))
+                Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
+                    app.siansa.ui.SettingsCard(tag = "best") {
+                        app.siansa.ui.HubGroupLabel("FOR THE BEST SIANSA")
+                        app.siansa.ui.bestLines(s, health).forEach { line ->
+                            androidx.compose.foundation.layout.Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+                                Box(Modifier.width(Space.Section), contentAlignment = androidx.compose.ui.Alignment.Center) {
+                                    Text(when (line.mark) { "ok" -> "✓"; "bad" -> "✕"; "warn" -> "!"; "dash" -> "–"; else -> "○" }, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                                }
+                                Text(line.words, style = MaterialTheme.typography.bodyMedium)
+                            }
+                        }
                     }
                 }
             },

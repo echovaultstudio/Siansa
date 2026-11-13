@@ -39,7 +39,7 @@ plainer.
 
 ## Situation
 
-The **Use the moment** panel (in **Settings › Auto Generated Mixes**) lets today's mixes suit what's going on
+The **Use the moment** panel (in **Settings › Radios & mixes › Today's mix and vibes**) lets today's mixes suit what's going on
 around you. Each part is switched on by itself, and is read once when a mix is made, never in the background:
 
 | Part | How it's read |

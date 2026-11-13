@@ -100,16 +100,16 @@ fun TvSettingsHub() {
         }
         Group("Music") {
             TvSettingRow("Library sync", syncSummary(progress, library), onClick = { nav.navigate("sync") }, icon = Icons.Rounded.Sync)
-            TvSettingRow("Auto Generated Mixes", "Your daily mixes and when they're made", onClick = { nav.navigate("vibes") }, icon = Icons.Rounded.Schedule)
-            TvSettingRow("Scrobbling and history", "Last.fm, ListenBrainz and what you've played", onClick = { nav.navigate("settings/scrobbling") }, icon = Icons.Rounded.GraphicEq)
+            TvSettingRow("Radios & mixes", "How far a radio wanders, what plays when the queue ends, and your daily mixes", onClick = { nav.navigate("settings/radios") }, icon = Icons.Rounded.Schedule)
+            TvSettingRow("Scrobbling & history", "Last.fm, ListenBrainz and what you've played", onClick = { nav.navigate("settings/scrobbling") }, icon = Icons.Rounded.GraphicEq)
         }
         Group("Sound") {
             TvSettingRow("Audio passthrough", "${settings.audioPassthrough.label} · Dolby and DTS to your receiver",
                 onClick = { nav.navigate(TvRoutes.PASSTHROUGH) }, icon = Icons.Rounded.SpeakerGroup)
-            TvSettingRow("Playback", "Crossfades, DJ blends, levelling, the equaliser, keep playing", onClick = { nav.navigate("settings/playback") }, icon = Icons.Rounded.Equalizer)
+            TvSettingRow("Sound", "The equaliser, levelling, crossfades and DJ blends", onClick = { nav.navigate("settings/sound") }, icon = Icons.Rounded.Equalizer)
             TvSettingRow("Streaming quality", if (settings.transcodeWifiKbps > 0) "Opus ${settings.transcodeWifiKbps} kbit/s" else "Original files",
-                // Streaming quality is on the Playback page now (v1.0): the row opens it there.
-                onClick = { nav.navigate("settings/playback") }, icon = Icons.Rounded.SwapVert)
+                // Streaming quality is on the Streaming & storage page (the owner, 13 Nov): the row opens it there.
+                onClick = { nav.navigate("settings/streaming") }, icon = Icons.Rounded.SwapVert)
         }
         Group("Look") {
             TvSettingRow("Colours", "Siansa's colours on the TV (always dark)", onClick = { nav.navigate("settings/themes") }, icon = Icons.Rounded.Palette)

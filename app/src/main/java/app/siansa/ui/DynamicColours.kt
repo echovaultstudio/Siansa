@@ -181,13 +181,27 @@ object DynamicAccent {
         return min(d, 1f - d)
     }
 
+    /** Hues further apart than this (0 to ½, a sixth of the circle: 60°) are of different families. */
+    private const val OTHER_FAMILY = 1f / 6f
+
+    /**
+     * The seed for a page whose header is painted in [tint] (the owner, 13 Nov: an artist page in khaki with a steel
+     * blue Play, the picture's sky): [seed] when it's of the header's family or either is grey, else the header's own
+     * colour, so Play never clashes with the header above it.
+     */
+    fun inFamily(seed: Color, tint: Color?): Color {
+        if (tint == null || chroma(seed) < GREY || chroma(tint) < GREY) return seed
+        return if (hueDistance(hsl(seed).first, hsl(tint).first) > OTHER_FAMILY) tint else seed
+    }
+
     /**
      * The colours for a cover whose own colour is [seed] ([seedOf]), on now playing's [backdrop] (see [backdropOf]). A
-     * grey [seed] gives silver. Null only for a colour that can't be read.
+     * grey [seed] gives silver. On a page whose header is painted in [tint], a seed of another family gives way to the
+     * header's ([inFamily]). Null only for a colour that can't be read.
      */
-    fun of(seed: Color, backdrop: Color): DynamicColours? {
+    fun of(seed: Color, backdrop: Color, tint: Color? = null): DynamicColours? {
         if (seed.alpha <= 0f) return null
-        val (h, s0, l0) = hsl(seed)
+        val (h, s0, l0) = hsl(inFamily(seed, tint))
         val grey = chroma(seed) < GREY
         val s = if (grey) 0f else min(MOST_SATURATION, s0 * CALM)
         // A light page (an album in the light theme, issue #1028): the colour is darkened until it stands out, from
@@ -285,7 +299,7 @@ private val tonesCache = ConcurrentHashMap<String, CoverTones>()
  * cover; [where] names the page in the log.
  */
 @Composable
-fun rememberDynamicColours(coverId: String?, on: Boolean, backdrop: Color? = null, where: String = "Now playing"): DynamicColours? {
+fun rememberDynamicColours(coverId: String?, on: Boolean, backdrop: Color? = null, where: String = "Now playing", tint: Color? = null): DynamicColours? {
     val graph = LocalGraph.current
     val context = LocalContext.current
     var tones by remember(coverId, on) { mutableStateOf(if (on) coverId?.let { tonesCache[it] } else null) }
@@ -317,7 +331,7 @@ fun rememberDynamicColours(coverId: String?, on: Boolean, backdrop: Color? = nul
             tones = read
         }
     }
-    val colours = tones?.let { t -> t.seed?.let { DynamicAccent.of(it, backdrop ?: DynamicAccent.backdropOf(t.average)) } }
+    val colours = tones?.let { t -> t.seed?.let { DynamicAccent.of(it, backdrop ?: DynamicAccent.backdropOf(t.average), tint) } }
     // Once per cover, not on every frame of a page colour fading in.
     LaunchedEffect(tones?.seed) {
         if (colours != null) AppLog.d("Colours", "$where in the cover's colours: controls ${hex(colours.controls)}, text ${hex(colours.text)}")
@@ -348,11 +362,14 @@ fun WithPageColours(coverId: String?, backdrop: Color, where: String, content: @
 /** The page's colours for its Play button only (Dynamic colours), set by the page around its content. */
 val LocalPlayColours = androidx.compose.runtime.staticCompositionLocalOf<DynamicColours?> { null }
 
-/** A page's colours from [coverId]'s cover on a page of [backdrop], with Style's Dynamic colours on; null when off. */
+/**
+ * A page's colours from [coverId]'s cover on a page of [backdrop], with Style's Dynamic colours on; null when off.
+ * [tint] is the colour the page's header is painted in ([rememberCoverColor]): Play keeps to its family.
+ */
 @Composable
-fun rememberPageColours(coverId: String?, backdrop: Color, where: String): DynamicColours? {
+fun rememberPageColours(coverId: String?, backdrop: Color, where: String, tint: Color? = null): DynamicColours? {
     val on = LocalGraph.current.settings.state.collectAsStateWithLifecycle().value.dynamicColours
-    return rememberDynamicColours(coverId, on && coverId != null, backdrop, where)
+    return rememberDynamicColours(coverId, on && coverId != null, backdrop, where, tint)
 }
 
 /**

@@ -26,13 +26,13 @@ class LastFmApi(private val http: OkHttpClient) {
         return root.obj("session")?.str("key") ?: throw ApiException("Last.fm sent no session")
     }
 
-    suspend fun nowPlaying(keys: Keys, song: Song) {
-        post(trackParams(song) + mapOf("method" to "track.updateNowPlaying", "api_key" to keys.apiKey, "sk" to keys.session), keys.secret)
+    suspend fun nowPlaying(keys: Keys, song: Song, albumArtist: String? = null) {
+        post(trackParams(song, albumArtist) + mapOf("method" to "track.updateNowPlaying", "api_key" to keys.apiKey, "sk" to keys.session), keys.secret)
     }
 
-    suspend fun scrobble(keys: Keys, song: Song, startedAtSec: Long) {
+    suspend fun scrobble(keys: Keys, song: Song, startedAtSec: Long, albumArtist: String? = null) {
         post(
-            trackParams(song) + mapOf(
+            trackParams(song, albumArtist) + mapOf(
                 "method" to "track.scrobble",
                 "timestamp" to startedAtSec.toString(),
                 "api_key" to keys.apiKey,
@@ -55,10 +55,15 @@ class LastFmApi(private val http: OkHttpClient) {
         )
     }
 
-    private fun trackParams(song: Song): Map<String, String> = buildMap {
+    /**
+     * [albumArtist] too, when known: Last.fm finds the album, and its cover, by it when the song's artist is a
+     * collaboration ("A • B", as Navidrome joins them) or the album a compilation (the owner, 12 Nov).
+     */
+    internal fun trackParams(song: Song, albumArtist: String? = null): Map<String, String> = buildMap {
         put("artist", song.artist)
         put("track", song.title)
         if (song.album.isNotBlank()) put("album", song.album)
+        if (!albumArtist.isNullOrBlank()) put("albumArtist", albumArtist)
         if (song.durationSec > 0) put("duration", song.durationSec.toString())
         song.track?.let { put("trackNumber", it.toString()) }
     }

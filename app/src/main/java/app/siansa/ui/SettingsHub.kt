@@ -1,6 +1,21 @@
 package app.siansa.ui
 
 import app.siansa.net.soundReady
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.automirrored.rounded.MenuBook
+import androidx.compose.material.icons.rounded.PhoneAndroid
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material3.Surface
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import app.siansa.data.AppSettings
+import app.siansa.data.Service
+import app.siansa.data.UserEntry
+import app.siansa.data.Users
 import androidx.compose.material.icons.rounded.SwapVert
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.ui.text.font.FontWeight
@@ -68,21 +83,17 @@ import androidx.compose.ui.platform.testTag
 import app.siansa.mix.ContinuousMode
 import app.siansa.mix.RadioDrift
 import app.siansa.playback.Preload
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import android.content.ClipData
 import android.content.ClipboardManager
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import app.siansa.covers.CoverStore
-import app.siansa.data.AppSettings
 import app.siansa.data.ReplayGainMode
 import app.siansa.data.SyncPhase
-import app.siansa.data.Users
 import app.siansa.log.AppLog
 import app.siansa.playback.CrossfadeMode
 import app.siansa.playback.EqSettings
@@ -101,39 +112,169 @@ import java.util.Date
 import kotlin.math.roundToInt
 
 /**
- * Settings start page (issue #780): one entry per area, each opening its own page, in six groups so each setting is
- * where you'd look for it. Just the names (issue #375).
+ * Settings start page (the owner, 13 Nov; issue #780 before): you and your server first, then the services with a dot
+ * each, then twelve pages in three groups of four, so the grid is always even. Nothing on the top panel has an arrow:
+ * the whole card is the tap. A service switched off under Services isn't shown. A search box finds any setting.
  */
 @Composable
 fun SettingsHub(nav: NavController) {
+    val graph = LocalGraph.current
+    val context = LocalContext.current
+    val settings by graph.settings.state.collectAsStateWithLifecycle()
+    val library by graph.library.status.collectAsStateWithLifecycle()
+    val progress by graph.sync.progress.collectAsStateWithLifecycle()
+    val health by ServiceHealth.state.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) { ServiceHealth.refreshInBackground(graph) }
+    val users = remember(settings.navidromeUrl, settings.navidromeUser) { Users.all(context) }
     Screen(title = "Settings", nav = nav) { padding ->
-        Column(Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState())) {
-            HubGroup("Sources", first = true)
-            // Servers (each login with its own library and sync) and services, on one page (issue #665).
-            HubRow(Icons.Rounded.Dns, "Connections") { nav.navigate("settings/connections") }
-            HubGroup("Listening")
-            // How music plays: equaliser, crossfade, streaming quality, song radio, keep playing, wind down and the
-            // book player's skips (v1.0 settings, the owner).
-            HubRow(Icons.Rounded.Equalizer, "Playback") { nav.navigate("settings/playback") }
-            // Loading ahead, the song cache, downloads and covers: what's kept on the phone and what it costs in data.
-            HubRow(Icons.Rounded.SwapVert, "Data") { nav.navigate("settings/streaming") }
-            HubGroup("Home")
-            // Notices and Cards; Source filter and Arrange Home are behind Home's own button.
-            HubRow(Icons.Rounded.Home, "Notices and Cards") { nav.navigate("settings/home") }
-            // Today's mix, the daily vibes and the moment (was Daily Vibe settings, issue #339).
-            HubRow(Icons.Rounded.Schedule, "Auto Generated Mixes") { nav.navigate("vibes") }
-            HubGroup("Look")
-            // Theme, now playing, mini player, nav bar, the phone's top bar and animated covers (issue #346).
-            HubRow(Icons.Rounded.Palette, "Style") { nav.navigate("settings/style") }
-            HubGroup("Your listening")
-            HubRow(Icons.Rounded.GraphicEq, "Scrobbling and history") { nav.navigate("settings/scrobbling") }
-            HubGroup("App")
-            HubRow(Icons.Rounded.Backup, "Backup and restore") { nav.navigate("settings/backup") }
-            // Debug logs and Report a problem in one place (#567).
-            HubRow(Icons.Rounded.BugReport, "Help") { nav.navigate("settings/help") }
-            // The version, What's new and links to the licences, the docs and the privacy policy (#576).
-            HubRow(Icons.Rounded.Info, "About") { nav.navigate("settings/about") }
-            Spacer(Modifier.height(Space.Section))
+        Column(
+            Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState()).padding(Space.Page),
+            verticalArrangement = Arrangement.spacedBy(Space.Medium),
+        ) {
+            SearchBox(nav)
+            YouCard(settings, users, library, progress, health[ServiceHealth.SERVER]) { nav.navigate("settings/connections") }
+            ServicesCard(settings, health) { nav.navigate("settings/services") }
+            HubGroupLabel("Playing", Modifier.padding(top = Space.Small))
+            HubTiles(listOf(
+                HubTile(Icons.Rounded.Equalizer, "Sound", "settings/sound"),
+                HubTile(Icons.Rounded.Schedule, "Radios & mixes", "settings/radios"),
+                HubTile(Icons.Rounded.SwapVert, "Streaming & storage", "settings/streaming"),
+                HubTile(Icons.AutoMirrored.Rounded.MenuBook, "Audiobooks & podcasts", "settings/books"),
+            )) { nav.navigate(it) }
+            HubGroupLabel("Home & look", Modifier.padding(top = Space.Small))
+            HubTiles(listOf(
+                HubTile(Icons.Rounded.Home, "Home page", "settings/home"),
+                HubTile(Icons.Rounded.Palette, "Theme", "settings/themes"),
+                HubTile(Icons.Rounded.PhoneAndroid, "Now playing", "settings/now-playing"),
+                HubTile(Icons.Rounded.Dashboard, "Bottom bar", "settings/bottom-bar"),
+            )) { nav.navigate(it) }
+            HubGroupLabel("Listening & app", Modifier.padding(top = Space.Small))
+            HubTiles(listOf(
+                HubTile(Icons.Rounded.GraphicEq, "Scrobbling & history", "settings/scrobbling"),
+                HubTile(Icons.Rounded.Backup, "Backup & restore", "settings/backup"),
+                HubTile(Icons.Rounded.BugReport, "Help & feedback", "settings/help"),
+                HubTile(Icons.Rounded.Info, "About", "settings/about"),
+            )) { nav.navigate(it) }
+        }
+    }
+}
+
+/** The box at the top of Settings: tap it and the search page opens with the keyboard up. */
+@Composable
+private fun SearchBox(nav: NavController) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        shape = CircleShape,
+        modifier = Modifier.fillMaxWidth().clickable(onClickLabel = "Find a setting") { nav.navigate("settings/find") }.testTag("hubSearch"),
+    ) {
+        Row(Modifier.padding(horizontal = Space.Page, vertical = Space.Medium), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
+            Icon(Icons.Rounded.Search, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("Find a setting", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+/** Who's signed in, on what, with how much music, and the other logins: tap it for Connections. */
+@Composable
+internal fun YouCard(
+    s: AppSettings,
+    users: List<UserEntry>,
+    library: app.siansa.data.LibraryStatus?,
+    progress: app.siansa.data.SyncProgress,
+    server: ServiceCheck?,
+    onClick: () -> Unit,
+) {
+    val name = s.navidromeUser.ifBlank { "API key" }
+    val others = users.filter { it.id != Users.active }
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        shape = MaterialTheme.shapes.large,
+        modifier = Modifier.fillMaxWidth().clickable(onClickLabel = "Open Connections", onClick = onClick).testTag("hubYou"),
+    ) {
+        Row(Modifier.padding(Space.Page), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
+            Box(Modifier.size(52.dp).background(MaterialTheme.colorScheme.primary, CircleShape), contentAlignment = Alignment.Center) {  // spacing: exact
+                Text(name.take(1).uppercase(), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimary)
+            }
+            Column(Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+                    Text("$name · ${s.sourceKind.label}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                    ServiceDot(if (s.navidromeReady) server?.ok else null)
+                }
+                Text(
+                    listOfNotNull(library?.let { "${"%,d".format(it.songs)} songs" }, syncSummary(progress, library).replaceFirstChar { it.lowercase() })
+                        .joinToString(" · "),
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (others.isNotEmpty()) Text(
+                    "${others.size} more ${if (others.size == 1) "login" else "logins"}: " + others.joinToString { it.serverName?.takeIf { n -> n.isNotBlank() } ?: it.label },
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
+
+/** The services that are on, two a row with a dot each (a lone last one spans the row), and Manage for the page. */
+@Composable
+internal fun ServicesCard(s: AppSettings, health: Map<String, ServiceCheck>, onOpen: () -> Unit) {
+    val on = Service.entries.filter { Service.on(s, it) && Service.setUp(s, it) && !(it == Service.BOOKS && app.siansa.BuildConfig.TV_APP) }
+    SettingsCard(tag = "hubServices") {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            HubGroupLabel("Services", Modifier.weight(1f))
+            // As tall as the label's line, not a button's 40 dp: the card's top and bottom margins stay the same.
+            TextButton(onClick = onOpen, contentPadding = PaddingValues(horizontal = Space.Small), modifier = Modifier.height(Space.Section).testTag("hubManage")) { Text("Manage") }
+        }
+        if (on.isEmpty()) {
+            Text("No service is on. Siansa works from your music server alone.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        } else {
+            // The rows a small step apart, like the page tiles below (the card's own gap is a step bigger).
+            Column(verticalArrangement = Arrangement.spacedBy(Space.Small)) {
+                on.chunked(2).forEach { pair ->
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+                        pair.forEach { service -> ServiceTile(service, health[service.id], Modifier.weight(1f), onOpen) }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ServiceTile(service: Service, check: ServiceCheck?, modifier: Modifier, onClick: () -> Unit) {
+    Surface(color = MaterialTheme.colorScheme.surfaceContainer, shape = MaterialTheme.shapes.medium, modifier = modifier.height(64.dp).clickable(onClick = onClick).testTag("hubService-${service.id}")) {  // spacing: exact
+        // The name on its own line, so "Audiobookshelf" fits; the dot beside the words it stands for, as on the Services page.
+        Column(Modifier.fillMaxSize().padding(horizontal = Space.Medium), verticalArrangement = Arrangement.Center) {
+            Text(service.short, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+                ServiceDot(check?.ok)
+                Text(check?.words ?: "Checking…", style = MaterialTheme.typography.labelSmall, color = if (check?.ok == false) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+    }
+}
+
+internal data class HubTile(val icon: ImageVector, val title: String, val route: String)
+
+/** The pages, two a row, every tile the same height. */
+@Composable
+internal fun HubTiles(tiles: List<HubTile>, onOpen: (String) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(Space.Small)) {
+        tiles.chunked(2).forEach { pair ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+                pair.forEach { tile ->
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        shape = MaterialTheme.shapes.large,
+                        modifier = Modifier.weight(1f).height(64.dp).clickable(onClickLabel = "Open ${tile.title}") { onOpen(tile.route) }.testTag("hubTile"),  // spacing: exact
+                    ) {
+                        Row(Modifier.padding(horizontal = Space.Medium), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
+                            Icon(tile.icon, null, tint = MaterialTheme.colorScheme.primary)
+                            Text(tile.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                }
+                if (pair.size == 1) Spacer(Modifier.weight(1f))
+            }
         }
     }
 }
@@ -157,7 +298,7 @@ internal fun HubGroup(label: String, first: Boolean = false) {
 fun HelpScreen(nav: NavController) {
     val graph = LocalGraph.current
     val settings by graph.settings.state.collectAsStateWithLifecycle()
-    Screen(title = "Help", nav = nav) { padding ->
+    Screen(title = "Help & feedback", nav = nav) { padding ->
         Column(
             Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState()).padding(Space.Page),
             verticalArrangement = Arrangement.spacedBy(Space.Medium),
@@ -237,52 +378,27 @@ internal fun formatBytes(bytes: Long): String = when {
     else -> "%.0f KB".format(bytes / 1024.0)
 }
 
+/**
+ * Settings › Radios & mixes (the owner, 13 Nov; the radio, queue and wind-down parts of Playback before): how far a
+ * song radio may wander, what plays when the queue ends, Wind down, and the daily mixes' page.
+ */
 @Composable
-fun PlaybackSettingsScreen(nav: NavController) {
+fun RadiosScreen(nav: NavController) {
     val graph = LocalGraph.current
     val settings by graph.settings.state.collectAsStateWithLifecycle()
-    val eq by graph.equaliser.state.collectAsStateWithLifecycle()
-    Screen(title = "Playback", nav = nav) { padding ->
+    Screen(title = "Radios & mixes", nav = nav) { padding ->
         Column(
             Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState()).padding(Space.Page),
             verticalArrangement = Arrangement.spacedBy(Space.Medium),
         ) {
-            Row(
-                Modifier.fillMaxWidth().clickable { nav.navigate("settings/equaliser") }.padding(vertical = Space.Tight),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Heading("Equaliser")
-                    Hint(if (eq.enabled) "On · ${eq.preset.label}" else "Off")
-                }
-            }
-            HorizontalDivider()
-            Row(
-                Modifier.fillMaxWidth().clickable { nav.navigate("settings/crossfade") }.padding(vertical = Space.Tight),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Heading("Crossfade and levelling")
-                    Hint(crossfadeSummary(settings))
-                }
-            }
-            HorizontalDivider()
-            // Each section folds (issue #776); open by default, folded ones stay folded (issue #780). Streaming quality
-            // is here, as it's what you hear (v1.0, the owner); loading ahead and the caches are under Data.
-            FoldSection("Streaming quality", "Wi-Fi ${qualityLabel(settings.transcodeWifiKbps)} · mobile ${qualityLabel(settings.transcodeMobileKbps)}") {
-                Hint(ServerWords.streamingHint(settings.sourceKind))
-                QualityRow("On Wi-Fi", settings.transcodeWifiKbps) { graph.settings.save(graph.settings.current.copy(transcodeWifiKbps = it)) }
-                QualityRow("On mobile data", settings.transcodeMobileKbps) { graph.settings.save(graph.settings.current.copy(transcodeMobileKbps = it)) }
-                Hint("Siansa always plays the quality chosen here; it never switches on its own. On a slow connection, pick Opus for mobile data.")
-            }
-            HorizontalDivider()
-            FoldSection("Song radio", settings.radioDrift.label) {
+            // Each section folds (issue #776); open by default, folded ones stay folded (issue #780).
+            FoldSection("Radio wandering", settings.radioDrift.label) {
                 Hint("A song radio always starts with its song. How far may it wander from it?")
                 RadioDriftChips(settings.radioDrift) { graph.settings.setRadioDrift(it) }
                 Hint(settings.radioDrift.hint)
             }
             HorizontalDivider()
-            FoldSection("Keep playing", settings.continuousPlay.label) {
+            FoldSection("When the queue ends", settings.continuousPlay.label) {
                 Hint("When the queue is about to end, should Siansa add more songs?")
                 ContinuousChips(settings.continuousPlay) { graph.settings.setContinuousPlay(it) }
                 Hint(continuousHint(settings.continuousPlay, settings.soundReady, graph.djProblem()))
@@ -296,15 +412,33 @@ fun PlaybackSettingsScreen(nav: NavController) {
                 }
             }
             HorizontalDivider()
-            // The book player's skips (v1.0, the owner: was its own page, Audiobooks and podcasts). The Audiobookshelf
-            // server itself is under Connections.
-            FoldSection("Audiobooks and podcasts", "Back ${settings.bookSkipBackSec} s · forward ${settings.bookSkipForwardSec} s") {
+            PageLink("Today's mix and vibes", if (settings.dailyMix.autoUpdate) "Auto update on" else "Auto update off", "radiosVibes") { nav.navigate("vibes") }
+        }
+    }
+}
+
+/**
+ * Settings › Audiobooks & podcasts (the owner, 13 Nov): how far the book player's skips jump. The Audiobookshelf
+ * server itself is under Services.
+ */
+@Composable
+fun BooksSettingsScreen(nav: NavController) {
+    val graph = LocalGraph.current
+    val settings by graph.settings.state.collectAsStateWithLifecycle()
+    Screen(title = "Audiobooks & podcasts", nav = nav) { padding ->
+        Column(
+            Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState()).padding(Space.Page),
+            verticalArrangement = Arrangement.spacedBy(Space.Medium),
+        ) {
+            FoldSection("Skips", "Back ${settings.bookSkipBackSec} s · forward ${settings.bookSkipForwardSec} s") {
                 Hint("How far the book player's skip buttons jump.")
                 Text("Back", style = MaterialTheme.typography.bodyMedium)
                 SkipChips(settings.bookSkipBackSec, "bookSkipBack") { graph.settings.save(graph.settings.current.copy(bookSkipBackSec = it)) }
                 Text("Forward", style = MaterialTheme.typography.bodyMedium)
                 SkipChips(settings.bookSkipForwardSec, "bookSkipForward") { graph.settings.save(graph.settings.current.copy(bookSkipForwardSec = it)) }
             }
+            HorizontalDivider()
+            Hint(if (settings.booksReady) "Audiobookshelf is set up under Services." else "Books and podcasts come from an Audiobookshelf server: set it up under Services.")
         }
     }
 }
@@ -312,7 +446,7 @@ fun PlaybackSettingsScreen(nav: NavController) {
 /** 10 to 90 seconds for a book player's skip (issue #521). */
 @Composable
 internal fun SkipChips(selected: Int, tag: String, onPick: (Int) -> Unit) {
-    Row(Modifier.horizontalScroll(rememberScrollState()).testTag(tag), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+    Row(Modifier.tvFocusGroup().horizontalScroll(rememberScrollState()).testTag(tag), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
         AppSettings.BOOK_SKIP_CHOICES.forEach { n ->
             FilterChip(
                 selected = selected == n,
@@ -327,7 +461,7 @@ internal fun SkipChips(selected: Int, tag: String, onPick: (Int) -> Unit) {
 /** "Stay close", "A little", "Wander": how far a song radio may go from its song (issue #256). */
 @Composable
 internal fun RadioDriftChips(selected: RadioDrift, onPick: (RadioDrift) -> Unit) {
-    Row(Modifier.horizontalScroll(rememberScrollState()).testTag("radioDrift"), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+    Row(Modifier.tvFocusGroup().horizontalScroll(rememberScrollState()).testTag("radioDrift"), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
         RadioDrift.entries.forEach { drift ->
             FilterChip(
                 selected = selected == drift,
@@ -342,7 +476,7 @@ internal fun RadioDriftChips(selected: RadioDrift, onPick: (RadioDrift) -> Unit)
 /** Off, Steady or DJ: what plays when the queue is about to end (issue #337). */
 @Composable
 internal fun ContinuousChips(selected: ContinuousMode, onPick: (ContinuousMode) -> Unit) {
-    Row(Modifier.horizontalScroll(rememberScrollState()).testTag("continuousPlay"), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+    Row(Modifier.tvFocusGroup().horizontalScroll(rememberScrollState()).testTag("continuousPlay"), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
         ContinuousMode.entries.forEach { mode ->
             FilterChip(
                 selected = selected == mode,
@@ -366,7 +500,7 @@ internal fun continuousHint(mode: ContinuousMode, audioMuseReady: Boolean, djPro
 /** 10, 20 or 30 calm songs for a wind down without a timer (issue #330). */
 @Composable
 internal fun WindDownChips(selected: Int, onPick: (Int) -> Unit) {
-    Row(Modifier.horizontalScroll(rememberScrollState()).testTag("windDownSongs"), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+    Row(Modifier.tvFocusGroup().horizontalScroll(rememberScrollState()).testTag("windDownSongs"), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
         AppSettings.WIND_DOWN_CHOICES.forEach { n ->
             FilterChip(
                 selected = selected == n,
@@ -382,7 +516,7 @@ internal fun WindDownChips(selected: Int, onPick: (Int) -> Unit) {
 @Composable
 internal fun PreloadRow(label: String, value: Int, tag: String, choices: IntRange = Preload.CHOICES, onPick: (Int) -> Unit) {
     Text(label, style = MaterialTheme.typography.bodyLarge)
-    Row(Modifier.horizontalScroll(rememberScrollState()).testTag(tag), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+    Row(Modifier.tvFocusGroup().horizontalScroll(rememberScrollState()).testTag(tag), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
         choices.forEach { n ->
             FilterChip(
                 selected = value == n,
@@ -395,25 +529,10 @@ internal fun PreloadRow(label: String, value: Int, tag: String, choices: IntRang
     }
 }
 
-private val qualities = listOf(0, 96, 128, 160, 192, 256, 320)
-
+internal val qualities = listOf(0, 96, 128, 160, 192, 256, 320)
 
 /** "Original" or "Opus 128", for a folded section's summary. */
-internal fun qualityLabel(kbps: Int): String = if (kbps == 0) "Original" else "Opus $kbps"
-
-@Composable
-private fun QualityRow(label: String, value: Int, onPick: (Int) -> Unit) {
-    Text(label, style = MaterialTheme.typography.bodyLarge)
-    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
-        qualities.forEach { kbps ->
-            FilterChip(
-                selected = value == kbps,
-                onClick = { onPick(kbps) },
-                label = { Text(if (kbps == 0) "Original" else "Opus $kbps") },
-            )
-        }
-    }
-}
+internal fun qualityLabel(kbps: Int): String = if (kbps == 0) "Original" else "Opus $kbps kbit/s"
 
 internal val cacheSizes = listOf(100, 250, 500, 1024, 2048, 5120, 0)
 // 0 is Off: songs stream without being kept on the phone.
@@ -424,9 +543,9 @@ private data class StorageUsage(val images: Long, val songs: Long, val downloads
 /** Image and song cache sizes and usage, and what else the app keeps on the phone. */
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 /**
- * Settings › Data (issue #780, was Storage, then Streaming and data): how many songs load ahead, the song cache, the
- * downloads with their settings and the covers kept on the phone: what decides data use and playing on without a
- * connection. Streaming quality is under Playback, animated covers under Style.
+ * Settings › Streaming & storage (the owner, 13 Nov; Data before): the streaming quality, how many songs load ahead,
+ * the song cache, the downloads with their settings and the covers kept on the phone: what you hear over the
+ * network, what it costs in data, and playing on without a connection.
  */
 @Composable
 fun StreamingDataScreen(nav: NavController) {
@@ -448,12 +567,21 @@ fun StreamingDataScreen(nav: NavController) {
         }
     }
 
-    Screen(title = "Data", nav = nav) { padding ->
+    Screen(title = "Streaming & storage", nav = nav) { padding ->
         Column(
             Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState()).padding(Space.Page),
             verticalArrangement = Arrangement.spacedBy(Space.Medium),
         ) {
             // Each section folds (issue #776); open by default, folded ones stay folded (issue #780).
+            // A TV has no mobile data (the owner, 12 Nov): only the Wi-Fi quality, without "On Wi-Fi".
+            val tv = app.siansa.BuildConfig.TV_APP
+            FoldSection("Streaming quality", if (tv) qualityLabel(settings.transcodeWifiKbps) else "Wi-Fi ${qualityLabel(settings.transcodeWifiKbps)} · mobile ${qualityLabel(settings.transcodeMobileKbps)}") {
+                Hint(ServerWords.streamingHint(settings.sourceKind))
+                ChoicePicker(if (tv) "Quality" else "On Wi-Fi", settings.transcodeWifiKbps, qualities, "quality-wifi", ::qualityLabel) { graph.settings.save(graph.settings.current.copy(transcodeWifiKbps = it)) }
+                if (!tv) ChoicePicker("On mobile data", settings.transcodeMobileKbps, qualities, "quality-mobile", ::qualityLabel) { graph.settings.save(graph.settings.current.copy(transcodeMobileKbps = it)) }
+                Hint(if (tv) "Siansa always plays the quality chosen here; it never switches on its own." else "Siansa always plays the quality chosen here; it never switches on its own. On a slow connection, pick Opus for mobile data.")
+            }
+            HorizontalDivider()
             val u = usage.valueOrNull()
             val preloadChoices = Preload.choices(settings)
             FoldSection("Load songs ahead", "Wi-Fi ${settings.preloadWifi.coerceIn(preloadChoices)} · mobile ${settings.preloadMobile.coerceIn(preloadChoices)}") {
@@ -475,7 +603,7 @@ fun StreamingDataScreen(nav: NavController) {
                 )
             }
             Text("Maximum size", style = MaterialTheme.typography.bodyLarge)
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+            Row(Modifier.tvFocusGroup().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
                 songCacheSizes.forEach { mb ->
                     FilterChip(
                         selected = settings.songCacheMb == mb,
@@ -600,6 +728,7 @@ fun LogsScreen(nav: NavController) {
                             "Share sends a ZIP with the log, the same entries as data for tools, and what's in it.",
                     )
                     androidx.compose.foundation.layout.FlowRow(
+                        Modifier.tvFocusGroup(),
                         horizontalArrangement = Arrangement.spacedBy(Space.Small),
                         verticalArrangement = Arrangement.spacedBy(Space.Small),
                     ) {
@@ -681,7 +810,7 @@ fun LogsScreen(nav: NavController) {
                     val all = entries.valueOrNull().orEmpty()
                     val errors = all.count { it.level == "E" }
                     val warnings = all.count { it.level == "W" }
-                    Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+                    Row(Modifier.tvFocusGroup(), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
                         FilterChip(selected = !problemsOnly, onClick = { problemsOnly = false }, label = { Text("Everything") })
                         FilterChip(
                             selected = problemsOnly,

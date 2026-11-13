@@ -299,6 +299,9 @@ internal fun coverFallbackKeys(id: String, size: Int?): List<String> {
     return listOf(null, LARGE_COVER, SMALL_COVER, 150).map { coverMemoryKey(id, it) }.distinct().filter { it != own }
 }
 
+/** How often a cover on screen looks whether it's showing a stand-in that's due to be asked for again. */
+private const val STAND_IN_POLL_MS = 2_000L
+
 /** The request [Cover] makes, so covers can be loaded ahead of time into the same cache entries. */
 fun coverRequest(context: android.content.Context, graph: app.siansa.AppGraph, id: String, size: Int?): ImageRequest {
     val px = coverServerPx(size)
@@ -339,7 +342,23 @@ fun Cover(
     val coverId = coverId?.let { app.siansa.data.freshArtistCover(it, freshArtists) }
     val context = LocalContext.current
     val loader = SingletonImageLoader.get(context)
-    val cached = remember(coverId, size) {
+    // A stand-in showing here is asked for again when its time comes (StandIns: soon the first times), without the
+    // cover having to leave the screen and come back (the owner, 12 Nov: a song's row kept the blue disc).
+    var again by remember(coverId) { androidx.compose.runtime.mutableIntStateOf(0) }
+    LaunchedEffect(coverId) {
+        val id = coverId ?: return@LaunchedEffect
+        val cacheId = app.siansa.covers.CoverVersions.cacheId(id)
+        while (true) {
+            val due = app.siansa.covers.StandIns.dueIn(cacheId)
+            if (due == null) { kotlinx.coroutines.delay(STAND_IN_POLL_MS); continue }
+            kotlinx.coroutines.delay(due + 50)
+            if (app.siansa.covers.StandIns.askAgain(cacheId)) {
+                app.siansa.covers.CoverCache.forgetInMemory(loader, cacheId)
+                again++
+            }
+        }
+    }
+    val cached = remember(coverId, size, again) {
         coverId?.let {
             // The server's stand-in, shown a while ago, is dropped here, so the cover is asked for again.
             app.siansa.covers.CoverCache.askAgain(loader, it)
@@ -351,7 +370,7 @@ fun Cover(
         if (cached != null || coverId == null) null
         else coverFallbackKeys(coverId, size).firstNotNullOfOrNull { loader.memoryCache?.get(MemoryCache.Key(it))?.image }
     }
-    val request = remember(coverId, size) { coverId?.let { coverRequest(context, graph, it, size) } }
+    val request = remember(coverId, size, again) { coverId?.let { coverRequest(context, graph, it, size) } }
     Box(
         modifier.clip(shape).background(MaterialTheme.colorScheme.surfaceVariant),
         contentAlignment = Alignment.Center,
@@ -811,13 +830,15 @@ fun GradientTile(
     size: Dp = 160.dp,
     busy: Boolean = false,
 ) {
+    // In the look chosen for Home's cards (the owner, 13 Nov): its own colours, softened, plain, or its cover's.
+    val paint = cardPaint(colors, coverArt, "tile-$title")
     Column(modifier.width(size).clickable(onClick = onClick)) {
         Box(
             Modifier
                 .size(size)
                 .testTag("gradientTileArt")
                 .clip(RoundedCornerShape(10.dp))
-                .background(Brush.linearGradient(listOf(colors.first, colors.second))),
+                .cardFill(paint, RoundedCornerShape(10.dp)),
         ) {
             if (coverArt != null) {
                 Cover(
@@ -831,14 +852,14 @@ fun GradientTile(
             WholeWordsText(
                 title,
                 style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.ExtraBold),
-                color = Color.White,
+                color = paint.text,
                 maxLines = 3,
                 modifier = Modifier.align(Alignment.TopStart).padding(Space.Medium).testTag("gradientTileTitle"),
             )
             if (busy) {
                 CircularProgressIndicator(
                     Modifier.size(22.dp).align(Alignment.BottomStart).padding(2.dp),  // spacing: exact (the badge's inset)
-                    color = Color.White,
+                    color = paint.text,
                     strokeWidth = 2.dp,
                 )
             }

@@ -41,6 +41,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -67,7 +68,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import app.siansa.data.MiniButton
 import androidx.compose.material.icons.rounded.Reorder
-import androidx.compose.material.icons.rounded.LibraryMusic
+import androidx.compose.material.icons.rounded.Sync
 import androidx.compose.material.icons.rounded.FilterList
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Casino
@@ -88,50 +89,11 @@ import androidx.compose.material3.Surface
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectDragGestures
 
-/**
- * Settings › Style (issue #346): how the app looks, each part on its own page. Theme is the Themes page as
- * before; Now Playing Style, Mini Player and Nav Bar are new.
- */
-@Composable
-fun StyleScreen(nav: NavController) {
-    val graph = LocalGraph.current
-    val settings by graph.settings.state.collectAsStateWithLifecycle()
-    Screen(title = "Style", nav = nav) { padding ->
-        Column(Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState())) {
-            HubRow(Icons.Rounded.Palette, "Theme") { nav.navigate("settings/themes") }
-            HubRow(Icons.Rounded.PhoneAndroid, "Now Playing Style") { nav.navigate("settings/style/now-playing") }
-            HubRow(Icons.Rounded.PlayCircle, "Mini Player") { nav.navigate("settings/style/mini-player") }
-            HubRow(Icons.Rounded.Dashboard, "Nav Bar") { nav.navigate("settings/style/nav-bar") }
-            HubRow(Icons.Rounded.Home, "Home") { nav.navigate("settings/style/home") }
-            HubRow(Icons.Rounded.FilterList, "Home Menu") { nav.navigate("settings/style/home-menu") }
-            HubRow(SiansaIcons.Turntable, "DJ Mix Bar") { nav.navigate("settings/style/dj-bar") }
-            Spacer(Modifier.height(Space.Section))
-            TopBarChoice(settings.topBar) {
-                AppLog.i("Style", "Phone's top bar: ${it.name.lowercase()}")
-                graph.settings.setTopBar(it)
-            }
-            // Animated covers (issue #780, moved here from Storage): it's how covers look.
-            Column(Modifier.padding(start = Space.Page, end = Space.Page, top = Space.Section, bottom = Space.Section), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
-                SwitchRow("Animated covers", settings.animatedCovers) { on -> graph.settings.setAnimatedCovers(on) }
-                Hint("When an album folder has an animated cover (cover.gif or cover.webp), it moves on the album page and in now playing; lists show its first frame. Your server may not shrink an animated WebP (Navidrome can't), so it's downloaded once in full and kept on the phone.")  // server-name: ok (an example of a server that can't)
-            }
-            // Dynamic colours, one switch for now playing and the pages (issues #970, #1028; the owner, 10 Nov).
-            Column(Modifier.padding(start = Space.Page, end = Space.Page, bottom = Space.Section), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
-                SwitchRow("Dynamic colours", settings.dynamicColours) { on ->
-                    AppLog.i("Style", "Dynamic colours ${if (on) "on" else "off"}")
-                    graph.settings.setDynamicColours(on)
-                }
-                Hint("Now playing and the album, artist and playlist pages take a soft colour from the cover, or from the artist's picture, always easy to see. On an artist's page, only Play.")
-            }
-        }
-    }
-}
-
 /** The phone's top bar (issue #681): see-through, black, or hidden for full screen. */
 @Composable
-internal fun TopBarChoice(selected: app.siansa.data.TopBarStyle, onPick: (app.siansa.data.TopBarStyle) -> Unit) {
-    Column(Modifier.fillMaxWidth().padding(horizontal = Space.Page).testTag("topBarChoice")) {
-        Text("Phone's top bar", style = MaterialTheme.typography.titleMedium)
+internal fun TopBarChoice(selected: app.siansa.data.TopBarStyle, edge: androidx.compose.ui.unit.Dp = Space.Page, onPick: (app.siansa.data.TopBarStyle) -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = edge).testTag("topBarChoice")) {
+        Text("The clock and battery at the top of the screen.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(Space.Small))
         Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
             app.siansa.data.TopBarStyle.entries.forEach { style ->
@@ -148,39 +110,89 @@ internal fun TopBarChoice(selected: app.siansa.data.TopBarStyle, onPick: (app.si
     }
 }
 
-/** Now Playing Style (issue #346): today's look with the lyrics button, or the one before it. */
+/**
+ * Settings › Now playing (the owner, 13 Nov; Now Playing Style, DJ Mix Bar and Mini Player before, issue #346): the
+ * buttons under the controls, the play button's slides and grooves, the order of the DJ mix bar's places, and the
+ * mini player's buttons.
+ */
 @Composable
 fun NowPlayingStyleScreen(nav: NavController) {
     val graph = LocalGraph.current
     val settings by graph.settings.state.collectAsStateWithLifecycle()
-    Screen(title = "Now Playing Style", nav = nav) { padding ->
-        Column(Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = Space.Page)) {
-            Row(
-                Modifier.fillMaxWidth().clickable { setLyricsButton(graph, !settings.nowPlayingLyricsButton) }.padding(vertical = Space.Medium),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text("Lyrics button", style = MaterialTheme.typography.bodyLarge)
-                    Text(
-                        if (settings.nowPlayingLyricsButton) "Lyrics, where it plays and the queue under the controls"
-                        else "Classic: where it plays and the queue, with the lyrics card peeking in below",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    Screen(title = "Now playing", nav = nav) { padding ->
+        Column(
+            Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState()).padding(Space.Page),
+            verticalArrangement = Arrangement.spacedBy(Space.Medium),
+        ) {
+            FoldSection("Buttons", if (settings.nowPlayingLyricsButton) "Lyrics, device and queue" else "Lyrics card peeking in") {
+                Row(
+                    Modifier.fillMaxWidth().clickable { setLyricsButton(graph, !settings.nowPlayingLyricsButton) },
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Lyrics button", style = MaterialTheme.typography.bodyLarge)
+                        Text(
+                            if (settings.nowPlayingLyricsButton) "Lyrics, where it plays and the queue under the controls"
+                            else "Classic: where it plays and the queue, with the lyrics card peeking in below",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Spacer(Modifier.width(Space.Medium))
+                    Switch(
+                        checked = settings.nowPlayingLyricsButton,
+                        onCheckedChange = { setLyricsButton(graph, it) },
+                        modifier = Modifier.testTag("lyricsButtonSwitch"),
                     )
                 }
-                Spacer(Modifier.width(Space.Medium))
-                Switch(
-                    checked = settings.nowPlayingLyricsButton,
-                    onCheckedChange = { setLyricsButton(graph, it) },
-                    modifier = Modifier.testTag("lyricsButtonSwitch"),
+            }
+            HorizontalDivider()
+            FoldSection("Play button", "Slides ${if (settings.playSlides.on) "on" else "off"} · grooves ${if (settings.playSlides.grooves) "on" else "off"}") {
+                PlaySlidesSettings(settings.playSlides, heading = false) { slides ->
+                    AppLog.i("Style", "Play button slides: ${slides.format()}")
+                    graph.settings.setPlaySlides(slides)
+                }
+            }
+            HorizontalDivider()
+            FoldSection("DJ mix bar", "${settings.djBarOrder.size} places") {
+                Hint("Slide up from the play button and the seek bar opens into this bar: let go on a place to start a DJ mix, stop the one playing, or give it that shape. Hold a row and drag it: top to bottom is left to right on the bar.")
+                ArrangeList(
+                    order = settings.djBarOrder,
+                    shown = settings.djBarOrder.toSet(),
+                    label = { it.arrangeLabel },
+                    icon = { it.icon(starting = true) },
+                    key = { it.id },
+                    canHide = { false },
+                    canShowMore = false,
+                    onChange = { places, _ ->
+                        AppLog.i("Style", "DJ mix bar: ${DjBarSpot.format(places)}")
+                        graph.settings.setDjBarOrder(places)
+                    },
+                    eyes = false,
+                    edge = 0.dp,
                 )
+                if (settings.djBarOrder != DjBarSpot.default) TextButton(onClick = { graph.settings.setDjBarOrder(DjBarSpot.default) }) { Text("Reset the order") }
             }
-            Spacer(Modifier.height(Space.Section))
-            PlaySlidesSettings(settings.playSlides) { slides ->
-                AppLog.i("Style", "Play button slides: ${slides.format()}")
-                graph.settings.setPlaySlides(slides)
+            HorizontalDivider()
+            FoldSection("Mini player", settings.miniButtons.joinToString(" · ") { it.label }.ifEmpty { "No buttons" }) {
+                Hint("Hold a row and drag it, left to right on the bar. Tap the eye to show or hide it. Up to ${MiniButton.MAX} buttons.")
+                ArrangeList(
+                    order = arrangeOrder(settings.miniButtons, MiniButton.entries),
+                    shown = settings.miniButtons.toSet(),
+                    label = { it.label },
+                    icon = { it.icon() },
+                    key = { it.id },
+                    canHide = { true },
+                    canShowMore = settings.miniButtons.size < MiniButton.MAX,
+                    onChange = { order, on ->
+                        val buttons = shownInOrder(order, on)
+                        AppLog.i("Style", "Mini player buttons: ${MiniButton.format(buttons).ifEmpty { "none" }}")
+                        graph.settings.setMiniButtons(buttons)
+                    },
+                    edge = 0.dp,
+                )
+                if (settings.miniButtons != MiniButton.default) TextButton(onClick = { graph.settings.setMiniButtons(MiniButton.default) }) { Text("Reset") }
             }
-            Spacer(Modifier.height(Space.Section))
         }
     }
 }
@@ -190,9 +202,9 @@ fun NowPlayingStyleScreen(nav: NavController) {
  * and whether the button gets record grooves while a DJ mix plays.
  */
 @Composable
-internal fun PlaySlidesSettings(slides: PlaySlides, onChange: (PlaySlides) -> Unit) {
+internal fun PlaySlidesSettings(slides: PlaySlides, heading: Boolean = true, onChange: (PlaySlides) -> Unit) {
     Column {
-        Text("Play button slides", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+        if (heading) Text("Play button slides", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
         StyleSwitchRow("Slide from the play button", "Up, down, left or right starts a mix or finds songs", slides.on, "playSlidesSwitch") {
             onChange(slides.copy(on = it))
         }
@@ -286,41 +298,6 @@ private fun setLyricsButton(graph: app.siansa.AppGraph, on: Boolean) {
 }
 
 /**
- * Mini Player (issue #346, #372): its buttons as a list, in the order they sit on the bar. Hold a row or grab its
- * 6-dot handle to move it; the eye shows or hides it. Lyrics, Add to playlist and Like can be added, up to
- * [MiniButton.MAX] at once.
- */
-@Composable
-fun MiniPlayerStyleScreen(nav: NavController) {
-    val graph = LocalGraph.current
-    val settings by graph.settings.state.collectAsStateWithLifecycle()
-    val shown = settings.miniButtons
-    fun save(buttons: List<MiniButton>) {
-        AppLog.i("Style", "Mini player buttons: ${MiniButton.format(buttons).ifEmpty { "none" }}")
-        graph.settings.setMiniButtons(buttons)
-    }
-    Screen(
-        title = "Mini Player",
-        nav = nav,
-        actions = { TextButton(onClick = { save(MiniButton.default) }, enabled = shown != MiniButton.default) { Text("Reset") } },
-    ) { padding ->
-        Column(Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState())) {
-            StyleHint("Hold a row and drag it, left to right on the bar. Tap the eye to show or hide it. Up to ${MiniButton.MAX} buttons.")
-            ArrangeList(
-                order = arrangeOrder(shown, MiniButton.entries),
-                shown = shown.toSet(),
-                label = { it.label },
-                icon = { it.icon() },
-                key = { it.id },
-                canHide = { true },
-                canShowMore = shown.size < MiniButton.MAX,
-                onChange = { order, on -> save(shownInOrder(order, on)) },
-            )
-        }
-    }
-}
-
-/**
  * Nav Bar (issue #346, #372): the tabs as a list, in their order on the bar. Hold a row or grab its 6-dot handle to
  * move it; the eye shows or hides it, up to [NavTab.MAX]. Settings always stays, so these choices can be found.
  */
@@ -334,7 +311,7 @@ fun NavBarStyleScreen(nav: NavController) {
         graph.settings.setNavTabs(tabs)
     }
     Screen(
-        title = "Nav Bar",
+        title = "Bottom bar",
         nav = nav,
         actions = { TextButton(onClick = { save(NavTab.default) }, enabled = shown != NavTab.default) { Text("Reset") } },
     ) { padding ->
@@ -354,27 +331,11 @@ fun NavBarStyleScreen(nav: NavController) {
     }
 }
 
-/** Settings › Style › Home (issue #934): how many shortcuts Home shows at its top. */
-@Composable
-fun HomeStyleScreen(nav: NavController) {
-    val graph = LocalGraph.current
-    val settings by graph.settings.state.collectAsStateWithLifecycle()
-    Screen(title = "Home", nav = nav) { padding ->
-        Column(Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState())) {
-            StyleHint("The shortcuts at the top of Home are what you played last, newest first.")
-            ShortcutCountRow(settings.homeShortcuts) {
-                AppLog.i("Style", "Home shortcuts: $it")
-                graph.settings.setHomeShortcuts(it)
-            }
-        }
-    }
-}
-
 /** How many shortcuts Home shows, 2 to 8, two to a row (issue #934). */
 @Composable
-internal fun ShortcutCountRow(count: Int, onDone: (Int) -> Unit) {
+internal fun ShortcutCountRow(count: Int, edge: androidx.compose.ui.unit.Dp = Space.Page, onDone: (Int) -> Unit) {
     var value by remember(count) { androidx.compose.runtime.mutableFloatStateOf(count.toFloat()) }
-    Column(Modifier.fillMaxWidth().padding(horizontal = Space.Page)) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = edge)) {
         Text("Shortcuts", style = MaterialTheme.typography.titleMedium)
         Row(verticalAlignment = Alignment.CenterVertically) {
             androidx.compose.material3.Slider(
@@ -391,80 +352,10 @@ internal fun ShortcutCountRow(count: Int, onDone: (Int) -> Unit) {
     }
 }
 
-/**
- * Home Menu (issue #872): the options in Home's menu, top to bottom as they hang under its button. Hold a row or grab
- * its 6-dot handle to move it. All of them always show: each is the only way to it from Home.
- */
-/**
- * DJ Mix Bar (issue #1033): the places on the bar that comes in over the seek bar when you slide up from the play button
- * while a DJ mix plays, in order, left to right. Hold a row and drag it. Every place is always on the bar.
- */
-@Composable
-fun DjBarStyleScreen(nav: NavController) {
-    val graph = LocalGraph.current
-    val settings by graph.settings.state.collectAsStateWithLifecycle()
-    val order = settings.djBarOrder
-    fun save(places: List<DjBarSpot>) {
-        AppLog.i("Style", "DJ mix bar: ${DjBarSpot.format(places)}")
-        graph.settings.setDjBarOrder(places)
-    }
-    Screen(
-        title = "DJ Mix Bar",
-        nav = nav,
-        actions = { TextButton(onClick = { save(DjBarSpot.default) }, enabled = order != DjBarSpot.default) { Text("Reset") } },
-    ) { padding ->
-        Column(Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState())) {
-            StyleHint("Slide up from the play button and the seek bar opens into this bar: let go on a place to start a DJ mix, stop the one playing, or give it that shape. Hold a row and drag it: top to bottom is left to right on the bar.")
-            ArrangeList(
-                order = order,
-                shown = order.toSet(),
-                label = { it.arrangeLabel },
-                icon = { it.icon(starting = true) },
-                key = { it.id },
-                canHide = { false },
-                canShowMore = false,
-                onChange = { places, _ -> save(places) },
-                eyes = false,
-            )
-        }
-    }
-}
-
-@Composable
-fun HomeMenuStyleScreen(nav: NavController) {
-    val graph = LocalGraph.current
-    val settings by graph.settings.state.collectAsStateWithLifecycle()
-    val order = settings.homeMenu
-    fun save(items: List<HomeMenuItem>) {
-        AppLog.i("Style", "Home menu: ${HomeMenuItem.format(items)}")
-        graph.settings.setHomeMenu(items)
-    }
-    Screen(
-        title = "Home Menu",
-        nav = nav,
-        actions = { TextButton(onClick = { save(HomeMenuItem.default) }, enabled = order != HomeMenuItem.default) { Text("Reset") } },
-    ) { padding ->
-        Column(Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState())) {
-            StyleHint("The round button at the top of Home. Hold a row and drag it: top to bottom as they open under the button.")
-            ArrangeList(
-                order = order,
-                shown = order.toSet(),
-                label = { it.label },
-                icon = { it.icon() },
-                key = { it.id },
-                canHide = { false },
-                canShowMore = false,
-                onChange = { items, _ -> save(items) },
-                eyes = false,
-            )
-        }
-    }
-}
-
 internal fun HomeMenuItem.icon(): ImageVector = when (this) {
     HomeMenuItem.DICE -> Icons.Rounded.Casino
     HomeMenuItem.PLAY_ON -> Icons.Rounded.Cast
-    HomeMenuItem.SOURCES -> Icons.Rounded.LibraryMusic
+    HomeMenuItem.SOURCES -> Icons.Rounded.Sync
     HomeMenuItem.ARRANGE -> Icons.Rounded.Reorder
 }
 
@@ -495,6 +386,8 @@ internal fun <T> ArrangeList(
     onChange: (order: List<T>, shown: Set<T>) -> Unit,
     /** Whether rows have the eye at all: Home's menu only puts its options in order (issue #872). */
     eyes: Boolean = true,
+    /** The rows' distance from the page's edges: the page margin on a page of its own, none inside a padded section. */
+    edge: androidx.compose.ui.unit.Dp = Space.Page,
 ) {
     val haptics = LocalHapticFeedback.current
     val pitchPx = with(LocalDensity.current) { ARRANGE_PITCH.toPx() }
@@ -560,7 +453,7 @@ internal fun <T> ArrangeList(
                 modifier = Modifier
                     .zIndex(if (lifted) 1f else 0f)
                     .graphicsLayer { translationY = if (lifted) offset else glide.value }
-                    .padding(horizontal = Space.Page, vertical = Space.Tight)
+                    .padding(horizontal = edge, vertical = Space.Tight)
                     .then(if (lifted) Modifier.shadow(6.dp, RoundedCornerShape(12.dp)) else Modifier)
                     .fillMaxWidth()
                     .pointerInput(item) {

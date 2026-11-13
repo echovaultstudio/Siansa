@@ -27,6 +27,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.Layout
@@ -52,7 +53,7 @@ import java.time.LocalDate
 /**
  * The notices at the top of Home (issue #784): chips for what needs you, what you're partway through and what's new.
  * Pinned kinds always show; the automatic ones come and go as they're needed (issue #794). None while [shown] is off
- * (Settings › Notices and Cards › Notices).
+ * (Settings › Home page › Top of Home).
  */
 @Composable
 internal fun rememberNotices(graph: AppGraph, settings: AppSettings, shown: Boolean): List<Notice> {
@@ -80,32 +81,57 @@ internal fun rememberNotices(graph: AppGraph, settings: AppSettings, shown: Bool
  * height, in line with them, a page margin from the right edge. A chip's height is measured from a chip's own
  * content, so the circle matches at any text size, with or without notices. Chips that don't fit scroll, and blend
  * out under a fade just before the circle, as Your Library's chips do.
+ *
+ * Home's menu opens in this row (the owner, 12 and 13 Nov): [menuBar] is laid over the chips' room, the chips' exact
+ * height, from the page's left edge to the room before the button, and [menuOpen] (0 to 1) brings it in while each
+ * chip shrinks towards its left end and fades, so the chips give way to the menu's pills. Nothing changes height.
  */
 @Composable
-internal fun HomeTopBar(notices: List<Notice>, onOpen: (Notice) -> Unit, modifier: Modifier = Modifier, menuButton: @Composable () -> Unit) {
+internal fun HomeTopBar(
+    notices: List<Notice>,
+    onOpen: (Notice) -> Unit,
+    modifier: Modifier = Modifier,
+    menuOpen: Float = 0f,
+    menuBar: (@Composable () -> Unit)? = null,
+    menuButton: @Composable () -> Unit,
+) {
     val scroll = rememberScrollState()
     val surface = MaterialTheme.colorScheme.surface
+    val shown = menuOpen.coerceIn(0f, 1f)
+    val chipsAlpha = (1f - shown * CHIPS_GONE_BY).coerceIn(0f, 1f)
     Layout(
         modifier = modifier.fillMaxWidth().testTag("homeTopBar"),
         content = {
             // A chip's content, never shown: its height is the circle's.
             NoticePillContent(Icons.Rounded.Album, "Ag")
             Row(
-                Modifier.horizontalScroll(scroll).padding(start = Space.Page, end = Space.Small).testTag("noticesRow"),
+                Modifier
+                    .horizontalScroll(scroll, enabled = shown == 0f)
+                    .padding(start = Space.Page, end = Space.Small)
+                    .testTag("noticesRow"),
                 horizontalArrangement = Arrangement.spacedBy(Space.Small),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                // The same pill as Your Library's chips (issue #794), not Material's outlined assist chip.
-                notices.forEach { notice -> androidx.compose.runtime.key(notice.key) { NoticePill(notice, onOpen = { onOpen(notice) }) } }
+                // The same pill as Your Library's chips (issue #794), not Material's outlined assist chip. As the menu
+                // opens each chip shrinks towards its left end and fades (the owner, 13 Nov), the menu's pills taking its place.
+                notices.forEach { notice ->
+                    androidx.compose.runtime.key(notice.key) {
+                        Box(Modifier.graphicsLayer { alpha = chipsAlpha; scaleX = chipShrink(shown); transformOrigin = TransformOrigin(0f, 0.5f) }) {
+                            NoticePill(notice, onOpen = { onOpen(notice) })
+                        }
+                    }
+                }
             }
             Box(
                 Modifier
-                    .graphicsLayer { alpha = if (scroll.canScrollForward) 1f else 0f }
+                    .graphicsLayer { alpha = if (scroll.canScrollForward) chipsAlpha else 0f }
                     .background(Brush.horizontalGradient(0f to surface.copy(alpha = 0f), 0.7f to surface, 1f to surface))
                     .testTag("noticesFade"),
             )
             // Passes on the exact size: the button is a chip's height whatever its own default.
             Box(propagateMinConstraints = true) { menuButton() }
+            // The menu's pill: there only while the menu is open or on its way, so a closed menu costs nothing.
+            Box(propagateMinConstraints = true) { if (menuBar != null && menuOpen > 0f) menuBar() }
         },
     ) { measurables, constraints ->
         val chip = measurables[0].measure(Constraints()).height
@@ -117,13 +143,20 @@ internal fun HomeTopBar(notices: List<Notice>, onOpen: (Notice) -> Unit, modifie
         val fadeWidth = NOTICES_FADE.roundToPx().coerceAtMost(room)
         val fade = measurables[2].measure(Constraints.fixed(fadeWidth, chip))
         val button = measurables[3].measure(Constraints.fixed(chip, chip))
+        // The pill fills the chips' room less their own margins: the page's edge, and the room before the button.
+        val barWidth = (room - page - Space.Small.roundToPx()).coerceAtLeast(0)
+        val bar = measurables[4].measure(Constraints.fixed(barWidth, chip))
         layout(width, chip) {
             chips.place(0, 0)
             fade.place(room - fadeWidth, 0)
+            bar.place(page, 0)
             button.place(width - page - chip, 0)
         }
     }
 }
+
+/** How fast the chips go as the menu opens: gone well before it's fully open. */
+private const val CHIPS_GONE_BY = 1.6f
 
 /** How wide the fade before Home's menu button is. */
 private val NOTICES_FADE = 48.dp

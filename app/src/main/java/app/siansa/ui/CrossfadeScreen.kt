@@ -57,9 +57,9 @@ import kotlin.math.roundToInt
 internal val CROSSFADE_GAP = Space.Medium
 
 /**
- * Settings › Playback › Crossfade and levelling (issues #60, #214): where song loudness and fade shapes come
- * from, levelling (Off, Track, Album: ReplayGain tags or the Siansa plugin's measurement, never both) with what
- * levels the song playing now, and crossfades.
+ * Settings › Sound (the owner, 13 Nov; Playback › Crossfade and levelling before, issues #60, #214): the equaliser's
+ * page, where song loudness and fade shapes come from, levelling (Off, Track, Album: ReplayGain tags or the Siansa
+ * plugin's measurement, never both) with what levels the song playing now, and crossfades.
  */
 @Composable
 fun CrossfadeScreen(nav: NavController) {
@@ -67,11 +67,14 @@ fun CrossfadeScreen(nav: NavController) {
     val settings by graph.settings.state.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     var test by remember { mutableStateOf<String?>(null) }
-    Screen(title = "Crossfade and levelling", nav = nav) { padding ->
+    val eq by graph.equaliser.state.collectAsStateWithLifecycle()
+    Screen(title = "Sound", nav = nav) { padding ->
         Column(
             Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState()).padding(Space.Page),
             verticalArrangement = Arrangement.spacedBy(CROSSFADE_GAP),
         ) {
+            PageLink("Equaliser", if (eq.enabled) "On · ${eq.preset.label}" else "Off", "soundEqualiser") { nav.navigate("settings/equaliser") }
+            HorizontalDivider()
             Heading("Where loudness and fades come from")
             LoudnessSourceRow(settings.loudnessSource, beats = settings.beatsReady) {
                 test = null
@@ -82,7 +85,7 @@ fun CrossfadeScreen(nav: NavController) {
                 if (!settings.audioMuseReady && !settings.beatsReady) {
                     Hint("Set up Siansa Beats or AudioMuse in Settings › Connections first. Until then, song tags are used.")
                 } else {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
+                    Row(Modifier.tvFocusGroup(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
                         OutlinedButton(modifier = Modifier.focusRing(), onClick = {
                             test = "Testing…"
                             scope.launch {
@@ -262,7 +265,7 @@ internal fun BeatMatchRow(selected: BeatMatchMode, onPick: (BeatMatchMode) -> Un
 /** The choice of where loudness and fades come from. */
 @Composable
 internal fun LoudnessSourceRow(selected: LoudnessSource, beats: Boolean = false, onPick: (LoudnessSource) -> Unit) {
-    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+    Row(Modifier.tvFocusGroup().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
         LoudnessSource.entries.forEach { source ->
             FilterChip(selected = selected == source, onClick = { onPick(source) }, label = { Text(if (source == LoudnessSource.PLUGIN && beats) "Siansa Beats" else source.label) })
         }

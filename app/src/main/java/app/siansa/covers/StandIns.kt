@@ -24,8 +24,15 @@ import java.util.concurrent.ConcurrentHashMap
  * Emby and Jellyfin answer a missing picture with HTTP 404, which was never kept.
  */
 object StandIns {
-    /** How long a stand-in is shown from memory before its cover is asked for again. */
+    /** How long a stand-in is shown from memory before its cover is asked for again, once [SOON_MS] are used up. */
     const val AGAIN_MS = 2 * 60_000L
+
+    /**
+     * The first askings come sooner (the owner, 12 Nov: Navidrome sent its stand-in for a song whose picture it has,
+     * while many covers were asked for at once, and the row showed the blue disc for two minutes though the player
+     * had the real picture a moment later): after 5 s, then 30 s, then every [AGAIN_MS].
+     */
+    val SOON_MS = longArrayOf(5_000L, 30_000L)
 
     /** How much of an answer is read to fingerprint a stand-in: Navidrome's biggest was 305 kB. */
     const val PEEK_BYTES = 1L shl 20
@@ -109,26 +116,42 @@ object StandIns {
     // ---- Shown now, asked for again later ----
 
     private val shown = ConcurrentHashMap<String, Long>()
+    private val times = ConcurrentHashMap<String, Int>()
 
-    /** The cover kept under [cacheId] just showed the server's stand-in. */
+    /** The cover kept under [cacheId] just showed the server's stand-in (the [times]th time running). */
     fun shown(cacheId: String, now: Long = System.currentTimeMillis()) {
         shown[cacheId] = now
+        times.merge(cacheId, 1, Int::plus)
     }
 
+    /** The server sent the real picture for [cacheId]: its stand-in showings start over. */
+    fun real(cacheId: String) {
+        shown.remove(cacheId)
+        times.remove(cacheId)
+    }
+
+    /** How long [cacheId]'s stand-in is shown before the server is asked again: [SOON_MS] in turn, then [AGAIN_MS]. */
+    fun waitMs(cacheId: String): Long = SOON_MS.getOrElse((times[cacheId] ?: 1) - 1) { AGAIN_MS }
+
+    /** How long until [cacheId]'s stand-in is asked for again, or null when it isn't showing one. */
+    fun dueIn(cacheId: String, now: Long = System.currentTimeMillis()): Long? =
+        shown[cacheId]?.let { (it + waitMs(cacheId) - now).coerceAtLeast(0L) }
+
     /**
-     * True, once, when [cacheId]'s stand-in has been shown for [AGAIN_MS]: what's in memory for it is then dropped, so
-     * the server is asked again.
+     * True, once, when [cacheId]'s stand-in has been shown for its [waitMs]: what's in memory for it is then dropped,
+     * so the server is asked again.
      */
     fun askAgain(cacheId: String, now: Long = System.currentTimeMillis()): Boolean {
         val since = shown[cacheId] ?: return false
-        return now - since >= AGAIN_MS && shown.remove(cacheId, since)
+        return now - since >= waitMs(cacheId) && shown.remove(cacheId, since)
     }
 
     /** Every cover showing a stand-in now is asked for again at its next showing (after a sync). */
-    fun askAllAgain(): Set<String> = shown.keys.toSet().also { shown.clear() }
+    fun askAllAgain(): Set<String> = shown.keys.toSet().also { shown.clear(); times.clear() }
 
     internal fun forget() {
         shown.clear()
+        times.clear()
         learned = emptySet()
     }
 }

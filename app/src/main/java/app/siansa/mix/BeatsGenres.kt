@@ -51,7 +51,18 @@ class BeatsGenres(
      * The ids of [name]'s songs by their sound, the ones that sound most like it first: all of them, or a random [limit]
      * of them when there are more. Null when Siansa Beats can't be asked (the tags play).
      */
-    suspend fun songIds(name: String, limit: Int): List<String>? {
+    suspend fun songIds(name: String, limit: Int): List<String>? = songsHeard(name, limit)?.ids
+
+    /**
+     * How much each song of a genre sounds like it, by the id, from the last answer about that genre (Beats 0.36's
+     * "weights"; a genre asked for before that, or by the tags, has none): the radio prefers the sure ones.
+     */
+    fun weightsOf(name: String): Map<String, Float> = weights[name].orEmpty()
+
+    private val weights = java.util.concurrent.ConcurrentHashMap<String, Map<String, Float>>()
+
+    /** [songIds] with each song's score ([HeardSongs.weights], Beats 0.36; empty before). */
+    suspend fun songsHeard(name: String, limit: Int): HeardSongs? {
         if (!ready() || now() < backOffUntil) return null
         val answer = try {
             ask(PATH + "?name=" + java.net.URLEncoder.encode(name, "UTF-8").replace("+", "%20") + "&limit=$limit") as? JsonObject
@@ -67,11 +78,19 @@ class BeatsGenres(
         val styles = (answer["styles"] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.content?.substringAfter("---") }.orEmpty()
         val genres = (answer["genres"] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.content }.orEmpty()
         val all = (answer["songs"] as? JsonPrimitive)?.content?.toIntOrNull()
+        val scores = (answer["weights"] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.content?.toFloatOrNull() }.orEmpty()
+        val byId = if (scores.size == ids.size) ids.zip(scores).toMap() else emptyMap()
+        weights[name] = byId
+        val sure = (answer["sure"] as? JsonPrimitive)?.content?.toIntOrNull()
         AppLog.i("Radio", "Genre $name: ${ids.size} songs by their sound, from Siansa Beats" +
             (all?.takeIf { it > ids.size }?.let { " (of $it)" }.orEmpty()) +
+            (sure?.let { ", $it sure" } ?: ", no scores (Siansa Beats 0.36 gives them)") +
             (styles + genres).takeIf { it.isNotEmpty() }?.joinToString(prefix = " (", postfix = ")").orEmpty())
-        return ids
+        return HeardSongs(ids, byId)
     }
+
+    /** A genre's songs by their sound: the ids, best first, and each one's score (empty before Beats 0.36). */
+    class HeardSongs(val ids: List<String>, val weights: Map<String, Float>)
 
     @Volatile private var noSongGenresUntil = 0L
 

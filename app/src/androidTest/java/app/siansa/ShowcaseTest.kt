@@ -21,6 +21,7 @@ import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -152,7 +153,7 @@ class ShowcaseTest {
                 // Home's menu (issue #872), then its row.
                 compose.onAllNodesWithContentDescription("Home menu", substring = true).onFirst().performClick()
                 idle(400)
-                click("Arrange Home")
+                compose.onNodeWithTag("homeMenu-arrange").performClick()
                 idle(1200)
                 click("Arrange")
                 idle(1200)
@@ -385,11 +386,11 @@ class ShowcaseTest {
                 shot("library-grid")
                 compose.onAllNodesWithContentDescription("Show as list").onFirst().performClick()
             }
-            step("style") {
+            step("services") {
                 tab("Settings")
-                click("Style")
+                compose.onNodeWithTag("hubManage").performClick()
                 idle(2000)
-                shot("style")
+                shot("services")
                 back()
             }
             step("settings") {

@@ -34,6 +34,27 @@ class GenreRadioTest {
         assertTrue("the last played don't come straight back", next.none { it == "s10" })
     }
 
+    /** The owner, 12 Nov: the picks prefer the songs the sound is sure of; without scores every song is alike. */
+    @Test fun sureSongsComeUpFarMoreOften() {
+        val ids = genre.map { it.id }
+        // Half the genre sure (0.6), half faint (0.15): over many radios the sure half is picked about 16 times as often.
+        val weights = ids.mapIndexed { i, id -> id to if (i % 2 == 0) 0.6f else 0.15f }.toMap()
+        var sure = 0
+        var faint = 0
+        repeat(200) { round ->
+            GenreRadio.weightedPicks(ids, weights, GenreRadio.PICKS, Random(round)).forEach { if (weights[it]!! >= 0.4f) sure++ else faint++ }
+        }
+        assertTrue("sure $sure vs faint $faint", sure > faint * 8)
+        assertEquals(GenreRadio.PICKS, GenreRadio.weightedPicks(ids, weights, GenreRadio.PICKS, Random(9)).toSet().size)
+        // No scores: as likely as each other, give or take.
+        var low = 0
+        repeat(200) { round -> GenreRadio.weightedPicks(ids, emptyMap(), GenreRadio.PICKS, Random(round)).forEach { if (it.removePrefix("s").toInt() <= 500) low++ } }
+        assertTrue("low $low of 6000", low in 2500..3500)
+        assertEquals(GenreRadio.weightOf(0.6f) / GenreRadio.weightOf(0.15f), 16.0, 0.01)
+        assertEquals("", GenreRadio.scoresLine(ids.take(3), emptyMap()))
+        assertEquals(" · scores 0.15 to 0.60, 1 sure", GenreRadio.scoresLine(ids.take(2), weights))
+    }
+
     @Test fun aShortGenreQueuesWhatItHas() {
         assertEquals(5, GenreRadio.firstPicks(genre.take(5), null, GenreRadio.PICKS, Random(4)).size)
     }

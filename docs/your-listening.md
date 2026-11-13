@@ -36,7 +36,7 @@ same faint, see-through white everywhere, so they read on any picture.
 
 ## Scrobbling
 
-**Settings › Scrobbling and history**:
+**Settings › Scrobbling & history**:
 
 - **When a song counts**: once more than the chosen share of it has played (50% by default), or four minutes,
   whichever comes first. Songs under 30 seconds never count. Listens made offline are sent later.
@@ -52,7 +52,10 @@ same faint, see-through white everywhere, so they read on any picture.
   can bring in an export of Koito or Last.fm there, and have it send your listens on to Last.fm; turn **Last.fm**
   off here then, or plays count twice.
 - **Last.fm**: uses your own Last.fm API account (create one at last.fm/api/account/create and copy the API key
-  and shared secret). Hearts are sent to Last.fm as loved tracks.
+  and shared secret). Hearts are sent to Last.fm as loved tracks. Each listen carries the song's artist, title, album
+  and the album's artist, so Last.fm finds the album and its cover for songs credited to several artists and for
+  compilations; Last.fm takes no pictures from Siansa itself, so a song it doesn't know under those names shows
+  none. Through Siansa Beats the same goes, from Siansa Beats 0.37.
 - **ListenBrainz / Koito**: for Koito, its address and an API key from Koito's settings. Leave the address empty
   for listenbrainz.org. **Send listens** switches it off without forgetting it; **Remove** (or saving with the
   token emptied) takes it away. If listens still arrive there with it off, your music server may be sending them

@@ -2,7 +2,7 @@
 
 ## Streaming quality
 
-**Settings › Data › Streaming quality**, set separately **On Wi-Fi** and **On mobile data**:
+**Settings › Streaming & storage › Streaming quality**, set separately **On Wi-Fi** and **On mobile data**:
 
 - **Original**: the file as it is on your server. Best on Wi-Fi.
 - **Opus 96–320 kbit/s**: converted by your server (Navidrome's "opus" transcoding profile), to save data.
@@ -13,10 +13,10 @@ Siansa always plays the quality you chose; it never switches by itself. Changes 
 
 ## Song cache and loading ahead
 
-- **Song cache** (**Settings › Data**, 2 GB by default): songs are kept on the phone as they play, so replays
+- **Song cache** (**Settings › Streaming & storage**, 2 GB by default): songs are kept on the phone as they play, so replays
   and skips start at once and survive a bad connection. Only original-quality streams are cached. **Off** keeps
   no song once it has played (the songs already cached are removed); it applies from the next song.
-- **Load songs ahead** (**Settings › Data**): while a song plays, Siansa loads the next ones, one at a time, so
+- **Load songs ahead** (**Settings › Streaming & storage**): while a song plays, Siansa loads the next ones, one at a time, so
   they start at once and keep playing if the connection drops. 2 on Wi-Fi and 1 on mobile data by default, up to
   5. Only original files are loaded ahead. This works with the song cache off too, for up to 3 songs: each is held
   only until it has played.
@@ -25,7 +25,7 @@ Siansa always plays the quality you chose; it never switches by itself. Changes 
 
 ## Downloads
 
-**Settings › Data › Downloads** (or the download button on an album or playlist): music you download stays on the phone
+**Settings › Streaming & storage › Downloads** (or the download button on an album or playlist): music you download stays on the phone
 and plays without a connection. It isn't part of the song cache and is never removed by itself.
 
 - **Download on Wi-Fi only** (on by default).
@@ -42,7 +42,7 @@ size, so they stay gapless too.
 
 ## Levelling (even loudness)
 
-**Settings › Playback › Crossfade and levelling**:
+**Settings › Sound**:
 
 - **Levelling**: **Track** plays every song at the same level. **Album** keeps an album's loud and quiet songs
   apart. **Off** plays songs as they are.
@@ -206,7 +206,7 @@ one, or while the sleep timer lets a song finish.
 
 ## Equaliser
 
-**Settings › Playback › Equaliser**: ten bands, presets, and a pre-amp. Songs stay as loud as with the equaliser
+**Settings › Sound › Equaliser**: ten bands, presets, and a pre-amp. Songs stay as loud as with the equaliser
 off; the pre-amp makes everything louder or quieter on top, and peaks that would distort are smoothed. Moving a
 band saves it as your Custom preset. Not used while casting.
 
@@ -233,8 +233,8 @@ choice: its icon beside the button, and its name in the middle of the cover, whi
 hides it. Until you're far enough the name is faint and says "Slide a little further"; then it lights up in your
 colour, says "Let go to start" and the phone clicks, and letting go there starts it. Everything else on the page dims while you
 slide, and going down, Play on makes way. Slide back to the middle to change your mind. A tap still plays and pauses, and pressing
-and holding still stops. What each way does can be changed, or the slides switched off, under **Settings › Style ›
-Now playing**. While a DJ mix plays, the play button has record grooves in its colour, with a glint that turns as it
+and holding still stops. What each way does can be changed, or the slides switched off, under **Settings › Now playing ›
+Play button**. While a DJ mix plays, the play button has record grooves in its colour, with a glint that turns as it
 plays.
 
 Sliding **up** from the play button opens the **DJ mix bar** (when up is set to DJ mix): the seek bar's line opens
@@ -246,7 +246,7 @@ queue does: the next songs change; the mix's shape now has a ring in your colour
 the place under your finger lights up (Stop in white, the rest in your colour) and the phone clicks at each one, while
 the cover shows its name, what it does and "Let go to start", "Let go to stop" or "Let go to reshape". Slide back down
 to change your mind. An album's or playlist's DJ mix plays its own songs, so its bar has only **Stop**. Put the places
-in your own order under **Settings › Style › DJ Mix Bar**.
+in your own order under **Settings › Now playing › DJ mix bar**.
 
 Swipe the mini player left for the next song or right for the one before; the phone gives a short buzz as the song
 changes, and when you press **Repeat** or **Add to playlist** in now playing (if touch vibration is on in your
@@ -279,7 +279,7 @@ same corner: tap it to close the lyrics again.
 
 From now playing. Pick a time, or let the current song finish. **Wind down** swaps everything after the current
 song for a path from that song to calmer music, long enough to fill the timer, so the music gets calmer and quieter
-as you fall asleep. Without a timer, Wind down queues a number of calm songs (**Settings › Playback › Wind down**:
+as you fall asleep. Without a timer, Wind down queues a number of calm songs (**Settings › Radios & mixes › Wind down**:
 10, 20 or 30) and the music ends with them.
 
 ## Casting (Chromecast and DLNA)
