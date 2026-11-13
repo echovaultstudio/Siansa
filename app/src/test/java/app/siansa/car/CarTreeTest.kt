@@ -43,6 +43,8 @@ class CarTreeTest {
         var moods: List<MoodRadio> = listOf(chill),
         var recent: List<RecentPlay> = emptyList(),
         var found: SearchResults = SearchResults(emptyList(), emptyList(), emptyList()),
+        var albumList: List<Album> = listOf(Album("al1", "First", artist = "Artist", coverArt = "al-1"), Album("al2", "Second")),
+        var artistList: List<Artist> = listOf(Artist("ar1", "Artist")),
     ) : CarLibrary {
         val mixList = listOf(mix("old", "morning", 1), mix("new", "morning", 5), mix("eve", "evening", 3))
         override suspend fun mixes() = latestMixes(mixList)
@@ -53,10 +55,10 @@ class CarTreeTest {
         override suspend fun playlists() = listOf(Playlist("p:1", "Road trip", songCount = 2, coverArt = "pl-1"))
         override suspend fun playlist(id: String) =
             if (id == "p:1") PlaylistDetail(Playlist("p:1", "Road trip", 2), listOf(song("x"), song("y"))) else null
-        override suspend fun albums() = listOf(Album("al1", "First", artist = "Artist", coverArt = "al-1"), Album("al2", "Second"))
+        override suspend fun albums() = albumList
         override suspend fun album(id: String) = albums().firstOrNull { it.id == id }
         override suspend fun albumSongs(id: String) = if (id == "al1") albumSongs else emptyList()
-        override suspend fun artists() = listOf(Artist("ar1", "Artist"))
+        override suspend fun artists() = artistList
         override suspend fun artist(id: String) = artists().firstOrNull { it.id == id }
         override suspend fun artistSongs(id: String) =
             listOf(song("s1", "One", "a1"), song("s2", "Two", "a2"), song("s3", "One", "a1"))
@@ -206,6 +208,77 @@ class CarTreeTest {
         assertEquals(true, tree().item("mood:chill")!!.mediaMetadata.isPlayable)
         assertNotNull(tree().item(CarId.Song(CarId.Album("al1"), "1").mediaId))
         assertNull(tree().item("8f3a9c0d1e"))
+    }
+
+    /** [perLetter] names under each of [letters], in the library's order. */
+    private fun names(letters: String, perLetter: Int): List<String> =
+        letters.flatMap { letter -> (1..perLetter).map { "$letter name %04d".format(it) } }
+
+    // Issues #1040 and #1041: a long list reached the car cut short, so the letters after the cut were grey.
+    @Test fun aLongListOfArtistsIsAFolderForEachLetter() = runBlocking {
+        val artists = (listOf("2Pac", "!!!") + names("ABCDEFGHIJKLMNOPQRSTUVWXYZ", 20)).mapIndexed { i, name -> Artist("ar$i", name) }
+        val lib = Fake(artistList = artists)
+        val letters = tree(lib).children("artists")!!
+        assertEquals(listOf("123") + ('A'..'Z').map { it.toString() }, letters.map { it.mediaMetadata.title.toString() })
+        assertTrue(letters.all { it.mediaMetadata.isBrowsable == true && it.mediaMetadata.isPlayable == false })
+        assertEquals("2 artists", letters[0].mediaMetadata.subtitle)
+        assertEquals("20 artists", letters[1].mediaMetadata.subtitle)
+        // Every artist is in exactly one letter, and the id the car sends back opens it.
+        val reached = letters.flatMap { letter ->
+            assertEquals(letter.mediaId, CarId.parse(letter.mediaId)!!.mediaId)
+            tree(lib).children(letter.mediaId)!!
+        }
+        assertEquals(artists.map { "artist:" + it.id }, reached.map { it.mediaId })
+        assertEquals("Z", tree(lib).item(letters.last().mediaId)!!.mediaMetadata.title)
+        // No list handed to the car is longer than what reaches it whole.
+        assertTrue(letters.size <= CarIndex.WHOLE)
+    }
+
+    @Test fun aLongListOfAlbumsIsLettersAndEachLetterAGridOfCovers() = runBlocking {
+        val albums = names("ABCDEFGHIJKLMNOPQRSTUVWXYZ", 10).mapIndexed { i, name -> Album("al$i", name) }
+        val lib = Fake(albumList = albums)
+        val grid = MediaConstants.EXTRAS_VALUE_CONTENT_STYLE_GRID_ITEM
+        // The Albums tab then lists letters, so it's no longer a grid; each letter is.
+        val tab = tree(lib).children("root")!![2]
+        assertEquals(0, tab.mediaMetadata.extras!!.getInt(MediaConstants.EXTRAS_KEY_CONTENT_STYLE_BROWSABLE))
+        val letters = tree(lib).children("albums")!!
+        assertEquals(26, letters.size)
+        assertEquals("10 albums", letters[16].mediaMetadata.subtitle)
+        assertEquals(grid, letters[16].mediaMetadata.extras!!.getInt(MediaConstants.EXTRAS_KEY_CONTENT_STYLE_BROWSABLE))
+        assertEquals("Q", letters[16].mediaMetadata.title)
+        assertEquals((160..169).map { "album:al$it" }, tree(lib).children(letters[16].mediaId)!!.map { it.mediaId })
+    }
+
+    @Test fun aLetterWithTooManyIsInParts() {
+        val names = names("A", 30) + names("T", 450) + names("Z", 5)
+        val groups = CarIndex.groups(names) { it }!!
+        assertEquals(listOf("A", "T (1 of 3)", "T (2 of 3)", "T (3 of 3)", "Z"), groups.map { it.key })
+        assertEquals(listOf(30, 200, 200, 50, 5), groups.map { it.entries.size })
+        assertEquals("T name 0001 – T name 0200", groups[1].range)
+        assertNull(groups[0].range)
+        assertEquals(names, groups.flatMap { it.entries })
+        assertTrue(groups.all { it.entries.size <= CarIndex.WHOLE })
+    }
+
+    @Test fun aListThatFitsStaysOneList() {
+        assertNull(CarIndex.groups(names("ABCDEFGHIJ", 20)) { it })
+        assertNotNull(CarIndex.groups(names("ABCDEFGHIJ", 20) + "one more") { it })
+    }
+
+    @Test fun namesAreUnderTheLetterTheLibrarySortsThemBy() {
+        assertEquals("A", CarIndex.letterOf("Ásgeir"))
+        assertEquals("B", CarIndex.letterOf("  beirut"))
+        assertEquals("H", CarIndex.letterOf("(hed) p.e."))
+        assertEquals("123", CarIndex.letterOf("2Pac"))
+        assertEquals("123", CarIndex.letterOf("!!!"))
+        assertEquals("123", CarIndex.letterOf(""))
+        assertEquals("Б", CarIndex.letterOf("браво"))
+    }
+
+    @Test fun aLetterNoLongerThereOpensEmpty() = runBlocking {
+        assertTrue(tree().children(CarId.Letter(CarId.Albums, "Q").mediaId)!!.isEmpty())
+        assertNull(tree().children(CarId.Letter(CarId.Home, "Q").mediaId))
+        assertEquals(CarId.Letter(CarId.Artists, "T (1 of 3)"), CarId.parse(CarId.Letter(CarId.Artists, "T (1 of 3)").mediaId))
     }
 
     @Test fun longListsArePaged() {

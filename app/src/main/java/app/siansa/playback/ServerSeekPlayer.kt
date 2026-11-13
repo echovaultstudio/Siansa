@@ -59,6 +59,12 @@ class ServerSeekPlayer(
 
     override fun getContentDuration(): Long = duration
 
+    // The player calls a stream without a length live, and a converted song is one. For a live stream Media3 hands
+    // no length and no position to the media session, so a car, the lock screen and the notification showed the
+    // song without its progress bar (issue #1039). It's a song with a length ([getDuration]), not a broadcast.
+    override fun isCurrentMediaItemLive(): Boolean =
+        live(exo.isCurrentMediaItemLive, exo.currentMediaItem?.mediaId?.let(converted) == true)
+
     // A converted stream has no length, so the player itself says it can't seek in it, and the app's controller
     // would then drop a seek before it got here. Seeking is done by Navidrome, so it's offered.
     private fun withSeek(commands: Player.Commands): Player.Commands {
@@ -144,4 +150,9 @@ class ServerSeekPlayer(
     }
 
     private fun MediaItem.withUri(uri: Uri): MediaItem = buildUpon().setUri(uri).build()
+
+    companion object {
+        /** Whether a stream is live for the media session: what the player says, except for a converted song. */
+        fun live(playerSaysLive: Boolean, converted: Boolean): Boolean = playerSaysLive && !converted
+    }
 }

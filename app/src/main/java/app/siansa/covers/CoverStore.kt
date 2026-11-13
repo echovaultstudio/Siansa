@@ -134,6 +134,32 @@ object CoverStore {
 
     fun sizeBytes(): Long = dir.listFiles()?.sumOf { it.length() } ?: 0L
 
+    /**
+     * The most animated originals kept, in bytes. No limit on a phone, where Settings › Data shows and clears them;
+     * the TV app sets its own ([app.siansa.data.StorageBudget]): it kept every one it had played, 17 to 163 MB each,
+     * for good, on a box with 8 GB for everything.
+     */
+    @Volatile var maxOriginalBytes: Long = Long.MAX_VALUE
+
+    /**
+     * Removes the animated originals played longest ago until those kept fit [maxOriginalBytes], never [keep] (the one
+     * just downloaded). Their stills stay, so lists show them as before; an animation downloads again when it next
+     * plays. Returns the bytes removed.
+     */
+    @Synchronized
+    fun prune(keep: File? = null): Long {
+        val max = maxOriginalBytes
+        if (max == Long.MAX_VALUE) return 0L
+        val originals = dir.listFiles { file -> file.name.endsWith(".anim") }.orEmpty().toList()
+        val drop = app.siansa.data.oldestToDrop(originals, max, { it.lastModified() }, { it.length() }, keep)
+        if (drop.isEmpty()) return 0L
+        val freed = drop.sumOf { it.length() }
+        drop.forEach { it.delete() }
+        AppLog.i("Cover", "Removed ${drop.size} animated cover(s) played longest ago (${mb(freed)}): at most ${mb(max)} of them are kept here. " +
+            "Their stills stay, and an animation downloads again when it plays")
+        return freed
+    }
+
     fun clear() {
         dir.listFiles()?.forEach { it.delete() }
         aliases.clear()
@@ -224,6 +250,7 @@ object CoverStore {
                 "Navidrome sends the original for every size, so it's downloaded once and lists use a still of it. " +
                 "Animated covers on the phone: ${mb(sizeBytes())}",
         )
+        prune(keep = originalFile(key))
         return local(key)?.let { serve(clean, it, wantsAnimation) } ?: throw IOException("Cover $id couldn't be saved")
     }
 
@@ -535,6 +562,8 @@ object CoverStore {
             if (still == null) AppLog.w("Cover", "No still for ${local.original.name}; sending the original")
         }
         val file = if (wantsAnimation || still == null) local.original else still
+        // Played now: the last to go when room is made ([prune]).
+        if (file == local.original && maxOriginalBytes != Long.MAX_VALUE) local.original.setLastModified(System.currentTimeMillis())
         val type = when {
             file == still -> "image/jpeg"
             else -> sniff(file.inputStream().use { s -> ByteArray(32).also { s.read(it) } })?.mime ?: "application/octet-stream"
