@@ -81,6 +81,7 @@ import app.siansa.ui.SiansaTheme
 import app.siansa.ui.SourceCardForTest
 import app.siansa.ui.Space
 import app.siansa.ui.SpacingRow
+import app.siansa.ui.cardFill
 import app.siansa.ui.SyncStrip
 import app.siansa.ui.ThemeChoice
 import app.siansa.ui.ThemeMode
@@ -315,6 +316,17 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                 Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Page)) {
                     app.siansa.ui.CardLookChooser(app.siansa.data.CardLook.SOFT, app.siansa.data.CardLook.forHome) {}
                     app.siansa.data.CardLook.forHome.forEach { app.siansa.ui.CardLookSample(it, Modifier.fillMaxWidth(), big = true) }
+                }
+            },
+            // A card painted after its own padding, as Today's mix is (the owner, 13 Nov: the wash sat a padding inside
+            // the solid, a grey frame): the colour must reach the rounded edge.
+            Scene("card_fill_edge") {
+                androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalCardLook provides app.siansa.data.CardLook.SOFT) {
+                    val paint = app.siansa.ui.cardPaint(Color(0xFFD6338A) to Color(0xFF4A1470))
+                    Box(
+                        Modifier.fillMaxWidth().padding(horizontal = Space.Page, vertical = Space.Medium)
+                            .clip(RoundedCornerShape(16.dp)).cardFill(paint, RoundedCornerShape(16.dp)),
+                    ) { Text("To the edge", Modifier.padding(Space.Page), color = paint.text) }
                 }
             },
             // A list to rearrange (Nav Bar, Mini Player; issue #701).
