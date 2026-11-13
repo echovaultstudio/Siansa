@@ -124,7 +124,7 @@ fun SettingsHub(nav: NavController) {
     val library by graph.library.status.collectAsStateWithLifecycle()
     val progress by graph.sync.progress.collectAsStateWithLifecycle()
     val health by ServiceHealth.state.collectAsStateWithLifecycle()
-    LaunchedEffect(Unit) { ServiceHealth.refresh(graph) }
+    LaunchedEffect(Unit) { ServiceHealth.refreshInBackground(graph) }
     val users = remember(settings.navidromeUrl, settings.navidromeUser) { Users.all(context) }
     Screen(title = "Settings", nav = nav) { padding ->
         Column(

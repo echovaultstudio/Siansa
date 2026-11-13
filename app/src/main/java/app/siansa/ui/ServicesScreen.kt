@@ -41,6 +41,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineName
+import kotlinx.coroutines.launch
 
 /** What a check of a service found: [ok] null while it hasn't been checked, and a line to show. */
 data class ServiceCheck(val ok: Boolean?, val words: String, val at: Long = System.currentTimeMillis())
@@ -60,6 +63,14 @@ object ServiceHealth {
 
     /** Puts a result in (tests, and a fix made on the page). */
     fun set(id: String, check: ServiceCheck) { _state.value = _state.value + (id to check) }
+
+    /**
+     * Checks in the app's own scope, so leaving the page doesn't cut a check short (the owner, 13 Nov: a page left
+     * while Beats was answering showed it red, "The coroutine scope left the composition", until the next minute).
+     */
+    fun refreshInBackground(graph: AppGraph, force: Boolean = false) {
+        graph.scope.launch(CoroutineName("service-health")) { refresh(graph, force) }
+    }
 
     suspend fun refresh(graph: AppGraph, force: Boolean = false) {
         lock.withLock {
@@ -82,9 +93,11 @@ object ServiceHealth {
         }
     }
 
-    private suspend fun check(id: String, block: suspend () -> String) {
+    internal suspend fun check(id: String, block: suspend () -> String) {
         val result = try {
             ServiceCheck(true, withTimeout(8_000) { block() })
+        } catch (e: CancellationException) {
+            throw e  // the check was called off, not failed: nothing to show
         } catch (e: Exception) {
             AppLog.w("Services", "$id doesn't answer: ${e.message}")
             ServiceCheck(false, e.message?.takeIf { it.isNotBlank() } ?: "Doesn't answer")
@@ -152,7 +165,7 @@ fun ServicesScreen(nav: NavController) {
     val graph = LocalGraph.current
     val settings by graph.settings.state.collectAsStateWithLifecycle()
     val health by ServiceHealth.state.collectAsStateWithLifecycle()
-    LaunchedEffect(Unit) { ServiceHealth.refresh(graph) }
+    LaunchedEffect(Unit) { ServiceHealth.refreshInBackground(graph) }
     Screen(title = "Services", nav = nav) { padding ->
         Column(
             Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState()).padding(Space.Page),

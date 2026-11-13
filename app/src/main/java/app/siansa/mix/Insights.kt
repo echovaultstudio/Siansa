@@ -174,7 +174,7 @@ class Insights(private val graph: AppGraph) {
 
         val navidrome = async {
             runCatching { graph.source.albums("frequent", 500, 0) }
-                .onFailure { AppLog.w("Rediscover", "Navidrome most-played failed: ${it.message}") }
+                .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it; AppLog.w("Rediscover", "Navidrome most-played failed: ${it.message}") }
                 .getOrDefault(emptyList())
                 .let { graph.library.keepSyncedAlbums(it, "Rediscover") }
         }
@@ -190,7 +190,7 @@ class Insights(private val graph: AppGraph) {
                 val old = top(now.minus(730, ChronoUnit.DAYS).epochSecond, cutoff.epochSecond, 100)
                 val recent = top(cutoff.epochSecond, now.epochSecond, 500).map { key(it.artist, it.title.orEmpty()) }.toSet()
                 old.filter { key(it.artist, it.title.orEmpty()) !in recent }
-            }.onFailure { AppLog.w("Rediscover", "$historyFrom history failed: ${it.message}") }.getOrNull()
+            }.onFailure { if (it is kotlinx.coroutines.CancellationException) throw it; AppLog.w("Rediscover", "$historyFrom history failed: ${it.message}") }.getOrNull()
         }
 
         val found = LinkedHashMap<String, Rediscovery>()

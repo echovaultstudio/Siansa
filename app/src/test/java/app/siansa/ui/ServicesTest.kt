@@ -7,6 +7,9 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 
 /** Settings › Services (the owner, 13 Nov): a service switched off is as if it weren't set up; For the best Siansa says what to look at. */
 class ServicesTest {
@@ -55,5 +58,17 @@ class ServicesTest {
         assertEquals(false, lfm.ok)
         assertEquals("Not signed in · 12 listens waiting", lfm.words)
         assertEquals("Signed in as max", ServiceHealth.lastFmCheck(all, 0).words)
+    }
+
+    /** A check called off (the page left while it ran, the owner, 13 Nov) stores nothing: no red "Doesn't answer". */
+    @Test fun aCancelledCheckStoresNothing() = runBlocking<Unit> {
+        val job = launch { ServiceHealth.check("probe") { kotlinx.coroutines.awaitCancellation() } }
+        kotlinx.coroutines.yield()
+        job.cancelAndJoin()
+        assertNull(ServiceHealth.state.value["probe"])
+        // A real failure is stored, with its reason.
+        ServiceHealth.check("probe") { throw java.io.IOException("No route to host") }
+        assertEquals(ServiceCheck(false, "No route to host").words, ServiceHealth.state.value["probe"]?.words)
+        assertEquals(false, ServiceHealth.state.value["probe"]?.ok)
     }
 }
