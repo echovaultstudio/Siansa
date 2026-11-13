@@ -210,7 +210,7 @@ class PlaybackService : MediaLibraryService() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
         // The app's queue changes, and Android Auto's browsing, search and playback (issue #62).
-        val car = CarTree(GraphCarLibrary(graph)) { cover -> CarCoverProvider.uriFor(this, cover) }
+        val car = CarTree(app.siansa.car.CarLibraryOrStandIn(GraphCarLibrary(graph))) { cover -> CarCoverProvider.uriFor(this, cover) }
         session = MediaLibrarySession.Builder(this, player, CarSessionCallback(graph, car))
             .setSessionActivity(openApp)
             .setBitmapLoader(CoverBitmapLoader(this, graph.scope))
