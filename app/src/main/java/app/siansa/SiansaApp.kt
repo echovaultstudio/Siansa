@@ -53,6 +53,11 @@ class SiansaApp : Application(), SingletonImageLoader.Factory {
             override fun onActivityDestroyed(activity: android.app.Activity) = Unit
         })
         Diagnostics.start(this)
+        // The TV keeps little (StorageBudget): say what's there and make room, away from the main thread.
+        if (BuildConfig.TV_APP) graph.scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching { app.siansa.data.TvStorage.tidy(this@SiansaApp) { graph.songCache } }
+                .onFailure { AppLog.w("Storage", "Couldn't check what's kept on the TV: ${it.message}") }
+        }
         // Each start: what the app is running on and with, then why it last closed.
         if (AppLog.enabled) AppLog.i("Session", sessionHeader())
         ExitReasons.logNew(this)
@@ -88,7 +93,8 @@ class SiansaApp : Application(), SingletonImageLoader.Factory {
      * animated album as an animation is what ran the app out of memory.
      */
     override fun newImageLoader(context: PlatformContext): ImageLoader {
-        val mb = graph.settings.current.imageCacheMb
+        // The TV app has no page for the size and keeps far less: what its storage budget gives it (StorageBudget).
+        val mb = if (BuildConfig.TV_APP) app.siansa.data.StorageBudget.ofTv(this).picturesMb else graph.settings.current.imageCacheMb
         imageCacheMbInUse = mb
         val unlimited = mb <= 0
         val bytes = if (unlimited) Long.MAX_VALUE / 4 else mb.coerceAtLeast(50) * 1024L * 1024L
@@ -171,7 +177,8 @@ class SiansaApp : Application(), SingletonImageLoader.Factory {
             "ReplayGain ${s.replayGain.label}",
             // How songs blend, so a DJ session's log says what it was set to (0.52.0-dev).
             "crossfade ${s.crossfade.name.lowercase()} ${s.crossfadeSeconds} s, beat-matched ${s.beatMatch.name.lowercase()}, ${s.blendBars} bars, bass swap ${if (s.bassSwap) "on" else "off"}",
-            "song cache ${mb(s.songCacheMb)}, image cache ${mb(s.imageCacheMb)}",
+            if (BuildConfig.TV_APP) app.siansa.data.StorageBudget.ofTv(this).let { "song cache ${it.songsMb} MB, image cache ${it.picturesMb} MB, animated covers kept ${it.animatedMb} MB" }
+            else "song cache ${mb(s.songCacheMb)}, image cache ${mb(s.imageCacheMb)}",
             "animated covers ${if (s.animatedCovers) "on" else "off"}, download all covers ${if (s.coverDownload) (if (s.coverDownloadAnyWifi) "any Wi-Fi" else "home") else "off"}",
             "scrobbling: " + listOfNotNull("Navidrome".takeIf { s.scrobbleNavidrome }, "Siansa Beats".takeIf { with(app.siansa.net.BeatsListens) { s.scrobbleBeats && s.beatsReady } }, "Last.fm".takeIf { s.lastFmReady }, "ListenBrainz/Koito".takeIf { s.listenBrainzReady }).joinToString(", ").ifEmpty { "off" },
         ).joinToString(" · ")

@@ -4,6 +4,7 @@ import kotlinx.serialization.json.JsonElement
 import app.siansa.net.BeatsHistory
 import app.siansa.net.BeatsApi
 import app.siansa.data.StationRepository
+import app.siansa.data.StorageBudget
 import app.siansa.net.OutsideSource
 import app.siansa.net.WebStationPictures
 import app.siansa.playback.ActivePlayer
@@ -372,6 +373,7 @@ class AppGraph(val app: Application) {
 
     init {
         CoverStore.init(app)
+        if (BuildConfig.TV_APP) CoverStore.maxOriginalBytes = StorageBudget.ofTv(app).animatedMb * 1024L * 1024L
         val songAlbums = java.util.concurrent.ConcurrentHashMap<String, String>()
         CoverStore.albumCoverOfSong = { songCover ->
             songAlbums[songCover] ?: runBlocking { library.albumCoverOfSongCover(songCover) }?.also { songAlbums[songCover] = it }
@@ -408,7 +410,9 @@ class AppGraph(val app: Application) {
      */
     val songCache: SimpleCache by lazy {
         // Off (0) still needs room for the songs loaded ahead, which are removed once played.
-        val megabytes = settings.current.songCacheMb.let { if (it <= 0) 1024 else it.coerceAtLeast(100) }
+        // The TV app has no page for the size and keeps far less: what its storage budget gives it (StorageBudget).
+        val megabytes = if (BuildConfig.TV_APP) StorageBudget.ofTv(app).songsMb
+            else settings.current.songCacheMb.let { if (it <= 0) 1024 else it.coerceAtLeast(100) }
         SimpleCache(
             File(app.cacheDir, "song_cache"),
             LeastRecentlyUsedCacheEvictor(megabytes * 1024L * 1024L),
