@@ -190,14 +190,15 @@ class SpacingHomeTest : SpacingCheck() {
         assertEven("Menu: the room before the button", button.left - pill.right, Space.Small, 0.5.dp)
         val places = listOf("dice", "play_on", "sources", "arrange").map { compose.onNodeWithTag("homeMenu-$it", useUnmergedTree = true).getBoundsInRoot() }
         val circles = compose.onAllNodesWithTag("homeMenuCircle", useUnmergedTree = true).fetchSemanticsNodes()
-        assertTrue("The places' circles are drawn", circles.size == 4)
+        assertTrue("The four pills are drawn", circles.size == 4)
         val width = places[0].right - places[0].left
         places.forEachIndexed { i, p ->
             assertEven("Menu: place $i as wide as the first", p.right - p.left, width, 0.5.dp)
             assertEven("Menu: place $i the pill's height", p.bottom - p.top, pill.bottom - pill.top, 0.5.dp)
         }
-        for (i in 1 until places.size) assertEven("Menu: place $i right after place ${i - 1}", places[i].left, places[i - 1].right, 0.5.dp)
-        assertEven("Menu: the places fill the pill", places.last().right - places.first().left, pill.right - pill.left, 0.5.dp)
+        // A pill each (the owner, 13 Nov): a small step between them, the four filling the chips' room.
+        for (i in 1 until places.size) assertEven("Menu: the gap after place ${i - 1}", places[i].left - places[i - 1].right, Space.Small, 0.5.dp)
+        assertEven("Menu: the pills fill the room", places.last().right - places.first().left, pill.right - pill.left, 0.5.dp)
     }
 
     /** Custom cards (issue #622): the banner sits a page margin from both edges of the screen. */

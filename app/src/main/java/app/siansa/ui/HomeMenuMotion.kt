@@ -1,7 +1,7 @@
 package app.siansa.ui
 
 /*
- * How Home's menu comes into the top row (the owner, 12 Nov): the numbers behind [HomeMenuBar]'s motion, kept apart
+ * How Home's menu comes into the top row (the owner, 12 and 13 Nov): the numbers behind [HomeMenuBar]'s motion, kept apart
  * from the drawing so they can be checked on their own.
  */
 
@@ -9,9 +9,8 @@ package app.siansa.ui
 internal const val MENU_SPRING_DAMPING = 0.82f
 internal const val MENU_SPRING_STIFFNESS = 320f
 
-/** What the menu's places are tinted with, over the blurred chips, fully open; and the hairline round the pill. */
-private const val MENU_PILL_TINT = 0.40f
-internal const val MENU_PILL_EDGE = 0.14f
+/** How far each notice chip shrinks towards its left end as the menu opens (the owner, 13 Nov), before it's gone. */
+private const val CHIP_SHRINK = 0.4f
 
 /** How the places come in: each a little after the one before, over this much of the opening. */
 private const val MENU_PLACES_FROM = 0.15f
@@ -32,6 +31,6 @@ internal fun placeScale(open: Float, index: Int): Float {
     return grown * (if (open > 1f) 1f + (open - 1f) * MENU_OVERSHOOT else 1f)
 }
 
-/** The pill's tint over the chips at [open]: nothing closed, [MENU_PILL_TINT] open. */
-internal fun pillTint(open: Float): Float = MENU_PILL_TINT * open.coerceIn(0f, 1f)
+/** A notice chip's width at [open], as a share of its own: whole closed, [CHIP_SHRINK] less when the menu is open. */
+internal fun chipShrink(open: Float): Float = 1f - CHIP_SHRINK * open.coerceIn(0f, 1f)
 
