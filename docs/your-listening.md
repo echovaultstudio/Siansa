@@ -36,7 +36,7 @@ same faint, see-through white everywhere, so they read on any picture.
 
 ## Scrobbling
 
-**Settings › Scrobbling and history**:
+**Settings › Scrobbling & history**:
 
 - **When a song counts**: once more than the chosen share of it has played (50% by default), or four minutes,
   whichever comes first. Songs under 30 seconds never count. Listens made offline are sent later.

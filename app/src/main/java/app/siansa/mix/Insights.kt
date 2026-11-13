@@ -399,7 +399,7 @@ class Insights(private val graph: AppGraph) {
             rising = rising(artists, prevArtists).map { RankedArtist(it.artist, it.count, findArtist(it.artist)) },
             fading = fading(artists, prevArtists),
             genresUp = genresUp, genresDown = genresDown,
-            source = "From Siansa's own history (scrobble to Siansa Beats or Koito under Scrobbling and history for the full picture)",
+            source = "From Siansa's own history (scrobble to Siansa Beats or Koito under Scrobbling & history for the full picture)",
         )
     }
 
@@ -489,7 +489,7 @@ class Insights(private val graph: AppGraph) {
         val finished = periodFinished(window, LocalDate.now())
         val times = java.util.concurrent.ConcurrentHashMap<String, String>()
         if (sources.isEmpty()) {
-            send(fromHistory(window, fromSec, toSec, limit, "Scrobble to Siansa Beats, Koito or Last.fm under Scrobbling and history for your full history", complete = true))
+            send(fromHistory(window, fromSec, toSec, limit, "Scrobble to Siansa Beats, Koito or Last.fm under Scrobbling & history for your full history", complete = true))
             return@channelFlow
         }
         val got = java.util.concurrent.ConcurrentHashMap<String, List<Played>>()

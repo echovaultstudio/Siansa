@@ -111,6 +111,9 @@ class Scrobbler(
             .onFailure { AppLog.d("Scrobble", "No album artist for ${song.title}: ${it.message}") }.getOrNull()
 
     /** Sends every waiting listen, oldest first; whatever still fails stays for next time. */
+    /** Listens still waiting to be sent to Last.fm or ListenBrainz (shown under Settings › Services). */
+    suspend fun pendingCount(): Int = pending.read().size
+
     suspend fun flush() = flushLock.withLock {
         val queue = pending.read()
         if (queue.isEmpty()) return@withLock

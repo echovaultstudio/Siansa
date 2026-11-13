@@ -386,11 +386,11 @@ class ShowcaseTest {
                 shot("library-grid")
                 compose.onAllNodesWithContentDescription("Show as list").onFirst().performClick()
             }
-            step("style") {
+            step("services") {
                 tab("Settings")
-                click("Style")
+                compose.onNodeWithTag("hubManage").performClick()
                 idle(2000)
-                shot("style")
+                shot("services")
                 back()
             }
             step("settings") {

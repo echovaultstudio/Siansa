@@ -53,6 +53,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.material3.HorizontalDivider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import app.siansa.log.AppLog
@@ -92,7 +93,7 @@ fun ThemesScreen(nav: NavController) {
         )
     }
 
-    Screen(title = "Themes", nav = nav) { padding ->
+    Screen(title = "Theme", nav = nav) { padding ->
         Column(Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState())) {
             ThemePreview(Modifier.padding(horizontal = Space.Page, vertical = Space.Small))
 
@@ -173,8 +174,33 @@ fun ThemesScreen(nav: NavController) {
                 "Buttons, hearts, the playing song, and anything that's on. It gets darker or lighter where it needs to stand out.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = Space.Page, end = Space.Page, top = SWATCH_GAP, bottom = Space.Section),
+                modifier = Modifier.padding(start = Space.Page, end = Space.Page, top = SWATCH_GAP),
             )
+            // Dynamic colours, the status bar and animated covers (the owner, 13 Nov: from Style, which is gone): how
+            // the app looks, all on one page. The TV has no status bar and plays covers on the TV itself (issue #860).
+            Column(Modifier.padding(start = Space.Page, end = Space.Page, top = Space.Section, bottom = Space.Section), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
+                FoldSection("Dynamic colours", if (settings.dynamicColours) "On" else "Off") {
+                    SwitchRow("Dynamic colours", settings.dynamicColours) { on ->
+                        AppLog.i("Style", "Dynamic colours ${if (on) "on" else "off"}")
+                        graph.settings.setDynamicColours(on)
+                    }
+                    Hint("Now playing and the album, artist and playlist pages take a soft colour from the cover, or from the artist's picture, always easy to see. On an artist's page, only Play.")
+                }
+                if (!app.siansa.BuildConfig.TV_APP) {
+                    HorizontalDivider()
+                    FoldSection("Status bar", settings.topBar.label) {
+                        TopBarChoice(settings.topBar, edge = 0.dp) {
+                            AppLog.i("Style", "Status bar: ${it.name.lowercase()}")
+                            graph.settings.setTopBar(it)
+                        }
+                    }
+                }
+                HorizontalDivider()
+                FoldSection("Animated covers", if (settings.animatedCovers) "On" else "Off") {
+                    SwitchRow("Animated covers", settings.animatedCovers) { on -> graph.settings.setAnimatedCovers(on) }
+                    Hint("When an album folder has an animated cover (cover.gif or cover.webp), it moves on the album page and in now playing; lists show its first frame. Your server may not shrink an animated WebP (Navidrome can't), so it's downloaded once in full and kept on the phone.")  // server-name: ok (an example of a server that can't)
+                }
+            }
         }
     }
 }

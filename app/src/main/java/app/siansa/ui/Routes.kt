@@ -48,22 +48,28 @@ fun NavGraphBuilder.siansaRoutes(nav: NavController, except: Set<String> = empty
     page("welcome") { SourcePickerScreen(nav) }
     page("welcome/extras/{source}") { SmartExtrasScreen(nav, it.arguments?.getString("source").orEmpty()) }
     page("settings/users") { ConnectionsHub(nav, open = "server") }
-    page("settings/playback") { PlaybackSettingsScreen(nav) }
-    page("settings/themes") { ThemesScreen(nav) }
-    page("settings/style") { StyleScreen(nav) }
-    page("settings/style/now-playing") { NowPlayingStyleScreen(nav) }
-    page("settings/style/mini-player") { MiniPlayerStyleScreen(nav) }
-    page("settings/style/nav-bar") { NavBarStyleScreen(nav) }
-    page("settings/style/home") { HomeStyleScreen(nav) }
-    page("settings/style/home-menu") { HomeMenuStyleScreen(nav) }
-    page("settings/style/dj-bar") { DjBarStyleScreen(nav) }
-    page("settings/equaliser") { EqualiserScreen(nav) }
+    page("settings/connections/{open}") { ConnectionsHub(nav, open = it.arguments?.getString("open")) }
+    // Settings regrouped (the owner, 13 Nov): Services, a search, and twelve pages. Old addresses still lead somewhere.
+    page("settings/services") { ServicesScreen(nav) }
+    page("settings/find") { SettingsSearchScreen(nav) }
+    page("settings/sound") { CrossfadeScreen(nav) }
+    page("settings/playback") { CrossfadeScreen(nav) }
     page("settings/crossfade") { CrossfadeScreen(nav) }
-    // Storage became Streaming and data (issue #780); the old address opens it.
+    page("settings/radios") { RadiosScreen(nav) }
+    page("settings/themes") { ThemesScreen(nav) }
+    page("settings/style") { ThemesScreen(nav) }
+    page("settings/now-playing") { NowPlayingStyleScreen(nav) }
+    page("settings/style/now-playing") { NowPlayingStyleScreen(nav) }
+    page("settings/style/mini-player") { NowPlayingStyleScreen(nav) }
+    page("settings/style/dj-bar") { NowPlayingStyleScreen(nav) }
+    page("settings/bottom-bar") { NavBarStyleScreen(nav) }
+    page("settings/style/nav-bar") { NavBarStyleScreen(nav) }
+    page("settings/style/home") { HomeSettingsScreen(nav) }
+    page("settings/style/home-menu") { HomeSettingsScreen(nav) }
+    page("settings/equaliser") { EqualiserScreen(nav) }
     page("settings/storage") { StreamingDataScreen(nav) }
     page("settings/streaming") { StreamingDataScreen(nav) }
-    // The book player's skips are under Playback now (v1.0); the old address still leads there.
-    page("settings/books") { PlaybackSettingsScreen(nav) }
+    page("settings/books") { BooksSettingsScreen(nav) }
     page("settings/home") { HomeSettingsScreen(nav) }
     page("settings/home/notices") { NoticesSettingsScreen(nav) }
     page("downloads") { DownloadsScreen(nav) }

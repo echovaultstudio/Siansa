@@ -166,8 +166,8 @@ class SpacingSettingsTest : SpacingCheck() {
         app.siansa.ui.FoldMemory.setFolded(context, "radio", false)
     }
 
-    /** Settings › Data › Image cache (issue #780, moved from Storage; in Data since v1.0): the size chips sit evenly between their label and Clear. */
-    @Test fun imageCacheChipsAreEvenlySpaced() {
+    /** Settings › Streaming & storage › Image cache (the owner, 13 Nov: a slider): the slider sits evenly between its label and Clear. */
+    @Test fun imageCacheSliderIsEvenlySpaced() {
         val graph = (androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as SiansaApp).graph
         compose.setContent {
             androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalGraph provides graph) {
@@ -180,11 +180,13 @@ class SpacingSettingsTest : SpacingCheck() {
         // for it, or it can land between two of the readings below (48 dp above but 12 below, issue #800).
         compose.waitUntil(5_000) { compose.onAllNodes(androidx.compose.ui.test.hasText("In use", substring = true)).fetchSemanticsNodes().isNotEmpty() }
         compose.waitForIdle()
-        // By their tags: the row of chips scrolls sideways, so one chip's bounds can be off to the side.
         val label = compose.onNodeWithTag("imageCacheLabel").getBoundsInRoot()
-        val chips = compose.onNodeWithTag("imageCacheChips").getBoundsInRoot()
+        val slider = compose.onNodeWithTag("imageCacheSlider").getBoundsInRoot()
         val clear = compose.onNodeWithTag("imageCacheClear").getBoundsInRoot()
-        assertEven("Image cache chips", chips.top - label.bottom, clear.top - chips.bottom)
+        assertEven("Image cache slider", slider.top - label.bottom, clear.top - slider.bottom)
+        // The size beside the slider is centred on it.
+        val size = compose.onNodeWithTag("imageCacheSize").getBoundsInRoot()
+        assertEven("Image cache size against its slider", size.top - slider.top, slider.bottom - size.bottom, 1.dp)
     }
 
     /** Beat-matched blends (issue #759): the 4 / 8 / 16 bars chips sit evenly between "Blend length" and their hint. */
@@ -234,14 +236,14 @@ class SpacingSettingsTest : SpacingCheck() {
         assertEven("API key hint", hint.top - password.bottom, key.top - hint.bottom)
     }
 
-    /** Style › Phone's top bar (issue #681): its chips sit evenly between the heading and the hint. */
+    /** Theme › Status bar (issue #681; a fold since 13 Nov): its chips sit evenly between the lead line and the hint. */
     @Test fun topBarChipsAreEvenlySpaced() {
         compose.setContent {
             SiansaTheme {
                 app.siansa.ui.TopBarChoice(app.siansa.data.TopBarStyle.BLACK) { }
             }
         }
-        val title = compose.onNodeWithText("Phone's top bar").getBoundsInRoot()
+        val title = compose.onNodeWithText("The clock and battery at the top of the screen.").getBoundsInRoot()
         val chips = compose.onNodeWithTag("topBar-HIDDEN").getBoundsInRoot()
         val hint = compose.onNodeWithText(app.siansa.data.TopBarStyle.BLACK.hint).getBoundsInRoot()
         assertEven("Top bar chips", chips.top - title.bottom, hint.top - chips.bottom)
@@ -328,39 +330,59 @@ class SpacingSettingsTest : SpacingCheck() {
         gaps.forEach { assertEven("Arrange rows", gaps[0], it, 1.dp) }
     }
 
-    /** Settings (issue #375): every entry is just its name, so each row is the same height. */
-    @Test fun settingsRowsAreOneHeight() {
+    /** Settings (the owner, 13 Nov): every tile is one height, the two in a row a small step apart, the rows the same. */
+    @Test fun settingsTilesAreOneHeightAndEvenlySpaced() {
         compose.setContent {
             SiansaTheme {
-                Column {
-                    HubRow(Icons.Rounded.Palette, "Style") { }
-                    HubRow(Icons.Rounded.Storage, "Storage") { }
+                Column(Modifier.padding(Space.Page)) {
+                    app.siansa.ui.HubTiles(listOf(
+                        app.siansa.ui.HubTile(Icons.Rounded.Palette, "Sound", "a"),
+                        app.siansa.ui.HubTile(Icons.Rounded.Palette, "Radios & mixes", "b"),
+                        app.siansa.ui.HubTile(Icons.Rounded.Palette, "Streaming & storage", "c"),
+                        app.siansa.ui.HubTile(Icons.Rounded.Palette, "Audiobooks & podcasts", "d"),
+                    )) { }
                 }
             }
         }
-        val rows = compose.onAllNodesWithTag("hubRow").fetchSemanticsNodes().map { it.boundsInRoot }
-        assertEquals(2, rows.size)
-        assertEven("Settings rows", with(compose.density) { rows[0].height.toDp() }, with(compose.density) { rows[1].height.toDp() }, 1.dp)
+        val tiles = compose.onAllNodesWithTag("hubTile").fetchSemanticsNodes().map { it.boundsInRoot }
+        assertEquals(4, tiles.size)
+        fun dp(px: Float) = with(compose.density) { px.toDp() }
+        tiles.forEach { assertEven("Tile heights", dp(tiles[0].height), dp(it.height), 1.dp) }
+        assertEven("Tile widths", dp(tiles[0].width), dp(tiles[1].width), 1.dp)
+        assertEven("Gap between the two tiles of a row", dp(tiles[1].left - tiles[0].right), Space.Small, 1.dp)
+        assertEven("Gap between rows", dp(tiles[2].top - tiles[0].bottom), Space.Small, 1.dp)
+        assertEven("The rows line up", dp(tiles[2].left), dp(tiles[0].left), 1.dp)
     }
 
-    /** Settings' groups (issue #780): each group's label sits the same distance above its first row, and its left edge
-     *  lines up with the rows' page margin. */
-    @Test fun settingsGroupLabelsSitEvenlyOverTheirRows() {
+    /**
+     * Settings' services (the owner, 13 Nov): the tiles are one height and a small step apart, a lone last one spans
+     * the row, and the card's margin above its label is the margin below its tiles (Manage is no taller than the label).
+     */
+    @Test fun settingsServiceTilesAreEven() {
+        val s = app.siansa.data.AppSettings(
+            navidromeUrl = "https://music.example", navidromeUser = "max", navidromePassword = "x",
+            beatsUrl = "http://beats:8090", audiobookshelfUrl = "http://abs", audiobookshelfToken = "t",
+            lastFmEnabled = true, lastFmApiKey = "k", lastFmSecret = "s",
+        )
         compose.setContent {
             SiansaTheme {
-                Column {
-                    app.siansa.ui.HubGroup("Sources", first = true)
-                    HubRow(Icons.Rounded.Palette, "Connections") { }
-                    app.siansa.ui.HubGroup("Look")
-                    HubRow(Icons.Rounded.Palette, "Style") { }
+                Column(Modifier.padding(Space.Page)) {
+                    app.siansa.ui.ServicesCard(s, mapOf("beats" to app.siansa.ui.ServiceCheck(true, "Connected"), "lastfm" to app.siansa.ui.ServiceCheck(false, "Not signed in"))) { }
                 }
             }
         }
-        val labels = compose.onAllNodesWithTag("hubGroup").fetchSemanticsNodes().map { it.boundsInRoot }
-        val rows = compose.onAllNodesWithTag("hubRow").fetchSemanticsNodes().map { it.boundsInRoot }
-        fun dp(px: Float) = with(compose.density) { px.toDp() }
-        assertEven("Label to its row", dp(rows[0].top - labels[0].bottom), dp(rows[1].top - labels[1].bottom), 1.dp)
-        assertTrue("A group stands apart from the row above it", dp(labels[1].top - rows[0].bottom) > dp(rows[1].top - labels[1].bottom))
+        val beats = compose.onNodeWithTag("hubService-beats").getBoundsInRoot()
+        val books = compose.onNodeWithTag("hubService-books").getBoundsInRoot()
+        val lastfm = compose.onNodeWithTag("hubService-lastfm").getBoundsInRoot()
+        assertEven("Service tile heights", beats.bottom - beats.top, books.bottom - books.top, 1.dp)
+        assertEven("Service tile widths", beats.right - beats.left, books.right - books.left, 1.dp)
+        assertEven("Gap between service tiles", books.left - beats.right, Space.Small, 1.dp)
+        assertEven("Gap between service rows", lastfm.top - beats.bottom, Space.Small, 1.dp)
+        // Three services: the last tile spans the row.
+        assertEven("A lone tile spans the row", lastfm.right, books.right, 1.dp)
+        val card = compose.onNodeWithTag("hubServices").getBoundsInRoot()
+        val label = compose.onNodeWithText("SERVICES").getBoundsInRoot()
+        assertEven("The card's margins", label.top - card.top, card.bottom - lastfm.bottom, Space.Tight)
     }
 
     /** First run (issue #113): every source in the picker is one row height, the text centred against its icon. */
