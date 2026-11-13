@@ -68,7 +68,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import app.siansa.data.MiniButton
 import androidx.compose.material.icons.rounded.Reorder
-import androidx.compose.material.icons.rounded.LibraryMusic
+import androidx.compose.material.icons.rounded.Sync
 import androidx.compose.material.icons.rounded.FilterList
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Casino
@@ -355,7 +355,7 @@ internal fun ShortcutCountRow(count: Int, edge: androidx.compose.ui.unit.Dp = Sp
 internal fun HomeMenuItem.icon(): ImageVector = when (this) {
     HomeMenuItem.DICE -> Icons.Rounded.Casino
     HomeMenuItem.PLAY_ON -> Icons.Rounded.Cast
-    HomeMenuItem.SOURCES -> Icons.Rounded.LibraryMusic
+    HomeMenuItem.SOURCES -> Icons.Rounded.Sync
     HomeMenuItem.ARRANGE -> Icons.Rounded.Reorder
 }
 

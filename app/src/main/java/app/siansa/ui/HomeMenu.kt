@@ -24,7 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Cast
 import androidx.compose.material.icons.rounded.CastConnected
 import androidx.compose.material.icons.rounded.FilterList
-import androidx.compose.material.icons.rounded.LibraryMusic
+import androidx.compose.material.icons.rounded.Sync
 import androidx.compose.material.icons.rounded.Reorder
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -355,7 +355,8 @@ fun HomeMenuBar(
                     if (info.playOn.active) Icons.Rounded.CastConnected else Icons.Rounded.Cast,
                     "Play on… " + (if (info.playOn.active) info.playOn.title else "TV or speaker"), info.playOn.active,
                 )
-                HomeMenuItem.SOURCES -> Triple(Icons.Rounded.LibraryMusic, "Sources: ${info.sources}", info.filterActive)
+                // The circle of arrows Sync all uses (the owner, 13 Nov): Sources is where the servers are synced from.
+                HomeMenuItem.SOURCES -> Triple(Icons.Rounded.Sync, "Sources: ${info.sources}", info.filterActive)
                 HomeMenuItem.ARRANGE -> Triple(Icons.Rounded.Reorder, "Arrange Home", false)
             }
             Box(

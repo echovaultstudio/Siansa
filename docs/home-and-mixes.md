@@ -19,7 +19,7 @@ Settings › Home page › Home menu). Nothing on the page is covered, and nothi
 - **Play on…** (the cast mark) opens the list of TVs and speakers to play on: Chromecast, Google TV, Cast speakers and
   DLNA ones. While something plays on one, its circle has a ring in the accent colour (amber unless you picked another
   in Themes) and the menu button has a small dot in the same colour; to stop, open Play on… and pick **This phone**.
-- **Sources** (the library mark) opens the Sources sheet. Its circle has a ring in the accent colour while the
+- **Sources** (the circle of arrows, as on Sync all) opens the Sources sheet. Its circle has a ring in the accent colour while the
   filter hides something.
 - **Arrange Home** (the three lines) opens Arrange, for the order and looks of Home's sections.
 
