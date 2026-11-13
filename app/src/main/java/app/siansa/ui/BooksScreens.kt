@@ -228,14 +228,15 @@ private val CARD_COVER_WIDTH = 100.dp
 @Composable
 private fun BookCard(book: Book, progress: BookProgress?, label: String, onOpen: () -> Unit) {
     val graph = LocalGraph.current
-    val colors = tileColors("book-${book.id}")
+    // In the look chosen for Home's cards (the owner, 13 Nov): its own colours, softened, plain, or the cover's.
+    val paint = cardPaint(tileColors("book-${book.id}"), book.cover, "book-${book.id}")
     val chapter = progress?.let { book.chapterAt(it.currentSec) }
     Box(
         Modifier
             .fillMaxWidth()
             .height(180.dp)
             .clip(RoundedCornerShape(16.dp))
-            .background(Brush.linearGradient(listOf(colors.first, colors.second)))
+            .cardFill(paint, RoundedCornerShape(16.dp))
             .clickable(onClick = onOpen)
             .testTag("bookCard"),
     ) {
@@ -258,7 +259,7 @@ private fun BookCard(book: Book, progress: BookProgress?, label: String, onOpen:
         // The words start a page's gap after the cover, which sits a page's gap in: the cover's width plus both.
         Column(Modifier.align(Alignment.TopStart).padding(start = CARD_COVER_WIDTH + Space.Page + Space.Page, top = Space.Page, end = Space.Page)) {
             Text(label.uppercase(), style = MaterialTheme.typography.labelSmall, color = Accent, fontWeight = FontWeight.Bold)
-            WholeWordsText(book.title, MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold), color = Color.White, maxLines = 2)
+            WholeWordsText(book.title, MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold), color = paint.text, maxLines = 2)
             Text(
                 listOfNotNull(
                     book.author.takeIf { it.isNotBlank() },
@@ -266,20 +267,20 @@ private fun BookCard(book: Book, progress: BookProgress?, label: String, onOpen:
                     chapter?.let { "Chapter ${it.index + 1} of ${book.chapters.size}" },
                 ).joinToString("\n"),
                 style = MaterialTheme.typography.bodySmall,
-                color = Color.White.copy(alpha = 0.85f),
+                color = paint.faint,
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
             )
         }
         if (progress?.started == true && !progress.finished) {
             Column(Modifier.align(Alignment.BottomStart).padding(start = CARD_COVER_WIDTH + Space.Page + Space.Page, end = Space.Page, bottom = Space.Page)) {
-                Text("${bookLength(progress.leftSec)} left", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.85f))
+                Text("${bookLength(progress.leftSec)} left", style = MaterialTheme.typography.bodySmall, color = paint.faint)
                 Spacer(Modifier.height(Space.Tight))
                 LinearProgressIndicator(
                     progress = { progress.fraction.toFloat() },
                     modifier = Modifier.fillMaxWidth().height(4.dp), // spacing: exact (a hairline bar)
                     color = Accent,
-                    trackColor = Color.White.copy(alpha = 0.2f),
+                    trackColor = paint.text.copy(alpha = 0.2f),
                 )
             }
         }

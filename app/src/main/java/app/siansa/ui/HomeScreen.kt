@@ -74,6 +74,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import app.siansa.AppGraph
 import app.siansa.data.Album
+import app.siansa.data.CardLook
 import app.siansa.data.HomeLook
 import app.siansa.data.HomeMenuItem
 import app.siansa.data.HomeSection
@@ -321,6 +322,8 @@ fun HomeScreen(nav: NavController) {
 
         // The rest in the order chosen under Arrange Home, without the hidden ones, each in its look (issue #655).
         val visibleSections = HomeSection.visible(homeOrder, homeHidden)
+        // Its cards' look (the owner, 13 Nov): its own, or Home's; the shortcut grid keeps its plain tiles.
+        fun cardLookOf(section: HomeSection) = if (section == HomeSection.QUICK) CardLook.VIVID else homeSettings.homeCardLooks[section] ?: homeSettings.homeCardLook
         for (section in visibleSections) {
             val look = homeSettings.homeLooks[section] ?: HomeLook.AS_IS
             when (section) {
@@ -331,7 +334,7 @@ fun HomeScreen(nav: NavController) {
                     // Quick access, the top grid (issue #271): what you played last, newest first, as
                     // many as Settings › Style › Home says (issue #934); until there's enough of that, today's mixes,
                     // playlists and recent albums. Liked songs is one of them only when you played it.
-                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, key = "quick") {
+                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "quick") {
                         val mixIds = mixes.orEmpty().mapTo(HashSet()) { it.id }
                         val fill = buildList {
                             todaysMixes.take(2).forEach { m -> add(RecentPlay("mix/${m.id}", m.title, m.songs.firstOrNull()?.cover)) }
@@ -374,7 +377,7 @@ fun HomeScreen(nav: NavController) {
                     }
                 }
                 HomeSection.TODAY -> {
-                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, key = "today") {
+                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "today") {
                         val mix = current
                         when {
                             mix != null && look != HomeLook.AS_IS -> HomeLookRow(
@@ -409,7 +412,7 @@ fun HomeScreen(nav: NavController) {
                     // While AudioMuse can't be reached the card above says so; no error and Try again as well. Without
                     // AudioMuse at all there's no today's mix (issue #486).
                     error?.takeIf { aiDown == null && aiMixes }?.let { message ->
-                        titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, key = "today_error") {
+                        titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "today_error") {
                             Column(Modifier.padding(horizontal = Space.Page)) {
                                 ErrorText(message, Modifier)
                                 TextButton(onClick = { build(null, force = false, open = false) }) { Text("Try again") }
@@ -420,14 +423,14 @@ fun HomeScreen(nav: NavController) {
                 HomeSection.CAROUSEL -> {
                     // Your own mixes for this part of the day, set in Vibes (issue #253): AI mixes, so only with
                     // AudioMuse (issue #486).
-                    if (homeSettings.navidromeReady && aiMixes) titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, key = "carousel") { HomeCarousel(nav, aiDown, look) }
+                    if (homeSettings.navidromeReady && aiMixes) titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "carousel") { HomeCarousel(nav, aiDown, look) }
                 }
                 // Audiobookshelf's books and podcasts (issue #521): only with a server set up.
-                HomeSection.BOOKS -> if (homeSettings.booksReady) titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, key = "books") { BooksCarousel(nav, podcasts = false, look = look) }
-                HomeSection.PODCASTS -> if (homeSettings.booksReady) titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, key = "podcasts") { BooksCarousel(nav, podcasts = true, look = look) }
+                HomeSection.BOOKS -> if (homeSettings.booksReady) titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "books") { BooksCarousel(nav, podcasts = false, look = look) }
+                HomeSection.PODCASTS -> if (homeSettings.booksReady) titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "podcasts") { BooksCarousel(nav, podcasts = true, look = look) }
                 HomeSection.MADE_FOR_YOU -> {
                     // Made for you: the vibe for this hour, then mixes from your own listening.
-                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, key = "made") {
+                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "made") {
                         // The same tiles as plain items, for the other looks (issue #655).
                         val made: List<HomeItem> = buildList {
                             applicable.filter { aiMixes }.forEach { selector ->
@@ -497,12 +500,12 @@ fun HomeScreen(nav: NavController) {
                 HomeSection.CARDS -> {
                     // Your cards (issue #622), in the order set in Settings › Notices and Cards › Cards; each is its own row.
                     pinnedCards.orEmpty().filter { it.shown }.forEach { card ->
-                        titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, key = "pinned-${card.id}") { PinnedCardSection(nav, card, aiDown) }
+                        titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "pinned-${card.id}") { PinnedCardSection(nav, card, aiDown) }
                     }
                 }
                 HomeSection.REDISCOVER -> {
                     // Albums you loved a while ago but haven't played since.
-                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, key = "rediscover") {
+                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "rediscover") {
                         val albums = lovedBefore.valueOrNull().orEmpty()
                         if (look != HomeLook.AS_IS) {
                             HomeLookRow(look, "rediscover", "Rediscover", albums.map { r -> albumItem(r.album, rediscoverSubtitle(r), play = { playAlbums(r.album.name, listOf(r.album)) }) { nav.navigate("album/${r.album.id}") } },
@@ -519,7 +522,7 @@ fun HomeScreen(nav: NavController) {
                     }
                 }
                 HomeSection.RADIOS -> {
-                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, key = "radios") {
+                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "radios") {
                         if (look != HomeLook.AS_IS) {
                             HomeLookRow(look, "radios", "Radios", moodRadios.map { radio ->
                                 HomeItem(radio.id, radio.name, colors = Color(radio.colors.first) to Color(radio.colors.second), open = { nav.openMoodRadio(radio.id) })
@@ -536,7 +539,7 @@ fun HomeScreen(nav: NavController) {
                     }
                 }
                 HomeSection.PLAYLISTS -> {
-                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, key = "playlists") {
+                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "playlists") {
                         if (look != HomeLook.AS_IS) {
                             HomeLookRow(look, "playlists", "Your playlists", playlists.valueOrNull().orEmpty().map { p ->
                                 HomeItem(p.id, p.name, if (p.songCount > 0) "${p.songCount} songs" else "", p.coverArt, open = { nav.navigate("playlist/${p.id}") })
@@ -547,7 +550,7 @@ fun HomeScreen(nav: NavController) {
                     }
                 }
                 HomeSection.RECENT -> {
-                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, key = "recent") {
+                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "recent") {
                         val albums = recentAlbums.valueOrNull().orEmpty()
                         if (look != HomeLook.AS_IS) {
                             HomeLookRow(look, "recent", "Recently played", albums.map { a -> albumItem(a, a.artist, play = { playAlbums(a.name, listOf(a)) }) { nav.navigate("album/${a.id}") } },
@@ -558,7 +561,7 @@ fun HomeScreen(nav: NavController) {
                     }
                 }
                 HomeSection.ARTIST_RADIOS -> {
-                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, key = "artist_radios") {
+                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "artist_radios") {
                         if (look != HomeLook.AS_IS) {
                             HomeLookRow(look, "artist_radios", "Artist radios", recentArtists.valueOrNull().orEmpty().map { artist ->
                                 HomeItem(artist.id, "${artist.name} radio", "With similar artists", freshCovers[artist.id] ?: artist.coverArt, round = true, open = {
@@ -580,7 +583,7 @@ fun HomeScreen(nav: NavController) {
                     }
                 }
                 HomeSection.ADDED -> {
-                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, key = "added") {
+                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "added") {
                         val albums = newest.valueOrNull().orEmpty()
                         if (look != HomeLook.AS_IS) {
                             HomeLookRow(look, "added", "Recently added", albums.map { a -> albumItem(a, a.artist, play = { playAlbums(a.name, listOf(a)) }) { nav.navigate("album/${a.id}") } },
@@ -591,7 +594,7 @@ fun HomeScreen(nav: NavController) {
                     }
                 }
                 HomeSection.GENRES -> {
-                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, key = "genres") {
+                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "genres") {
                         if (look != HomeLook.AS_IS) {
                             HomeLookRow(look, "genres", "Your genres", genres.orEmpty().map { genre ->
                                 HomeItem(genre.name, genre.name, open = { nav.openGenreRadio(genre.name) })
@@ -608,7 +611,7 @@ fun HomeScreen(nav: NavController) {
                     }
                 }
                 HomeSection.RANDOM -> {
-                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, key = "random") {
+                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "random") {
                         val albums = rediscover.valueOrNull().orEmpty()
                         if (look != HomeLook.AS_IS) {
                             HomeLookRow(look, "random", "Random picks", albums.map { a -> albumItem(a, a.artist, play = { playAlbums(a.name, listOf(a)) }) { nav.navigate("album/${a.id}") } },
@@ -719,14 +722,16 @@ private fun HeroMix(
     /** The song Play carries on from, when the mix was left part-way (issue #269). */
     resume: Song? = null,
 ) {
-    val colors = tileColors(mix.selectorId)
+    // Painted in the look chosen for Home's cards (the owner, 13 Nov), from the mix's own colours or its first cover.
+    val paint = cardPaint(tileColors(mix.selectorId), mix.songs.firstOrNull()?.cover, "heroMix")
+    val white = paint.text
     Box(
         Modifier
             .fillMaxWidth()
             // Panels on Home keep a little more room around them (issue #312).
             .padding(horizontal = Space.Page, vertical = Space.Medium)
             .clip(RoundedCornerShape(16.dp))
-            .background(Brush.linearGradient(listOf(colors.first, colors.second)))
+            .cardFill(paint, RoundedCornerShape(16.dp))
             .clickable(onClick = onOpen),
     ) {
         Column(Modifier.padding(Space.Page)) {
@@ -736,16 +741,16 @@ private fun HeroMix(
                 Column(Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         if (mix.aiNamed) {
-                            Icon(Icons.Rounded.AutoAwesome, null, Modifier.size(14.dp), tint = Color.White)
+                            Icon(Icons.Rounded.AutoAwesome, null, Modifier.size(14.dp), tint = white)
                             Spacer(Modifier.width(Space.Tight))
                         }
-                        Text("Today's mix", style = MaterialTheme.typography.labelLarge, color = Color.White.copy(alpha = 0.85f))
+                        Text("Today's mix", style = MaterialTheme.typography.labelLarge, color = paint.faint)
                     }
-                    WholeWordsText(mix.title, MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.ExtraBold), color = Color.White, maxLines = 3)
+                    WholeWordsText(mix.title, MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.ExtraBold), color = white, maxLines = 3)
                     Text(
                         if (resume != null) "${mix.songs.size} tracks · Play carries on from ${resume.title}" else "${mix.songs.size} tracks",
                         style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.85f),
+                        color = paint.faint,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -753,17 +758,17 @@ private fun HeroMix(
             }
             if (mix.description.isNotBlank()) {
                 Spacer(Modifier.height(Space.Medium))
-                Text(mix.description, style = MaterialTheme.typography.bodyMedium, color = Color.White)
+                Text(mix.description, style = MaterialTheme.typography.bodyMedium, color = white)
             }
             Spacer(Modifier.height(Space.Medium))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (busy) {
-                    CircularProgressIndicator(Modifier.size(24.dp), color = Color.White, strokeWidth = 2.dp)
+                    CircularProgressIndicator(Modifier.size(24.dp), color = white, strokeWidth = 2.dp)
                 } else {
-                    IconButton(onClick = onRegenerate) { Icon(Icons.Rounded.Refresh, "Make a new mix", tint = Color.White) }
+                    IconButton(onClick = onRegenerate) { Icon(Icons.Rounded.Refresh, "Make a new mix", tint = white) }
                 }
                 Spacer(Modifier.weight(1f))
-                IconButton(onClick = onShuffle) { Icon(Icons.Rounded.Shuffle, "Shuffle", tint = Color.White) }
+                IconButton(onClick = onShuffle) { Icon(Icons.Rounded.Shuffle, "Shuffle", tint = white) }
                 // ⏸ while this mix plays: a tap pauses it, or plays on (#562).
                 val graph = LocalGraph.current
                 val card = rememberCardPlay(mix.songs)
@@ -935,7 +940,9 @@ internal fun androidx.compose.foundation.lazy.LazyListScope.titledItem(
     key: Any,
     // Tiles of the row when it's set to the shortcut grid (the owner, 10 Nov).
     gridSize: Int = GRID_LOOK_MOST,
+    // How its coloured cards are painted (the owner, 13 Nov).
+    cardLook: CardLook = CardLook.VIVID,
     content: @Composable androidx.compose.foundation.lazy.LazyItemScope.() -> Unit,
 ) = item(key = key) {
-    androidx.compose.runtime.CompositionLocalProvider(LocalSectionTitleShown provides titleShown, LocalGridSize provides gridSize) { content() }
+    androidx.compose.runtime.CompositionLocalProvider(LocalSectionTitleShown provides titleShown, LocalGridSize provides gridSize, LocalCardLook provides cardLook) { content() }
 }

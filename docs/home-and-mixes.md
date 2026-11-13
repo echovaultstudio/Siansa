@@ -32,9 +32,22 @@ Their order is yours: **Settings › Style › Home Menu**, hold a row and drag 
 
 ## Arrange Home
 
-Arrange is a sheet of its own (the Sources sheet is another): a row per section, with the handle at the left to move it,
-the eye to hide it and the cog for its look. Arrange's **Spacing** slider sets the gap between every section at once, from Tight to Airy; **Reset** puts the order,
-the hidden sections, the spacing and the looks back.
+Arrange is a sheet of its own (the Sources sheet is another), in three parts: **Cards**, **Spacing** and **Sections**.
+
+**Cards** is how every coloured card on Home is painted — Today's mix, the book and podcast cards, Made for you,
+Radios and the other generated tiles; never the shortcut grid, whose tiles are plain already. Four small cards show
+the choice:
+
+| Look | What it does |
+|---|---|
+| **Vivid** | Each card in its own full colour (the default). |
+| **Soft** | The same colours at a third of their strength over the dark surface: the card keeps its colour, the page keeps its calm. |
+| **Plain** | Every card the same grey as the shortcut tiles; colour only in the artwork and the play button. |
+| **From the artwork** | A muted colour taken from the card's own artwork, as the listening pages' headers do; a card without artwork is painted soft. |
+
+**Spacing** sets the gap between every section at once, from Tight to Airy. **Sections** is a row per section, with
+the handle at the left to move it, the eye to hide it and the cog for its look. **Reset** puts the order, the hidden
+sections, the spacing, the looks and the cards' colour back.
 
 The **cog** on a section changes its look, to any of the custom cards' looks:
 
@@ -54,7 +67,8 @@ added and Random picks in order. Sections of radios, playlists, genres, books an
 cards** keep their own looks: their cog opens **Settings › Notices and Cards › Cards**.
 
 The same cog has **Show its title**: turn it off and the section shows without the heading above it ("Your evening",
-"Recently played"), keeping the gap where it was.
+"Recently played"), keeping the gap where it was. And its **Colour**: a card shows the section's cards in the chosen
+look, and **As Home** follows the choice made under Cards, or pick one for this section alone (Shortcuts has none).
 
 | Section | What it shows |
 |---|---|

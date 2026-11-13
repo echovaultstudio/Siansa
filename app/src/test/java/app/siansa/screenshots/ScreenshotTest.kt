@@ -309,6 +309,14 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
             },
             // Arrange Home's spacing ("Compact", issue #694).
             Scene("arrange_spacing") { SpacingRow(gap = 1) {} },
+            // The cards' colour (the owner, 13 Nov): the four small cards to pick from, Soft chosen; and Today's mix in each
+            // look, as the cog's dialog shows it.
+            Scene("card_looks") {
+                Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Page)) {
+                    app.siansa.ui.CardLookChooser(app.siansa.data.CardLook.SOFT, app.siansa.data.CardLook.forHome) {}
+                    app.siansa.data.CardLook.forHome.forEach { app.siansa.ui.CardLookSample(it, Modifier.fillMaxWidth(), big = true) }
+                }
+            },
             // A list to rearrange (Nav Bar, Mini Player; issue #701).
             Scene("arrange_list") {
                 ArrangeList(
