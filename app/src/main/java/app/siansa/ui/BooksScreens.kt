@@ -329,7 +329,7 @@ fun BookScreen(nav: NavController, id: String) {
                     BookPageHeader(b, color, surface, bookDetails(b, episodeList.size.takeIf { b.podcast && it > 0 }, finished), position) {
                         // Dynamic colours: Play in the cover's colour, as an album's (the owner, 10 Nov: books and podcasts too).
                         androidx.compose.runtime.CompositionLocalProvider(
-                            LocalPlayColours provides rememberPageColours(b.cover, pageBackdrop(surface, color), where = "Book page"),
+                            LocalPlayColours provides rememberPageColours(b.cover, pageBackdrop(surface, color), where = "Book page", tint = color),
                         ) { BookActions(b, progress, position) }
                     }
                 }
@@ -380,7 +380,7 @@ fun BookScreen(nav: NavController, id: String) {
         }
         // Play in the bar once the page's own has scrolled under it, as on every page (the owner, 10 Nov).
         val b = book
-        val barColours = rememberPageColours(b?.cover, pageBackdrop(surface, color), where = "Book page bar")
+        val barColours = rememberPageColours(b?.cover, pageBackdrop(surface, color), where = "Book page bar", tint = color)
         FadingTitleBar(nav, book?.title ?: "Book", color, barAlpha, actions = {
             BarReveal(b != null && listState.firstVisibleItemIndex > 0) {
                 if (b != null) {
