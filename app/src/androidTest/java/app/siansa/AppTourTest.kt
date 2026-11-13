@@ -331,34 +331,53 @@ class AppTourTest {
                 else if (compose.onAllNodesWithText("Radios").fetchSemanticsNodes().isEmpty()) problems += "Back from a search didn't return to the search page"
             }
             step("vibes") {
-                settingsRow("Auto Generated Mixes")
+                settingsRow("Radios & mixes")
+                click("Today's mix and vibes")
                 idle(1000)
                 shot("17-vibes")
+                back()
             }
             step("settings") {
                 tab("Settings")
                 idle(800)
                 shot("18-settings")
-                // Users joined Connections in 0.43; Cards has a page of its own.
-                // Grouped and renamed in issue #780, and again for v1.0.
-                listOf("Connections", "Playback", "Data", "Notices and Cards", "Style", "Scrobbling and history", "Help").forEachIndexed { i, page ->
-                    tab("Settings")
-                    // The row itself, not the Home tab of the same name, scrolled into view on the longer page.
-                    waitText(page)
-                    compose.onAllNodes(hasTestTag("hubRow") and hasText(page)).onFirst().performScrollTo().performClick()
-                    idle()
+                // Regrouped (the owner, 13 Nov): you and the services first, then twelve tiles.
+                listOf("Sound", "Radios & mixes", "Streaming & storage", "Audiobooks & podcasts", "Home page", "Theme", "Now playing", "Bottom bar", "Scrobbling & history", "Help & feedback").forEachIndexed { i, page ->
+                    settingsRow(page)
                     idle(1200)
-                    shot("19-settings-${i + 1}-" + page.lowercase().replace(' ', '-'))
+                    shot("19-settings-${i + 1}-" + page.lowercase().replace(Regex("[^a-z0-9]+"), "-"))
                     back()
                     idle(400)
                 }
-                // Issue #302: Download all covers is in Settings › Data, under the song download settings (v1.0).
-                settingsRow("Data")
+                // The services' page, from Manage on the start page.
+                tab("Settings")
+                waitText("Manage")
+                compose.onNodeWithTag("hubManage").performClick()
+                idle(1500)
+                shot("19-settings-services")
+                if (!exists("Siansa Beats")) problems += "Services doesn't list Siansa Beats"
+                back()
+                idle(400)
+                // The search: "battery" finds Pure black and lands on Theme.
+                tab("Settings")
+                compose.onNodeWithTag("hubSearch").performClick()
+                idle(600)
+                compose.onNodeWithTag("findSetting").performTextInput("battery")
                 idle(800)
-                // The Data page is a plain scrolling column: scroll the heading itself into view.
+                shot("19-settings-find")
+                if (!exists("Pure black")) problems += "Finding \"battery\" doesn't offer Pure black"
+                compose.onAllNodesWithTag("find-result").onFirst().performClick()
+                idle(1000)
+                if (!exists("Theme")) problems += "A search result didn't open its page"
+                back()
+                back()
+                idle(400)
+                // Issue #302: Download all covers is in Settings › Streaming & storage, under the song download settings.
+                settingsRow("Streaming & storage")
+                idle(800)
                 compose.onAllNodesWithText("Download all covers").onFirst().performScrollTo()
                 idle(600)
-                if (!exists("Download all covers")) problems += "Download all covers isn't on the Data page"
+                if (!exists("Download all covers")) problems += "Download all covers isn't on the Streaming & storage page"
                 shot("19-settings-downloads-covers")
                 back()
                 idle(400)
@@ -373,10 +392,7 @@ class AppTourTest {
                     graph.settings.setTheme("DARK", "SUNSET", true)
                     idle(1200)
                     shot("19d-home-sunset-pure-black")
-                    // Themes is inside Style since issue #346.
-                    settingsRow("Style")
-                    waitText("Theme")
-                    click("Theme")
+                    settingsRow("Theme")
                     waitText("Pure black")
                     idle(800)
                     shot("19e-themes-sunset-dark")
@@ -400,14 +416,13 @@ class AppTourTest {
                     shot("19i-home-your-colour-pink-dark")
                     tab("Settings")
                     idle(400)
-                    back()
                 } finally {
                     graph.settings.setTheme("AUTO", "SIANSA", false)
                     idle(800)
                 }
             }
             step("equaliser") {
-                settingsRow("Playback")
+                settingsRow("Sound")
                 click("Equaliser")
                 idle(1200)
                 shot("19b-equaliser")
@@ -416,8 +431,7 @@ class AppTourTest {
             }
             step("crossfade and levelling") {
                 try {
-                    settingsRow("Playback")
-                    click("Crossfade and levelling")
+                    settingsRow("Sound")
                     idle(1000)
                     shot("19j-crossfade")
                     // Issue #214: levelling (ReplayGain) lives here now, with what levels the song playing now.
@@ -426,14 +440,13 @@ class AppTourTest {
                         compose.onNodeWithTag("section-levelling-header").performClick()
                         idle(600)
                     }
-                    if (compose.onAllNodesWithText("Album").fetchSemanticsNodes().isEmpty()) problems += "Levelling chips missing on Crossfade and levelling"
+                    if (compose.onAllNodesWithText("Album").fetchSemanticsNodes().isEmpty()) problems += "Levelling chips missing on Sound"
                     val now = compose.onAllNodesWithTag("levelling-now", useUnmergedTree = true).fetchSemanticsNodes()
-                    if (now.isEmpty()) problems += "No 'levelled by' line on Crossfade and levelling"
+                    if (now.isEmpty()) problems += "No 'levelled by' line on Sound"
                     graph.settings.setLoudness(LoudnessSource.PLUGIN)
                     graph.settings.setCrossfade(CrossfadeMode.SMART, 8)
                     idle(800)
                     shot("19k-crossfade-smart-plugin")
-                    back()
                     back()
                 } finally {
                     graph.settings.setCrossfade(CrossfadeMode.OFF, 6)
@@ -586,7 +599,8 @@ class AppTourTest {
     private fun settingsRow(page: String) {
         tab("Settings")
         waitText(page)
-        compose.onAllNodes(hasTestTag("hubRow") and hasText(page)).onFirst().performScrollTo().performClick()
+        // The tile itself, not the Home tab of the same name, scrolled into view on the longer page.
+        compose.onAllNodes(hasTestTag("hubTile") and hasText(page)).onFirst().performScrollTo().performClick()
         idle()
     }
 

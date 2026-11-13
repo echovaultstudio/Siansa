@@ -720,20 +720,60 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     app.siansa.ui.MixingDocsLink()
                 }
             },
-            // The Settings start page in groups (issue #780, renamed for v1.0), and Settings › Notices and Cards' rows.
-            Scene("settings_groups") {
-                Column {
-                    app.siansa.ui.HubGroup("Sources", first = true)
-                    app.siansa.ui.HubRow(androidx.compose.material.icons.Icons.Rounded.Dns, "Connections") {}
-                    app.siansa.ui.HubGroup("Listening")
-                    app.siansa.ui.HubRow(androidx.compose.material.icons.Icons.Rounded.Equalizer, "Playback") {}
-                    app.siansa.ui.HubRow(androidx.compose.material.icons.Icons.Rounded.SwapVert, "Data") {}
-                    app.siansa.ui.HubGroup("Home")
-                    app.siansa.ui.HubRow(androidx.compose.material.icons.Icons.Rounded.Home, "Notices and Cards") {}
-                    app.siansa.ui.HubRow(androidx.compose.material.icons.Icons.Rounded.Schedule, "Auto Generated Mixes") {}
-                    Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
-                        app.siansa.ui.PageLink("Notices", app.siansa.ui.noticesLine(true, app.siansa.mix.NoticePrefs()), "n") {}
-                        app.siansa.ui.PageLink("Cards", "Made for you and your own cards", "c") {}
+            // The Settings start page (the owner, 13 Nov): you and your server, the services with their dots, and the
+            // first group of tiles; a long server name and a service that doesn't answer.
+            Scene("settings_start") {
+                val s = app.siansa.data.AppSettings(
+                    navidromeUrl = "https://music.home.example", navidromeUser = "maximilian-the-longest-login", navidromePassword = "x",
+                    beatsUrl = "http://beats:8090", audiobookshelfUrl = "http://abs", audiobookshelfToken = "t",
+                    lastFmEnabled = true, lastFmApiKey = "k", lastFmSecret = "s", lastFmUser = "max",
+                    listenBrainzEnabled = true, listenBrainzToken = "lb",
+                )
+                val health = mapOf(
+                    app.siansa.ui.ServiceHealth.SERVER to app.siansa.ui.ServiceCheck(true, "Connected to Navidrome 0.64.2"),
+                    "beats" to app.siansa.ui.ServiceCheck(true, "Siansa Beats 0.40.1: 46,033 songs analysed"),
+                    "books" to app.siansa.ui.ServiceCheck(true, "Connected to Audiobookshelf 2.19"),
+                    "lastfm" to app.siansa.ui.ServiceCheck(false, "Not signed in · 12 listens waiting"),
+                    "listenbrainz" to app.siansa.ui.ServiceCheck(true, "Set up"),
+                )
+                Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
+                    app.siansa.ui.YouCard(
+                        s,
+                        listOf(app.siansa.data.UserEntry(0, "maximilian-the-longest-login", true), app.siansa.data.UserEntry(1, "Kids", true, serverName = "Kids on the Unbelievably Long Server Name")),
+                        app.siansa.data.LibraryStatus(1_762_000_000_000L, 2_100, 5_300, 46_033),
+                        app.siansa.data.SyncProgress(),
+                        health[app.siansa.ui.ServiceHealth.SERVER],
+                    ) {}
+                    app.siansa.ui.ServicesCard(s, health) {}
+                    app.siansa.ui.HubGroupLabel("Playing")
+                    app.siansa.ui.HubTiles(listOf(
+                        app.siansa.ui.HubTile(androidx.compose.material.icons.Icons.Rounded.Equalizer, "Sound", "a"),
+                        app.siansa.ui.HubTile(androidx.compose.material.icons.Icons.Rounded.Schedule, "Radios & mixes", "b"),
+                        app.siansa.ui.HubTile(androidx.compose.material.icons.Icons.Rounded.SwapVert, "Streaming & storage", "c"),
+                        app.siansa.ui.HubTile(androidx.compose.material.icons.Icons.AutoMirrored.Rounded.MenuBook, "Audiobooks & podcasts", "d"),
+                    )) {}
+                }
+            },
+            // Settings › Services' "For the best Siansa" (the owner, 13 Nov): every kind of line, with Siansa Beats on and
+            // AudioMuse-AI on too, so it offers to turn AudioMuse-AI off.
+            Scene("settings_services_best") {
+                val s = app.siansa.data.AppSettings(
+                    navidromeUrl = "https://music.home.example", navidromeUser = "max", navidromePassword = "x",
+                    beatsUrl = "http://beats:8090", audioMuseUrl = "http://am:8000", audiobookshelfUrl = "http://abs", audiobookshelfToken = "t",
+                    lastFmEnabled = true, lastFmApiKey = "k", lastFmSecret = "s", lastFmUser = "max",
+                )
+                val health = mapOf("lastfm" to app.siansa.ui.ServiceCheck(false, "Not signed in · 12 listens waiting"))
+                Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
+                    app.siansa.ui.SettingsCard(tag = "best") {
+                        app.siansa.ui.HubGroupLabel("FOR THE BEST SIANSA")
+                        app.siansa.ui.bestLines(s, health).forEach { line ->
+                            androidx.compose.foundation.layout.Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+                                Box(Modifier.width(Space.Section), contentAlignment = androidx.compose.ui.Alignment.Center) {
+                                    Text(when (line.mark) { "ok" -> "✓"; "bad" -> "✕"; "warn" -> "!"; "dash" -> "–"; else -> "○" }, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                                }
+                                Text(line.words, style = MaterialTheme.typography.bodyMedium)
+                            }
+                        }
                     }
                 }
             },

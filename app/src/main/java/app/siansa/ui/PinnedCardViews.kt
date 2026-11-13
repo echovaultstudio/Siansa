@@ -85,7 +85,7 @@ fun PinnedCardSection(nav: NavController, card: PinnedCard, aiDown: String?) {
         else {
             SectionTitle(card.title)
             Text(
-                if (card.contents.fromBooks) "Nothing here yet." else "No songs match yet. Change the card in Settings › Notices and Cards › Cards.",
+                if (card.contents.fromBooks) "Nothing here yet." else "No songs match yet. Change the card in Settings › Home page › Cards.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = Space.Page).testTag("pinnedProblem"),
@@ -285,7 +285,7 @@ fun PinnedCardScreen(nav: NavController, id: String) {
             LoadBox(content, Modifier.padding(top = padding.calculateTopPadding())) { found ->
                 val albums = found?.albums.orEmpty()
                 if (albums.isEmpty()) {
-                    Text("No albums match yet. Change the card in Settings › Notices and Cards › Cards.", style = MaterialTheme.typography.bodyMedium,
+                    Text("No albums match yet. Change the card in Settings › Home page › Cards.", style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(Space.Page).testTag("pinnedProblem"))
                 } else {
                     AlbumsGridOrList(albums, page = "pinned-albums", onOpen = { nav.navigate("album/${it.id}") }, modifier = Modifier.fillMaxSize(),

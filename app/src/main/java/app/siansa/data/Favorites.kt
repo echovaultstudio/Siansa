@@ -103,7 +103,7 @@ class Favorites(
                     "Favorites",
                     "Not sent to Last.fm: " + when {
                         !s.lastFmEnabled -> "Last.fm scrobbling is switched off"
-                        s.lastFmSession.isBlank() -> "not signed in to Last.fm (Settings › Scrobbling and history › Last.fm)"
+                        s.lastFmSession.isBlank() -> "not signed in to Last.fm (Settings › Scrobbling & history › Last.fm)"
                         else -> "API key or shared secret missing"
                     },
                 )

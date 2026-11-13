@@ -73,7 +73,7 @@ Song radios, mixes, the dice and recently played only use what the filter shows.
 playlist, a playlist on your server only takes its own user's songs (Kids' playlists take Kids' songs), and a
 playlist on this phone takes anyone's. Playlists that can't take the songs are greyed out.
 
-**Scrobbling for other users**: in **Settings › Scrobbling and history › Users** you can turn a user off, so songs from their
+**Scrobbling for other users**: in **Settings › Scrobbling & history › Users** you can turn a user off, so songs from their
 library aren't sent anywhere while you listen as you.
 
 ## Playlists on your server

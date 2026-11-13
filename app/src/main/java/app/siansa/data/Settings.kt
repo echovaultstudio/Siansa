@@ -17,7 +17,7 @@ import app.siansa.net.SourceKind
 
 enum class ReplayGainMode(val label: String) { TRACK("Track"), ALBUM("Album"), OFF("Off") }
 
-/** The phone's top bar, with the clock and battery (issue #681, Settings › Style). */
+/** The phone's top bar, with the clock and battery (issue #681, Settings › Theme › Status bar). */
 enum class TopBarStyle(val label: String, val hint: String) {
     CLEAR("See-through", "The app shows behind the phone's top bar."),
     BLACK("Black", "A black top bar, so nothing shows behind the clock and icons."),
@@ -132,6 +132,11 @@ data class AppSettings(
     val bookSkipBackSec: Int = 10,
     val bookSkipForwardSec: Int = 30,
     val aiTitles: Boolean = true,
+    /**
+     * Services switched off under Settings › Services (the owner, 13 Nov): [Service] ids. One that's off is left
+     * alone and shown nowhere, as if it weren't set up, while its login stays for when it's switched back on.
+     */
+    val servicesOff: Set<String> = emptySet(),
     val replayGain: ReplayGainMode = ReplayGainMode.TRACK,
     val preampDb: Float = 0f,
     val syncFolders: Set<String> = emptySet(),
@@ -184,7 +189,7 @@ data class AppSettings(
     /** Opus kbit/s for downloads, or 0 for the original file. */
     val downloadKbps: Int = 0,
     val homeOrder: List<HomeSection> = HomeSection.default,
-    /** Settings › Style (issue #346): the mini player's buttons, the bottom bar's tabs, and now playing's lyrics button. */
+    /** Settings › Now playing and Bottom bar (issue #346): the mini player's buttons, the bottom bar's tabs, and now playing's lyrics button. */
     val miniButtons: List<MiniButton> = MiniButton.default,
     val navTabs: List<NavTab> = NavTab.default,
     /** Home's menu, top to bottom (issue #872). */
@@ -281,13 +286,18 @@ data class AppSettings(
     /** An API key for an OpenSubsonic server (issue #493); Emby and Jellyfin have their own login. */
     val hasApiKey: Boolean get() = sourceKind == SourceKind.OPENSUBSONIC && navidromeApiKey.isNotBlank()
     val audioMuseReady: Boolean
-        get() = audioMuseUrl.isNotBlank()
+        get() = audioMuseUrl.isNotBlank() && Service.AUDIOMUSE.id !in servicesOff
     /** Siansa Beats is set up: the app asks it directly, and not the plugin. */
     val beatsReady: Boolean
-        get() = beatsUrl.isNotBlank()
+        get() = beatsUrl.isNotBlank() && Service.BEATS.id !in servicesOff
     val aiReady: Boolean
-        get() = aiTitles && aiModel.isNotBlank() && (aiKey.isNotBlank() || !aiProvider.needsKey) &&
+        get() = aiTitles && Service.AI.id !in servicesOff && aiModel.isNotBlank() && (aiKey.isNotBlank() || !aiProvider.needsKey) &&
             aiCompletionsUrl(aiProvider, aiAddress) != null
+    /** AudioMuse's login is there, whether or not the service is switched on. */
+    val audioMuseSetUp: Boolean get() = audioMuseUrl.isNotBlank()
+    val beatsSetUp: Boolean get() = beatsUrl.isNotBlank()
+    val aiSetUp: Boolean get() = aiModel.isNotBlank() && (aiKey.isNotBlank() || !aiProvider.needsKey) && aiCompletionsUrl(aiProvider, aiAddress) != null
+    val booksSetUp: Boolean get() = audiobookshelfUrl.isNotBlank() && (audiobookshelfToken.isNotBlank() || (audiobookshelfUser.isNotBlank() && audiobookshelfPassword.isNotBlank()))
     /**
      * These settings with the Connections page's fields taken from [page]: the music server, its proxy login,
      * AudioMuse, the AI service and Audiobookshelf. Everything else keeps its value here.
@@ -321,7 +331,7 @@ data class AppSettings(
 
     /** Books show once an Audiobookshelf server with a login is set (issue #521). */
     val booksReady: Boolean
-        get() = audiobookshelfUrl.isNotBlank() && (audiobookshelfToken.isNotBlank() || (audiobookshelfUser.isNotBlank() && audiobookshelfPassword.isNotBlank()))
+        get() = booksSetUp && Service.BOOKS.id !in servicesOff
 
     companion object {
         const val HOME_GAP_DEFAULT = 2
@@ -488,6 +498,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         scrobbleOffUsers = prefs.getString("scrobble_off_users", null).orEmpty().split(',').mapNotNull { it.trim().toIntOrNull() }.toSet(),
         scrobbleBeats = prefs.getBoolean("scrobble_beats", false),
         lastFmEnabled = prefs.getBoolean("lfm_on", false),
+        servicesOff = prefs.getString("services_off", "").orEmpty().split(",").filter { it.isNotBlank() }.toSet(),
         lastFmApiKey = prefs.getString("lfm_key", "") ?: "",
         lastFmSecret = secret("lfm_secret"),
         lastFmUser = prefs.getString("lfm_user", "") ?: "",
@@ -617,6 +628,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
             .putString("scrobble_off_users", s.scrobbleOffUsers.sorted().joinToString(","))
             .putBoolean("scrobble_beats", s.scrobbleBeats)
             .putBoolean("lfm_on", s.lastFmEnabled)
+            .putString("services_off", s.servicesOff.sorted().joinToString(","))
             .putString("lfm_key", s.lastFmApiKey.trim())
             .putString("lfm_secret", SecretBox.encrypt(s.lastFmSecret.trim()))
             .putString("lfm_user", s.lastFmUser.trim())
@@ -701,6 +713,13 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
     fun setDynamicColours(on: Boolean) {
         prefs.edit().putBoolean("dynamic_colours", on).apply()
         _state.value = _state.value.copy(dynamicColours = on)
+    }
+
+    /** Switches a service on or off under Settings › Services (the owner, 13 Nov): its login stays. */
+    fun setServiceOn(service: Service, on: Boolean) {
+        val off = if (on) _state.value.servicesOff - service.id else _state.value.servicesOff + service.id
+        prefs.edit().putString("services_off", off.sorted().joinToString(",")).apply()
+        _state.value = _state.value.copy(servicesOff = off)
     }
 
     fun setAnimatedCovers(on: Boolean) {
@@ -963,3 +982,41 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
 
 /** Whether covers move until it's set: on a phone, yes; on the TV app, no (issue #945). */
 internal fun animatedCoversByDefault(tv: Boolean): Boolean = !tv
+
+/**
+ * What Siansa talks to besides the music server (Settings › Services, the owner, 13 Nov): each can be switched off
+ * there and is then left alone and shown nowhere. Last.fm and ListenBrainz keep their own switches
+ * ([AppSettings.lastFmEnabled], [AppSettings.listenBrainzEnabled]); the rest go in [AppSettings.servicesOff].
+ */
+enum class Service(val id: String, val label: String, val gives: String) {
+    BEATS("beats", "Siansa Beats", "Beats and phrases for DJ blends, loudness and keys, genres by sound, similar albums and artists, and where your listening is kept."),
+    AUDIOMUSE("audiomuse", "AudioMuse-AI", "The sound of each song, similar music and the search by words, when there's no Siansa Beats."),
+    BOOKS("books", "Audiobookshelf", "Audiobooks and podcasts, with your place in each."),
+    LASTFM("lastfm", "Last.fm", "Your listening, scrobbled as you go."),
+    LISTENBRAINZ("listenbrainz", "ListenBrainz / Koito", "Your listening, sent to ListenBrainz or a Koito of your own."),
+    AI("ai", "AI", "Mix titles and sound searches in your own words.");
+
+    /** Which card on Connections sets it up. */
+    val connection: String get() = when (this) {
+        BEATS -> "beats"; AUDIOMUSE -> "audiomuse"; BOOKS -> "books"; AI -> "ai"; LASTFM, LISTENBRAINZ -> "scrobbling"
+    }
+
+    companion object {
+        /** Whether [service] is switched on in [s] (its login may still be missing: [setUp]). */
+        fun on(s: AppSettings, service: Service): Boolean = when (service) {
+            LASTFM -> s.lastFmEnabled
+            LISTENBRAINZ -> s.listenBrainzEnabled
+            else -> service.id !in s.servicesOff
+        }
+
+        /** Whether [service]'s login is there, on or off. */
+        fun setUp(s: AppSettings, service: Service): Boolean = when (service) {
+            BEATS -> s.beatsSetUp
+            AUDIOMUSE -> s.audioMuseSetUp
+            BOOKS -> s.booksSetUp
+            LASTFM -> s.lastFmApiKey.isNotBlank() && s.lastFmSecret.isNotBlank()
+            LISTENBRAINZ -> s.listenBrainzToken.isNotBlank()
+            AI -> s.aiSetUp
+        }
+    }
+}

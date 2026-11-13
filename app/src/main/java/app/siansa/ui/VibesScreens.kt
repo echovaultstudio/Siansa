@@ -87,7 +87,7 @@ fun VibesScreen(nav: NavController) {
     LaunchedEffect(Unit) { graph.selectors.all() }
 
     Screen(
-        title = "Auto Generated Mixes",
+        title = "Today's mix and vibes",
         nav = nav,
         actions = {
             IconButton(onClick = { nav.navigate("selector/new") }) { Icon(Icons.Rounded.Add, "Add vibe") }

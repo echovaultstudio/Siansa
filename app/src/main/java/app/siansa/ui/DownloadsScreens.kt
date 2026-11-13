@@ -62,6 +62,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
@@ -635,16 +636,8 @@ internal fun DownloadSettings(nav: NavController) {
             if (settings.downloadWifiOnly) "A VPN counts as mobile data, so nothing downloads while one is on."
             else "Downloads on any connection, including mobile data and a VPN.",
         )
-        Text("Download quality", style = MaterialTheme.typography.bodyLarge)
-        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
-            downloadQualities.forEach { kbps ->
-                FilterChip(
-                    selected = settings.downloadKbps == kbps,
-                    onClick = { graph.settings.setDownloads(kbps = kbps) },
-                    label = { Text(if (kbps == 0) "Original" else "Opus $kbps") },
-                )
-            }
-        }
+        // A drop-down, not chips (the owner, 13 Nov): the words were cut off.
+        ChoicePicker("Download quality", settings.downloadKbps, downloadQualities, "download-quality", ::qualityLabel) { graph.settings.setDownloads(kbps = it) }
         Hint(ServerWords.downloadHint(settings.sourceKind))
         Text("Storage limit", style = MaterialTheme.typography.bodyLarge)
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
@@ -683,6 +676,25 @@ internal fun DownloadSettings(nav: NavController) {
             },
             dismissButton = { TextButton(onClick = { removeAll = false }) { Text("Keep") } },
         )
+    }
+}
+
+/** The image cache's size as a slider over [cacheSizes] (100 MB to 5 GB, then No limit), the size beside it. */
+@Composable
+internal fun ImageCacheSlider(selected: Int, onPick: (Int) -> Unit) {
+    val index = cacheSizes.indexOf(selected).takeIf { it >= 0 } ?: cacheSizes.lastIndex
+    var value by remember(selected) { mutableFloatStateOf(index.toFloat()) }
+    val shown = cacheSizes[value.toInt().coerceIn(0, cacheSizes.lastIndex)]
+    Row(Modifier.fillMaxWidth().testTag("imageCacheSlider"), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
+        androidx.compose.material3.Slider(
+            value = value,
+            onValueChange = { value = kotlin.math.round(it) },
+            onValueChangeFinished = { onPick(cacheSizes[value.toInt().coerceIn(0, cacheSizes.lastIndex)]) },
+            valueRange = 0f..cacheSizes.lastIndex.toFloat(),
+            steps = cacheSizes.size - 2,
+            modifier = Modifier.weight(1f),
+        )
+        Text(if (shown <= 0) "No limit" else formatMb(shown), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.testTag("imageCacheSize"))
     }
 }
 
@@ -787,15 +799,8 @@ internal fun ImageCacheSection() {
         )
     }
     Text("Maximum size", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.testTag("imageCacheLabel"))
-    Row(Modifier.horizontalScroll(rememberScrollState()).testTag("imageCacheChips"), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
-        cacheSizes.forEach { mb ->
-            FilterChip(
-                selected = settings.imageCacheMb == mb,
-                onClick = { graph.settings.setImageCacheMb(mb) },
-                label = { Text(if (mb <= 0) "No limit" else formatMb(mb)) },
-            )
-        }
-    }
+    // A slider over the sizes (the owner, 13 Nov), No limit at its end; the size shows beside it.
+    ImageCacheSlider(settings.imageCacheMb) { graph.settings.setImageCacheMb(it) }
     // Its tag on a box around it: the box takes the button's whole touch area, as the chips above count theirs.
     Box(Modifier.testTag("imageCacheClear")) {
         OutlinedButton(onClick = {
