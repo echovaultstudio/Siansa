@@ -104,7 +104,7 @@ import app.siansa.log.AppLog
 import kotlinx.coroutines.CancellationException
 import app.siansa.playback.PlayerState
 
-/** A bottom-bar tab's look; which tabs show, and in what order, is set in Settings › Style › Nav Bar (issue #346). */
+/** A bottom-bar tab's look; which tabs show, and in what order, is set in Settings › Bottom bar (issue #346). */
 internal fun NavTab.icon(): ImageVector = when (this) {
     NavTab.HOME -> Icons.Rounded.Home
     NavTab.SEARCH -> Icons.Rounded.Search
@@ -438,7 +438,7 @@ private fun MiniPlayer(state: PlayerState, onOpen: () -> Unit) {
                     )
                 }
               }
-                // The buttons and their order are set in Settings › Style › Mini Player (issue #346).
+                // The buttons and their order are set in Settings › Now playing › Mini player (issue #346).
                 val settings by graph.settings.state.collectAsStateWithLifecycle()
                 settings.miniButtons.forEach { button ->
                     MiniPlayerButton(button, state, song, onOpen, onStop = {

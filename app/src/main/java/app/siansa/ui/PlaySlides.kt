@@ -96,7 +96,7 @@ enum class PlaySlide(val label: String) {
 enum class SlideWay(val label: String) { UP("up"), DOWN("down"), LEFT("left"), RIGHT("right") }
 
 /**
- * Sliding from the play button (issue #919): on unless switched off under Settings › Style › Now playing, and what each
+ * Sliding from the play button (issue #919): on unless switched off under Settings › Now playing, and what each
  * way does. Up for a DJ mix, down for a Steady radio, left for a song path, right for songs that sound like it.
  */
 data class PlaySlides(

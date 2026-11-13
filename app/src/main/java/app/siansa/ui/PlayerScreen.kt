@@ -190,7 +190,7 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
             LyricsShortcut.pending.value = false
         }
     }
-    // Settings › Style › Now Playing Style: off brings back the look before the lyrics button (issue #346).
+    // Settings › Now playing › Buttons: off brings back the look before the lyrics button (issue #346).
     val style by graph.settings.state.collectAsStateWithLifecycle()
     val classic = !style.nowPlayingLyricsButton
     var menuOpen by remember { mutableStateOf(false) }

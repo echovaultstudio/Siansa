@@ -57,9 +57,9 @@ import kotlin.math.roundToInt
 internal val CROSSFADE_GAP = Space.Medium
 
 /**
- * Settings › Playback › Crossfade and levelling (issues #60, #214): where song loudness and fade shapes come
- * from, levelling (Off, Track, Album: ReplayGain tags or the Siansa plugin's measurement, never both) with what
- * levels the song playing now, and crossfades.
+ * Settings › Sound (the owner, 13 Nov; Playback › Crossfade and levelling before, issues #60, #214): the equaliser's
+ * page, where song loudness and fade shapes come from, levelling (Off, Track, Album: ReplayGain tags or the Siansa
+ * plugin's measurement, never both) with what levels the song playing now, and crossfades.
  */
 @Composable
 fun CrossfadeScreen(nav: NavController) {
@@ -67,11 +67,14 @@ fun CrossfadeScreen(nav: NavController) {
     val settings by graph.settings.state.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     var test by remember { mutableStateOf<String?>(null) }
-    Screen(title = "Crossfade and levelling", nav = nav) { padding ->
+    val eq by graph.equaliser.state.collectAsStateWithLifecycle()
+    Screen(title = "Sound", nav = nav) { padding ->
         Column(
             Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState()).padding(Space.Page),
             verticalArrangement = Arrangement.spacedBy(CROSSFADE_GAP),
         ) {
+            PageLink("Equaliser", if (eq.enabled) "On · ${eq.preset.label}" else "Off", "soundEqualiser") { nav.navigate("settings/equaliser") }
+            HorizontalDivider()
             Heading("Where loudness and fades come from")
             LoudnessSourceRow(settings.loudnessSource, beats = settings.beatsReady) {
                 test = null

@@ -72,7 +72,7 @@ import app.siansa.playback.dlna.Dlna
 
 /*
  * Home's menu (the round button at the end of the notices, at the top of Home): Roll the dice, Play on…, Sources and
- * Arrange Home ([HomeMenuItem], in the order set in Settings › Style › Home Menu). It opens in the top row itself (the
+ * Arrange Home ([HomeMenuItem], in the order set in Settings › Home page › Home menu). It opens in the top row itself (the
  * owner, 12 Nov): the notice chips fade and blur away as one pill of glass takes their place, the chips' exact height,
  * with the four as circles along it, as the DJ mix bar's places; nothing on the page is covered. A tap opens it;
  * pressing the button and sliding along the pill picks a place as the finger lets go (a glide), with a light tick as

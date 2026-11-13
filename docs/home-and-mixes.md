@@ -28,7 +28,7 @@ fills and grows a touch, with a light tick as you pass each) and let go. Letting
 a tap on the button (its lines become a cross while the menu is open) or anywhere on the page. The button's three lines
 are always in the accent colour; the button has a thin ring in the same colour while the source filter hides something.
 
-Their order is yours: **Settings › Style › Home Menu**, hold a row and drag it.
+Their order is yours: **Settings › Home page › Home menu**, hold a row and drag it.
 
 ## Arrange Home
 
@@ -59,12 +59,12 @@ The **cog** on a section changes its look, to any of the custom cards' looks:
 | **List** | The first five, listed; the title opens the rest. |
 | **Play button** | A slim card: its ▶ plays the section; a tap anywhere else on the card opens it. |
 | **Cover rows** | Covers with their details beside them, three to a column, to swipe through: the same look as a custom card's. The cover plays that album or opens that item; the row opens it. Books and podcasts show how far you are along the cover. A radio or genre shows its colours instead of a cover. |
-| **Shortcut grid** | Small tiles two to a row, like Shortcuts. Pick **2, 4, 6 or 8 tiles** under it in the same dialog. A tile opens its item; the title opens the rest. Shortcuts itself has no such choice: it's the grid already, and its count is under Settings › Style › Home. |
+| **Shortcut grid** | Small tiles two to a row, like Shortcuts. Pick **2, 4, 6 or 8 tiles** under it in the same dialog. A tile opens its item; the title opens the rest. Shortcuts itself has no such choice: it's the grid already, and its count is under Settings › Home page › Top of Home. |
 
 A section in another look says which under its name. **Play** in a banner or the ▶ of a play button card plays the section:
 today's mix or the carousel's first mix where they left off, or the albums of Rediscover, Recently played, Recently
 added and Random picks in order. Sections of radios, playlists, genres, books and Made for you open instead. **Your
-cards** keep their own looks: their cog opens **Settings › Notices and Cards › Cards**.
+cards** keep their own looks: their cog opens **Settings › Home page › Cards**.
 
 The same cog has **Show its title**: turn it off and the section shows without the heading above it ("Your evening",
 "Recently played"), keeping the gap where it was. And its **Colour**: a card shows the section's cards in the chosen
@@ -72,7 +72,7 @@ look, and **As Home** follows the choice made under Cards, or pick one for this 
 
 | Section | What it shows |
 |---|---|
-| **Shortcuts** | The albums, playlists, mixes and Liked songs you played from last, newest first: 8 of them, or as many as you pick from 2 to 8 under **Settings › Style › Home**. Until there's enough of that, today's mixes, your playlists and recent albums. |
+| **Shortcuts** | The albums, playlists, mixes and Liked songs you played from last, newest first: 8 of them, or as many as you pick from 2 to 8 under **Settings › Home page › Top of Home**. Until there's enough of that, today's mixes, your playlists and recent albums. |
 | **Today's mix** | The day's mix, made for the vibe of the hour it's made in (see below). |
 | **Your mixes carousel** | Three or four mixes of your own for each part of the day, side by side. |
 | **Made for you** | Your sound, On repeat, Discover for you, then cards of your own. |
@@ -100,7 +100,7 @@ their own: a finished book, albums older than three days or last month's report 
 | **Liked songs** | Always, once you add it: it's **Off** until you set it to Automatic or Pinned. | Liked songs |
 
 At most five show. By default they're ordered for you: what needs you first, then what you're in the middle of, then
-what's new; among the new ones, the kinds you tap most come first. In **Settings › Notices and Cards › Notices** you can hide the
+what's new; among the new ones, the kinds you tap most come first. In **Settings › Home page › Top of Home** you can hide the
 row, or set each kind to **Pinned**, **Automatic** or **Off**. Pinned kinds always show, first and in the order you
 pin them, and are never pushed out by other notices; the automatic ones fill the places left. The notices are
 always at the top of Home, so they're not in Arrange Home.
@@ -108,7 +108,7 @@ always at the top of Home, so they're not in Arrange Home.
 ## Vibes and today's mix
 
 A **vibe** covers part of the day. Siansa starts with Morning, Daytime, Evening and Night. When you open the app,
-the vibe for the current hour builds **today's mix**. **Settings › Auto Generated Mixes** lets you change them:
+the vibe for the current hour builds **today's mix**. **Settings › Radios & mixes › Today's mix and vibes** lets you change them:
 
 - **Name**, **Days** (or every day), and **hours** (0–23; a vibe from 22 to 5 runs past midnight). When several
   vibes fit, the most specific wins: one set for a day before an everyday one, one for some hours before an
@@ -124,7 +124,7 @@ the vibe for the current hour builds **today's mix**. **Settings › Auto Genera
 
 How the songs are picked is explained in [How it works](how-it-works.md#todays-mix-and-vibes).
 
-**Today's mix** has settings of its own at the top of **Settings › Auto Generated Mixes**, which apply to it whichever
+**Today's mix** has settings of its own at the top of **Settings › Radios & mixes › Today's mix and vibes**, which apply to it whichever
 vibe makes it:
 
 - **Auto update** (on by default): the mix follows the time of day. A new one is made as the day or the hour's vibe
@@ -169,12 +169,12 @@ same day; Siansa tells you which one already has them.
   Koito, ListenBrainz or Last.fm when you use them. It opens straight away and checks your server for changes while
   the cog turns, like a playlist. Until there's enough to go on, it isn't shown.
 - **Discover for you**: songs that sound like your taste, from artists you don't play much (only with AudioMuse-AI).
-- **Cards of your own** (**Settings › Notices and Cards › Cards › Made for you**): pick what a card shows (for example a genre or a
+- **Cards of your own** (**Settings › Home page › Cards › Made for you**): pick what a card shows (for example a genre or a
   period) and name it. Each card gets new songs every day.
 
 ## Your cards
 
-Custom cards you make yourself (**Settings › Notices and Cards › Cards › Custom cards**), shown on Home in its **Your cards** section
+Custom cards you make yourself (**Settings › Home page › Cards › Custom cards**), shown on Home in its **Your cards** section
 (move it under Arrange Home; the cards' own order is set in Settings). **Add a custom card** or tap one to change it,
 on a page of its own:
 

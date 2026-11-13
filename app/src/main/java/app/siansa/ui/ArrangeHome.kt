@@ -74,7 +74,7 @@ import app.siansa.data.movesFirstVisible
 
 /**
  * Home's settings panel with the saved settings, from Home's button or Settings › Home (issue #780): Sources
- * ([startOnSources]) or Arrange. Your cards' cog closes it and opens Settings › Notices and Cards › Cards.
+ * ([startOnSources]) or Arrange. Your cards' cog closes it and opens Settings › Home page › Cards.
  */
 @Composable
 fun HomeSettingsSheet(nav: androidx.navigation.NavController, startOnSources: Boolean, onDismiss: () -> Unit) {
@@ -85,7 +85,7 @@ fun HomeSettingsSheet(nav: androidx.navigation.NavController, startOnSources: Bo
     }
     val graph = LocalGraph.current
     val s by graph.settings.state.collectAsStateWithLifecycle()
-    // The notices are the top of Home (issue #872), not a section to move: shown or not in Settings › Notices and Cards › Notices.
+    // The notices are the top of Home (issue #872), not a section to move: shown or not in Settings › Home page › Top of Home.
     ArrangeHomeSheet(s.homeOrder - HomeSection.NOTICES, s.homeHidden, gap = s.homeGap, onGapChange = {
         AppLog.i("Home", "Spacing: ${homeGapLabel(it)}")
         graph.settings.setHomeGap(it)
@@ -128,7 +128,7 @@ fun HomeSettingsSheet(nav: androidx.navigation.NavController, startOnSources: Bo
         },
         onOpenSettings = { section ->
             onDismiss()
-            nav.navigate(if (section == HomeSection.NOTICES) "settings/home/notices" else "settings/cards")
+            nav.navigate(if (section == HomeSection.NOTICES) "settings/home" else "settings/cards")
         },
     )
 }
@@ -150,8 +150,8 @@ fun ArrangeHomeSheet(
     // The gap between Home's sections, a step of the spacing scale (#554).
     gap: Int = AppSettings.HOME_GAP_DEFAULT,
     onGapChange: (Int) -> Unit = {},
-    // Each row's look (issue #655), changed with its cog; Your cards' cog opens Settings › Notices and Cards › Cards, and
-    // Notices' cog Settings › Notices and Cards › Notices (issue #784).
+    // Each row's look (issue #655), changed with its cog; Your cards' cog opens Settings › Home page › Cards, and
+    // Notices' cog Settings › Home page › Top of Home (issue #784).
     looks: Map<HomeSection, HomeLook> = emptyMap(),
     // Each row's title shown or hidden (issue #961), in the same dialog as its look.
     untitled: Set<HomeSection> = emptySet(),
@@ -426,7 +426,7 @@ private fun HomeLookDialog(
                     onTitleShown(it)
                 }
                 HorizontalDivider(Modifier.padding(vertical = Space.Small))
-                // Shortcuts is the grid already: its size is set in Settings › Style › Home.
+                // Shortcuts is the grid already: its size is set in Settings › Home page.
                 HomeLook.entries.filter { it != HomeLook.GRID || section != HomeSection.QUICK }.forEach { option ->
                     Row(
                         Modifier.fillMaxWidth().clickable { look = option; onPick(option) }.padding(vertical = Space.Small).testTag("homeLook-${option.id}"),

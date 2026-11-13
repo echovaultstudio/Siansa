@@ -7,7 +7,7 @@ Long-press a song (or use its menu) and pick **Start a mix**, or slide from the 
 adds songs that sound like it and share its mood. When only a few are left, it finds more, so it keeps going.
 Playing anything else ends the radio.
 
-**Settings › Playback › Song radio** sets how far it may wander:
+**Settings › Radios & mixes › Radio wandering** sets how far it may wander:
 
 | Choice | What happens |
 |---|---|
@@ -81,7 +81,7 @@ Without AudioMuse-AI, song radio uses Navidrome's similar songs, or Emby's Insta
 
 ## Keep playing
 
-**Settings › Playback › Keep playing**: what happens when the queue is about to end.
+**Settings › Radios & mixes › When the queue ends**: what happens when the queue is about to end.
 
 | Choice | What happens |
 |---|---|

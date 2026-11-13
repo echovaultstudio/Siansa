@@ -1,6 +1,6 @@
 # Troubleshooting
 
-First steps for any problem: update Siansa, turn on **Debug logs** (**Settings › Help**), make the problem happen a
+First steps for any problem: update Siansa, turn on **Debug logs** (**Settings › Help & feedback**), make the problem happen a
 few times, then use **Report a problem** there. See [Reporting problems](privacy-and-logs.md#report-a-problem).
 
 ## Can't connect to my server
@@ -71,7 +71,7 @@ Siansa shows the picture your server sends, and keeps it on the phone so it show
 - **A cover you replaced on the server** shows after the next sync. **Sync all** (the music source at the top of
   Home) checks every cover kept on the phone: stand-ins kept by older versions are removed, and a cover that changed
   on Navidrome, Emby or Jellyfin is fetched fresh. Nothing else in the image cache is thrown away.
-- Still wrong? **Settings › Data › Covers on the phone › Clear image cache** starts over, and the log (lines marked `Covers`) says
+- Still wrong? **Settings › Streaming & storage › Covers on the phone › Clear image cache** starts over, and the log (lines marked `Covers`) says
   what was removed and replaced.
 
 ## Songs show the wrong length, or the seek bar jumps
@@ -81,7 +81,7 @@ the file's is far off. If it's still wrong, rescan the file on your server and s
 
 ## Plays don't show up on my server, Last.fm or ListenBrainz
 
-- Check **Settings › Scrobbling and history**: is the service on, and is the user switched on under **Users**?
+- Check **Settings › Scrobbling & history**: is the service on, and is the user switched on under **Users**?
 - A song counts only after the chosen share of it, or four minutes. Songs of 30 seconds or less never count.
 - Offline plays wait and are sent later.
 

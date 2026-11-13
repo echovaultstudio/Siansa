@@ -219,9 +219,10 @@ class TvRemoteSweepTest {
     @Test fun settingsHub() = check("Settings") { TvSettingsHub() }
     @Test fun passthrough() = check("Audio passthrough") { TvPassthrough() }
     @Test fun sources() = check("Show music from") { TvSources() }
-    @Test fun scrobbling() = check("Scrobbling and history") { app.siansa.ui.ScrobblingScreen(LocalNav.current) }
-    @Test fun playback() = check("Playback") { app.siansa.ui.PlaybackSettingsScreen(LocalNav.current) }
-    @Test fun crossfade() = check("Crossfade and levelling") { app.siansa.ui.CrossfadeScreen(LocalNav.current) }
+    @Test fun scrobbling() = check("Scrobbling & history") { app.siansa.ui.ScrobblingScreen(LocalNav.current) }
+    @Test fun radios() = check("Radios & mixes") { app.siansa.ui.RadiosScreen(LocalNav.current) }
+    @Test fun sound() = check("Sound") { app.siansa.ui.CrossfadeScreen(LocalNav.current) }
+    @Test fun streaming() = check("Streaming quality") { app.siansa.ui.StreamingDataScreen(LocalNav.current) }
     @Test fun connections() = check("Connections") { app.siansa.ui.ConnectionsHub(LocalNav.current) }
     @Test fun sync() = check("Library sync") { app.siansa.ui.SyncScreen(LocalNav.current) }
     @Test fun report() = check("Report a problem") { app.siansa.ui.ProblemReportScreen(LocalNav.current) }

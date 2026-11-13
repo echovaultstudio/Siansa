@@ -1,7 +1,7 @@
 # Install Siansa and report a problem
 
 Siansa is a music player for your own Navidrome, Emby or Jellyfin server, with mixes made for the moment. Found a
-problem? Please report it from the app (Settings › Help › Report a problem). Thank you!
+problem? Please report it from the app (Settings › Help & feedback › Report a problem). Thank you!
 Problems and ideas go in the [Siansa repository on GitHub](https://github.com/echovaultstudio/Siansa/issues), where the code is too.
 
 Website and sign-up: <https://siansa.app>
@@ -68,7 +68,7 @@ Open Siansa, go to **Settings**, enter these, use **Test** next to each, then **
 2. Look at the [open issues](https://github.com/echovaultstudio/Siansa/issues) first. Someone may have reported it already: add a 👍 or a comment instead.
 
 The most useful reports say what you did, what you expected and what happened. A log helps a lot:
-in Siansa, go to **Settings › Help › Show the log**, then **Share**, and attach the file, or paste the part around the problem.
+in Siansa, go to **Settings › Help & feedback › Show the log**, then **Share**, and attach the file, or paste the part around the problem.
 
 **Before you post anything**
 - Never paste passwords, tokens or API keys. Siansa's log never has them, but check anyway.

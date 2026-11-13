@@ -85,12 +85,12 @@ class Taste(private val graph: AppGraph) {
         val lastFm = async {
             if (s.lastFmApiKey.isBlank() || s.lastFmUser.isBlank()) return@async null
             runCatching { graph.historyApi.lastFmTop(s.lastFmApiKey, s.lastFmUser) }
-                .onFailure { AppLog.w("Taste", "Last.fm history failed: ${it.message}") }
+                .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it; AppLog.w("Taste", "Last.fm history failed: ${it.message}") }
                 .getOrNull()
         }
         val navidrome = async {
             runCatching { graph.source.albums("frequent", 40, 0) }
-                .onFailure { AppLog.w("Taste", "Navidrome most-played failed: ${it.message}") }
+                .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it; AppLog.w("Taste", "Navidrome most-played failed: ${it.message}") }
                 .getOrNull()
                 ?.let { graph.library.keepSyncedAlbums(it, "Most played") }
         }

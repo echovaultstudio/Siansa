@@ -327,12 +327,12 @@ fun HomeScreen(nav: NavController) {
         for (section in visibleSections) {
             val look = homeSettings.homeLooks[section] ?: HomeLook.AS_IS
             when (section) {
-                // The chips row (issue #784); its kinds are set in Settings › Notices and Cards › Notices.
+                // The chips row (issue #784); its kinds are set in Settings › Home page › Top of Home.
                 // The notices are the top of Home now (issue #872), not a section of their own.
                 HomeSection.NOTICES -> Unit
                 HomeSection.QUICK -> {
                     // Quick access, the top grid (issue #271): what you played last, newest first, as
-                    // many as Settings › Style › Home says (issue #934); until there's enough of that, today's mixes,
+                    // many as Settings › Home page says (issue #934); until there's enough of that, today's mixes,
                     // playlists and recent albums. Liked songs is one of them only when you played it.
                     titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "quick") {
                         val mixIds = mixes.orEmpty().mapTo(HashSet()) { it.id }
@@ -498,7 +498,7 @@ fun HomeScreen(nav: NavController) {
                     }
                 }
                 HomeSection.CARDS -> {
-                    // Your cards (issue #622), in the order set in Settings › Notices and Cards › Cards; each is its own row.
+                    // Your cards (issue #622), in the order set in Settings › Home page › Cards; each is its own row.
                     pinnedCards.orEmpty().filter { it.shown }.forEach { card ->
                         titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "pinned-${card.id}") { PinnedCardSection(nav, card, aiDown) }
                     }
@@ -791,7 +791,7 @@ internal fun MakeTodayCard(onMake: () -> Unit) {
         Row(Modifier.padding(Space.Page), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("Today's mix", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Text("None made yet. Auto update is off in Settings › Auto Generated Mixes, so it's made when you ask.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("None made yet. Auto update is off in Settings › Radios & mixes › Today's mix and vibes, so it's made when you ask.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Spacer(Modifier.width(Space.Page))
             FilledTonalButton(onClick = onMake) { Text("Make it") }
@@ -912,7 +912,7 @@ internal fun madeForYouCaption(trackCount: Int?, aiDown: Boolean, prompt: String
     else -> prompt
 }
 
-/** The most shortcuts on Home, and the fewest (Settings › Style › Home, issue #934). */
+/** The most shortcuts on Home, and the fewest (Settings › Home page, issue #934). */
 internal const val QUICK_COUNT = 8
 internal const val QUICK_MIN = 2
 

@@ -33,7 +33,7 @@ request, and says which page in its description.
 ## Writing
 
 - Plain, short English, for the app's users. Name screens and settings exactly as the app shows them, with `›`
-  between steps: **Settings › Playback › Keep playing**.
+  between steps: **Settings › Radios & mixes › When the queue ends**.
 - Say what something does and when it's useful, then the details.
 - No passwords, tokens, private addresses or log excerpts with personal data.
 
