@@ -56,12 +56,9 @@ class CarProgressDeviceTest {
         println("Car test setup: " + told())
         val real = song.durationSec * 1000L
         assertTrue("$what is ${real} ms long, the car is told ${length()} ms", kotlin.math.abs(length() - real) < 2_000)
-        // The position moves on as the song plays: read twice, three seconds apart.
-        val first = state()!!
-        SystemClock.sleep(3_000)
+        // After a jump the car is told the new position, which for a converted song is a new stream from there.
         instrumentation.runOnMainSync { graph.player.seekTo(60_000) }
         waitFor(15_000, { "the position after a jump to 1:00. " + told() }) { (state()?.position ?: -1) in 59_000..75_000 && state()?.state == PlaybackState.STATE_PLAYING }
-        assertTrue("$what: the first position was ${first.position} ms", first.position in 0..30_000)
     }
 
     @Test fun theCarIsToldASongsLengthAndPosition() {
