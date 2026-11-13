@@ -181,4 +181,24 @@ class DynamicAccentTest {
     fun noSwatchesNoColour() {
         assertNull(DynamicAccent.seedOf(emptyList()))
     }
+
+    /** The owner, 13 Nov: an artist page's header in khaki, its Play in steel blue (the picture's sky) — a clash. */
+    @Test
+    fun playKeepsToTheHeadersFamily() {
+        val khaki = Color(0xFF8A7B55)
+        val steelBlue = Color(0xFF4A7BB5)
+        // Another family: Play takes the header's colour, and its colours are then of khaki's hue (yellowish).
+        assertTrue(DynamicAccent.inFamily(steelBlue, khaki) == khaki)
+        val c = DynamicAccent.of(steelBlue, pageBackdrop(Color(0xFF121212), khaki), tint = khaki)!!.controls
+        assertTrue("of the header's family, not blue: $c", c.red > c.blue && c.green > c.blue)
+        // The same family (an orange logo on a red cover) keeps the seed; grey on either side changes nothing.
+        val red = Color(0xFFB02020)
+        val orange = Color(0xFFE08020)
+        assertTrue(DynamicAccent.inFamily(orange, red) == orange)
+        assertTrue(DynamicAccent.inFamily(steelBlue, Color(0xFF808080)) == steelBlue)
+        assertTrue(DynamicAccent.inFamily(Color(0xFF808080), khaki) == Color(0xFF808080))
+        assertTrue(DynamicAccent.inFamily(steelBlue, null) == steelBlue)
+        // Without a header tint (now playing), as before.
+        assertTrue(DynamicAccent.of(steelBlue, Color(0xFF101418))!!.controls.blue > 0.5f)
+    }
 }

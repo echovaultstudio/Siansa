@@ -143,7 +143,8 @@ not here.
   the cover (an artist's picture; a radio's or mix's own drawn cover; a book's or podcast's) instead of your theme's,
   fading from song to song. On those pages only Play takes it;
   Shuffle and the other buttons keep your theme's, and an artist's heart is red once they're a favourite. It's the colour that fills most of the
-  cover, a little calmer than on the cover itself, so it sits with the cover rather than shouting over it: a sepia
+  cover, a little calmer than on the cover itself, so it sits with the cover rather than shouting over it, and on a page
+  with a coloured header it stays in the header's family (a khaki header never gets a blue Play from the same picture): a sepia
   cover with a red light in it gets tan, not red, and a muted colour stays muted; a cover in black and white gets
   silver, and so does one with a few small spots of different colours. The colour is lightened or darkened as much as
   it needs to be to stand out from what's behind it, in the light theme too.

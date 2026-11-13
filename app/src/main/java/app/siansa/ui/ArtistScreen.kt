@@ -231,7 +231,7 @@ fun ArtistScreen(nav: NavController, id: String) {
 
     // With Dynamic colours, only Play takes the picture's colour (the owner, 10 Nov): Radio, Shuffle and the heart stay
     // as they are, so the row doesn't shout.
-    val playColours = rememberPageColours(pictureId, pageBackdrop(MaterialTheme.colorScheme.surface, tint), where = "Artist page")
+    val playColours = rememberPageColours(pictureId, pageBackdrop(MaterialTheme.colorScheme.surface, tint), where = "Artist page", tint = tint)
     HeroPage(
         title = p?.artist?.name ?: "Artist",
         heroHeight = HERO,
