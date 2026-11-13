@@ -123,6 +123,23 @@ Downloads, mobile data, Android Auto, the mini player, arranging Home, cards and
 are their settings: the TV's pages leave out what it can't use (the Time Machine's option, the book player's skips,
 Audiobookshelf, the mobile-data quality).
 
+## What it keeps on the TV
+
+The TV app plays from your server at home, so it keeps little on the TV, and nothing needs setting:
+
+- up to 512 MB of songs it has played, so they start at once the next time;
+- up to 200 MB of covers;
+- up to 300 MB of animated covers, when **Animated covers** is on. One that's removed plays again after downloading
+  it once more; lists keep their still of it.
+
+That's about 1 GB together. Siansa also leaves 1 GB of the TV's storage free: on a TV with less room it keeps less of
+each, animated covers first. Each time the app starts it removes what was played longest ago until it's within these
+sizes, and the log's first lines say what it keeps (`Storage: …`). The list of your library and the debug logs come
+on top.
+
+Siansa TV and Siansa TV Dev are two apps, and each keeps its own. To give the room back at once, remove the one you
+don't use, or clear its cache in the TV's own **Settings › Apps**.
+
 ## Reporting a problem
 
 Debug logs are on in the TV app from the start, so when something goes wrong the log already has it. Make the problem
