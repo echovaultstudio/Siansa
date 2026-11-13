@@ -159,6 +159,39 @@ class BeatsSoundTest {
         assertEquals("/api/v1/audiomuse/api/sync?ids=a", BeatsSound.path("/api/sync?ids=a"))
     }
 
+    /**
+     * Siansa Beats 0.44 (the owner, 13 Nov) has paths of its own for what songs sound like and says them in its
+     * capabilities: the app asks there. An older one says none, and is asked where it always was.
+     */
+    @Test fun siansaBeatsIsAskedAtItsOwnPathsWhenItSaysThem() {
+        val caps = BeatsApi.Capabilities.parse(AppJson.parseToJsonElement(
+            """{"version":"0.44.0","api":1,"features":{"sound":{"available":true,"songs":46000,"prefix":"/api/v1/audiomuse",
+               "answers":["/api/similar_tracks","/api/sync","/api/clap/search"],
+               "paths":{"/api/similar_tracks":"/api/v1/sound/similar","/api/sync":"/api/v1/sound/songs",
+                        "/api/clap/search":"/api/v1/sound/search","/api/not_answered":"/api/v1/sound/else","/api/find_path":"http://elsewhere/x"}}}}""",
+        ) as JsonObject)
+        assertEquals("/api/v1/sound/similar", caps.soundPaths["/api/similar_tracks"])
+        var kept: Map<String, String>? = null
+        BeatsSound.onChanged = { _, where -> kept = where }
+        try {
+            BeatsSound.heard(caps.sound, caps.soundPaths)
+            assertEquals("/api/v1/sound/similar?item_id=s1&n=5", BeatsSound.path("/api/similar_tracks?item_id=s1&n=5"))
+            assertEquals("/api/v1/sound/songs?ids=a", BeatsSound.path("/api/sync?ids=a"))
+            assertEquals("/api/v1/sound/search", BeatsSound.path("/api/clap/search"))
+            // Only for what it answers, and only a path of its own: anything else is asked where it always was.
+            assertEquals(setOf("/api/similar_tracks", "/api/sync", "/api/clap/search"), kept!!.keys)
+            assertEquals("/api/v1/audiomuse/api/find_path?start_song_id=a", BeatsSound.path("/api/find_path?start_song_id=a"))
+            // Kept for the next start, and an older Siansa Beats (no paths) is asked under the old prefix again.
+            BeatsSound.restore(caps.sound, kept!!)
+            assertEquals("/api/v1/sound/songs?ids=a", BeatsSound.path("/api/sync?ids=a"))
+            BeatsSound.heard(caps.sound)
+            assertEquals("/api/v1/audiomuse/api/sync?ids=a", BeatsSound.path("/api/sync?ids=a"))
+            assertEquals(emptyMap<String, String>(), kept)
+        } finally {
+            BeatsSound.onChanged = null
+        }
+    }
+
     /** From the owner's log, 11 Nov: similar songs still came from Navidrome's AudioMuse-AI plugin. */
     @Test fun similarSongsAreAskedOfSiansaBeatsBeforeTheMusicServersPlugin() {
         assertEquals(app.siansa.mix.SonicRoute.BEATS, app.siansa.mix.sonicRoute(navidromeSonic = true, audioMuseReady = true, beatsSound = true))
