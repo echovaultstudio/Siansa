@@ -364,11 +364,7 @@ class PlayerConnection(
     fun toggleShuffle() = withController { it.shuffleModeEnabled = !it.shuffleModeEnabled }
 
     fun cycleRepeat() = withController { c ->
-        c.repeatMode = when (c.repeatMode) {
-            Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
-            Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
-            else -> Player.REPEAT_MODE_OFF
-        }
+        c.repeatMode = app.siansa.car.CarButtons.nextRepeat(c.repeatMode)
         // Shown at once rather than when the service reports back, so the button answers the tap (issue #370).
         refresh()
     }

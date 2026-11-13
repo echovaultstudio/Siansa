@@ -92,8 +92,9 @@ closed. Siansa tries once more by itself; it's only a problem if the second try 
 - Levelling needs ReplayGain tags in your files, or the Siansa plugin as the source.
 - Smart crossfades need the plugin's measurements; until a song is measured, the fixed length is used.
 - Crossfades don't happen while casting, with Repeat one, or while the sleep timer lets a song finish.
-- Repeat and shuffle are changed in Siansa only: a car's or a headset's own repeat or shuffle button doesn't change
-  them (some cars switched repeat on by themselves when the song changed). The log says when one asked.
+- Repeat and shuffle are changed in Siansa only, in the app or with Siansa's own Shuffle and Repeat buttons in
+  Android Auto and the notification: a car's or a headset's own repeat or shuffle button doesn't change them (some
+  cars switched repeat on by themselves when the song changed). The log says when one asked.
 
 ## Nothing on a TV or speaker when casting
 
