@@ -16,6 +16,7 @@ import app.siansa.data.RecentPlay
 import app.siansa.data.SearchResults
 import app.siansa.data.Song
 import app.siansa.data.cover
+import app.siansa.data.normalizeKey
 import app.siansa.data.picture
 import app.siansa.mix.MoodRadio
 import java.net.URLDecoder
@@ -40,6 +41,8 @@ sealed class CarId {
     data class Mood(val id: String) : CarId()
     /** The songs found for a search, so picking one plays the rest of them after it. */
     data class Search(val query: String) : CarId()
+    /** One letter's part of a long list ([list] is Albums or Artists), named by its [key] in [CarIndex]. */
+    data class Letter(val list: CarId, val key: String) : CarId()
     /** A song in a list: [list] is the list it was picked from, which then plays from it. */
     data class Song(val list: CarId, val songId: String) : CarId()
 
@@ -58,6 +61,7 @@ sealed class CarId {
             is Mix -> "mix:" + enc(id)
             is Mood -> "mood:" + enc(id)
             is Search -> "search:" + enc(query)
+            is Letter -> "letter:" + enc(list.mediaId) + ":" + enc(key)
             is Song -> "song:" + enc(list.mediaId) + ":" + enc(songId)
         }
 
@@ -91,6 +95,12 @@ sealed class CarId {
                     "mix" -> Mix(dec(rest))
                     "mood" -> Mood(dec(rest))
                     "search" -> Search(dec(rest))
+                    "letter" -> {
+                        val parts = rest.split(':')
+                        if (parts.size != 2) return null
+                        val list = parse(dec(parts[0])) ?: return null
+                        Letter(list, dec(parts[1]))
+                    }
                     "song" -> {
                         val parts = rest.split(':')
                         if (parts.size != 2) return null
@@ -142,6 +152,44 @@ data class CarQueue(
     val cover: String? = null,
 )
 
+/** One folder of a long list split by letter: [key] is its name in the car, [range] says from which name to which when a letter is in several parts. */
+data class CarGroup<T>(val key: String, val range: String?, val entries: List<T>)
+
+/**
+ * A long list of albums or artists as a folder for each letter (issues #1040, #1041). A list reaches the car whole
+ * only up to 256 KB (Media3 cuts what's over, without a word), a few hundred albums or artists, and the car's own
+ * "Jump to letter" only knows the letters of what reached it: with more, the later letters were grey and their
+ * albums and artists couldn't be reached. So a list longer than [WHOLE] is handed over as letters, each opening to
+ * its part, and a letter with more than [WHOLE] itself in parts of that size.
+ */
+object CarIndex {
+    /** The longest list handed to the car as it is: well inside what reaches it (about 500 short entries). */
+    const val WHOLE = 200
+
+    /** What comes before the letters: names that start with a digit or a sign, as the car's own index calls them. */
+    const val DIGITS = "123"
+
+    /** The letter [name] is listed under, as the library orders it (no accents, no leading signs). */
+    fun letterOf(name: String): String {
+        val first = normalizeKey(name).firstOrNull() ?: return DIGITS
+        return if (first.isLetter()) first.uppercaseChar().toString() else DIGITS
+    }
+
+    /** [entries] (in the library's order) by letter, or null when the list is short enough to go as it is. */
+    fun <T> groups(entries: List<T>, limit: Int = WHOLE, name: (T) -> String): List<CarGroup<T>>? {
+        if (entries.size <= limit) return null
+        val byLetter = LinkedHashMap<String, MutableList<T>>()
+        for (entry in entries) byLetter.getOrPut(letterOf(name(entry))) { ArrayList() }.add(entry)
+        return byLetter.flatMap { (letter, list) ->
+            if (list.size <= limit) return@flatMap listOf(CarGroup(letter, null, list))
+            val parts = list.chunked(limit)
+            parts.mapIndexed { i, part ->
+                CarGroup("$letter (${i + 1} of ${parts.size})", "${name(part.first())} – ${name(part.last())}", part)
+            }
+        }
+    }
+}
+
 /**
  * The browse tree Android Auto shows (issue #62): four tabs (Home, Playlists, Albums, Artists), each opening to songs
  * to play, and search. Kept apart from the service so it can be tested on its own: [library] gives the data and
@@ -160,8 +208,9 @@ class CarTree(private val library: CarLibrary, private val coverUri: (String) ->
         CarId.Home -> folder(id, "Home")
         CarId.Recent -> folder(id, "Recently played")
         CarId.Playlists -> folder(id, "Playlists")
-        CarId.Albums -> folder(id, "Albums", grid = true)
+        CarId.Albums -> folder(id, "Albums", grid = albumGroups() == null)
         CarId.Artists -> folder(id, "Artists")
+        is CarId.Letter -> folder(id, id.key, grid = id.list == CarId.Albums)
         is CarId.Album -> library.album(id.id)?.let(::albumItem) ?: folder(id, "Album")
         is CarId.Artist -> library.artist(id.id)?.let(::artistItem) ?: folder(id, "Artist")
         is CarId.Playlist -> library.playlist(id.id)?.playlist?.let(::playlistItem) ?: folder(id, "Playlist")
@@ -176,14 +225,20 @@ class CarTree(private val library: CarLibrary, private val coverUri: (String) ->
         CarId.Root -> listOf(
             folder(CarId.Home, "Home"),
             folder(CarId.Playlists, "Playlists"),
-            folder(CarId.Albums, "Albums", grid = true),
+            // Albums show as a grid of covers; their letters, when there are too many for one list, as a list.
+            folder(CarId.Albums, "Albums", grid = albumGroups() == null),
             folder(CarId.Artists, "Artists"),
         )
         CarId.Home -> home()
         CarId.Recent -> library.recent().mapNotNull(::recentItem)
         CarId.Playlists -> library.playlists().map(::playlistItem)
-        CarId.Albums -> library.albums().map(::albumItem)
-        CarId.Artists -> library.artists().map(::artistItem)
+        CarId.Albums -> albumGroups()?.map { letterItem(CarId.Albums, it, "albums") } ?: library.albums().map(::albumItem)
+        CarId.Artists -> artistGroups()?.map { letterItem(CarId.Artists, it, "artists") } ?: library.artists().map(::artistItem)
+        is CarId.Letter -> when (id.list) {
+            CarId.Albums -> albumGroups()?.firstOrNull { it.key == id.key }?.entries.orEmpty().map(::albumItem)
+            CarId.Artists -> artistGroups()?.firstOrNull { it.key == id.key }?.entries.orEmpty().map(::artistItem)
+            else -> null
+        }
         is CarId.Artist -> artistSongs(id.id).map { songItem(it, id, it.album.ifBlank { null }) }
         is CarId.Album, is CarId.Playlist, is CarId.Mix, is CarId.Search -> songsOf(id).map { songItem(it, id, null) }
         else -> null
@@ -228,6 +283,14 @@ class CarTree(private val library: CarLibrary, private val coverUri: (String) ->
         found.artists.firstOrNull()?.let { a -> queue(CarId.Artist(a.id).mediaId)?.let { return it } }
         return null
     }
+
+    /** The albums by letter when there are too many for the car to take as one list ([CarIndex]), else null. */
+    private suspend fun albumGroups(): List<CarGroup<Album>>? = CarIndex.groups(library.albums()) { it.name }
+    private suspend fun artistGroups(): List<CarGroup<Artist>>? = CarIndex.groups(library.artists()) { it.name }
+
+    /** A letter of [list] to open: how many it holds, or from which name to which when the letter is in parts. */
+    private fun letterItem(list: CarId, group: CarGroup<*>, what: String): MediaItem =
+        folder(CarId.Letter(list, group.key), group.key, subtitle = group.range ?: "${group.entries.size} $what", grid = list == CarId.Albums)
 
     private suspend fun home(): List<MediaItem> {
         val recent = if (library.recent().any { recentItem(it) != null }) listOf(folder(CarId.Recent, "Recently played")) else emptyList()

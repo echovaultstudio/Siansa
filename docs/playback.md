@@ -373,8 +373,11 @@ Siansa shows up in Android Auto as a music app. On the car's screen you can brow
 Picking a song plays its whole list from that song, the same as tapping it on the phone. Mood radios play straight
 away. Albums, playlists and mixes played from the car show up in **Recently played** on the phone's Home too.
 
-Very long lists show their first 1,000 entries in the car; search for anything further down. Covers are loaded by the
-phone and handed to the car, so the car never needs to reach your server.
+With more than 200 albums or artists, **Albums** and **Artists** open to a folder for each letter (**123** for names
+that start with a number), so every one of them can be reached; a letter with more than 200 is in parts. Other very
+long lists, such as a playlist of many hundred songs, show only their first few hundred in the car, as much as a car
+takes in one list. Picking a song still plays the whole list from it; search for anything further down. Covers are
+loaded by the phone and handed to the car, so the car never needs to reach your server.
 
 **Siansa not in Android Auto?** Android Auto only lists apps installed from Google Play, unless you allow others.
 Siansa from F-Droid, GitHub or Siansa Dev needs this once:

@@ -33,6 +33,34 @@ class GraphCarLibrary(private val graph: AppGraph) : CarLibrary {
     override suspend fun anything(): List<Song> = graph.library.randomSongs(100)
 }
 
+/**
+ * What the car browses: the phone's library, or the one the emulator's car test has put in [standIn], so the test can
+ * ask the real service, as a car does, about a library far larger than the test server's (issues #1040, #1041).
+ */
+class CarLibraryOrStandIn(private val real: CarLibrary) : CarLibrary {
+    private val now: CarLibrary get() = standIn ?: real
+    override suspend fun mixes() = now.mixes()
+    override suspend fun mix(id: String) = now.mix(id)
+    override fun moods() = now.moods()
+    override suspend fun moodSongs(id: String) = now.moodSongs(id)
+    override suspend fun recent() = now.recent()
+    override suspend fun playlists() = now.playlists()
+    override suspend fun playlist(id: String) = now.playlist(id)
+    override suspend fun albums() = now.albums()
+    override suspend fun album(id: String) = now.album(id)
+    override suspend fun albumSongs(id: String) = now.albumSongs(id)
+    override suspend fun artists() = now.artists()
+    override suspend fun artist(id: String) = now.artist(id)
+    override suspend fun artistSongs(id: String) = now.artistSongs(id)
+    override suspend fun search(query: String) = now.search(query)
+    override suspend fun anything() = now.anything()
+
+    companion object {
+        /** Only ever set by a test. */
+        @Volatile var standIn: CarLibrary? = null
+    }
+}
+
 /** The newest mix of each vibe, newest first: what Home shows as today's mixes. */
 fun latestMixes(all: List<Mix>): List<Mix> =
     all.groupBy { it.selectorId }.values.mapNotNull { mixes -> mixes.maxByOrNull { it.createdAt } }
