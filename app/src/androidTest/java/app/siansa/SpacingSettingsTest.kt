@@ -236,14 +236,14 @@ class SpacingSettingsTest : SpacingCheck() {
         assertEven("API key hint", hint.top - password.bottom, key.top - hint.bottom)
     }
 
-    /** Style › Phone's top bar (issue #681): its chips sit evenly between the heading and the hint. */
+    /** Theme › Status bar (issue #681; a fold since 13 Nov): its chips sit evenly between the lead line and the hint. */
     @Test fun topBarChipsAreEvenlySpaced() {
         compose.setContent {
             SiansaTheme {
                 app.siansa.ui.TopBarChoice(app.siansa.data.TopBarStyle.BLACK) { }
             }
         }
-        val title = compose.onNodeWithText("Phone's top bar").getBoundsInRoot()
+        val title = compose.onNodeWithText("The clock and battery at the top of the screen.").getBoundsInRoot()
         val chips = compose.onNodeWithTag("topBar-HIDDEN").getBoundsInRoot()
         val hint = compose.onNodeWithText(app.siansa.data.TopBarStyle.BLACK.hint).getBoundsInRoot()
         assertEven("Top bar chips", chips.top - title.bottom, hint.top - chips.bottom)
@@ -354,7 +354,10 @@ class SpacingSettingsTest : SpacingCheck() {
         assertEven("The rows line up", dp(tiles[2].left), dp(tiles[0].left), 1.dp)
     }
 
-    /** Settings' services (the owner, 13 Nov): the tiles are one height, a lone last one spans the row, the dots sit level with their names. */
+    /**
+     * Settings' services (the owner, 13 Nov): the tiles are one height and a small step apart, a lone last one spans
+     * the row, and the card's margin above its label is the margin below its tiles (Manage is no taller than the label).
+     */
     @Test fun settingsServiceTilesAreEven() {
         val s = app.siansa.data.AppSettings(
             navidromeUrl = "https://music.example", navidromeUser = "max", navidromePassword = "x",
@@ -377,6 +380,9 @@ class SpacingSettingsTest : SpacingCheck() {
         assertEven("Gap between service rows", lastfm.top - beats.bottom, Space.Small, 1.dp)
         // Three services: the last tile spans the row.
         assertEven("A lone tile spans the row", lastfm.right, books.right, 1.dp)
+        val card = compose.onNodeWithTag("hubServices").getBoundsInRoot()
+        val label = compose.onNodeWithText("SERVICES").getBoundsInRoot()
+        assertEven("The card's margins", label.top - card.top, card.bottom - lastfm.bottom, Space.Tight)
     }
 
     /** First run (issue #113): every source in the picker is one row height, the text centred against its icon. */

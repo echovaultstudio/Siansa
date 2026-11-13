@@ -996,6 +996,9 @@ enum class Service(val id: String, val label: String, val gives: String) {
     LISTENBRAINZ("listenbrainz", "ListenBrainz / Koito", "Your listening, sent to ListenBrainz or a Koito of your own."),
     AI("ai", "AI", "Mix titles and sound searches in your own words.");
 
+    /** The name on a half-width tile, where "ListenBrainz / Koito" would be cut off. */
+    val short: String get() = if (this == LISTENBRAINZ) "ListenBrainz" else label
+
     /** Which card on Connections sets it up. */
     val connection: String get() = when (this) {
         BEATS -> "beats"; AUDIOMUSE -> "audiomuse"; BOOKS -> "books"; AI -> "ai"; LASTFM, LISTENBRAINZ -> "scrobbling"

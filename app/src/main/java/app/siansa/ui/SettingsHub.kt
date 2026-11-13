@@ -221,14 +221,18 @@ internal fun ServicesCard(s: AppSettings, health: Map<String, ServiceCheck>, onO
     SettingsCard(tag = "hubServices") {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             HubGroupLabel("Services", Modifier.weight(1f))
-            TextButton(onClick = onOpen, modifier = Modifier.testTag("hubManage")) { Text("Manage") }
+            // As tall as the label's line, not a button's 40 dp: the card's top and bottom margins stay the same.
+            TextButton(onClick = onOpen, contentPadding = PaddingValues(horizontal = Space.Small), modifier = Modifier.height(Space.Section).testTag("hubManage")) { Text("Manage") }
         }
         if (on.isEmpty()) {
             Text("No service is on. Siansa works from your music server alone.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         } else {
-            on.chunked(2).forEach { pair ->
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
-                    pair.forEach { service -> ServiceTile(service, health[service.id], Modifier.weight(1f), onOpen) }
+            // The rows a small step apart, like the page tiles below (the card's own gap is a step bigger).
+            Column(verticalArrangement = Arrangement.spacedBy(Space.Small)) {
+                on.chunked(2).forEach { pair ->
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+                        pair.forEach { service -> ServiceTile(service, health[service.id], Modifier.weight(1f), onOpen) }
+                    }
                 }
             }
         }
@@ -238,10 +242,11 @@ internal fun ServicesCard(s: AppSettings, health: Map<String, ServiceCheck>, onO
 @Composable
 private fun ServiceTile(service: Service, check: ServiceCheck?, modifier: Modifier, onClick: () -> Unit) {
     Surface(color = MaterialTheme.colorScheme.surfaceContainer, shape = MaterialTheme.shapes.medium, modifier = modifier.height(64.dp).clickable(onClick = onClick).testTag("hubService-${service.id}")) {  // spacing: exact
-        Row(Modifier.padding(horizontal = Space.Medium), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
-            ServiceDot(check?.ok)
-            Column(Modifier.weight(1f)) {
-                Text(service.label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        // The name on its own line, so "Audiobookshelf" fits; the dot beside the words it stands for, as on the Services page.
+        Column(Modifier.fillMaxSize().padding(horizontal = Space.Medium), verticalArrangement = Arrangement.Center) {
+            Text(service.short, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+                ServiceDot(check?.ok)
                 Text(check?.words ?: "Checking…", style = MaterialTheme.typography.labelSmall, color = if (check?.ok == false) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }

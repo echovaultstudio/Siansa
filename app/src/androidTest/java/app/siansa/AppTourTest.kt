@@ -352,7 +352,8 @@ class AppTourTest {
                 // The services' page, from Manage on the start page.
                 tab("Settings")
                 waitText("Manage")
-                compose.onNodeWithTag("hubManage").performClick()
+                // Scrolled into view: the start page stays where the last tile left it.
+                compose.onNodeWithTag("hubManage").performScrollTo().performClick()
                 idle(1500)
                 shot("19-settings-services")
                 if (!exists("Siansa Beats")) problems += "Services doesn't list Siansa Beats"
