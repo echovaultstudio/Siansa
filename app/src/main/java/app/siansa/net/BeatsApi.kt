@@ -48,7 +48,7 @@ class BeatsApi(private val http: OkHttpClient, private val settings: () -> AppSe
     private fun key(s: AppSettings) = listOf(s.beatsUrl, s.sourceKind.name, s.navidromeUrl, s.navidromeUser).joinToString("|")
 
     private fun remember(caps: Capabilities): String? {
-        BeatsSound.heard(caps.sound)
+        BeatsSound.heard(caps.sound, caps.soundPaths)
         val s = settings()
         val id = serverFor(caps.servers, s.sourceKind, s.navidromeUrl, s.navidromeUser)
         if (chosen?.let { it.key == key(s) && it.id == id } != true) {
@@ -111,6 +111,8 @@ class BeatsApi(private val http: OkHttpClient, private val settings: () -> AppSe
         val genres: Boolean,
         /** AudioMuse-AI's paths it answers from the songs' sound (0.25, [BeatsSound]); empty before, or with none. */
         val sound: Set<String> = emptySet(),
+        /** Siansa Beats' own path for each of them (0.44: `/api/similar_tracks` → `/api/v1/sound/similar`); empty before. */
+        val soundPaths: Map<String, String> = emptyMap(),
         /** Which kind of music server these numbers are of ("navidrome", "emby", "jellyfin"). */
         val musicServer: String?,
         /** That server's id there (Siansa Beats 0.23), and every server it reads. */
@@ -131,6 +133,8 @@ class BeatsApi(private val http: OkHttpClient, private val settings: () -> AppSe
                         .mapNotNull { (it as? kotlinx.serialization.json.JsonPrimitive)?.content }.toSet() +
                         // It takes listens (0.29): kept with what it answers, so the switch shows without asking again.
                         setOfNotNull(BeatsListens.PATH.takeIf { feature("scrobbling")?.get("available")?.toString() == "true" }),
+                    soundPaths = (feature("sound")?.get("paths") as? JsonObject).orEmpty()
+                        .mapNotNull { (name, path) -> (path as? kotlinx.serialization.json.JsonPrimitive)?.content?.let { name to it } }.toMap(),
                     musicServer = (body["music_server"] as? JsonObject)?.str("kind"),
                     serverId = (body["music_server"] as? JsonObject)?.str("id"),
                     servers = (body["servers"] as? kotlinx.serialization.json.JsonArray).orEmpty().mapNotNull { it as? JsonObject }.mapNotNull { o ->
