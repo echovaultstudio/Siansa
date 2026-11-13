@@ -80,8 +80,12 @@ private fun soft(colors: Pair<Color, Color>, quiet: CardPaint) =
     CardPaint(quiet.base, Brush.linearGradient(listOf(colors.first.copy(alpha = SOFT_ALPHA), colors.second.copy(alpha = SOFT_ALPHA))), quiet.text, quiet.faint)
 
 /** Fills a card with [paint] in [shape]: the solid, then the wash over it. */
-fun Modifier.cardFill(paint: CardPaint, shape: Shape): Modifier =
-    background(paint.base, shape).then(paint.wash?.let { background(it, shape) } ?: Modifier)
+fun Modifier.cardFill(paint: CardPaint, shape: Shape): Modifier {
+    // The wash on a fresh Modifier: on `this` it would carry the chain before it (the card's padding) a second time,
+    // and paint the wash a padding's width inside the solid (the owner, 13 Nov: a grey frame round Today's mix).
+    val wash = paint.wash?.let { Modifier.background(it, shape) } ?: Modifier
+    return background(paint.base, shape).then(wash)
+}
 
 /** The sample card's own colours, and the ones standing in for a picture's in the look that takes the picture's. */
 private val SAMPLE_COLOURS = Color(0xFFD6338A) to Color(0xFF4A1470)
