@@ -139,7 +139,7 @@ class HomeMenuState {
     internal val rows = mutableStateMapOf<HomeMenuItem, MenuBounds>()
 
     fun show(glide: Boolean) {
-        rows.clear()
+        if (!open) rows.clear()  // open already: the places are where they are
         highlighted = null
         gliding = glide
         open = true
@@ -215,12 +215,14 @@ fun HomeMenuButton(
             .semantics {
                 contentDescription = description
                 role = Role.Button
-                onClick { state.show(glide = false); true }
+                onClick { if (state.open) state.close() else state.show(glide = false); true }
             }
             .pointerInput(state) {
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
                     down.consume()
+                    // Open already (the cross): a tap closes it; a glide from the cross still picks a place.
+                    val wasOpen = state.open
                     state.show(glide = true)
                     val slop = viewConfiguration.touchSlop
                     var moved = false
@@ -247,7 +249,7 @@ fun HomeMenuButton(
                         state.highlighted = null
                     }
                     when (glideEnd(moved, row)) {
-                        GlideEnd.STAY_OPEN -> Unit
+                        GlideEnd.STAY_OPEN -> if (wasOpen && !moved) state.close()
                         GlideEnd.CLOSE -> state.close()
                         GlideEnd.PICK -> {
                             state.close()

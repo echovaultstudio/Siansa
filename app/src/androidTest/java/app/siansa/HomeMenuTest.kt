@@ -140,6 +140,21 @@ class HomeMenuTest {
         assertEquals(0, scroll.value)
     }
 
+    @Test fun aTapOnTheCrossClosesTheMenu() {
+        // The owner, 13 Nov: open, the button (now a cross) did nothing; only a scroll closed the menu.
+        home()
+        compose.onNodeWithTag("homeMenu").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithTag("homeMenuPanel").assertIsDisplayed()
+        compose.onNodeWithTag("homeMenu").performClick()
+        compose.waitForIdle()
+        assertTrue("The menu is closed", compose.onAllNodesWithTagCount("homeMenuPanel") == 0)
+        // And open again after that.
+        compose.onNodeWithTag("homeMenu").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithTag("homeMenuPanel").assertIsDisplayed()
+    }
+
     @Test fun aTapOpensTheMenuInTheRowAndItsPlacesOpen() {
         home()
         compose.onNodeWithTag("homeMenu").performClick()
