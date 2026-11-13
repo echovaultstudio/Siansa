@@ -126,3 +126,38 @@ fun <T> List<T>.moved(from: Int, to: Int): List<T> {
     if (from == to || from !in indices || to !in indices) return this
     return toMutableList().apply { add(to, removeAt(from)) }
 }
+
+/**
+ * How the coloured cards on Home are painted (the owner, 13 Nov: some were too dominant): Today's mix, the book and
+ * podcast cards, Made for you, Radios and the other generated tiles. Never the shortcut grid. One choice for the whole
+ * of Home under Arrange Home, and a card's own under its cog ([AS_HOME] follows Home's).
+ */
+enum class CardLook(val id: String, val label: String, val hint: String) {
+    AS_HOME("as_home", "As Home", "The choice made for the whole of Home"),
+    VIVID("vivid", "Vivid", "Its own full colour"),
+    SOFT("soft", "Soft", "Its colour at a third of its strength over the dark surface"),
+    PLAIN("plain", "Plain", "The same grey as the shortcut tiles; colour only in the artwork"),
+    ARTWORK("artwork", "From the artwork", "A muted colour taken from its own artwork, as the listening pages' headers");
+
+    companion object {
+        /** The choices for the whole of Home: all but [AS_HOME]. */
+        val forHome: List<CardLook> = entries.filter { it != AS_HOME }
+        val DEFAULT = VIVID
+
+        fun of(id: String?): CardLook? = entries.firstOrNull { it.id == id }
+
+        /** Reads the saved cards' looks ("today:soft,radios:plain"); unknown sections and looks are dropped. */
+        fun parse(saved: String?): Map<HomeSection, CardLook> {
+            if (saved.isNullOrBlank()) return emptyMap()
+            return saved.split(',').mapNotNull { pair ->
+                val (section, look) = pair.split(':').takeIf { it.size == 2 } ?: return@mapNotNull null
+                val s = HomeSection.entries.firstOrNull { it.id == section.trim() } ?: return@mapNotNull null
+                val l = of(look.trim()) ?: return@mapNotNull null
+                if (l != AS_HOME) s to l else null
+            }.toMap()
+        }
+
+        fun format(looks: Map<HomeSection, CardLook>): String =
+            HomeSection.entries.mapNotNull { s -> looks[s]?.let { "${s.id}:${it.id}" } }.joinToString(",")
+    }
+}

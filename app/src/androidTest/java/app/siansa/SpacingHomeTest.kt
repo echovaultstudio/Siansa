@@ -287,6 +287,23 @@ class SpacingHomeTest : SpacingCheck() {
         }
     }
 
+    /** Arrange Home's Cards (the owner, 13 Nov): four small cards of one size, an even gap apart, page margins at the ends. */
+    @Test fun cardLookChooserIsFourEvenCards() {
+        compose.setContent {
+            SiansaTheme {
+                app.siansa.ui.CardLookChooser(app.siansa.data.CardLook.SOFT, app.siansa.data.CardLook.forHome, Modifier.padding(horizontal = Space.Page)) {}
+            }
+        }
+        val screen = compose.onRoot().getBoundsInRoot()
+        val cards = app.siansa.data.CardLook.forHome.map { compose.onNodeWithTag("cardLook-${it.id}").getBoundsInRoot() }
+        assertEven("Cards: left margin", cards.first().left - screen.left, Space.Page, 1.dp)
+        assertEven("Cards: right margin", screen.right - cards.last().right, Space.Page, 1.dp)
+        val width = cards[0].right - cards[0].left
+        cards.forEach { assertEven("Cards: each as wide as the first", it.right - it.left, width, 1.dp) }
+        val gaps = cards.zipWithNext { a, b -> b.left - a.right }
+        gaps.forEach { assertEven("Cards: the gap between them", it, Space.Medium, 1.dp) }
+    }
+
     /** Home's rows as a list (issue #655): five rows of one height, evenly spaced. */
     @Test fun homeLookListRowsAreEven() {
         val items = (1..8).map { app.siansa.ui.HomeItem("a$it", "Album $it", "Artist", open = {}) }

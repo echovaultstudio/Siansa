@@ -1,6 +1,15 @@
 package app.siansa.ui
 
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.foundation.layout.Arrangement
+import app.siansa.data.CardLook
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.background
+import androidx.compose.material3.FilterChip
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Column
@@ -104,8 +113,18 @@ fun HomeSettingsSheet(nav: androidx.navigation.NavController, startOnSources: Bo
             graph.settings.setHomeGridSize(section, size)
         },
         onResetLooks = {
-            AppLog.i("Home", "Every row back in its own look")
+            AppLog.i("Home", "Every row back in its own look, every card in Home's colour")
             graph.settings.resetHomeLooks()
+        },
+        cardLook = s.homeCardLook,
+        cardLooks = s.homeCardLooks,
+        onCardLookChange = { look ->
+            AppLog.i("Home", "Cards: ${look.label}")
+            graph.settings.setHomeCardLook(look)
+        },
+        onSectionCardLookChange = { section, look ->
+            AppLog.i("Home", "${section.label}'s cards: ${look.label}")
+            graph.settings.setHomeCardLook(section, look)
         },
         onOpenSettings = { section ->
             onDismiss()
@@ -145,6 +164,11 @@ fun ArrangeHomeSheet(
     onOpenSettings: (HomeSection) -> Unit = {},
     // The sections listed here, in Reset's order: all but the notices, which are the top of Home (issue #872).
     sections: List<HomeSection> = HomeSection.default - HomeSection.NOTICES,
+    // How Home's coloured cards are painted (the owner, 13 Nov), and the sections with a look of their own.
+    cardLook: CardLook = CardLook.DEFAULT,
+    cardLooks: Map<HomeSection, CardLook> = emptyMap(),
+    onCardLookChange: (CardLook) -> Unit = {},
+    onSectionCardLookChange: (HomeSection, CardLook) -> Unit = { _, _ -> },
 ) {
     var picking by remember { mutableStateOf<HomeSection?>(null) }
     picking?.let { section ->
@@ -157,6 +181,9 @@ fun ArrangeHomeSheet(
             onDismiss = { picking = null },
             gridSize = gridSizes[section] ?: HomeLook.GRID_MOST,
             onGridSize = { onGridSizeChange(section, it) },
+            cardLook = cardLooks[section] ?: CardLook.AS_HOME,
+            homeCardLook = cardLook,
+            onCardLook = { onSectionCardLookChange(section, it) },
         )
     }
     var items by remember { mutableStateOf(order) }
@@ -223,7 +250,7 @@ fun ArrangeHomeSheet(
                 Column(Modifier.weight(1f)) {
                     Text("Arrange Home", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     Text(
-                        "Hold a row to move it. The eye hides it, the cog changes its look or hides its title.",
+                        "What's on Home, in what order, and how its cards look.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -241,15 +268,28 @@ fun ArrangeHomeSheet(
                             onHiddenChange(hiddenItems)
                         }
                         if (gap != AppSettings.HOME_GAP_DEFAULT) onGapChange(AppSettings.HOME_GAP_DEFAULT)
-                        if (looks.isNotEmpty()) onResetLooks()
+                        if (looks.isNotEmpty() || cardLook != CardLook.DEFAULT || cardLooks.isNotEmpty()) onResetLooks()
                     },
-                    enabled = items != sections || hiddenItems.any { it in sections } || gap != AppSettings.HOME_GAP_DEFAULT || looks.isNotEmpty(),
+                    enabled = items != sections || hiddenItems.any { it in sections } || gap != AppSettings.HOME_GAP_DEFAULT || looks.isNotEmpty() ||
+                        cardLook != CardLook.DEFAULT || cardLooks.isNotEmpty(),
                 ) { Text("Reset") }
             }
-            Spacer(Modifier.height(Space.Small))
+            // The cards' colour (the owner, 13 Nov): four small cards to pick by eye; never the shortcut grid.
+            SheetLabel("Cards")
+            CardLookChooser(cardLook, CardLook.forHome, Modifier.padding(horizontal = Space.Page), onPick = onCardLookChange)
+            Text(
+                "Every card on Home, not the shortcuts. A card can have its own under its cog.",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = Space.Page, end = Space.Page, top = Space.Small),
+            )
+            SheetLabel("Spacing")
             SpacingRow(gap, onGapChange)
-            androidx.compose.material3.HorizontalDivider(Modifier.padding(horizontal = Space.Page, vertical = Space.Tight), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-            LazyColumn(state = list, userScrollEnabled = dragging == null) {
+            SheetLabel("Sections", "hold to move")
+            // One grouped list (the owner, 13 Nov): the rows on a raised surface, a hairline between them.
+            LazyColumn(
+                state = list, userScrollEnabled = dragging == null,
+                modifier = Modifier.padding(horizontal = Space.Page).clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surfaceContainer).testTag("arrangeSections"),
+            ) {
                 items(items, key = { it.id }) { section ->
                     val lifted = section == dragging
                     val isHidden = section in hiddenItems
@@ -264,7 +304,6 @@ fun ArrangeHomeSheet(
                             )
                             .zIndex(if (lifted) 1f else 0f)
                             .graphicsLayer { translationY = if (lifted) offset else 0f }
-                            .padding(horizontal = Space.Small)
                             .then(if (lifted) Modifier.shadow(6.dp, RoundedCornerShape(12.dp)) else Modifier)
                             .fillMaxWidth()
                             .pointerInput(section) {
@@ -276,7 +315,7 @@ fun ArrangeHomeSheet(
                                 )
                             },
                     ) {
-                        Row(Modifier.height(52.dp).padding(start = Space.Small), verticalAlignment = Alignment.CenterVertically) {
+                        Row(Modifier.height(52.dp).padding(start = Space.Small).then(if (!lifted && section != items.first()) Modifier.hairlineAbove() else Modifier), verticalAlignment = Alignment.CenterVertically) {
                             // The handle moves straight away, without the hold.
                             Icon(
                                 Icons.Rounded.DragIndicator,
@@ -301,8 +340,8 @@ fun ArrangeHomeSheet(
                                     style = MaterialTheme.typography.bodyLarge,
                                     color = if (isHidden) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
                                 )
-                                // A row in another look says which (issue #655); a hidden one says so.
-                                val line = if (isHidden) "Hidden" else looks[section]?.label
+                                // A row in another look says which (issue #655), and its cards' own colour; a hidden one says so.
+                                val line = if (isHidden) "Hidden" else listOfNotNull(looks[section]?.label, cardLooks[section]?.label).joinToString(" · ").ifEmpty { null }
                                 if (line != null) Text(line, style = MaterialTheme.typography.bodySmall, color = if (isHidden) MaterialTheme.colorScheme.onSurfaceVariant else Accent, modifier = Modifier.testTag("homeLookLabel"))
                             }
                             IconButton(onClick = {
@@ -348,16 +387,39 @@ private fun HomeLookDialog(
     onDismiss: () -> Unit,
     gridSize: Int = HomeLook.GRID_MOST,
     onGridSize: (Int) -> Unit = {},
+    // Its cards' colour (the owner, 13 Nov): its own, or [CardLook.AS_HOME], which is [homeCardLook].
+    cardLook: CardLook = CardLook.AS_HOME,
+    homeCardLook: CardLook = CardLook.DEFAULT,
+    onCardLook: (CardLook) -> Unit = {},
 ) {
     // The switch shows its change at once: the dialog stays open for the look.
     var shown by remember(section) { mutableStateOf(titleShown) }
     var look by remember(section) { mutableStateOf(current) }
     var tiles by remember(section) { mutableStateOf(gridSize) }
+    var colour by remember(section) { mutableStateOf(cardLook) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(section.label) },
         text = {
-            Column(Modifier.testTag("homeLookDialog")) {
+            Column(Modifier.verticalScroll(rememberScrollState()).testTag("homeLookDialog")) {
+                if (section != HomeSection.QUICK) {
+                    // One card in the chosen colour, then the choice: As Home follows Arrange Home's.
+                    CardLookSample(if (colour == CardLook.AS_HOME) homeCardLook else colour, Modifier.fillMaxWidth(), big = true)
+                    Spacer(Modifier.height(Space.Medium))
+                    Text("Colour", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.Small), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
+                        CardLook.entries.forEach { option ->
+                            FilterChip(
+                                selected = option == colour,
+                                onClick = { colour = option; onCardLook(option) },
+                                label = { Text(if (option == CardLook.AS_HOME) "As Home (${homeCardLook.label})" else option.label) },
+                                modifier = Modifier.testTag("cardLook-${option.id}"),
+                            )
+                        }
+                    }
+                    Text("Just this card. As Home follows the choice in Arrange Home.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    HorizontalDivider(Modifier.padding(vertical = Space.Small))
+                }
                 // Its title on Home (issue #961): off leaves only the gap above the section.
                 SectionTitleSwitch(shown) {
                     shown = it
@@ -383,8 +445,24 @@ private fun HomeLookDialog(
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
     )
+}
+
+/** A small capital label over a part of the sheet ("CARDS"), with a quiet note after it when given. */
+@Composable
+private fun SheetLabel(text: String, note: String? = null) {
+    Row(Modifier.padding(start = Space.Page, end = Space.Page, top = Space.Page, bottom = Space.Small), verticalAlignment = Alignment.CenterVertically) {
+        Text(text.uppercase(), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant, letterSpacing = androidx.compose.ui.unit.TextUnit(0.08f, androidx.compose.ui.unit.TextUnitType.Em))
+        if (note != null) Text(" · $note", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.outline)
+    }
+}
+
+/** A hairline along the top of a row in a grouped list. */
+@Composable
+private fun Modifier.hairlineAbove(): Modifier {
+    val colour = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+    return drawBehind { drawLine(colour, Offset.Zero, Offset(size.width, 0f), 1f) }  // spacing: exact (a hairline)
 }
 
 /**

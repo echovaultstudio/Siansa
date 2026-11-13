@@ -205,6 +205,9 @@ data class AppSettings(
     val homeGridSizes: Map<HomeSection, Int> = emptyMap(),
     /** Home's sections shown without their title (issue #961). */
     val homeUntitled: Set<HomeSection> = emptySet(),
+    /** How Home's coloured cards are painted (the owner, 13 Nov), and the cards with a look of their own. */
+    val homeCardLook: CardLook = CardLook.DEFAULT,
+    val homeCardLooks: Map<HomeSection, CardLook> = emptyMap(),
     /** The gap between Home's sections (#554), as a step of the spacing scale: 0 tight … 4 airy. 2 is the default. */
     val homeGap: Int = HOME_GAP_DEFAULT,
     /** Show only music on the phone, across the whole app (issue #141). */
@@ -511,6 +514,8 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         topBar = TopBarStyle.parse(prefs.getString("top_bar", null)),
         homeHidden = HomeSection.parseHidden(prefs.getString("home_hidden", null)),
         homeLooks = HomeLook.parse(prefs.getString("home_looks", null)),
+        homeCardLook = CardLook.of(prefs.getString("home_card_look", null))?.takeIf { it != CardLook.AS_HOME } ?: CardLook.DEFAULT,
+        homeCardLooks = CardLook.parse(prefs.getString("home_card_looks", null)),
         homeGridSizes = HomeLook.parseGridSizes(prefs.getString("home_grid_sizes", null)),
         homeUntitled = HomeSection.parseHidden(prefs.getString("home_untitled", null)),
         homeGap = prefs.getInt("home_gap", AppSettings.HOME_GAP_DEFAULT).coerceIn(0, AppSettings.HOME_GAP_MAX),
@@ -825,10 +830,24 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         _state.value = _state.value.copy(homeGridSizes = sizes)
     }
 
-    /** Every row back in its own look. */
+    /** Every row back in its own look, and every card in Home's colour. */
     fun resetHomeLooks() {
-        prefs.edit().remove("home_looks").remove("home_grid_sizes").apply()
-        _state.value = _state.value.copy(homeLooks = emptyMap(), homeGridSizes = emptyMap())
+        prefs.edit().remove("home_looks").remove("home_grid_sizes").remove("home_card_look").remove("home_card_looks").apply()
+        _state.value = _state.value.copy(homeLooks = emptyMap(), homeGridSizes = emptyMap(), homeCardLook = CardLook.DEFAULT, homeCardLooks = emptyMap())
+    }
+
+    /** How every coloured card on Home is painted (the owner, 13 Nov). */
+    fun setHomeCardLook(look: CardLook) {
+        val chosen = if (look == CardLook.AS_HOME) CardLook.DEFAULT else look
+        prefs.edit().putString("home_card_look", chosen.id).apply()
+        _state.value = _state.value.copy(homeCardLook = chosen)
+    }
+
+    /** One section's cards in a look of their own; [CardLook.AS_HOME] puts it back with the rest. */
+    fun setHomeCardLook(section: HomeSection, look: CardLook) {
+        val looks = (_state.value.homeCardLooks - section) + (if (look != CardLook.AS_HOME) mapOf(section to look) else emptyMap())
+        prefs.edit().putString("home_card_looks", CardLook.format(looks)).apply()
+        _state.value = _state.value.copy(homeCardLooks = looks)
     }
 
     fun setSyncFolders(ids: Set<String>) {

@@ -830,13 +830,15 @@ fun GradientTile(
     size: Dp = 160.dp,
     busy: Boolean = false,
 ) {
+    // In the look chosen for Home's cards (the owner, 13 Nov): its own colours, softened, plain, or its cover's.
+    val paint = cardPaint(colors, coverArt, "tile-$title")
     Column(modifier.width(size).clickable(onClick = onClick)) {
         Box(
             Modifier
                 .size(size)
                 .testTag("gradientTileArt")
                 .clip(RoundedCornerShape(10.dp))
-                .background(Brush.linearGradient(listOf(colors.first, colors.second))),
+                .cardFill(paint, RoundedCornerShape(10.dp)),
         ) {
             if (coverArt != null) {
                 Cover(
@@ -850,14 +852,14 @@ fun GradientTile(
             WholeWordsText(
                 title,
                 style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.ExtraBold),
-                color = Color.White,
+                color = paint.text,
                 maxLines = 3,
                 modifier = Modifier.align(Alignment.TopStart).padding(Space.Medium).testTag("gradientTileTitle"),
             )
             if (busy) {
                 CircularProgressIndicator(
                     Modifier.size(22.dp).align(Alignment.BottomStart).padding(2.dp),  // spacing: exact (the badge's inset)
-                    color = Color.White,
+                    color = paint.text,
                     strokeWidth = 2.dp,
                 )
             }
