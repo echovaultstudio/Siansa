@@ -145,7 +145,7 @@ dependencies {
     implementation("io.coil-kt.coil3:coil-gif:3.0.4")
 
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
 
     // The TV's sign-in QR code (issue #860): ZXing's encoder only, plain Java with no Android parts.
