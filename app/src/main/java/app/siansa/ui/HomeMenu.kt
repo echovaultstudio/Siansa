@@ -1,6 +1,9 @@
 package app.siansa.ui
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -280,7 +283,7 @@ fun HomeMenuButton(
 
 /**
  * How far open the menu is, 0 to 1 (a touch past 1 on the way, and back): one soft spring that the top row's every
- * part rides (the chips fading and blurring, the pill's tint and edge, each place growing in), so it's one motion.
+ * part rides (the chips shrinking and fading, each pill growing in), so it's one motion.
  */
 @Composable
 fun rememberHomeMenuOpen(state: HomeMenuState): Float {
@@ -290,7 +293,7 @@ fun rememberHomeMenuOpen(state: HomeMenuState): Float {
 
 /**
  * Over Home while the menu is open: a clear layer that closes it on a tap (nothing dims or blurs the page), and Back
- * closes it too. The layer starts under the top row, where the menu itself is ([HomeMenuBar]), so the row's places
+ * closes it too. The layer starts under the top row, where the menu itself is ([HomeMenuBar]), so the row's pills
  * and button stay tappable.
  */
 @Composable
@@ -315,15 +318,13 @@ internal val MENU_CIRCLE = 36.dp
 /** The icon in the button. */
 private val MENU_ICON = 20.dp
 
-/** The pill's own colour, before its tint. */
-private val MENU_PILL_COLOUR = Color(0xFF2C2C2C)
-
 /**
- * The menu in the top row: one pill of glass the notice chips' height and width (the row gives both), the places in
- * [order] along it as circles, as the DJ mix bar's. [open] (0 to 1, [rememberHomeMenuOpen]) brings it in: the tint
- * and hairline come up with it and the places grow in one after another. A place lit under a gliding finger grows and
- * fills with the accent; Play on…'s has a ring in the accent while something is cast, and Sources' while the source
- * filter hides something. Icons only, so the row never grows taller than the chips; the names are read out.
+ * The menu in the top row (the owner, 13 Nov: a pill each): the places in [order] as four pills of the notice chips'
+ * own shape and colour, the chips' height, equal widths a small step apart, filling the chips' room. [open] (0 to 1,
+ * [rememberHomeMenuOpen]) brings them in: each grows in a little after the one before, while the chips shrink away
+ * ([HomeTopBar]). A pill lit under a gliding finger, Play on…'s while something is cast, and Sources' while the source
+ * filter hides something, fill with the accent colour. Icons only, so the row never grows taller than the chips; the
+ * names are read out.
  */
 @Composable
 fun HomeMenuBar(
@@ -334,18 +335,13 @@ fun HomeMenuBar(
     onPick: (HomeMenuItem) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val shape = CircleShape
-    val tint = MENU_PILL_COLOUR.copy(alpha = pillTint(open))
-    val edge = Color.White.copy(alpha = MENU_PILL_EDGE * open.coerceIn(0f, 1f))
     Row(
         modifier
             .fillMaxSize()
-            .clip(shape)
-            .background(tint, shape)
-            .border(1.dp, edge, shape)
-            // Taps between the places stay here: the chips underneath aren't pressed through the pill.
+            // Taps between the pills stay here: the chips underneath aren't pressed through the row.
             .then(if (state.open) Modifier.clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {} else Modifier)
             .testTag("homeMenuPanel"),
+        horizontalArrangement = Arrangement.spacedBy(Space.Small),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         order.forEachIndexed { index, item ->
@@ -359,8 +355,10 @@ fun HomeMenuBar(
                 HomeMenuItem.SOURCES -> Triple(Icons.Rounded.Sync, "Sources: ${info.sources}", info.filterActive)
                 HomeMenuItem.ARRANGE -> Triple(Icons.Rounded.Reorder, "Arrange Home", false)
             }
-            Box(
-                Modifier
+            MenuPill(
+                icon, spoken, chosen = state.highlighted == item, lit = lit,
+                onTap = { state.close(); onPick(item) },
+                modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight()
                     .onGloballyPositioned { c -> c.boundsInRoot().let { state.rows[item] = MenuBounds(it.left, it.top, it.right, it.bottom) } }
@@ -369,15 +367,46 @@ fun HomeMenuBar(
                         val scale = placeScale(open, index)
                         scaleX = scale
                         scaleY = scale
-                    },
-            ) {
-                // The tag goes on the place itself (the node a tap and TalkBack see); its circle is "homeMenuCircle",
-                // "homeMenuChosenCircle" lit.
-                GlidePlace(
-                    icon, spoken, chosen = state.highlighted == item, now = lit, tag = "homeMenu",
-                    onTap = { state.close(); onPick(item) }, modifier = Modifier.fillMaxSize().testTag("homeMenu-${item.id}"),
-                )
-            }
+                    }
+                    .testTag("homeMenu-${item.id}"),
+            )
         }
     }
 }
+
+/**
+ * One of the menu's pills: a notice chip's shape and colour with the place's icon in it. [lit] (something cast, the
+ * filter on) fills it with the accent; [chosen] (under a gliding finger) fills it too and grows it a touch. The tag
+ * goes on the pill ("homeMenu-<id>", the node a tap and TalkBack see); its drawing is "homeMenuCircle",
+ * "homeMenuChosenCircle" chosen.
+ */
+@Composable
+private fun MenuPill(
+    icon: ImageVector,
+    description: String,
+    chosen: Boolean,
+    lit: Boolean,
+    onTap: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val accent = Accent
+    val fill by animateColorAsState(if (chosen || lit) accent else MaterialTheme.colorScheme.surfaceContainerHigh, label = "menuPillFill")
+    val ink by animateColorAsState(if (chosen || lit) OnAccent else MaterialTheme.colorScheme.onSurface, label = "menuPillInk")
+    val grow by animateFloatAsState(if (chosen) MENU_PILL_CHOSEN_GROW else 1f, label = "menuPillGrow")
+    Box(
+        modifier
+            .graphicsLayer { scaleX = grow; scaleY = grow }
+            .clip(CircleShape)
+            .background(fill)
+            .clickable(onClickLabel = description, onClick = onTap)
+            .semantics { contentDescription = description },
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(Modifier.fillMaxSize().testTag(if (chosen) "homeMenuChosenCircle" else "homeMenuCircle"), contentAlignment = Alignment.Center) {
+            Icon(icon, null, tint = ink, modifier = Modifier.size(MENU_ICON))
+        }
+    }
+}
+
+/** How much a pill grows under a gliding finger. */
+private const val MENU_PILL_CHOSEN_GROW = 1.08f

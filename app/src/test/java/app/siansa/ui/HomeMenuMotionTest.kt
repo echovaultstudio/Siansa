@@ -5,8 +5,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * How Home's menu comes into the top row (the owner, 12 Nov): one spring, the places growing in one after another,
- * nothing taller than the chips.
+ * How Home's menu comes into the top row (the owner, 12 Nov): one spring, the chips shrinking away and the pills growing in
+ * one after another, nothing taller than the chips.
  */
 class HomeMenuMotionTest {
     @Test fun closedNothingShowsAndOpenEverythingDoes() {
@@ -15,8 +15,8 @@ class HomeMenuMotionTest {
             assertEquals(1f, placeIn(1f, i), 0f)
             assertEquals(1f, placeScale(1f, i), 1e-6f)
         }
-        assertEquals(0f, pillTint(0f), 0f)
-        assertTrue("A see-through tint, not a lid", pillTint(1f) in 0.3f..0.5f)
+        assertEquals(1f, chipShrink(0f), 0f)
+        assertTrue("The chips shrink, but never to nothing", chipShrink(1f) in 0.4f..0.8f)
     }
 
     @Test fun thePlacesComeInOneAfterAnother() {
@@ -29,10 +29,10 @@ class HomeMenuMotionTest {
     }
 
     @Test fun theSpringsOvershootShowsInThePlacesOnly() {
-        // Past 1 the places swell a touch; the pill's tint and the places' alpha stay at their full value.
+        // Past 1 the pills swell a touch; the chips' shrink and the pills' alpha stay at their full value.
         assertTrue(placeScale(1.05f, 0) > 1f)
         assertEquals(1f, placeIn(1.05f, 0), 0f)
-        assertEquals(pillTint(1f), pillTint(1.05f), 0f)
+        assertEquals(chipShrink(1f), chipShrink(1.05f), 0f)
     }
 
     @Test fun theSpringIsSoftAndQuick() {

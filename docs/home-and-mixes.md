@@ -10,21 +10,21 @@ With no notices, or notices turned off, the button sits on its own.
 
 ## Home's menu
 
-The round button opens the menu in the top row itself: the notice chips fade and blur away and one see-through pill
-takes their place, exactly the chips' height, with the four options along it as small circles (in the order set under
+The round button opens the menu in the top row itself: the notice chips shrink and fade away and four pills of their
+own shape take their place, exactly the chips' height and a small gap apart, one option each (in the order set under
 Settings › Home page › Home menu). Nothing on the page is covered, and nothing moves. The names are read out by TalkBack:
 
 - **Roll the dice** (the dice) plays a song you've never played (see [Roll the dice](discovery.md)). While it finds
   one, the dice tumbles in the menu button.
 - **Play on…** (the cast mark) opens the list of TVs and speakers to play on: Chromecast, Google TV, Cast speakers and
-  DLNA ones. While something plays on one, its circle has a ring in the accent colour (amber unless you picked another
+  DLNA ones. While something plays on one, its pill is filled with the accent colour (amber unless you picked another
   in Themes) and the menu button has a small dot in the same colour; to stop, open Play on… and pick **This phone**.
-- **Sources** (the circle of arrows, as on Sync all) opens the Sources sheet. Its circle has a ring in the accent colour while the
-  filter hides something.
+- **Sources** (the circle of arrows, as on Sync all) opens the Sources sheet. Its pill is filled with the accent colour
+  while the filter hides something.
 - **Arrange Home** (the three lines) opens Arrange, for the order and looks of Home's sections.
 
-Tap the button and then one of them, or do it in one go: press the button, slide your finger along the pill to one (it
-grows and fills, with a light tick as you pass each) and let go. Letting go anywhere else closes the menu, and so does
+Tap the button and then one of them, or do it in one go: press the button, slide your finger along the pills to one (it
+fills and grows a touch, with a light tick as you pass each) and let go. Letting go anywhere else closes the menu, and so does
 a tap on the button (its lines become a cross while the menu is open) or anywhere on the page. The button's three lines
 are always in the accent colour; the button has a thin ring in the same colour while the source filter hides something.
 

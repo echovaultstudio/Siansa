@@ -27,7 +27,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.Layout
@@ -82,9 +82,9 @@ internal fun rememberNotices(graph: AppGraph, settings: AppSettings, shown: Bool
  * content, so the circle matches at any text size, with or without notices. Chips that don't fit scroll, and blend
  * out under a fade just before the circle, as Your Library's chips do.
  *
- * Home's menu opens in this row (the owner, 12 Nov): [menuBar] is laid over the chips' room, the chips' exact height,
- * from the page's left edge to the room before the button, and [menuOpen] (0 to 1) brings it in while the chips fade,
- * blur and draw together under it, so the row reads as one pill turning into the menu. Nothing changes height.
+ * Home's menu opens in this row (the owner, 12 and 13 Nov): [menuBar] is laid over the chips' room, the chips' exact
+ * height, from the page's left edge to the room before the button, and [menuOpen] (0 to 1) brings it in while each
+ * chip shrinks towards its left end and fades, so the chips give way to the menu's pills. Nothing changes height.
  */
 @Composable
 internal fun HomeTopBar(
@@ -107,16 +107,20 @@ internal fun HomeTopBar(
             Row(
                 Modifier
                     .horizontalScroll(scroll, enabled = shown == 0f)
-                    .graphicsLayer { alpha = chipsAlpha }
-                    .blur(CHIPS_BLUR * shown)
                     .padding(start = Space.Page, end = Space.Small)
                     .testTag("noticesRow"),
-                // The chips draw together as the menu opens, into the one pill it becomes.
-                horizontalArrangement = Arrangement.spacedBy(Space.Small * (1f - shown)),
+                horizontalArrangement = Arrangement.spacedBy(Space.Small),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                // The same pill as Your Library's chips (issue #794), not Material's outlined assist chip.
-                notices.forEach { notice -> androidx.compose.runtime.key(notice.key) { NoticePill(notice, onOpen = { onOpen(notice) }) } }
+                // The same pill as Your Library's chips (issue #794), not Material's outlined assist chip. As the menu
+                // opens each chip shrinks towards its left end and fades (the owner, 13 Nov), the menu's pills taking its place.
+                notices.forEach { notice ->
+                    androidx.compose.runtime.key(notice.key) {
+                        Box(Modifier.graphicsLayer { alpha = chipsAlpha; scaleX = chipShrink(shown); transformOrigin = TransformOrigin(0f, 0.5f) }) {
+                            NoticePill(notice, onOpen = { onOpen(notice) })
+                        }
+                    }
+                }
             }
             Box(
                 Modifier
@@ -151,9 +155,8 @@ internal fun HomeTopBar(
     }
 }
 
-/** How fast the chips go as the menu opens (gone well before it's fully open), and how far they blur under its glass. */
+/** How fast the chips go as the menu opens: gone well before it's fully open. */
 private const val CHIPS_GONE_BY = 1.6f
-private val CHIPS_BLUR = 12.dp
 
 /** How wide the fade before Home's menu button is. */
 private val NOTICES_FADE = 48.dp
