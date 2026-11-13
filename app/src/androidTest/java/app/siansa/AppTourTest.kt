@@ -361,7 +361,7 @@ class AppTourTest {
                 idle(400)
                 // The search: "battery" finds Pure black and lands on Theme.
                 tab("Settings")
-                compose.onNodeWithTag("hubSearch").performClick()
+                compose.onNodeWithTag("hubSearch").performScrollTo().performClick()
                 idle(600)
                 compose.onNodeWithTag("findSetting").performTextInput("battery")
                 idle(800)
