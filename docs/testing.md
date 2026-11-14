@@ -60,7 +60,7 @@ Open Siansa, go to **Settings**, enter these, use **Test** next to each, then **
 2. On the **Catalog** tab, install **Siansa Analysis** and apply the restart.
 3. Open **Plugins › Siansa Analysis › Settings** and use **Measure all songs** to measure your library.
    A big library takes hours or days, and AudioMuse-AI pauses its own jobs while a round runs.
-4. In Siansa, go to **Settings › Crossfade and levelling** and choose the plugin.
+4. In Siansa, go to **Settings › Sound** and choose the plugin.
 
 ## Report a problem
 

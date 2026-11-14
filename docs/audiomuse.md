@@ -127,9 +127,8 @@ song, measures its loudness, fades and key, and sorts songs into genres by their
 set its address in **Settings › Connections › Siansa Beats**. Then levelling, smart crossfades, DJ blends and the
 genres come from Siansa Beats, and the Siansa plugin isn't needed for them.
 
-**From Siansa Beats 0.25, it also answers what songs sound like.** Siansa Beats takes over what AudioMuse-AI has
-worked out about each song (connect AudioMuse-AI on Siansa Beats' page, under Setup), and Siansa then asks Siansa
-Beats first for:
+**From Siansa Beats 0.25, it also answers what songs sound like.** Siansa Beats works this out from the songs
+itself (from 0.43 it no longer connects to AudioMuse-AI), and Siansa asks Siansa Beats first for:
 
 - songs like a song (song radio, Similar songs, Keep playing, Wind down),
 - similar albums and "Fans also like",
