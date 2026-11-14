@@ -146,7 +146,7 @@ internal fun BookPageHeader(
     Column(
         Modifier
             .fillMaxWidth()
-            .background(Brush.verticalGradient(0f to color, 0.75f to color.copy(alpha = 0.35f), 1f to surface))
+            .softFade(color, surface)
             .statusBarsPadding()
             .padding(top = 56.dp, start = Space.Page, end = Space.Page),  // spacing: exact (below the top bar)
     ) {

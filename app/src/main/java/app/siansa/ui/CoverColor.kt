@@ -31,10 +31,24 @@ private val colorCache = ConcurrentHashMap<String, Int>()
  */
 @Composable
 fun rememberCoverColor(coverId: String?): Color {
+    val fallback = MaterialTheme.colorScheme.surfaceVariant
+    val target = rememberCoverTarget(coverId).takeIf { it != null && it != Color.Unspecified } ?: fallback
+    return animateColorAsState(coverTone(target), tween(350), label = "cover-color").value
+}
+
+/** A cover's main colour as a page is painted in it: toned down so white text stays readable. */
+internal fun coverTone(main: Color): Color = lerp(main, Color.Black, 0.35f)
+
+/**
+ * The cover's main colour once it has been looked at, not fading: null while it's being read, [Color.Unspecified]
+ * for a cover that gave none. What a page's colours are worked out from, once, so they don't change while the page's
+ * colour fades in (the owner, 14 Nov: Play was blue, then the header's colour).
+ */
+@Composable
+internal fun rememberCoverTarget(coverId: String?): Color? {
     val graph = LocalGraph.current
     val context = LocalContext.current
-    val fallback = MaterialTheme.colorScheme.surfaceVariant
-    var target by remember(coverId) { mutableStateOf(coverId?.let { colorCache[it] }?.let { Color(it) } ?: fallback) }
+    var target by remember(coverId) { mutableStateOf(coverId?.let { colorCache[it] }?.let { Color(it) }) }
     LaunchedEffect(coverId) {
         if (coverId == null || colorCache.containsKey(coverId)) return@LaunchedEffect
         val argb = withContext(Dispatchers.IO) {
@@ -55,10 +69,11 @@ fun rememberCoverColor(coverId: String?): Color {
         if (argb != null) {
             colorCache[coverId] = argb
             target = Color(argb)
+        } else {
+            target = Color.Unspecified
         }
     }
-    val tone = lerp(target, Color.Black, 0.35f)
-    return animateColorAsState(tone, tween(350), label = "cover-color").value
+    return target
 }
 
 /** How bright the cards under now playing may be: dark enough for white text, light enough to stand out (#717). */
