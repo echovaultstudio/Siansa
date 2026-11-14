@@ -71,6 +71,11 @@ More in the [install guide](docs/testing.md).
 <td align="center"><img src="docs/screenshots/arrange.png" alt="Arrange Home: show, hide and style each section" width="240"><br><sub><b>Arrange Home</b> your way</sub></td>
 <td align="center"><img src="docs/screenshots/home-more.png" alt="More of Home: recently added, your genres and random picks" width="240"><br><sub><b>More of Home</b>: genres, random picks</sub></td>
 </tr>
+<tr>
+<td align="center"><img src="docs/screenshots/dj-start.png" alt="Sliding up from the play button: Start a DJ mix" width="240"><br><sub><b>Slide up</b> for a DJ mix</sub></td>
+<td align="center"><img src="docs/screenshots/dj-bar.png" alt="The DJ mix bar: steady, a build, stop, euphoric or a wind down" width="240"><br><sub><b>Shape the mix</b> while it plays</sub></td>
+<td align="center"><img src="docs/screenshots/services.png" alt="Services: Siansa Beats and the others, each with whether it's working" width="240"><br><sub><b>Your services</b>, Siansa Beats first</sub></td>
+</tr>
 </table>
 
 <p align="center"><sub>The covers, artist pictures and names in these screenshots are made up; in the app you see your own library.</sub></p>

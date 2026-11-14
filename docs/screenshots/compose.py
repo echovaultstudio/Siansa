@@ -25,6 +25,9 @@ SINGLES = [
     ("search", "search"),
     ("arrange", "arrange"),
     ("home-more-2", "home-more"),
+    ("slide-dj", "dj-start"),
+    ("dj-bar", "dj-bar"),
+    ("services", "services"),
 ]
 # Each in the grid is shown 240 px wide: 540 px stays sharp on high-density screens.
 SINGLE_WIDTH = 540
