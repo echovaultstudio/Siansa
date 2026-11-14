@@ -82,7 +82,7 @@ look, and **As Home** follows the choice made under Cards, or pick one for this 
 | **Recently played** | Albums you played lately, only from music the source filter shows. |
 | **Artist radios** | Artists you played lately, mixed with artists like them. |
 | **Recently added** | The newest albums on your server. |
-| **Your genres** | Genre radios from your library: the songs tagged with that genre. In Siansa Dev with Siansa Beats, every song that sounds like it, whatever its tags say (a remix tagged with its album's genre, but sounding like trance, plays in Trance), as long as the genre is among the song's three best guesses (Siansa Beats 0.36: a faint fourth guess doesn't count); without Siansa Beats, or until it has heard enough of them, the tags as always. |
+| **Your genres** | Genre radios from your library: the songs tagged with that genre. With Siansa Beats, every song that sounds like it, whatever its tags say (a remix tagged with its album's genre, but sounding like trance, plays in Trance), as long as the genre is among the song's three best guesses (Siansa Beats 0.36: a faint fourth guess doesn't count); without Siansa Beats, or until it has heard enough of them, the tags as always. |
 | **Random picks** | A random selection to dig into. |
 
 ## Notices

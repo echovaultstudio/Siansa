@@ -113,8 +113,8 @@ DJ radio, Keep playing in DJ mode and the DJ mix of an album or playlist leave o
 whole DJ set or a live recording in one file): they're mixes themselves. You can still start one from such a song.
 
 In DJ playback only: DJ radio, songs Keep playing adds in DJ mode, and the DJ mix of an album or playlist (slide
-Shuffle onto Play). An album or playlist playing on its own never beat-matches. Needs the Siansa plugin (in Siansa Dev,
-the Siansa Beats (dev) plugin). Two songs that both keep a beat can clash at the changeover when their beats land at different moments,
+Shuffle onto Play). An album or playlist playing on its own never beat-matches. Needs Siansa Beats, or the Siansa plugin
+on AudioMuse-AI. Two songs that both keep a beat can clash at the changeover when their beats land at different moments,
 like a bad DJ set. The Siansa plugin for AudioMuse measures the beat grid at each end of every song, so Siansa can
 blend them the way a DJ mixes:
 
@@ -128,7 +128,7 @@ blend them the way a DJ mixes:
   to 8 %) so its beats keep time with the old song's, then eases back to its own speed over about 25
   seconds, in small steps too slight to hear. A shift of more than 4 % is kept to 8 bars, however long the Blend
   length, so the song is back at its own speed sooner.
-- **Smart picks how to blend (Siansa Dev, with Siansa Beats' readings at both ends, and the keys from AudioMuse-AI):**
+- **Smart picks how to blend (with Siansa Beats' readings at both ends, and the keys from AudioMuse-AI):**
   - **Long blend**, 32 bars with the bass swapped in the middle: tempos within 2 %, keys that mix, both ends sure of
     their beat, and 8 bars or more without bass at one end.
   - **Drop swap**: the next song comes in 16 (or 8) bars before its first drop, so the drop lands where the old song
@@ -143,7 +143,7 @@ blend them the way a DJ mixes:
     slides in under the old song instead.
   - **Bass swap**, 16 bars: the usual. Never the same technique twice running when another fits as well.
   - Fixed always uses the bass swap over the bars set. The log says which was picked and why ("smart: …").
-- **Siansa Beats (Siansa Dev)**: each end of a song is read from where its beat locks onto its grid (the first and
+- **Siansa Beats**: each end of a song is read from where its beat locks onto its grid (the first and
   last 4 bars it all keeps to). A blend stays inside that, and an end needs 80 % of its beats on the grid there to be
   beat-matched, and 80 % of them sitting on the grid. A track cut from a mixed CD carries the DJ's own changeovers at
   its ends: its blends are laid inside its lock and kept to 8 bars, and without a lock it gets a short blend.
@@ -152,7 +152,7 @@ blend them the way a DJ mixes:
   - A song whose beat comes in more than 8 seconds into it (an ambient intro) isn't beat-matched from there, which
     would skip its intro: it slides in under the old song from its start, and the old song is gone a bar before
     its beat comes in.
-  - Siansa Dev asks for a song's readings again after half an hour when Siansa Beats hadn't analysed it yet, so a
+  - Siansa asks for a song's readings again after half an hour when Siansa Beats hadn't analysed it yet, so a
     song analysed since is blended on its grid.
 
 In DJ playback, a blend where one end has no beat at all (a beatless

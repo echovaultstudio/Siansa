@@ -82,12 +82,13 @@ Both update on their own. Or build it from this source (below): a build of your 
 
 1. In Settings, enter:
    - **Your server**: address (e.g. `http://192.168.1.10:4533`), username, password.
-   - **AudioMuse-AI**: address of its web/API port (e.g. `http://192.168.1.10:8000`) and its API token if authentication is on. Text search (CLAP) must be enabled.
+   - **Siansa Beats** (under Settings › Connections): its address, for the mixes, radios, levelling and DJ blends.
+   - **AudioMuse-AI** (optional, when there's no Siansa Beats): address of its web/API port (e.g. `http://192.168.1.10:8000`) and its API token if authentication is on. Text search (CLAP) must be enabled.
    - **OpenRouter** (optional): API key and model id (default `google/gemini-2.5-flash`; any OpenRouter model id works).
    - **Audiobookshelf** (optional, under Settings › Connections): address and an API token or login.
 2. Use **Test** next to each section, then **Save**.
-3. Optional: install the **Siansa plugin** on AudioMuse-AI (see [`audiomuse-plugin/`](audiomuse-plugin/README.md)) and choose it
-   under Settings › Crossfade and levelling. It measures each song's loudness and how it starts and ends, for
+3. Optional: install the **Siansa plugin** on AudioMuse-AI (see [siansa-beats](https://github.com/echovaultstudio/siansa-beats)) and choose it
+   under Settings › Sound. It measures each song's loudness and how it starts and ends, for
    levelling and smooth crossfades, and finds similar albums and artists.
 
 Inside the app, with **Settings › Help › Debug logs** on, the log records each start (version, phone, settings that change behaviour), why the app last closed (crash, freeze, killed for memory, swiped away; Android 11+), every error in background work, playback decisions, downloads and covers. **Report a problem** on the same page sends it with your words.
@@ -111,7 +112,7 @@ Every pull request, push and nightly run builds the app and runs Lint, the unit 
 
 A release is published from main when the build, Lint, unit tests and secret scan pass. A failing check shows a red cross on the commit, and its details are in the run's annotations.
 
-Inside the app, with **Settings → Logs → Keep a log** on, the log records each start (version, phone, settings that change behaviour), why the app last closed (crash, freeze, killed for memory, swiped away; Android 11+), every error in background work, playback decisions, downloads and covers. **Problems** on the Logs page shows only warnings and errors.
+Inside the app, with **Settings › Help & feedback › Debug logs** on, the log records each start (version, phone, settings that change behaviour), why the app last closed (crash, freeze, killed for memory, swiped away; Android 11+), every error in background work, playback decisions, downloads and covers. **Problems** on the Logs page shows only warnings and errors.
 
 ## Building
 

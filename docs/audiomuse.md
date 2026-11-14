@@ -120,16 +120,15 @@ The Siansa plugin measures songs on every server: it fetches each song from whic
 AudioMuse-AI runs the plugin's 15-minute task once per server; the first run does the work and the others stop
 straight away, so more servers don't make it take longer.
 
-## Siansa Beats (Siansa Dev)
+## Siansa Beats
 
 Siansa Beats is a separate service (its own container, next to Navidrome) that finds every beat and downbeat of each
-song, measures its loudness, fades and key, and sorts songs into genres by their sound. Siansa Dev can ask it directly:
+song, measures its loudness, fades and key, and sorts songs into genres by their sound. Siansa asks it directly:
 set its address in **Settings › Connections › Siansa Beats**. Then levelling, smart crossfades, DJ blends and the
 genres come from Siansa Beats, and the Siansa plugin isn't needed for them.
 
-**From Siansa Beats 0.25, it also answers what songs sound like.** Siansa Beats takes over what AudioMuse-AI has
-worked out about each song (connect AudioMuse-AI on Siansa Beats' page, under Setup), and Siansa then asks Siansa
-Beats first for:
+**From Siansa Beats 0.25, it also answers what songs sound like.** Siansa Beats works this out from the songs
+itself (from 0.43 it no longer connects to AudioMuse-AI), and Siansa asks Siansa Beats first for:
 
 - songs like a song (song radio, Similar songs, Keep playing, Wind down),
 - similar albums and "Fans also like",
