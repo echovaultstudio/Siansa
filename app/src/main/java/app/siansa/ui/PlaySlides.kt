@@ -172,7 +172,7 @@ data class SlideState(val way: SlideWay, val armed: Boolean, val bar: Boolean = 
  * finger from it up, down, left or right (past the button's edge is fine; only the way counts) shows that way's choice
  * beside the button ([slides]), growing and filling with the play button's colour, with a click, once it's far enough;
  * let go there and [onSlide] runs it. Back in the middle, or a way with Nothing on it, and nothing happens. [unavailable]
- * says why a choice can't run now ("Needs AudioMuse"), shown in place of its name.
+ * says why a choice can't run now ("Needs Siansa Beats"), shown in place of its name.
  *
  * While a DJ mix plays and [grooves] is on, the button shows record grooves in its own colour, with a glint that turns
  * while it plays. [onSliding] tells the controls around it to make way. [preview] draws a slide without a finger, for
@@ -359,7 +359,7 @@ data class SlideLabel(val slide: PlaySlide, val way: SlideWay, val armed: Boolea
  * A slide's choice in the middle of now playing's cover (issue #933), where a thumb on the play button can't hide it:
  * the cover blurs behind its icon and name. Until the finger is far enough it's faint, on a lighter blur, with "Slide a
  * little further" and the way to go; then it lights up in the accent with "Let go to start" (the second vibrate comes
- * from the button). Why a choice can't run ("Needs AudioMuse") shows in place of those words. Nothing while [label] is
+ * from the button). Why a choice can't run ("Needs Siansa Beats") shows in place of those words. Nothing while [label] is
  * null.
  */
 @Composable
@@ -540,7 +540,7 @@ private const val GLINT_TURN_MS = 4_000
  */
 fun slideUnavailable(slide: PlaySlide, settings: app.siansa.data.AppSettings, aiProblem: String?, djProblem: String? = null): String? = when (slide) {
     PlaySlide.SONG_PATH -> when {
-        !settings.soundReady -> "Needs AudioMuse"
+        !settings.soundReady -> "Needs Siansa Beats"
         aiProblem != null -> "Not available now"
         else -> null
     }

@@ -73,7 +73,7 @@ private fun FingerprintPage(nav: NavController) {
     val scope = rememberCoroutineScope()
     var round by rememberSaveable { mutableIntStateOf(0) }
     val profile by loadStateFresh("fingerprint-$round") {
-        if (!graph.settings.current.soundReady) error("Set up AudioMuse in Settings to see your sonic fingerprint.")
+        if (!graph.settings.current.soundReady) error("Set up Siansa Beats or AudioMuse-AI in Settings › Connections to see your sonic fingerprint.")
         graph.fingerprint.today(force = round > 0)
     }
     val p = profile.valueOrNull()

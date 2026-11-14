@@ -511,7 +511,7 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                         listOf(
                             app.siansa.ui.SlideLabel(app.siansa.ui.PlaySlide.DJ_MIX, app.siansa.ui.SlideWay.UP, armed = true),
                             app.siansa.ui.SlideLabel(app.siansa.ui.PlaySlide.SONIC_MATCH, app.siansa.ui.SlideWay.RIGHT, armed = false),
-                            app.siansa.ui.SlideLabel(app.siansa.ui.PlaySlide.SONG_PATH, app.siansa.ui.SlideWay.LEFT, armed = false, why = "Needs AudioMuse"),
+                            app.siansa.ui.SlideLabel(app.siansa.ui.PlaySlide.SONG_PATH, app.siansa.ui.SlideWay.LEFT, armed = false, why = "Needs Siansa Beats"),
                         ).forEach { label ->
                             Box(
                                 Modifier.size(220.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(10.dp))

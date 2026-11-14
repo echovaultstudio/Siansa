@@ -297,7 +297,7 @@ private fun ThemePreview(modifier: Modifier) {
             }
             Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
                 PreviewTile("Liked songs", Modifier.weight(1f), Brush.linearGradient(BrandGradient), heart = true)
-                PreviewTile("Daily mix", Modifier.weight(1f), Brush.linearGradient(listOf(MaterialTheme.colorScheme.tertiary, MaterialTheme.colorScheme.secondary)))
+                PreviewTile("Today's mix", Modifier.weight(1f), Brush.linearGradient(listOf(MaterialTheme.colorScheme.tertiary, MaterialTheme.colorScheme.secondary)))
             }
             Row(
                 Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceContainerHighest).padding(Space.Small),

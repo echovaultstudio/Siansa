@@ -74,7 +74,7 @@ fun SimilarAlbumsScreen(nav: NavController, songId: String) {
             Box {
                 if (found.isEmpty()) {
                     Text(
-                        "No similar albums yet. The Siansa plugin on your AudioMuse server finds them once it has " +
+                        "No similar albums yet. Siansa Beats finds them once it has " +
                             "analysed your library; try again later.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
