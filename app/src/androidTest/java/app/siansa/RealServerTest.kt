@@ -374,8 +374,12 @@ class RealServerTest {
             val levelled = 10.0.pow(-9 / 20.0).toFloat()
             var lastFirst = 0L
             var switchedAt = 0L
+            // When the next song is first heard, in ms after the switch. With the mixer the player moves to the next
+            // song when the old one is handed over to it (0:23 here), and the next comes in later (0:26): the switch
+            // alone isn't when it starts (the release run of 14 Nov failed on that, at 22,969 ms).
+            var heardAt = -1L
             val volumes = ArrayList<Pair<Long, Float>>() // ms after the switch, volume
-            val end = SystemClock.elapsedRealtime() + 25_000
+            val end = SystemClock.elapsedRealtime() + 30_000
             while (SystemClock.elapsedRealtime() < end) {
                 var id: String? = null
                 var position = 0L
@@ -390,21 +394,28 @@ class RealServerTest {
                 if (id == first.id) lastFirst = position
                 if (id == second.id) {
                     if (switchedAt == 0L) switchedAt = now
-                    volumes += (now - switchedAt) to volume
-                    if (now - switchedAt > 4_000) break
+                    val after = now - switchedAt
+                    volumes += after to volume
+                    if (heardAt < 0 && volume > 0.01f) heardAt = after
+                    // Until well after its 1 s fade-in, so its level is settled.
+                    if (heardAt >= 0 && after - heardAt > 2_500) break
+                    if (after > 10_000) break
                 }
                 SystemClock.sleep(50)
             }
-            println("Crossfade: first song left at ${lastFirst} ms; volumes after the switch: " + volumes.filterIndexed { i, _ -> i % 4 == 0 }.joinToString { "${it.first}ms=${"%.2f".format(it.second)}" })
+            println("Crossfade: first song left at ${lastFirst} ms, next heard ${heardAt} ms after; volumes after the switch: " + volumes.filterIndexed { i, _ -> i % 4 == 0 }.joinToString { "${it.first}ms=${"%.2f".format(it.second)}" })
             val log = AppLog.tail(400)
             assertTrue("The second song never started", switchedAt > 0)
             assertTrue("Profiles weren't asked for", plugin.asked.any { it.contains("/api/profiles") && it.contains(first.id) })
             assertTrue("No fade was logged:\n" + log.takeLast(30).joinToString("\n"), log.any { "Fading ${first.id} into ${second.id}" in it })
             assertTrue("The fade wasn't ready in time", log.none { "wasn't ready to fade" in it })
-            // The next song starts about 4 s before the end (30 s song, so near 26 s), not at the end.
-            assertTrue("Next song started with the first at ${lastFirst} ms, expected about 26 s", lastFirst in 23_000..28_500)
+            assertTrue("The second song was never heard: ${volumes.takeLast(6)}", heardAt >= 0)
+            // The next song comes in about 4 s before the end (30 s song, so near 26 s), not at the end.
+            val cameIn = lastFirst + heardAt
+            assertTrue("Next song came in with the first at $cameIn ms (left at $lastFirst ms, heard $heardAt ms after), expected about 26 s", cameIn in 23_000..28_500)
             // It fades in: quieter than its level at first, at its level after.
-            assertTrue("No fade-in: ${volumes.take(6)}", volumes.take(10).any { it.second < levelled * 0.8f })
+            val fadingIn = volumes.filter { it.first >= heardAt }
+            assertTrue("No fade-in: ${fadingIn.take(6)}", fadingIn.take(10).any { it.second < levelled * 0.8f })
             assertEquals("Levelled volume after the fade", levelled, volumes.last().second, 0.03f)
         } finally {
             instrumentation.runOnMainSync { graph.player.stop() }
