@@ -1,3 +1,0 @@
-### Changed
-- **Genres show at once.** Search's genres from Siansa Beats are saved on your phone, so they show straight away and stay when Siansa Beats is slow or away; they're brought up to date in the background. Search shows the 30 with the most songs and an **All genres** tile for every one, and Home's **Your genres** shows the same list. Without Siansa Beats, your genre tags as always.
-- **DJ mixes only when they can work.** A DJ mix is only offered when AudioMuse and Siansa Beats both answer; until then its buttons are greyed out with the reason, an album's Shuffle is a plain shuffle and Keep playing in DJ mode adds songs as Steady does.
