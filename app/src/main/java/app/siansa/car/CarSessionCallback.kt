@@ -1,6 +1,7 @@
 package app.siansa.car
 
 import android.net.Uri
+import android.os.Bundle
 import androidx.annotation.OptIn
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
@@ -9,14 +10,17 @@ import androidx.media3.session.LibraryResult
 import androidx.media3.session.MediaLibraryService.LibraryParams
 import androidx.media3.session.MediaLibraryService.MediaLibrarySession
 import androidx.media3.session.MediaSession
+import androidx.media3.session.SessionCommand
 import androidx.media3.session.SessionError
 import androidx.media3.session.SessionResult
 import app.siansa.BuildConfig
 import app.siansa.playback.QueueRules
 import app.siansa.AppGraph
+import app.siansa.data.OutsideMedia
 import app.siansa.log.AppLog
 import app.siansa.playback.SongRegistry
 import app.siansa.playback.toMediaItem
+import app.siansa.playback.toSong
 import com.google.common.collect.ImmutableList
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
@@ -48,6 +52,37 @@ class CarSessionCallback(private val graph: AppGraph, private val tree: CarTree)
             return SessionError.ERROR_NOT_SUPPORTED
         }
         return SessionResult.RESULT_SUCCESS
+    }
+
+    /** Every app that connects may press Siansa's own Like, Shuffle and Repeat ([CarButtons], issue #1042). */
+    override fun onConnect(session: MediaSession, controller: MediaSession.ControllerInfo): MediaSession.ConnectionResult {
+        val commands = MediaSession.ConnectionResult.DEFAULT_SESSION_AND_LIBRARY_COMMANDS.buildUpon()
+        CarButtons.commands.forEach { commands.add(it) }
+        return MediaSession.ConnectionResult.AcceptedResultBuilder(session).setAvailableSessionCommands(commands.build()).build()
+    }
+
+    /** A press of Like, Shuffle or Repeat in the car (or in the phone's notification). */
+    override fun onCustomCommand(session: MediaSession, controller: MediaSession.ControllerInfo, customCommand: SessionCommand, args: Bundle): ListenableFuture<SessionResult> {
+        val player = session.player
+        val did = when (customCommand.customAction) {
+            CarButtons.LIKE -> {
+                val song = player.currentMediaItem?.toSong()?.takeUnless { OutsideMedia.isOutside(it.id) }
+                    ?: return Futures.immediateFuture(SessionResult(SessionError.ERROR_BAD_VALUE))
+                graph.favorites.toggle(song)
+                if (graph.favorites.isLiked(song)) "liked \"${song.title}\"" else "unliked \"${song.title}\""
+            }
+            CarButtons.SHUFFLE -> {
+                player.shuffleModeEnabled = !player.shuffleModeEnabled
+                "turned shuffle ${if (player.shuffleModeEnabled) "on" else "off"}"
+            }
+            CarButtons.REPEAT -> {
+                player.repeatMode = CarButtons.nextRepeat(player.repeatMode)
+                "pressed repeat"
+            }
+            else -> return Futures.immediateFuture(SessionResult(SessionError.ERROR_NOT_SUPPORTED))
+        }
+        AppLog.i("Car", "${controller.packageName} $did with Siansa's button")
+        return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
     }
 
     override fun onGetLibraryRoot(session: MediaLibrarySession, browser: MediaSession.ControllerInfo, params: LibraryParams?): ListenableFuture<LibraryResult<MediaItem>> {

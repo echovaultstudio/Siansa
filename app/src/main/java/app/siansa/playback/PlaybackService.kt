@@ -214,7 +214,11 @@ class PlaybackService : MediaLibraryService() {
         session = MediaLibrarySession.Builder(this, player, CarSessionCallback(graph, car))
             .setSessionActivity(openApp)
             .setBitmapLoader(CoverBitmapLoader(this, graph.scope))
+            .setMediaButtonPreferences(shownButtons)
             .build()
+        // Like, Shuffle and Repeat in the car follow the song and what's set (issue #1042); a like made in the app too.
+        showButtons()
+        mainScope.launch { graph.favorites.changes.collect { showButtons() } }
         // A late notification's foreground start, refused in the background, no longer crashes the app (0.52.0-dev).
         setMediaNotificationProvider(
             SafeNotificationProvider(androidx.media3.session.DefaultMediaNotificationProvider.Builder(applicationContext).build()) {
@@ -712,6 +716,7 @@ class PlaybackService : MediaLibraryService() {
         }
         events?.attach(target)
         session.player = target
+        showButtons()
     }
 
     private fun spotOf(player: Player): CastSpot<MediaItem> {
@@ -868,6 +873,19 @@ class PlaybackService : MediaLibraryService() {
      * Tracks how long each song is actually heard, for scrobbling, and applies ReplayGain. Follows playback
      * to a Cast device and back; the phone-only parts (ReplayGain, pre-caching, watchdogs) rest meanwhile.
      */
+    private var shownButtons = app.siansa.car.CarButtons.buttons(liked = null, shuffle = false, repeat = Player.REPEAT_MODE_OFF)
+
+    /** Like, Shuffle and Repeat as they're set now, for the car and the notification ([app.siansa.car.CarButtons]). */
+    private fun showButtons() {
+        val session = session ?: return
+        val player = session.player
+        val song = player.currentMediaItem?.toSong()?.takeUnless { OutsideMedia.isOutside(it.id) }
+        val buttons = app.siansa.car.CarButtons.buttons(song?.let { graph.favorites.isLiked(it) }, player.shuffleModeEnabled, player.repeatMode)
+        if (buttons == shownButtons) return
+        shownButtons = buttons
+        session.setMediaButtonPreferences(buttons)
+    }
+
     private inner class Events(private var player: Player) : Player.Listener {
         private var current: Song? = null
         // The song playing when playback moved between phone and TV: still the same listen.
@@ -903,7 +921,10 @@ class PlaybackService : MediaLibraryService() {
         }
 
         /** Every change of repeat is in the log, whoever made it: it once came on by itself (the owner, 12 Nov). */
+        override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) = showButtons()
+
         override fun onRepeatModeChanged(repeatMode: Int) {
+            showButtons()
             AppLog.i("Player", "Repeat is now " + when (repeatMode) {
                 Player.REPEAT_MODE_ALL -> "all"
                 Player.REPEAT_MODE_ONE -> "this song"
@@ -912,6 +933,7 @@ class PlaybackService : MediaLibraryService() {
         }
 
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            showButtons()
             // The same song swapped for another quality or format: keep counting it as one listen.
             if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED && mediaItem?.mediaId != null && mediaItem.mediaId == current?.id) return
             val moved = carriedOver

@@ -370,6 +370,10 @@ Siansa shows up in Android Auto as a music app. On the car's screen you can brow
   album exactly plays that artist or album; otherwise the songs found play. "Play music on Siansa" plays your newest
   mix.
 
+The car's player has **Like**, **Shuffle** and **Repeat** beside play, previous and next, each showing how it's set.
+Repeat goes round as in the app: off, all, this song. A radio station has no heart. The same buttons show in the
+phone's own notification and on the lock screen, as many as Android has room for there.
+
 Picking a song plays its whole list from that song, the same as tapping it on the phone. Mood radios play straight
 away. Albums, playlists and mixes played from the car show up in **Recently played** on the phone's Home too.
 
