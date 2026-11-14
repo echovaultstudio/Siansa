@@ -180,7 +180,7 @@ dependencies {
     // Screenshot tests (issue #710): parts of the app drawn on Robolectric and compared with the approved images in
     // app/src/test/screenshots. Roborazzi takes Compose from the app, so nothing here moves Compose's version.
     testImplementation("org.robolectric:robolectric:4.17")
-    testImplementation("io.github.takahirom.roborazzi:roborazzi:1.77.0")
+    testImplementation("io.github.takahirom.roborazzi:roborazzi:1.78.0")
     testImplementation("io.github.takahirom.roborazzi:roborazzi-compose:1.77.0")
     testImplementation("io.github.takahirom.roborazzi:roborazzi-junit-rule:1.77.0")
     testImplementation(composeBom)
