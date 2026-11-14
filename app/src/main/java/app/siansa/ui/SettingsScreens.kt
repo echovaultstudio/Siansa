@@ -147,7 +147,7 @@ fun ConnectionsScreen(nav: NavController, sourceName: String? = null, extras: Bo
             if (firstRun) {
                 Text(
                     if (fromPicker) "Enter your server's address and login. Test checks them before you save."
-                    else "Welcome! Connect your server to get started. AudioMuse and an AI service can be added now or later.",
+                    else "Welcome! Connect your server to get started. ${smartExtrasName(BEATS_OFFERED)} and an AI service can be added now or later.",
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 // A user being added: a way back to the users already set up.
@@ -176,8 +176,13 @@ fun ConnectionsScreen(nav: NavController, sourceName: String? = null, extras: Bo
             }
             // Smart extras turned down on the first run (issue #113): only the server. They're here later in Settings.
             if (extras || !firstRun) {
+                if (BEATS_OFFERED) {
+                    HorizontalDivider()
+                    Heading("Siansa Beats")
+                    BeatsFields(graph, draft) { draft = it }
+                }
                 HorizontalDivider()
-                Heading("AudioMuse-AI")
+                Heading(if (BEATS_OFFERED) "AudioMuse-AI (optional)" else "AudioMuse-AI")
                 Field("Server address", draft.audioMuseUrl, "192.168.1.10:8000") { draft = draft.copy(audioMuseUrl = it) }
                 Hint("Leave the address empty if this user has no AudioMuse.")
                 Hint("If AudioMuse has a login, use either an API token or its username and password.")

@@ -27,11 +27,11 @@ Not on the list yet? [Ask for an invite](https://siansa.app).
 ## First setup
 
 1. **Where's your music?** Pick your server type: OpenSubsonic (Navidrome and others), Jellyfin or Emby.
-2. **Smart extras.** Choose **Add AudioMuse-AI** if you have it, or **Not now**. You can add it later in
+2. **Smart extras.** Choose **Add Siansa Beats** if you have it, or **Not now**. You can add it later in
    Settings › Connections.
 3. **Connect your servers.** Enter your server's address (for example `http://192.168.1.10:4533`), user name and
-   password. Tap **Test**, then **Save**. If you added AudioMuse-AI, enter its address and its API token (or
-   user name and password) too.
+   password. Tap **Test**, then **Save**. If you added Siansa Beats, enter its address too (and its key, if
+   it asks for one). AudioMuse-AI's address and login are optional, below it.
 4. **Library sync.** Siansa copies your library's list of artists, albums and songs to the phone, so browsing
    and search are instant and mixes build quickly. The first sync of a large library takes a few minutes. Only
    the list is copied, never the music files.
