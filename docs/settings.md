@@ -47,7 +47,7 @@ to fold it open; they start folded. **Save** (at the top, or in any open card) k
 **Servers**
 
 - **Each music server login** (a "user": its own library, history and settings). The one in use has its address,
-  user name, password or an API key (OpenSubsonic), an optional proxy login, its **Name shown in Siansa**, its **Server name in AudioMuse** and
+  user name, password or an API key (OpenSubsonic), an optional proxy login, its **Name shown in Siansa**, its **Server name in AudioMuse-AI** and
   its **Library sync**. Another one has **Switch to it** (Siansa restarts) and **Remove**. See
   [Servers, users and libraries](servers-and-users.md).
 - **Audiobookshelf**: address, API token or user name and password, and **Scan for new books**. See
@@ -58,11 +58,9 @@ to fold it open; they start folded. **Save** (at the top, or in any open card) k
 **Services**
 
 - **AudioMuse-AI**: address, and an API token or user name and password. See [AudioMuse-AI](audiomuse.md).
-- **Siansa Beats**: its address (port 8090) and, if it asks for one, its API key or password. With it
-  set, each song's beats, loudness, fades and key, and the genres, come straight from Siansa Beats instead of the
-  Siansa plugin on AudioMuse-AI; leave the address empty to keep using the plugin, or the songs' tags. **Test** says
-  how many songs it has analysed. It reads Navidrome, so it's for a Navidrome server. See
-  [AudioMuse-AI](audiomuse.md#siansa-beats).
+- **Siansa Beats**: its address (port 8090) and, if it asks for one, its API key or password. With it set, each
+  song's beats, loudness, fades and key, the genres, and what songs sound like come from Siansa Beats. **Test** says
+  what it can do. It reads Navidrome, Emby and Jellyfin. See [Siansa Beats](siansa-beats.md).
 - **AI** (optional): which service writes mix titles and sound searches (OpenRouter, OpenAI, Anthropic, Google
   Gemini, Mistral, Groq, Ollama or another), its key, its model, and **AI titles and sound searches**. See
   [AI features](ai.md).

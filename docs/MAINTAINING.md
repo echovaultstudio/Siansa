@@ -17,6 +17,7 @@ request, and says which page in its description.
 |---|---|
 | Setup, requirements, installing | [Getting started](getting-started.md) |
 | Servers, users, libraries, source filter | [Servers, users and libraries](servers-and-users.md) |
+| Siansa Beats | [Siansa Beats](siansa-beats.md), [API](api.md) |
 | AudioMuse-AI or the plugin | [AudioMuse-AI](audiomuse.md), [API](api.md) |
 | Home, mixes, vibes, radios | [Home and your mixes](home-and-mixes.md) |
 | Song radio, similar, Song path, Flow, dice | [Discovery](discovery.md) |

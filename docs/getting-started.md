@@ -6,7 +6,7 @@
 |---|---|
 | **Phone** | Android 8.0 or newer. |
 | **Music server** | Navidrome (or another OpenSubsonic server: Gonic, Airsonic, Ampache…), Jellyfin (10.9 or later) or Emby, that your phone can reach. At home on Wi-Fi is fine. Away from home, use a VPN such as WireGuard or Tailscale, or your own secure address. Files on the phone are listed as "coming soon". |
-| **Siansa Beats** (recommended) | [Siansa Beats](https://github.com/echovaultstudio/siansa-beats), a service of its own next to your music server. It powers the mixes, radios, search by sound, loudness levelling, smart crossfades, DJ blends that keep to the beat, genres by sound, and similar albums and artists. See [Siansa Beats](audiomuse.md#siansa-beats). |
+| **Siansa Beats** (recommended) | [Siansa Beats](https://github.com/echovaultstudio/siansa-beats), a service of its own next to your music server. It powers the mixes, radios, search by sound, loudness levelling, smart crossfades, DJ blends that keep to the beat, genres by sound, and similar albums and artists. See [Siansa Beats](siansa-beats.md). |
 | **AudioMuse-AI** (optional) | [AudioMuse-AI](https://github.com/NeptuneHub/AudioMuse-AI) 3.6.4 or newer with text search (CLAP) on does the mixes, radios and search by sound when there's no Siansa Beats; with the [Siansa Analysis plugin](audiomuse.md#install-the-siansa-analysis-plugin) it also measures loudness and beats. See [AudioMuse-AI](audiomuse.md). |
 | **An AI service** (optional) | For mix titles and sound searches written by an AI model: OpenRouter, OpenAI, Anthropic, Google Gemini, Mistral, Groq, or Ollama on your own network. See [AI features](ai.md). |
 | **Last.fm or Koito** (optional) | Where Siansa sends your listens (scrobbling) and reads your history back from. [Last.fm](https://www.last.fm) with your own API key, or [Koito](https://github.com/gabehf/Koito), a ListenBrainz-compatible history server you run yourself. They keep your full listening history, which powers **Time Machine**, **Your month and year** and your history. Siansa Beats keeps it too, when you scrobble there. Set them up in **Settings › Scrobbling & history**. See [Your listening](your-listening.md#scrobbling). |
@@ -46,5 +46,5 @@ you have; tap it to see every version's changes.
 ## Next
 
 - Several servers or users? See [Servers, users and libraries](servers-and-users.md).
-- Set up the smart parts: [AudioMuse-AI and the Siansa plugin](audiomuse.md).
+- Set up the smart parts: [Siansa Beats](siansa-beats.md), or [AudioMuse-AI and the Siansa plugin](audiomuse.md).
 - Keep your history and use Time Machine: [Your listening](your-listening.md).
