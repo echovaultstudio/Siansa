@@ -53,8 +53,6 @@ import app.siansa.ui.GradientTile
 import app.siansa.ui.HomeItem
 import app.siansa.ui.HomeLookRow
 import app.siansa.ui.ProgressCard
-import app.siansa.playback.BeatMatchMode
-import app.siansa.ui.BeatMatchSection
 import app.siansa.net.SourceKind
 import app.siansa.ui.Hint
 import app.siansa.ui.NewServerButtons
@@ -432,10 +430,6 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     ApiKeyField(AppSettings(navidromeApiKey = "a-very-long-api-key-from-the-server-0123456789")) {}
                     TestRow("✗ " + SubsonicApi.NO_API_KEYS) {}
                 }
-            },
-            // Beat-matched blends with the echo switch (issue #759).
-            Scene("crossfade_beat_match") {
-                Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(CROSSFADE_GAP)) { BeatMatchSection(BeatMatchMode.DJ_RADIO, bars = 8, echo = true, bassSwap = true, keepKey = false, onMode = {}, onBars = {}, onEcho = {}, onBassSwap = {}, onKeepKey = {}) }
             },
             // Today's mix settings (issue #776): the switch and tuning chips, and a folded settings section with its
             // summary, then one opened (the arrow turned).

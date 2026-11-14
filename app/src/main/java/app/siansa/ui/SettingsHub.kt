@@ -279,21 +279,6 @@ internal fun HubTiles(tiles: List<HubTile>, onOpen: (String) -> Unit) {
     }
 }
 
-/** A group's label on the Settings start page (issue #780): not a page, just a heading over its rows. */
-@Composable
-internal fun HubGroup(label: String, first: Boolean = false) {
-    Text(
-        label.uppercase(),
-        style = MaterialTheme.typography.labelLarge,
-        fontWeight = FontWeight.Bold,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = Space.Page, end = Space.Page, top = if (first) Space.Small else Space.Section, bottom = Space.Tight)
-            .testTag("hubGroup"),
-    )
-}
-
 @Composable
 fun HelpScreen(nav: NavController) {
     val graph = LocalGraph.current
@@ -357,18 +342,6 @@ internal fun HubRow(icon: ImageVector, title: String, onClick: () -> Unit) {
         Icon(icon, null, tint = MaterialTheme.colorScheme.primary)
         Text(title, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f).padding(start = Space.Page))
     }
-}
-
-/** "Crossfade 6 s · levelling track by the Siansa plugin", "No crossfade · levelling album by ReplayGain tags", "… · no levelling". */
-internal fun crossfadeSummary(s: AppSettings): String {
-    val fade = when (s.crossfade) {
-        CrossfadeMode.OFF -> "No crossfade"
-        CrossfadeMode.FIXED -> "Crossfade ${s.crossfadeSeconds} s"
-        CrossfadeMode.SMART -> "Smart crossfade"
-    }
-    val levelling = if (s.replayGain == ReplayGainMode.OFF) "no levelling" else
-        "levelling ${s.replayGain.label.lowercase()} by " + if (s.loudnessSource == LoudnessSource.PLUGIN) s.measurer else "ReplayGain tags"
-    return "$fade · $levelling"
 }
 
 internal fun formatMb(mb: Int): String = if (mb >= 1024) "${"%.0f".format(mb / 1024.0)} GB" else "$mb MB"

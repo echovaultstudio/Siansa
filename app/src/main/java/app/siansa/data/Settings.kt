@@ -920,35 +920,11 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         _state.value = _state.value.copy(crossfade = mode, crossfadeSeconds = length)
     }
 
-    fun setBeatMatch(mode: BeatMatchMode) {
-        noteBlend("Beat-matched blends", _state.value.beatMatch.name.lowercase(), mode.name.lowercase())
-        prefs.edit().putString("beat_match", mode.name).apply()
-        _state.value = _state.value.copy(beatMatch = mode)
-    }
-
     fun setBlendBars(bars: Int) {
         val length = bars.takeIf { it in AppSettings.BLEND_BAR_CHOICES } ?: AppSettings.DEFAULT_BLEND_BARS
         noteBlend("Blend length", "${_state.value.blendBars} bars", "$length bars")
         prefs.edit().putInt("blend_bars", length).apply()
         _state.value = _state.value.copy(blendBars = length)
-    }
-
-    fun setEchoTail(on: Boolean) {
-        noteBlend("Echo at the end", _state.value.echoTail, on)
-        prefs.edit().putBoolean("echo_tail", on).apply()
-        _state.value = _state.value.copy(echoTail = on)
-    }
-
-    fun setBassSwap(on: Boolean) {
-        noteBlend("Bass swap", _state.value.bassSwap, on)
-        prefs.edit().putBoolean("bass_swap", on).apply()
-        _state.value = _state.value.copy(bassSwap = on)
-    }
-
-    fun setKeepKey(on: Boolean) {
-        noteBlend("Keep the key", _state.value.keepKey, on)
-        prefs.edit().putBoolean("keep_key", on).apply()
-        _state.value = _state.value.copy(keepKey = on)
     }
 
     /** The shape and surprise of a DJ mix (issue #649). */

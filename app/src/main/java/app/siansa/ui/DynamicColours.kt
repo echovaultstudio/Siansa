@@ -348,17 +348,6 @@ fun rememberDynamicColours(coverId: String?, on: Boolean, backdrop: Color? = nul
     return DynamicColours(controls, text, target.onControls)
 }
 
-/**
- * [content] with its Play button, Shuffle and the other buttons in the colour of [coverId]'s cover, with Style's
- * Dynamic colours on (issue #1028), standing out from a page of [backdrop]. With it off, or before the cover has
- * been read, the theme's colours.
- */
-@Composable
-fun WithPageColours(coverId: String?, backdrop: Color, where: String, content: @Composable () -> Unit) {
-    val colours = rememberPageColours(coverId, backdrop, where)
-    WithAccent(colours?.controls, colours?.onControls, content)
-}
-
 /** The page's colours for its Play button only (Dynamic colours), set by the page around its content. */
 val LocalPlayColours = androidx.compose.runtime.staticCompositionLocalOf<DynamicColours?> { null }
 

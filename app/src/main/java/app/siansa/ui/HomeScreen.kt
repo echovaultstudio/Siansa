@@ -834,25 +834,6 @@ fun CoverMosaic(mix: Mix, modifier: Modifier = Modifier) {
     }
 }
 
-@Composable
-fun MixRow(mix: Mix, onClick: () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = Space.Page, vertical = Space.Small),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        CoverMosaic(mix, Modifier.size(56.dp))
-        Spacer(Modifier.width(Space.Medium))
-        Column(Modifier.weight(1f)) {
-            Text(mix.title, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(
-                "${mix.songs.size} tracks",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
 /** Roll the dice (issue #347): whether it's rolling, how many rolls so far (for the die's tumble) and [roll]. */
 @Stable
 internal class DiceRoller {

@@ -186,9 +186,6 @@ class Guests(
         }
     }
 
-    /** Whether [user] is on the same server as the user in use, so their music may be shown together. */
-    fun onSameServer(user: Int): Boolean = sameServerNow(user) == true
-
     /**
      * Whether [user] is on the user in use's server: yes for the same kind at the same address, no for another
      * kind; for the same kind at another address (a domain and an IP for one Navidrome), what [checkSameServers]
