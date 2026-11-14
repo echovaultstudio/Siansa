@@ -112,8 +112,9 @@ private suspend fun appearsOnOf(graph: app.siansa.AppGraph, page: ArtistPage): L
         .filterNot { album -> page.albums.any { it.id == album.id } }
         .sortedWith(compareByDescending<Album> { it.year ?: 0 }.thenBy { app.siansa.data.normalizeKey(it.name) })
 
-// A third shorter than it was (the owner, 14 Nov: too much empty space above the songs).
-private val HERO = 260.dp
+// Shorter than it first was (the owner, 14 Nov: too much empty space above the songs), then a little taller again
+// (the same day: at 260 dp the picture was cut off, faces lost their top), three quarters of a phone's width.
+private val HERO = 308.dp
 
 /** The dark band at the foot of the artist's picture, behind the name at rest. */
 private val HERO_NAME_BAND = 120.dp
