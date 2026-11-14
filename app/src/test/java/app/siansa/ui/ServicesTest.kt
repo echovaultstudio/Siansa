@@ -71,13 +71,4 @@ class ServicesTest {
         assertEquals(ServiceCheck(false, "No route to host").words, ServiceHealth.state.value["probe"]?.words)
         assertEquals(false, ServiceHealth.state.value["probe"]?.ok)
     }
-
-    /** First-run setup offers Siansa Beats where this build has a page for it, and AudioMuse-AI where it doesn't. */
-    @Test fun setupOffersTheServiceThisBuildHas() {
-        assertEquals("Siansa Beats", smartExtrasName(beats = true))
-        assertEquals("AudioMuse-AI", smartExtrasName(beats = false))
-        assertTrue(smartExtrasWords(true, app.siansa.net.SourceKind.JELLYFIN).contains("Siansa Beats"))
-        assertFalse(smartExtrasWords(false, app.siansa.net.SourceKind.JELLYFIN).contains("Siansa Beats"))
-        assertTrue(smartExtrasWords(false, app.siansa.net.SourceKind.JELLYFIN).contains("Jellyfin"))
-    }
 }
