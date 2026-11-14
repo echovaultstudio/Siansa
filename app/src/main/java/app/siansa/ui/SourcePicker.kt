@@ -110,8 +110,8 @@ internal fun extrasRoute(kind: SourceKind) = "welcome/extras/${kind.name}"
 internal fun connectionsRoute(kind: SourceKind, extras: Boolean) = "settings/connections?source=${kind.name}&extras=$extras"
 
 /**
- * The second step of a new setup (issue #113): AudioMuse-AI and AI titles, which the rest of Siansa works
- * without. Either way the connection details come next.
+ * The second step of a new setup (issue #113): Siansa Beats where this build offers it, else AudioMuse-AI, and AI
+ * titles, which the rest of Siansa works without. Either way the connection details come next.
  */
 @Composable
 fun SmartExtrasScreen(nav: NavController, sourceName: String) {
@@ -129,23 +129,17 @@ fun SmartExtrasScreen(nav: NavController, sourceName: String) {
                     Icon(Icons.Rounded.AutoAwesome, null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
                 }
                 Text(
-                    "AudioMuse-AI",
+                    smartExtrasName(BEATS_OFFERED),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.padding(start = Space.Medium),
                 )
             }
-            Text(
-                "Listens to your music on your server, for mixes made for you, Vibes, Song path and searching by " +
-                    "sound. Needs an AudioMuse-AI server. Everything else in Siansa works without it, and you can " +
-                    "add it later in Settings." +
-                    if (kind.embyLike) " With ${ServerWords.name(kind)}, all of these come from AudioMuse: set it up to read your ${ServerWords.name(kind)} library." else "",
-                style = MaterialTheme.typography.bodyMedium,
-            )
+            Text(smartExtrasWords(BEATS_OFFERED, kind), style = MaterialTheme.typography.bodyMedium)
             Button(
                 onClick = { AppLog.i("Setup", "Smart extras: yes"); nav.navigate(connectionsRoute(kind, extras = true)) },
                 modifier = Modifier.focusRing().fillMaxWidth().testTag("extrasYes"),
-            ) { Text("Add AudioMuse-AI") }
+            ) { Text("Add ${smartExtrasName(BEATS_OFFERED)}") }
             OutlinedButton(
                 onClick = { AppLog.i("Setup", "Smart extras: not now"); nav.navigate(connectionsRoute(kind, extras = false)) },
                 modifier = Modifier.focusRing().fillMaxWidth().testTag("extrasNo"),
@@ -165,3 +159,19 @@ private fun SwitchBackButtons() {
         }
     }
 }
+
+/** The service the Smart extras step offers: Siansa Beats where this build has a page for it, else AudioMuse-AI. */
+internal fun smartExtrasName(beats: Boolean): String = if (beats) "Siansa Beats" else "AudioMuse-AI"
+
+/** What that service gives, and that Siansa works without it. */
+internal fun smartExtrasWords(beats: Boolean, kind: SourceKind): String =
+    if (beats) {
+        "Listens to your music on your server, for mixes made for you, Vibes, Song path, searching by sound, even " +
+            "loudness and DJ blends. Needs Siansa Beats running next to your music server; AudioMuse-AI can be " +
+            "added too, or used in its place. Everything else in Siansa works without it, and you can add it later in Settings."
+    } else {
+        "Listens to your music on your server, for mixes made for you, Vibes, Song path and searching by " +
+            "sound. Needs an AudioMuse-AI server. Everything else in Siansa works without it, and you can " +
+            "add it later in Settings." +
+            if (kind.embyLike) " With ${ServerWords.name(kind)}, all of these come from AudioMuse: set it up to read your ${ServerWords.name(kind)} library." else ""
+    }
