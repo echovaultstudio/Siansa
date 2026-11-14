@@ -137,7 +137,7 @@ fun TvNowPlaying() {
             horizontalArrangement = Arrangement.spacedBy(Space.Large * 2),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // Animated covers move here as on the phone (Settings › Playback there: Animated covers), and a song's own
+            // Animated covers move here as on the phone (Settings › Theme there: Animated covers), and a song's own
             // picture shows when it has one. Paused, the cover darkens under a pause sign, as on the Chromecast screen.
             if (!queue) {
                 Box(Modifier.size(COVER_SIZE), contentAlignment = Alignment.Center) {

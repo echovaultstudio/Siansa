@@ -35,7 +35,7 @@ class BeatsGenresTest {
     }
 
     @Test fun aMissingServiceIsLeftAloneForAWhileAfterSeveralMisses() = runBlocking {
-        reply = { throw IllegalStateException("AudioMuse answered HTTP 502") }
+        reply = { throw IllegalStateException("AudioMuse-AI answered HTTP 502") }
         // One slow or failed answer doesn't turn Siansa Beats' genres off: only BeatsGenres.MISSES in a row do.
         repeat(BeatsGenres.MISSES) { assertNull(beats.songIds("Trance", 300)) }
         assertEquals(BeatsGenres.MISSES, asked.size)
@@ -103,7 +103,7 @@ class BeatsGenresTest {
     @Test fun theSavedListStaysWhenSiansaBeatsDoesntAnswer() = runBlocking {
         reply = { manyGenres() }
         val first = beats.refresh()!!
-        reply = { throw IllegalStateException("AudioMuse answered HTTP 502") }
+        reply = { throw IllegalStateException("AudioMuse-AI answered HTTP 502") }
         assertNull(beats.refresh())
         assertEquals(first, beats.saved())
     }

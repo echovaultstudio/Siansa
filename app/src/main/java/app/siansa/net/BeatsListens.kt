@@ -9,7 +9,7 @@ import kotlinx.serialization.json.putJsonArray
 
 /**
  * Listens sent to Siansa Beats (0.29, the owner, 11 Nov: it keeps the listening history itself, with a page for it,
- * and can send listens on to Last.fm): "Scrobble to Siansa Beats" in Settings › Scrobbling, offered once Siansa Beats
+ * and can send listens on to Last.fm): "Scrobble to Siansa Beats" in Settings › Scrobbling & history, offered once Siansa Beats
  * is set up and says it takes listens.
  *
  * A listen carries the song's id on the music server (Siansa Beats knows the song by it, on Navidrome, Emby and

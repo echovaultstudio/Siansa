@@ -113,13 +113,13 @@ class AudioMuseComplianceTest {
             fail("expected an error")
         } catch (e: ApiException) {
             assertEquals(3002, e.code)
-            assertEquals("AudioMuse's index isn't ready yet. Run an analysis in AudioMuse first.", e.message)
+            assertEquals("AudioMuse-AI's index isn't ready yet. Run an analysis in AudioMuse-AI first.", e.message)
         }
         // Older servers: only the HTTP status and "error".
-        assertEquals("AudioMuse answered HTTP 500: boom", AudioMuseErrors.message(null, 500, "boom"))
+        assertEquals("AudioMuse-AI answered HTTP 500: boom", AudioMuseErrors.message(null, 500, "boom"))
         assertEquals("Odd", AudioMuseErrors.message(9999, 500, "Odd"))
         // Beta report 810dc85c: a song AudioMuse doesn't know points to the server name setting too.
-        assertTrue(AudioMuseErrors.message(1004, 404, "x").contains("Server name in AudioMuse"))
+        assertTrue(AudioMuseErrors.message(1004, 404, "x").contains("Server name in AudioMuse-AI"))
         assertEquals(AudioMuseErrors.NOT_KNOWN, AudioMuseErrors.message(null, 404, "x"))
     }
 

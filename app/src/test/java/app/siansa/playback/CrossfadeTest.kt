@@ -564,7 +564,7 @@ class ProfileStoreTest {
     }
 
     @Test fun aFailingPluginIsLeftAloneForAWhile() = runBlocking {
-        reply = { throw ApiException("AudioMuse answered HTTP 404: not found") }
+        reply = { throw ApiException("AudioMuse-AI answered HTTP 404: not found") }
         assertTrue(store.fetch(listOf("a")).isEmpty())
         assertEquals(app.siansa.net.AudioMuseErrors.PLUGIN_MISSING, store.problem)
         store.fetch(listOf("a"))
@@ -612,7 +612,7 @@ class ProfileStoreTest {
         reply = { JsonObject(mapOf("plugin" to JsonPrimitive("siansa_analysis"), "status" to JsonPrimitive("ok"))) }
         assertTrue(store.check().message.contains("not as Siansa Beats (dev)"))
 
-        reply = { throw ApiException("AudioMuse sent something that isn't JSON. Is the address its API port?") }
+        reply = { throw ApiException("AudioMuse-AI sent something that isn't JSON. Is the address its API port?") }
         val login = store.check()
         assertFalse(login.ok)
         assertTrue(login.message.contains("login"))

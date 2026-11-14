@@ -221,7 +221,7 @@ data class AppSettings(
     val timeMachineMissing: Boolean = true,
     /**
      * Now playing shows "Bad blend" during a DJ blend and for a minute after it, to mark a change that sounded wrong
-     * (Settings › Help; the owner, 12 Nov). On by default in Siansa Dev only.
+     * (Settings › Help & feedback; the owner, 12 Nov). On by default in Siansa Dev only.
      */
     val badBlendButton: Boolean = app.siansa.playback.LastBlend.onByDefault,
     /** How each kind of notice on Home shows (issue #784): pinned, automatic (the default) or off. */

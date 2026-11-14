@@ -84,7 +84,7 @@ class SiansaApp : Application(), SingletonImageLoader.Factory {
     }
 
     /**
-     * Covers are kept on disk as they load, up to the size chosen in Settings › Data (or without a
+     * Covers are kept on disk as they load, up to the size chosen in Settings › Streaming & storage (or without a
      * limit), so scrolling back is instant and works offline. With no limit they're kept in the app's
      * files rather than its cache, so Android doesn't remove them when it runs short of space.
      *
@@ -172,7 +172,7 @@ class SiansaApp : Application(), SingletonImageLoader.Factory {
             "Android ${android.os.Build.VERSION.RELEASE} (SDK ${android.os.Build.VERSION.SDK_INT}) on ${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}",
             "memory class ${am?.memoryClass ?: "?"} MB",
             network,
-            "Navidrome ${if (s.navidromeReady) "set" else "not set"}, AudioMuse ${if (s.audioMuseReady) "set" else "not set"}, AI ${if (s.aiReady) "on" else "off"}",
+            "Navidrome ${if (s.navidromeReady) "set" else "not set"}, AudioMuse-AI ${if (s.audioMuseReady) "set" else "not set"}, AI ${if (s.aiReady) "on" else "off"}",
             "quality Wi-Fi ${if (s.transcodeWifiKbps > 0) "Opus ${s.transcodeWifiKbps}" else "original"}, mobile ${if (s.transcodeMobileKbps > 0) "Opus ${s.transcodeMobileKbps}" else "original"}",
             "ReplayGain ${s.replayGain.label}",
             // How songs blend, so a DJ session's log says what it was set to (0.52.0-dev).

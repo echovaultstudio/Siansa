@@ -59,7 +59,7 @@ class DjReadyTest {
     }
 
     @Test fun everyReasonIsExplained() {
-        for (p in listOf("Needs AudioMuse", "Needs Siansa Beats", "Checking…", "Not available now")) {
+        for (p in listOf("Needs AudioMuse-AI", "Needs Siansa Beats", "Checking…", "Not available now")) {
             assertTrue(DjReady.explain(p).isNotBlank())
         }
     }

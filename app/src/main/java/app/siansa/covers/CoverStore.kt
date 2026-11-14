@@ -135,7 +135,7 @@ object CoverStore {
     fun sizeBytes(): Long = dir.listFiles()?.sumOf { it.length() } ?: 0L
 
     /**
-     * The most animated originals kept, in bytes. No limit on a phone, where Settings › Data shows and clears them;
+     * The most animated originals kept, in bytes. No limit on a phone, where Settings › Streaming & storage shows and clears them;
      * the TV app sets its own ([app.siansa.data.StorageBudget]): it kept every one it had played, 17 to 163 MB each,
      * for good, on a box with 8 GB for everything.
      */

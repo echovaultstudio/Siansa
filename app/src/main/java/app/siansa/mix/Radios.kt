@@ -39,7 +39,7 @@ class Radios(private val graph: AppGraph) {
     suspend fun mood(radio: MoodRadio): List<Song> {
         AppLog.i("Radio", "Mood radio ${radio.name}")
         val songs = graph.generator.soundSearch(radio.query, 120)
-        if (songs.isEmpty()) throw MixException("AudioMuse found nothing for ${radio.name}")
+        if (songs.isEmpty()) throw MixException("AudioMuse-AI found nothing for ${radio.name}")
         return varied(songs, 60)
     }
 
@@ -47,7 +47,7 @@ class Radios(private val graph: AppGraph) {
     suspend fun windDown(): List<Song> {
         AppLog.i("Radio", "Wind down")
         val songs = graph.generator.soundSearch(WIND_DOWN_QUERY, 80)
-        if (songs.isEmpty()) throw MixException("AudioMuse found no calm songs")
+        if (songs.isEmpty()) throw MixException("AudioMuse-AI found no calm songs")
         return varied(songs, 30)
     }
 
@@ -67,7 +67,7 @@ class Radios(private val graph: AppGraph) {
         AppLog.i("Radio", "Mood centre radio ${centre.mood} ${centre.index} (${centre.tags.joinToString()})")
         val hits = graph.audioMuse.moodRadio(centre, 120)
         val songs = graph.generator.resolveHits(hits)
-        if (songs.isEmpty()) throw MixException("AudioMuse found nothing for this mood")
+        if (songs.isEmpty()) throw MixException("AudioMuse-AI found nothing for this mood")
         return varied(songs, 60)
     }
 
@@ -81,7 +81,7 @@ class Radios(private val graph: AppGraph) {
         AppLog.i("Radio", "Song alchemy of ${seeds.size} songs")
         val hits = graph.audioMuse.alchemy(seeds, count = 80).filter { it.id !in seeds }
         val found = graph.generator.resolveHits(hits)
-        if (found.isEmpty()) throw MixException("AudioMuse found nothing like these songs")
+        if (found.isEmpty()) throw MixException("AudioMuse-AI found nothing like these songs")
         return varied(found, 60)
     }
 
@@ -97,7 +97,7 @@ class Radios(private val graph: AppGraph) {
                 mood(moodRadios.firstOrNull { it.id == parts[2] } ?: throw MixException("This radio isn't in Siansa any more"))
             parts.size == 3 && parts[0] == "radio" && parts[1] == "centre" ->
                 centre(graph.audioMuse.moodCentres().firstOrNull { app.siansa.net.AudioMuseApi.centreKey(it) == parts[2] }
-                    ?: throw MixException("AudioMuse doesn't have this mood any more"))
+                    ?: throw MixException("AudioMuse-AI doesn't have this mood any more"))
             parts.size == 3 && parts[0] == "radio" && parts[1] == "genre" -> {
                 val all = graph.genreRadio.songsOf(parts[2])
                 if (all.isEmpty()) throw MixException("No songs of ${parts[2]} on the phone")

@@ -14,7 +14,7 @@ import kotlinx.coroutines.withContext
 import kotlin.math.abs
 
 /**
- * What happens when the queue is about to run out (issue #337), set in Settings › Playback › Keep playing.
+ * What happens when the queue is about to run out (issue #337), set in Settings › Radios & mixes › When the queue ends.
  */
 enum class ContinuousMode(val label: String, val hint: String) {
     OFF("Off", "The music stops when the queue ends."),

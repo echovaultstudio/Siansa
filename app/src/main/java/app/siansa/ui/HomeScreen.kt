@@ -482,7 +482,7 @@ fun HomeScreen(nav: NavController) {
                                     )
                                 })
                             }
-                            // Your own cards, added and named in Settings › Made for you cards (issue #274).
+                            // Your own cards, added and named in Settings › Home page › Cards (issue #274).
                             customCards.orEmpty().forEach { card ->
                                 add(card.id to @Composable {
                                     GradientTile(
@@ -628,7 +628,7 @@ fun HomeScreen(nav: NavController) {
     }
     }
     panel?.let { sources ->
-        // The same panel opens from Settings › Home (issue #780).
+        // The same panel opens from Settings › Home page (issue #780).
         HomeSettingsSheet(nav, startOnSources = sources) { panel = null }
     }
     if (castOpen) CastSheet(onDismiss = { castOpen = false })

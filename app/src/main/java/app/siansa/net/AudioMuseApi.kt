@@ -156,7 +156,7 @@ class AudioMuseApi(
     /** A request to [path] (or the full address [at]), naming the server of the songs [about] (see [serverFor]). */
     private suspend fun request(path: String, about: List<String> = emptyList(), at: okhttp3.HttpUrl? = null): Request.Builder {
         val s = settings()
-        if (s.audioMuseUrl.isBlank()) throw ApiException("AudioMuse isn't set up yet")
+        if (s.audioMuseUrl.isBlank()) throw ApiException("AudioMuse-AI isn't set up yet")
         val builder = Request.Builder().url(serverInUrl(at?.toString() ?: (s.audioMuseUrl + path), server(about)))
         when {
             s.audioMuseToken.isNotBlank() -> builder.header("Authorization", "Bearer ${s.audioMuseToken}")
@@ -181,16 +181,16 @@ class AudioMuseApi(
             http.newCall(request).execute().use { response ->
                 when (response.code) {
                     200 -> Unit
-                    401 -> throw ApiException("AudioMuse rejected the username or password")
-                    404 -> throw ApiException("AudioMuse has no login switched on, so leave its username and password empty")
-                    else -> throw ApiException("AudioMuse login failed (HTTP ${response.code})")
+                    401 -> throw ApiException("AudioMuse-AI rejected the username or password")
+                    404 -> throw ApiException("AudioMuse-AI has no login switched on, so leave its username and password empty")
+                    else -> throw ApiException("AudioMuse-AI login failed (HTTP ${response.code})")
                 }
                 response.headers("Set-Cookie")
                     .firstNotNullOfOrNull { header ->
                         header.split(';').first().trim().takeIf { it.startsWith("audiomuse_jwt=") }
                             ?.substringAfter('=')
                     }
-                    ?: throw ApiException("AudioMuse accepted the login but sent no session")
+                    ?: throw ApiException("AudioMuse-AI accepted the login but sent no session")
             }
         }
         session = key to jwt
@@ -198,7 +198,7 @@ class AudioMuseApi(
     }
 
     private suspend fun execute(build: suspend () -> Request): JsonObject =
-        executeElement(build) as? JsonObject ?: throw ApiException("AudioMuse sent an unexpected answer")
+        executeElement(build) as? JsonObject ?: throw ApiException("AudioMuse-AI sent an unexpected answer")
 
     private suspend fun executeElement(build: suspend () -> Request): JsonElement {
         val first = runCatching { send(build()) }
@@ -209,7 +209,7 @@ class AudioMuseApi(
             return send(build())
         }
         if (error is Unauthorized) {
-            throw ApiException("AudioMuse needs a login: set an API token, or its username and password, in Settings")
+            throw ApiException("AudioMuse-AI needs a login: set an API token, or its username and password, in Settings")
         }
         return first.getOrThrow()
     }
@@ -231,7 +231,7 @@ class AudioMuseApi(
                 AppLog.w("AudioMuse", "$path failed: HTTP ${response.code}, error ${code ?: "?"}: ${if (AudioMuseErrors.isWebPage(body)) "a web page, not the API (the plugin isn't installed)" else reason}")
                 throw AudioMuseHttpException(message, code, response.code)
             }
-            element ?: throw ApiException("AudioMuse sent something that isn't JSON. Is the address its API port?")
+            element ?: throw ApiException("AudioMuse-AI sent something that isn't JSON. Is the address its API port?")
         }
     }
 
@@ -299,7 +299,7 @@ class AudioMuseApi(
                 })
             }
         }.toString()
-        val root = sound("/api/clap/search", payload = payload) as? JsonObject ?: throw ApiException("AudioMuse sent an unexpected answer")
+        val root = sound("/api/clap/search", payload = payload) as? JsonObject ?: throw ApiException("AudioMuse-AI sent an unexpected answer")
         val hits = root.arr("results").mapNotNull { r ->
             val id = r.str("item_id") ?: return@mapNotNull null
             ClapHit(
@@ -332,7 +332,7 @@ class AudioMuseApi(
     /** AudioMuse's mood centres (happy, relaxed…), each with the tags that describe it (issue #208). */
     suspend fun moodCentres(): List<MoodCentre> {
         centres?.let { return it }
-        val root = sound("/api/mood_centroids") as? JsonObject ?: throw ApiException("AudioMuse sent an unexpected answer")
+        val root = sound("/api/mood_centroids") as? JsonObject ?: throw ApiException("AudioMuse-AI sent an unexpected answer")
         return parseMoodCentres(root).also { centres = it }
     }
 
@@ -359,13 +359,13 @@ class AudioMuseApi(
             count?.let { put("n", it) }
         }.toString()
         val root = sound("/api/alchemy", payload = payload, about = blend + avoid) as? JsonObject
-            ?: throw ApiException("AudioMuse sent an unexpected answer")
+            ?: throw ApiException("AudioMuse-AI sent an unexpected answer")
         return neighbours(root["results"] ?: JsonArray(emptyList()))
     }
 
     private fun apiUrl(path: String): okhttp3.HttpUrl.Builder {
         val base = settings().audioMuseUrl.trimEnd('/')
-        if (base.isBlank()) throw ApiException("AudioMuse isn't set up yet")
+        if (base.isBlank()) throw ApiException("AudioMuse-AI isn't set up yet")
         return base.toHttpUrl().newBuilder().addPathSegments(path)
     }
 
@@ -438,7 +438,7 @@ class AudioMuseApi(
      */
     suspend fun conceptCatalogue(): ConceptCatalogue {
         catalogue?.let { return it }
-        val root = sound("/api/clap/concepts") as? JsonObject ?: throw ApiException("AudioMuse sent an unexpected answer")
+        val root = sound("/api/clap/concepts") as? JsonObject ?: throw ApiException("AudioMuse-AI sent an unexpected answer")
         return parseCatalogue(root).also { if (it.categories.isNotEmpty()) catalogue = it }
     }
 
@@ -454,13 +454,13 @@ class AudioMuseApi(
             listOf("ids" to batch.joinToString(","), "include_embeddings" to "false", "limit" to batch.size.toString()),
             about = batch,
             beatsOnly = beatsOnly,
-        ) as? JsonObject ?: throw ApiException("AudioMuse sent an unexpected answer")
+        ) as? JsonObject ?: throw ApiException("AudioMuse-AI sent an unexpected answer")
         root.arr("tracks").mapNotNull(::parseFeatures)
     }
 
     /** Sound concepts this library's search understands well, to steer the AI's wording. */
     suspend fun concepts(): List<String> {
-        val root = sound("/api/clap/concepts") as? JsonObject ?: throw ApiException("AudioMuse sent an unexpected answer")
+        val root = sound("/api/clap/concepts") as? JsonObject ?: throw ApiException("AudioMuse-AI sent an unexpected answer")
         if (root.bool("available") == false) return emptyList()
         return root.arr("categories")
             .flatMap { category -> category.arr("terms").mapNotNull { it.str("term") } }
@@ -478,7 +478,7 @@ class AudioMuseApi(
             val best = hits.take(top).joinToString("; ") { "${it.title} – ${it.artist} (${"%.3f".format(Locale.ROOT, it.similarity)})" }
             return "Search \"$query\" · concepts $steer · ${hits.size} songs" +
                 (if (best.isNotEmpty()) " · best: $best" else "") +
-                (if (warnings.isNotEmpty()) " · AudioMuse: ${warnings.joinToString("; ")}" else "")
+                (if (warnings.isNotEmpty()) " · AudioMuse-AI: ${warnings.joinToString("; ")}" else "")
         }
 
         val JSON_TYPE = "application/json".toMediaType()

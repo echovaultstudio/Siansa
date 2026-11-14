@@ -203,7 +203,7 @@ fun RadioScreen(nav: NavController, kind: String, key: String) {
             }
             "centre" -> {
                 val c = graph.audioMuse.moodCentres().firstOrNull { AudioMuseApi.centreKey(it) == key }
-                    ?: throw IllegalStateException("AudioMuse doesn't have this mood any more")
+                    ?: throw IllegalStateException("AudioMuse-AI doesn't have this mood any more")
                 graph.radios.centre(c)
             }
             else -> graph.radios.genre(key)
