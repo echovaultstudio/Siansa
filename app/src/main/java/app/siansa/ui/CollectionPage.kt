@@ -89,6 +89,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
@@ -731,10 +732,12 @@ fun PlayButtonRow(
     modifier: Modifier = Modifier,
     horizontalArrangement: Arrangement.Horizontal = Arrangement.Start,
     verticalAlignment: Alignment.Vertical = Alignment.CenterVertically,
+    // The room under the row: the artist page's pills follow closer (the owner, 14 Nov).
+    below: Dp = Space.BelowPlayButton,
     content: @Composable RowScope.() -> Unit,
 ) {
     Row(
-        modifier.fillMaxWidth().padding(bottom = Space.BelowPlayButton),
+        modifier.fillMaxWidth().padding(bottom = below),
         horizontalArrangement = horizontalArrangement,
         verticalAlignment = verticalAlignment,
         content = content,
@@ -1001,7 +1004,7 @@ private const val SLIDE_OTHERS = 0.3f
 /** Where Play continues an album you stopped part way (issue #965): the song's position and its label ("10", "2-3"). */
 data class PlayResume(val index: Int, val label: String)
 
-private val BIG_PLAY_SIZE = 56.dp
+internal val BIG_PLAY_SIZE = 56.dp
 /**
  * An album bar icon's size, and how far its drawing sits inside its touch area: the icon centred in 48 dp, plus the
  * circle's own margin in its 24-unit drawing (2 units). The plus moves left by that, so its circle starts in line with
