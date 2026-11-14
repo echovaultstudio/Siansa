@@ -6,7 +6,7 @@
 |---|---|
 | **Phone** | Android 8.0 or newer. |
 | **Music server** | Navidrome (or another OpenSubsonic server: Gonic, Airsonic, Ampache…), Jellyfin (10.9 or later) or Emby, that your phone can reach. At home on Wi-Fi is fine. Away from home, use a VPN such as WireGuard or Tailscale, or your own secure address. Files on the phone are listed as "coming soon". |
-| **Siansa Beats** (recommended) | [Siansa Beats](https://github.com/echovaultstudio/siansa-beats), a service of its own next to your music server. It powers the mixes, radios, search by sound, loudness levelling, smart crossfades, DJ blends that keep to the beat, genres by sound, and similar albums and artists. See [Siansa Beats](siansa-beats.md). |
+| **Siansa Beats** (recommended) | [Siansa Beats](https://github.com/echovaultstudio/siansa-beats), a service of its own next to your music server. It powers the mixes, radios, search by sound, loudness levelling, smart crossfades, DJ blends that keep to the beat, genres by sound, similar albums and artists, and your listening history. One Docker container: start it, add your music server on its page, then connect it in the app (three steps, see [Siansa Beats](siansa-beats.md) and [siansa.app/beats](https://siansa.app/beats)). |
 | **AudioMuse-AI** (optional) | [AudioMuse-AI](https://github.com/NeptuneHub/AudioMuse-AI) 3.6.4 or newer with text search (CLAP) on does the mixes, radios and search by sound when there's no Siansa Beats; with the [Siansa Analysis plugin](audiomuse.md#install-the-siansa-analysis-plugin) it also measures loudness and beats. See [AudioMuse-AI](audiomuse.md). |
 | **An AI service** (optional) | For mix titles and sound searches written by an AI model: OpenRouter, OpenAI, Anthropic, Google Gemini, Mistral, Groq, or Ollama on your own network. See [AI features](ai.md). |
 | **Last.fm or Koito** (optional) | Where Siansa sends your listens (scrobbling) and reads your history back from. [Last.fm](https://www.last.fm) with your own API key, or [Koito](https://github.com/gabehf/Koito), a ListenBrainz-compatible history server you run yourself. They keep your full listening history, which powers **Time Machine**, **Your month and year** and your history. Siansa Beats keeps it too, when you scrobble there. Set them up in **Settings › Scrobbling & history**. See [Your listening](your-listening.md#scrobbling). |
@@ -40,8 +40,10 @@ That's it: Home fills with your mixes and recent music.
 
 ## Updating
 
-Google Play and F-Droid update Siansa by themselves. **Settings › About › What's new** shows what changed in the version
-you have; tap it to see every version's changes.
+Google Play and F-Droid update Siansa by themselves. When a newer version is out, a notice at the top of Home says so
+("Siansa 1.6.0 is out"); a tap opens the store you installed it from. **Settings › About › What's new** shows what
+changed in the version you have; tap it to see every version's changes. Update Siansa Beats with `docker compose pull`
+and `docker compose up -d` in its folder.
 
 ## Next
 
