@@ -105,6 +105,8 @@ Siansa shows your music as your server reads its tags, so tag your files the way
   first time.
 - **Several artists on a song:** tag each one (Navidrome: `ARTISTS`; Emby: separate them with `; `). Every
   artist gets a page, and the song shows up there.
+- **Several artists on an album:** tag each album artist (Navidrome: `ALBUMARTISTS`; Emby and Jellyfin: separate
+  them with `; `). Tapping the artist on the album's page then offers each of them.
 - **Compilations:** set the compilation tag (`COMPILATION=1`). An album by "Various Artists" (or "VA") counts as
   a compilation too, also on Emby, which has no such tag.
 - **Song details** (⋮ › **Show details**) shows what the song's tags say, as far as your server passes them on:

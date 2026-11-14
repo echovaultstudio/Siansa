@@ -30,6 +30,8 @@ import app.siansa.AppGraph
 import app.siansa.data.Artist
 import app.siansa.data.picture
 import app.siansa.data.Song
+import app.siansa.data.Album
+import app.siansa.data.ArtistRef
 import app.siansa.data.normalizeKey
 import app.siansa.data.splitArtists
 import app.siansa.log.AppLog
@@ -113,6 +115,25 @@ fun ArtistCircle(artist: Artist, modifier: Modifier) {
 /** The artist with [id], or the artists it names when it's several artists in one name (issue #359). */
 internal suspend fun artistsNamedBy(graph: AppGraph, id: String, name: String): List<Artist> =
     graph.library.expandArtists(listOf(graph.library.artist(id) ?: Artist(id, name)), serverArtistsNamed(graph))
+
+/**
+ * Every artist of [album] (the owner, 14 Nov: an album by "Fred again.. • LATIN MAFIA" opened only Fred again..): the
+ * server's list of album artists ([serverArtists]) when it has more than one, else the artists in its shown name split
+ * where names are joined, else its one artist ([artistsNamedBy]). As artists in the library where possible.
+ */
+internal suspend fun albumArtistsOf(graph: AppGraph, album: Album, serverArtists: List<ArtistRef>, artistId: String): List<Artist> {
+    if (serverArtists.size > 1) {
+        val found = graph.library.expandArtists(serverArtists.map { ref -> graph.library.artist(ref.id) ?: Artist(ref.id, ref.name) }, serverArtistsNamed(graph))
+        AppLog.d("Artist", "Album ${album.id}: ${found.size} artists from the server's list")
+        if (found.size > 1) return found
+    }
+    val known = graph.library.artists().map { normalizeKey(it.name) }.toSet()
+    val byName = splitArtists(album.artist) { normalizeKey(it) in known }
+        .mapNotNull { graph.library.artistByName(it) }
+        .distinctBy { it.id }
+    if (byName.size > 1) return byName
+    return artistsNamedBy(graph, artistId, album.artist)
+}
 
 /** Every artist on the song, as artists in the library where possible. */
 private suspend fun artistsOf(graph: AppGraph, song: Song): List<Artist> {
