@@ -264,6 +264,26 @@ fun TvPlaylist(id: String) {
     )
 }
 
+/** Your liked songs as a page (the owner, 14 Nov): Play, Shuffle and the songs, as on the phone. */
+@Composable
+fun TvLiked() {
+    val graph = LocalGraph.current
+    val songs by produceState<List<Song>?>(null) {
+        value = runCatching { app.siansa.ui.likedSongs(graph) }
+            .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it; AppLog.w("Tv", "Couldn't load liked songs: ${it.message}") }
+            .getOrDefault(emptyList())
+    }
+    val list = songs ?: return Loading()
+    val minutes = list.sumOf { it.durationSec } / 60
+    CollectionPage(
+        title = "Liked songs",
+        coverId = list.firstOrNull()?.cover,
+        songs = list,
+        shortcut = null,
+        about = listOfNotNull("${list.size} songs", "$minutes min".takeIf { minutes > 0 }).joinToString(" · "),
+    )
+}
+
 @Composable
 fun TvMix(id: String) {
     val graph = LocalGraph.current
