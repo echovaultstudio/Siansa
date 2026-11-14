@@ -616,6 +616,28 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     }
                 }
             },
+            // The mini player's song while it's swiped for the next one (the owner, 14 Nov): at rest, a little way, and
+            // most of the way. The cover stays; only the words go, fading, and never across the cover. A long title too.
+            Scene("mini_swipe") {
+                Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
+                    listOf(0f, -140f, -520f, 260f).forEach { dragged ->
+                        androidx.compose.runtime.CompositionLocalProvider(androidx.compose.material3.LocalContentColor provides Color.White) {
+                            Row(
+                                Modifier.fillMaxWidth().clip(androidx.compose.foundation.shape.RoundedCornerShape(10.dp)).background(Color(0xFF3B2A1E)).padding(Space.Small),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                app.siansa.ui.MiniSong(
+                                    "Mauro Picotto in the Mix: Metamorphosis, Disc Two", "Various Artists and Friends",
+                                    dragged = { dragged }, barWidth = 1000, modifier = Modifier.weight(1f),
+                                    cover = { Box(it.clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp)).background(Color(0xFFD4813A))) },
+                                )
+                                // Where the bar's buttons are.
+                                repeat(3) { Box(Modifier.padding(start = Space.Small).size(40.dp).clip(androidx.compose.foundation.shape.CircleShape).background(Color.White.copy(alpha = 0.2f))) }
+                            }
+                        }
+                    }
+                }
+            },
             // An artist's name on their page (the owner, 10 Nov): at rest on the picture, riding up with the page, halfway into
             // the title bar (shrinking, sideways past the back arrow), and settled there as the bar's title. A long name too.
             Scene("artist_name_glide") {

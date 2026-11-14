@@ -248,7 +248,8 @@ the cover shows its name, what it does and "Let go to start", "Let go to stop" o
 to change your mind. An album's or playlist's DJ mix plays its own songs, so its bar has only **Stop**. Put the places
 in your own order under **Settings › Now playing › DJ mix bar**.
 
-Swipe the mini player left for the next song or right for the one before; the phone gives a short buzz as the song
+Swipe the mini player left for the next song or right for the one before: the title and artist follow your finger
+while the cover stays, and changes with the song. The phone gives a short buzz as the song
 changes, and when you press **Repeat** or **Add to playlist** in now playing (if touch vibration is on in your
 phone's settings). With no song after this one, a swipe left springs back and the song plays on; with none before
 it, a swipe right starts it again.

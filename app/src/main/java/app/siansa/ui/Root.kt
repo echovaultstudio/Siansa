@@ -37,6 +37,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -416,28 +417,10 @@ private fun MiniPlayer(state: PlayerState, onOpen: () -> Unit) {
                     .padding(horizontal = Space.Small, vertical = Space.Small),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-              Row(
-                  Modifier
-                      .weight(1f)
-                      .graphicsLayer {
-                          translationX = drag.value
-                          alpha = 1f - (kotlin.math.abs(drag.value) / barWidth).coerceIn(0f, 0.7f)
-                      },
-                  verticalAlignment = Alignment.CenterVertically,
-              ) {
-                Cover(song.cover, 150, Modifier.size(44.dp), RoundedCornerShape(6.dp))
-                Spacer(Modifier.width(Space.Medium))
-                Column(Modifier.weight(1f)) {
-                    Text(song.title, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(
-                        song.artist,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.75f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-              }
+                MiniSong(
+                    song.title, song.artist, dragged = { drag.value }, barWidth = barWidth, modifier = Modifier.weight(1f),
+                    cover = { Cover(song.cover, 150, it, RoundedCornerShape(6.dp)) },
+                )
                 // The buttons and their order are set in Settings › Now playing › Mini player (issue #346).
                 val settings by graph.settings.state.collectAsStateWithLifecycle()
                 settings.miniButtons.forEach { button ->
@@ -450,6 +433,48 @@ private fun MiniPlayer(state: PlayerState, onOpen: () -> Unit) {
             MiniProgress(state.durationMs)
         }
       }
+    }
+}
+
+/**
+ * The mini player's song: its cover, and beside it the title and artist. Swiped for the next or the last song
+ * ([dragged] px of a bar [barWidth] px wide), the cover stays where it is and only the words follow the finger, fading
+ * as they go and never over the cover; the cover changes when the song does (the owner, 14 Nov: the whole line slid
+ * away and the bar looked empty).
+ */
+@Composable
+internal fun MiniSong(
+    title: String,
+    artist: String,
+    dragged: () -> Float,
+    barWidth: Int,
+    modifier: Modifier = Modifier,
+    cover: @Composable (Modifier) -> Unit,
+) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+        cover(Modifier.size(44.dp).testTag("miniCover"))
+        Spacer(Modifier.width(Space.Medium))
+        // Clipped to their own place: the words slide out under the cover's edge and the buttons', not across them.
+        Box(Modifier.weight(1f).clipToBounds()) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .graphicsLayer {
+                        translationX = dragged()
+                        alpha = 1f - (kotlin.math.abs(dragged()) / barWidth).coerceIn(0f, 0.7f)
+                    }
+                    .testTag("miniWords"),
+            ) {
+                Text(title, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    artist,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.75f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
     }
 }
 
