@@ -184,7 +184,7 @@ class BeatsApi(
 
         /** Whether [version] ("0.44.1") is [wanted] or newer; an unreadable one isn't. */
         fun atLeast(version: String, wanted: String): Boolean {
-            fun parts(v: String) = v.trim().split('.', '-').take(3).map { it.toIntOrNull() ?: return null }
+            fun parts(v: String): List<Int>? = v.trim().split('.', '-').take(3).map { it.toIntOrNull() ?: return null }
             val have = parts(version) ?: return false
             val need = parts(wanted) ?: return false
             for (i in 0 until 3) {
