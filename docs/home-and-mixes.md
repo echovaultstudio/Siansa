@@ -246,8 +246,9 @@ Home with its switch in Settings.
   Library under **Favourites**. Right after you heart one, **Make a Home card** makes a custom card of it, or pick it
   later under **Comes from › A favourite radio** in a card.
 - **On every page of songs**, once the cover and buttons have scrolled away, the title bar has its **Play** (a radio's
-  **radio**, and its heart). They grow into the bar the same way on every page: albums, playlists, radios, genres,
-  artists, books and podcasts.
+  **radio**, and its heart; an album's heart, before Play as on an artist's page). They grow into the bar the same
+  way on every page: albums, playlists, radios, genres, artists, books and podcasts. A title too long for the bar
+  fades out before them.
 - **Genres** open a page with every song of the genre on your phone, to look
   through. With Siansa Beats (0.19 or later), it says what the genre is, with a little of its history: the opening of
   its Wikipedia article, linked under it. Under that, one line: how many songs it has on the left, and on the right

@@ -1,6 +1,7 @@
 package app.siansa.screenshots
 
 import androidx.compose.material.icons.rounded.Schedule
+import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.SwapVert
 import androidx.compose.material.icons.rounded.Dns
@@ -659,12 +660,14 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                 Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Page)) {
                     app.siansa.ui.CollectionByline("Thornhill", null, null, "Album · 2019", note = "Continue from 8")
                     val download: @Composable () -> Unit = { androidx.compose.material3.Icon(Icons.Rounded.DownloadForOffline, "Download", Modifier.size(28.dp)) }
-                    app.siansa.ui.ActionButtons(enabled = true, onQueue = {}, download = download, onSimilar = {}, onShuffle = {}, onPlay = {}, onDjMix = {}, albumBar = true, onAddToPlaylist = {})
-                    app.siansa.ui.ActionButtons(enabled = true, onQueue = {}, download = download, onSimilar = {}, onShuffle = {}, onPlay = {}, onDjMix = {}, albumBar = true, onAddToPlaylist = {},
+                    // The album's heart beside Download (the owner, 14 Nov), off and on.
+                    val heart: @Composable () -> Unit = { androidx.compose.material3.IconButton(onClick = {}) { androidx.compose.material3.Icon(Icons.Rounded.FavoriteBorder, "Favourite", Modifier.size(28.dp)) } }
+                    app.siansa.ui.ActionButtons(enabled = true, onQueue = {}, download = download, onSimilar = {}, onShuffle = {}, onPlay = {}, onDjMix = {}, albumBar = true, onAddToPlaylist = {}, rowExtras = heart)
+                    app.siansa.ui.ActionButtons(enabled = true, onQueue = {}, download = download, onSimilar = {}, onShuffle = {}, onPlay = {}, onDjMix = {}, albumBar = true, onAddToPlaylist = {}, rowExtras = heart,
                         resume = app.siansa.ui.PlayResume(9, "10") to 24)
-                    app.siansa.ui.ActionButtons(enabled = true, onQueue = {}, download = download, onSimilar = {}, onShuffle = {}, onPlay = {}, onDjMix = {}, albumBar = true, onAddToPlaylist = {},
+                    app.siansa.ui.ActionButtons(enabled = true, onQueue = {}, download = download, onSimilar = {}, onShuffle = {}, onPlay = {}, onDjMix = {}, albumBar = true, onAddToPlaylist = {}, rowExtras = heart,
                         djSlide = app.siansa.ui.DjSlide(armed = true), dim = 0.3f)
-                    app.siansa.ui.ActionButtons(enabled = true, onQueue = {}, download = download, onSimilar = {}, onShuffle = {}, onPlay = {}, onDjMix = {}, albumBar = true, onAddToPlaylist = {},
+                    app.siansa.ui.ActionButtons(enabled = true, onQueue = {}, download = download, onSimilar = {}, onShuffle = {}, onPlay = {}, onDjMix = {}, albumBar = true, onAddToPlaylist = {}, rowExtras = heart,
                         mixOn = true)  // paused: a turning glint never lets the picture settle
                     Row(horizontalArrangement = Arrangement.spacedBy(Space.Page)) {
                         listOf(true, false).forEach { armed ->
