@@ -4,77 +4,32 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
-import androidx.compose.ui.platform.LocalContext
-import androidx.palette.graphics.Palette
-import app.siansa.data.LocalPlaylists
-import coil3.SingletonImageLoader
-import coil3.request.ImageRequest
-import coil3.request.SuccessResult
-import coil3.request.allowHardware
-import coil3.toBitmap
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import java.util.concurrent.ConcurrentHashMap
-
-private val colorCache = ConcurrentHashMap<String, Int>()
 
 /**
- * The cover's main colour (for page backgrounds), toned down so white text stays
- * readable. Fades in once the cover has been looked at; remembered for the rest of the session.
+ * The cover's main colour (for page backgrounds), toned down so white text stays readable. The same colour Play is
+ * worked out from ([CoverTones.main]). Known in the page's first frame when the cover has been seen before (its colours
+ * are kept on the phone, [CoverToneStore]); otherwise the theme's grey until the cover is read. It fades only from
+ * one cover's colour to another's (now playing's next song), never in from the grey a page started with.
  */
 @Composable
 fun rememberCoverColor(coverId: String?): Color {
     val fallback = MaterialTheme.colorScheme.surfaceVariant
-    val target = rememberCoverTarget(coverId).takeIf { it != null && it != Color.Unspecified } ?: fallback
-    return animateColorAsState(coverTone(target), tween(350), label = "cover-color").value
+    val main = rememberCoverTarget(coverId)?.takeIf { it != Color.Unspecified }
+    // Starts at the colour it has in the first frame: no fade when it's known then.
+    return animateColorAsState(coverTone(main ?: fallback), tween(350), label = "cover-color").value
 }
 
 /** A cover's main colour as a page is painted in it: toned down so white text stays readable. */
 internal fun coverTone(main: Color): Color = lerp(main, Color.Black, 0.35f)
 
 /**
- * The cover's main colour once it has been looked at, not fading: null while it's being read, [Color.Unspecified]
- * for a cover that gave none. What a page's colours are worked out from, once, so they don't change while the page's
- * colour fades in (the owner, 14 Nov: Play was blue, then the header's colour).
+ * The cover's main colour ([CoverTones.main]), not fading: null while it's being read, [Color.Unspecified] for a cover
+ * that gave none. What a page's colours are worked out from, once, so they don't change while the page is open.
  */
 @Composable
-internal fun rememberCoverTarget(coverId: String?): Color? {
-    val graph = LocalGraph.current
-    val context = LocalContext.current
-    var target by remember(coverId) { mutableStateOf(coverId?.let { colorCache[it] }?.let { Color(it) }) }
-    LaunchedEffect(coverId) {
-        if (coverId == null || colorCache.containsKey(coverId)) return@LaunchedEffect
-        val argb = withContext(Dispatchers.IO) {
-            runCatching {
-                val builder = ImageRequest.Builder(context)
-                if (coverId.startsWith(LocalPlaylists.FILE_COVER)) builder.data(java.io.File(coverId.removePrefix(LocalPlaylists.FILE_COVER)))
-                else builder.data(graph.source.coverUrl(coverId, 300)).diskCacheKey(app.siansa.covers.CoverCache.diskKey(coverId, 300))
-                val request = builder
-                    .memoryCacheKey("cover:${app.siansa.covers.CoverVersions.cacheId(coverId)}:palette")
-                    .allowHardware(false)
-                    .size(120)
-                    .build()
-                val result = SingletonImageLoader.get(context).execute(request) as? SuccessResult ?: return@runCatching null
-                val palette = Palette.from(result.image.toBitmap()).maximumColorCount(16).generate()
-                (palette.vibrantSwatch ?: palette.dominantSwatch ?: palette.mutedSwatch)?.rgb
-            }.getOrNull()
-        }
-        if (argb != null) {
-            colorCache[coverId] = argb
-            target = Color(argb)
-        } else {
-            target = Color.Unspecified
-        }
-    }
-    return target
-}
+internal fun rememberCoverTarget(coverId: String?): Color? = rememberCoverTones(coverId)?.main
 
 /** How bright the cards under now playing may be: dark enough for white text, light enough to stand out (#717). */
 internal const val CARD_LIGHT_MIN = 0.085f

@@ -98,7 +98,7 @@ What you hear over the network, what it costs in data, and how well Siansa plays
 | **Load songs ahead** | How many songs to load ahead, on Wi-Fi and on mobile data (0–5). |
 | **Song cache** | Keeps songs as they play, up to the size chosen, with **Clear song cache**. **Off** keeps no song once it has played (from the next song); then up to 3 songs are loaded ahead, each held only until it plays. A new size applies after a restart. |
 | **Downloads** | **Your downloads** (what's on the phone, opening the list to add or remove music), **Download on Wi-Fi only**, the download quality (a drop-down), the storage limit and **Remove all downloads**. See [Playback](playback.md#downloads). |
-| **Covers on the phone** | **Download all covers** (every album, artist and playlist cover; it looks each artist up first, so their photo is downloaded even when Navidrome found it after your library was last read), and the **Image cache** (its size on a slider, 100 MB to 5 GB or no limit, and **Clear image cache**; a new size applies after a restart). |
+| **Covers on the phone** | **Download all covers** (every album, artist, playlist, song and disc cover, at the small size lists use and the big one now playing shows; it looks each artist up first, so their photo is downloaded even when Navidrome found it after your library was last read; with a limit on the image cache, give it room for them all), and the **Image cache** (its size on a slider, 100 MB to 5 GB or no limit, and **Clear image cache**; a new size applies after a restart). |
 | **Other data on this phone** | What the library database and the logs take. |
 
 The downloads themselves are also in Your Library (the download button at the top), with **Add music**,
@@ -138,7 +138,9 @@ not here.
 - **Dynamic colours** (off at first), one switch for the whole app: now playing's seek bar, Play button, the heart of
   a liked song and where it plays, and the Play button on every page of songs (albums, playlists, artists, radios, mixes,
   cards, books and podcasts) and in its title bar, and the book player's seek bar and buttons, take a soft colour from
-  the cover (an artist's picture; a radio's or mix's own drawn cover; a book's or podcast's) instead of your theme's,
+  the cover (an artist's picture; a radio's or mix's own drawn cover; a book's or podcast's) instead of your theme's
+  (the same colour the page's top is painted in; each cover's colours are kept on the phone, so a page seen before, or
+  shown in a list, opens in its colours and they don't change while it's open),
   fading from song to song. On those pages only Play takes it;
   Shuffle and the other buttons keep your theme's, and an artist's heart is red once they're a favourite. It's the colour that fills most of the
   cover, a little calmer than on the cover itself, so it sits with the cover rather than shouting over it, and on a page

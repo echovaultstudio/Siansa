@@ -189,7 +189,9 @@ fun ArtistScreen(nav: NavController, id: String) {
     }
     val artistCover = p?.artist?.let { freshCovers[it.id] ?: it.coverArt }
     val pictureId = artistCover ?: p?.albums?.firstOrNull()?.coverArt
-    val colourOf = pictureId.takeIf { photoLookedUp }
+    // The picture's colours are used at once when they're known (kept from an earlier visit: the library keeps the photo
+    // a lookup found), else once the lookup has ended.
+    val colourOf = pictureId.takeIf { photoLookedUp || CoverToneStore.has(it) }
     val tint = rememberCoverColor(colourOf)
 
     // Release types as tabs at the top (issue #1029): All, Albums, EPs, Singles, DJ-mixes… one at a time, only while
@@ -244,7 +246,10 @@ fun ArtistScreen(nav: NavController, id: String) {
 
     // With Dynamic colours, only Play takes the picture's colour (the owner, 10 Nov): Radio, Shuffle and the heart stay
     // as they are, so the row doesn't shout.
-    val playColours = rememberPageColours(colourOf, pageBackdrop(MaterialTheme.colorScheme.surface, tint), where = "Artist page", tint = tint)
+    val playColours = rememberPageColours(
+        colourOf, pageBackdrop(MaterialTheme.colorScheme.surface, tint), where = "Artist page", tint = tint,
+        pending = colourOf == null && pictureId != null,
+    )
     HeroPage(
         title = p?.artist?.name ?: "Artist",
         heroHeight = HERO,
