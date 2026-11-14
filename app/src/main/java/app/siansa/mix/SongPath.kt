@@ -41,24 +41,24 @@ const val MOOD_END = "mood:"
 /**
  * Song paths: a queue that moves smoothly from the sound of one song to the sound of another (or to a mood),
  * played straight away or saved as a Navidrome playlist. AudioMuse directly when it's set up in Siansa: the path
- * is then exactly the length picked, and can end on a mood or follow the lyrics (issue #208). Without it,
+ * is then exactly the length picked, and can end on a mood (issue #208). Without it,
  * Navidrome's own `findSonicPath` (the AudioMuse-AI Navidrome plugin) between two songs.
  */
 class SongPath(private val graph: AppGraph) {
-    suspend fun build(fromId: String, toId: String, length: Int, lyrics: Boolean = false): List<Song> {
+    suspend fun build(fromId: String, toId: String, length: Int): List<Song> {
         if (fromId == toId) throw MixException("Pick two different songs")
         val (fromSong, fromMood) = pathEnd(fromId)
         val (toSong, toMood) = pathEnd(toId)
         val started = System.currentTimeMillis()
         val ids: List<String> = when {
             graph.settings.current.soundReady -> {
-                val steps = graph.audioMuse.findPath(fromSong, toSong, length, fromMood, toMood, lyrics).map { it.id }
+                val steps = graph.audioMuse.findPath(fromSong, toSong, length, fromMood, toMood).map { it.id }
                 if (steps.isEmpty()) throw MixException("AudioMuse found no path between these")
                 // A mood end is whichever song AudioMuse picked for it: the path is used as it comes.
                 if (fromMood != null || toMood != null) steps.distinct() else songPathIds(fromId, toId, steps, length)
             }
-            fromMood != null || toMood != null || lyrics ->
-                throw MixException("Set up AudioMuse in Settings to end a path on a mood or follow the lyrics")
+            fromMood != null || toMood != null ->
+                throw MixException("Set up AudioMuse in Settings to end a path on a mood")
             graph.source.hasSonicMatch() -> {
                 val steps = graph.source.sonicPath(fromId, toId, length).map { it.id }
                 if (steps.isEmpty()) throw MixException("Your server found no path between these songs")
@@ -69,7 +69,7 @@ class SongPath(private val graph: AppGraph) {
             else -> throw MixException("Set up AudioMuse in Settings, or the AudioMuse-AI plugin in Navidrome, for song paths")
         }
         val songs = graph.generator.resolveSongs(ids)
-        AppLog.i("SongPath", "$fromId → $toId (lyrics=$lyrics): ${ids.size} steps, ${songs.size} songs in ${System.currentTimeMillis() - started}ms")
+        AppLog.i("SongPath", "$fromId → $toId : ${ids.size} steps, ${songs.size} songs in ${System.currentTimeMillis() - started}ms")
         if (songs.size < 3) throw MixException("No songs found between these two")
         return songs
     }

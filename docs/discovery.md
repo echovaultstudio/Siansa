@@ -134,8 +134,7 @@ then glides into the title bar, shrinking as it goes, to become the page's title
 ## Song path
 
 From a song's menu: **Song path…**. Pick a second song (or a mood) and Siansa builds a queue that moves smoothly
-from the sound of one to the other. Choose how many songs. **Follow the lyrics** moves by what the songs are
-about, not only how they sound (needs lyrics analysed in AudioMuse-AI). Play it, or save it as a playlist.
+from the sound of one to the other. Choose how many songs. Play it, or save it as a playlist.
 
 ## Flow
 

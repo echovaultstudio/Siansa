@@ -4,7 +4,6 @@ import app.siansa.net.soundReady
 import app.siansa.net.PathMood
 import app.siansa.mix.MOOD_END
 import androidx.compose.ui.platform.testTag
-import androidx.compose.material3.Switch
 import androidx.compose.material3.AssistChip
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
@@ -85,13 +84,12 @@ fun SongPathPicker(nav: NavController, songId: String, fromNowPlaying: Boolean =
         found.filter { it.id != songId }.take(40)
     }
 
-    var lyrics by rememberSaveable { mutableStateOf(false) }
     val audioMuse = graph.settings.current.soundReady
 
     /** The other end: a song id, or MOOD_END + a mood (issue #208). */
     fun go(otherId: String) {
         val (from, to) = if (toHere) otherId to songId else songId to otherId
-        nav.navigate("songpath/${Uri.encode(from)}/${Uri.encode(to)}/$length?lyrics=$lyrics&live=$fromNowPlaying")
+        nav.navigate("songpath/${Uri.encode(from)}/${Uri.encode(to)}/$length?live=$fromNowPlaying")
     }
 
     Screen("Song path", nav) { padding ->
@@ -143,11 +141,10 @@ fun SongPathPicker(nav: NavController, songId: String, fromNowPlaying: Boolean =
                     }
                 }
             }
-            // AudioMuse can end (or start) a path on a mood, and follow the lyrics' meaning (issue #208).
+            // A path can end (or start) on a mood (issue #208).
             if (audioMuse) {
                 item {
                     PathMoodPicker(toHere) { mood -> go(MOOD_END + mood.id) }
-                    LyricsSwitchRow(lyrics) { lyrics = it }
                 }
             }
             item {
@@ -199,15 +196,15 @@ fun SongPathPicker(nav: NavController, songId: String, fromNowPlaying: Boolean =
 
 /** Song path, step two: the path itself, ready to play or save as a playlist. */
 @Composable
-fun SongPathScreen(nav: NavController, fromId: String, toId: String, length: Int, lyrics: Boolean = false, fromNowPlaying: Boolean = false) {
+fun SongPathScreen(nav: NavController, fromId: String, toId: String, length: Int, fromNowPlaying: Boolean = false) {
     val graph = LocalGraph.current
     val snack = LocalSnack.current
     val scope = rememberCoroutineScope()
-    val result by loadState(listOf(fromId, toId, length, lyrics)) { graph.songPath.build(fromId, toId, length, lyrics) }
+    val result by loadState(listOf(fromId, toId, length)) { graph.songPath.build(fromId, toId, length) }
     val songs = result.valueOrNull()
     // Started from now playing (#212): once the path is ready, the song keeps playing and the rest of the path
     // becomes the queue after it, instead of waiting for Play (which started the same song again).
-    var queued by rememberSaveable(fromId, toId, length, lyrics) { mutableStateOf(false) }
+    var queued by rememberSaveable(fromId, toId, length) { mutableStateOf(false) }
     LaunchedEffect(songs) {
         if (!fromNowPlaying || queued || songs == null) return@LaunchedEffect
         val upcoming = songPathUpNext(songs.map { it.id }, graph.player.state.value.current?.id) ?: return@LaunchedEffect
@@ -283,22 +280,3 @@ internal fun PathMoodPicker(toHere: Boolean, onMood: (PathMood) -> Unit) {
     }
 }
 
-/** Build the path by the lyrics' meaning (AudioMuse's SemGrove) instead of the sound alone. */
-@Composable
-internal fun LyricsSwitchRow(lyrics: Boolean, onChange: (Boolean) -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().clickable { onChange(!lyrics) }.padding(horizontal = Space.Page, vertical = Space.Small),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text("Follow the lyrics", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.testTag("lyricsTitle"))
-            Text(
-                "Moves by what the songs are about, not only how they sound. Needs lyrics analysed in AudioMuse.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        Spacer(Modifier.width(Space.Medium))
-        Switch(checked = lyrics, onCheckedChange = onChange)
-    }
-}

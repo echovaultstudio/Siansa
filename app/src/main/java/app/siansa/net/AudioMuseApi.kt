@@ -411,7 +411,6 @@ class AudioMuseApi(
      * A song path (AudioMuse's `find_path`): tracks that move step by step from one end to the other, in order,
      * both ends included. Each end is a song id, or one end a [PathMood]. [length] is the whole path, both ends
      * counted, and is kept exactly (`path_fix_size`), so the path is as long as the listener picked (issue #208).
-     * [lyrics] builds it in the lyrics' meaning (SemGrove) instead of the sound alone.
      */
     suspend fun findPath(
         startId: String?,
@@ -419,19 +418,12 @@ class AudioMuseApi(
         length: Int,
         startMood: PathMood? = null,
         endMood: PathMood? = null,
-        lyrics: Boolean = false,
     ): List<ClapHit> {
         val asked = listOf(
             "start_song_id" to startId, "end_song_id" to endId, "start_mood" to startMood?.id, "end_mood" to endMood?.id,
             "max_steps" to length.toString(), "path_fix_size" to "true",
         )
-        // A path through the lyrics' meaning is AudioMuse's own: Siansa Beats has the sound alone.
-        val root = if (lyrics) {
-            val url = apiUrl("api/find_path").apply { (asked + ("path_space" to "lyrics")).forEach { (k, v) -> v?.let { addQueryParameter(k, it) } } }.build()
-            executeElement { request("", listOfNotNull(startId, endId), at = url).get().build() }
-        } else {
-            sound("/api/find_path", asked, about = listOfNotNull(startId, endId))
-        }
+        val root = sound("/api/find_path", asked, about = listOfNotNull(startId, endId))
         val rows = (root as? JsonArray) ?: (root as? JsonObject)?.let { it["path"] as? JsonArray } ?: JsonArray(emptyList())
         return rows.mapNotNull { element ->
             val r = element as? JsonObject ?: return@mapNotNull null
