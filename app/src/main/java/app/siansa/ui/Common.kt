@@ -299,6 +299,9 @@ internal fun coverFallbackKeys(id: String, size: Int?): List<String> {
     return listOf(null, LARGE_COVER, SMALL_COVER, 150).map { coverMemoryKey(id, it) }.distinct().filter { it != own }
 }
 
+/** How long a cover shows before its colours are read ahead ([CoverToneStore.warm]). */
+private const val WARM_AFTER_MS = 600L
+
 /** How often a cover on screen looks whether it's showing a stand-in that's due to be asked for again. */
 private const val STAND_IN_POLL_MS = 2_000L
 
@@ -371,6 +374,12 @@ fun Cover(
         else coverFallbackKeys(coverId, size).firstNotNullOfOrNull { loader.memoryCache?.get(MemoryCache.Key(it))?.image }
     }
     val request = remember(coverId, size, again) { coverId?.let { coverRequest(context, graph, it, size) } }
+    // Its colours, worked out in the background while it shows (CoverToneStore): the page it opens has them in its
+    // first frame. A cover only scrolled past isn't read.
+    LaunchedEffect(coverId) {
+        kotlinx.coroutines.delay(WARM_AFTER_MS)
+        CoverToneStore.warm(context, graph, coverId)
+    }
     Box(
         modifier.clip(shape).background(MaterialTheme.colorScheme.surfaceVariant),
         contentAlignment = Alignment.Center,
