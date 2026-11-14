@@ -95,9 +95,8 @@ fun NavGraphBuilder.siansaRoutes(nav: NavController, except: Set<String> = empty
         arguments = listOf(androidx.navigation.navArgument("live") { defaultValue = "false" }),
     ) { SongPathPicker(nav, it.arguments?.getString("id").orEmpty(), it.arguments?.getString("live") == "true") }
     page(
-        "songpath/{from}/{to}/{length}?lyrics={lyrics}&live={live}",
+        "songpath/{from}/{to}/{length}?live={live}",
         arguments = listOf(
-            androidx.navigation.navArgument("lyrics") { defaultValue = "false" },
             androidx.navigation.navArgument("live") { defaultValue = "false" },
         ),
     ) {
@@ -107,7 +106,6 @@ fun NavGraphBuilder.siansaRoutes(nav: NavController, except: Set<String> = empty
             args?.getString("from").orEmpty(),
             args?.getString("to").orEmpty(),
             args?.getString("length")?.toIntOrNull() ?: 20,
-            args?.getString("lyrics") == "true",
             args?.getString("live") == "true",
         )
     }

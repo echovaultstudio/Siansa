@@ -32,7 +32,6 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.siansa.mix.SoundDial
 import app.siansa.mix.VibeTuning
 import app.siansa.ui.DayChips
-import app.siansa.ui.LyricsSwitchRow
 import app.siansa.ui.PathMoodPicker
 import app.siansa.ui.SiansaTheme
 import app.siansa.ui.Space
@@ -365,22 +364,6 @@ class SpacingHomeTest : SpacingCheck() {
         assertEven("Queue all and Save as playlist, vertical centre", (queue.top + queue.bottom) / 2, (save.top + save.bottom) / 2, 1.dp)
         assertTrue("Save as playlist is right of Queue all and doesn't overlap it", queue.right <= save.left + 0.5.dp)
         assertTrue("Save as playlist right next to Queue all (${(save.left - queue.right).value} dp)", save.left - queue.right <= app.siansa.ui.Space.Small + 0.5.dp)
-    }
-
-    /** Song path: the mood chips sit evenly between their label and the "Follow the lyrics" row (issue #208). */
-    @Test fun pathMoodChipsAreEvenlySpaced() {
-        compose.setContent {
-            SiansaTheme {
-                Column {
-                    PathMoodPicker(toHere = false) { }
-                    LyricsSwitchRow(false) { }
-                }
-            }
-        }
-        val label = compose.onNodeWithTag("pathMoodLabel").getBoundsInRoot()
-        val chip = compose.onNode(hasClickAction() and hasAnyDescendant(hasText("Happy")), useUnmergedTree = true).getBoundsInRoot()
-        val lyrics = compose.onNodeWithTag("lyricsTitle", useUnmergedTree = true).getBoundsInRoot()
-        assertEven("Path mood chips", chip.top - label.bottom, lyrics.top - chip.bottom)
     }
 
     /** Shape your sound (issue #339; the pad, 11 Nov): the same gap between the pad, each pill and the sounds' title. */

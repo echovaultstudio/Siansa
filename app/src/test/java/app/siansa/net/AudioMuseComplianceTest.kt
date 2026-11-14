@@ -63,11 +63,11 @@ class AudioMuseComplianceTest {
         assertEquals("20", url.queryParameter("max_steps"))
         assertEquals("true", url.queryParameter("path_fix_size"))
         assertNull(url.queryParameter("path_space"))
-        api(fake).findPath("a", null, 10, endMood = PathMood.RELAXED, lyrics = true)
+        api(fake).findPath("a", null, 10, endMood = PathMood.RELAXED)
         val mood = fake.seen.last().first.url
         assertEquals("relaxed", mood.queryParameter("end_mood"))
         assertNull(mood.queryParameter("end_song_id"))
-        assertEquals("lyrics", mood.queryParameter("path_space"))
+        assertNull(mood.queryParameter("path_space"))
     }
 
     @Test fun steeringGoesWithTheSearch() = runBlocking {

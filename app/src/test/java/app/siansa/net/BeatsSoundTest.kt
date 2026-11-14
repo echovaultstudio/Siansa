@@ -121,12 +121,8 @@ class BeatsSoundTest {
         // One that answers some: the rest are still AudioMuse-AI's.
         BeatsSound.heard(setOf("/api/similar_tracks"))
         assertEquals(listOf("s2"), api(both).findPath("s1", "s3", 5).map { it.id })
-        // A path through the lyrics' meaning is AudioMuse-AI's own.
-        BeatsSound.heard(everything)
-        assertEquals(listOf("s2"), api(both).findPath("s1", "s3", 5, lyrics = true).map { it.id })
         assertEquals(emptyList<Pair<String, String?>>(), askedOfBeats.toList())
-        assertEquals(3, askedOfAudioMuse.size)
-        assertTrue(askedOfAudioMuse.last(), askedOfAudioMuse.last().contains("path_space=lyrics"))
+        assertEquals(2, askedOfAudioMuse.size)
     }
 
     @Test fun withoutSiansaBeatsNothingChanges() = runBlocking {

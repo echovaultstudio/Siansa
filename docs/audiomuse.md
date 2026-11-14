@@ -133,7 +133,7 @@ Beats first for:
 
 - songs like a song (song radio, Similar songs, Keep playing, Wind down),
 - similar albums and "Fans also like",
-- Song path and Flow (not the path through the lyrics' meaning, which stays AudioMuse-AI's),
+- Song path and Flow,
 - radios blended from several songs, and the mood radios,
 - Your sound (your sonic fingerprint) and the mixes made from it,
 - each song's tempo, key, moods and energy, which DJ mixes and Keep playing choose by.
@@ -143,8 +143,7 @@ mood radios (Chill, Energy, Focus…), "Describe what you want to hear" in Flow,
 mixes made from a description, cards made from a sound, and "Songs that sound like…" in Search.
 
 With Siansa Beats answering these, **AudioMuse-AI can be left out of Siansa's own settings**: its address can be
-empty and all of the above still work. One thing still needs AudioMuse-AI set up in Siansa: the Song path through
-the lyrics' meaning. AudioMuse-AI itself keeps running next to Siansa Beats for now, as it's what listens to new
+empty and all of the above still work. AudioMuse-AI itself keeps running next to Siansa Beats for now, as it's what listens to new
 songs.
 
 When Siansa Beats can't answer (a song whose sound it doesn't have yet) and AudioMuse-AI is set up in Siansa,
