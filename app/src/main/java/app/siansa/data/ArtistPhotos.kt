@@ -27,6 +27,11 @@ class ArtistPhotos(private val source: MusicSource, private val library: Library
     /** Artist id → their new picture id, for the artists refreshed this run. */
     val covers: StateFlow<Map<String, String>> = _covers.asStateFlow()
 
+    private val answered = ConcurrentHashMap.newKeySet<String>()
+
+    /** Whether [artistId]'s photo lookup has ended this run (it's looked up once): its picture won't change again. */
+    fun lookedUp(artistId: String): Boolean = artistId in answered
+
     /**
      * Looks up [artists] not looked up yet this run; true when any picture id changed. [onProgress] hears how many of
      * them are done, of how many (Download all covers, which looks every artist up first).
@@ -52,7 +57,7 @@ class ArtistPhotos(private val source: MusicSource, private val library: Library
                     }.onFailure {
                         if (it is kotlinx.coroutines.CancellationException) throw it
                         AppLog.d("Covers", "Artist photo for ${artist.name} not refreshed: ${it.message}")
-                    }.getOrDefault(false).also { onProgress(finished.incrementAndGet(), todo.size) }
+                    }.getOrDefault(false).also { answered.add(artist.id); onProgress(finished.incrementAndGet(), todo.size) }
                 }
             }
         }.awaitAll().count { it }
