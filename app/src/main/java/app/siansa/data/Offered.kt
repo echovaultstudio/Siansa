@@ -1,13 +1,12 @@
 package app.siansa.data
 
-import app.siansa.BuildConfig
-
 /**
- * What this build offers. Siansa Beats' card shows in Siansa Dev (and test builds) first, not yet in the app everyone
- * has (the owner, 10 Nov), so a message can't send someone there to set up a service they have no page for.
+ * What this build offers, so a message can't send someone to set up a service they have no page for. Siansa Beats
+ * showed in Siansa Dev and test builds only at first (the owner, 10 Nov); it's in the app everyone has from the
+ * release that brings it (the owner, 14 Nov).
  */
 object Offered {
-    val beats: Boolean = BuildConfig.BUILD_TYPE != "release"
+    val beats: Boolean = true
 
     /** The services that work out what songs sound like, as a message names them. */
     val soundServices: String = soundServices(beats)

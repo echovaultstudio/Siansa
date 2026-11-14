@@ -629,7 +629,7 @@ internal fun AudioMuseFields(graph: AppGraph, draft: AppSettings, onChange: (App
     TestRow(result) { test(graph, draft, scope, { result = it }, "AudioMuse") { s -> testAudioMuse(graph, s) } }
 }
 
-/** Siansa Beats' card shows in Siansa Dev (and test builds) first, not yet in the app everyone has. */
+/** Whether Siansa Beats' card shows: in every build now ([app.siansa.data.Offered]). */
 internal val BEATS_OFFERED: Boolean = app.siansa.data.Offered.beats
 
 internal fun beatsLine(ready: Boolean): String = if (ready) "Beats, loudness and genres · set up" else "Beats, loudness and genres · not set up"
