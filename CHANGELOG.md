@@ -3,6 +3,11 @@
 Every version of Siansa, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 1.5.2 — 2026-11-14
+
+### Changed
+- **An artist's picture is a little taller**, so less of it is cut off.
+
 ## 1.5.1 — 2026-11-14
 
 ### Fixed
