@@ -153,7 +153,8 @@ dependencies {
 
     testImplementation("junit:junit:4.13.2")
 
-    // The remote sweep on a TV emulator (src/androidTest, .github/workflows/tv-tests.yml), at the phone app's versions.
+    // The remote sweep (.github/workflows/tv-tests.yml) and the showcase screenshots (TvShowcaseTest, showcase.yml) on a
+    // TV emulator (src/androidTest), at the phone app's versions.
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("androidx.test:rules:1.6.1")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
