@@ -302,7 +302,8 @@ fun HomeScreen(nav: NavController) {
                 onOpen = { notice ->
                     AppLog.i("Home", "Notice opened: ${notice.kind.id}")
                     graph.notices.tap(notice.kind)
-                    nav.navigate(notice.route)
+                    if (notice.route == app.siansa.mix.Notices.UPDATE_ROUTE) app.siansa.update.UpdateCheck.openStore(graph.app)
+                    else nav.navigate(notice.route)
                 },
                 modifier = Modifier.statusBarsPadding().padding(top = Space.Medium),
                 menuOpen = menuOpen,

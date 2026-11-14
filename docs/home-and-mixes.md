@@ -93,6 +93,7 @@ their own: a finished book, albums older than three days or last month's report 
 | Notice | When it shows | Opens |
 |---|---|---|
 | **Library sync failed** | The last library sync didn't finish. | Connections |
+| **Siansa 1.5.0 is out** | A newer Siansa is out. Siansa looks once a day, on siansa.app (the list of its F-Droid repo, which every release updates as it goes to Google Play), and sends nothing about you. Set it to **Off** to stop looking. | Google Play or F-Droid, wherever you installed Siansa from |
 | **Carry on: …** | A book or podcast episode you played in the last week and haven't finished. | The book |
 | **3 new albums** | Albums added to your library in the last 30 days. It shows as soon as Home opens. | Recently added |
 | **Your October** | The first week of a month: last month's listening. | The month's report |
