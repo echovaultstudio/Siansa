@@ -60,6 +60,9 @@ import app.siansa.data.Song
 import app.siansa.data.cover
 import app.siansa.data.isFavouriteAlbum
 import app.siansa.log.AppLog
+import app.siansa.net.soundReady
+import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.GraphicEq
 import app.siansa.ui.browseGenres
 import app.siansa.ui.AlbumTag
 import app.siansa.ui.Cover
@@ -133,7 +136,7 @@ fun TvLibrary() {
             }
             // The phone's page for this: (with AudioMuse) the sound of your library. Time machine isn't on the TV for now
             // (issue #949): laying it out froze a SHIELD for seconds.
-            if (settings.audioMuseReady) {
+            if (settings.soundReady) {
                 item { TvPillDivider() }
                 item { TvButton("Your sound", null, quiet = true, onClick = { nav.navigate("fingerprint") }) }
             }
@@ -193,7 +196,6 @@ fun TvAlbum(id: String) {
         songs = songs,
         shortcut = Shortcut("album/$id", album.name, album.coverArt),
         about = listOfNotNull(album.year?.toString(), "${songs.size} songs", "$total min".takeIf { total > 0 }).joinToString(" · "),
-        animated = true,
         // Plain words, not pills (issue #996): the artists, then the genre and the label, each opening its page.
         values = {
             if (artists.isEmpty()) {
@@ -219,11 +221,12 @@ fun TvAlbum(id: String) {
                 if (favourite) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
                 onClick = { graph.favouriteAlbums.toggle(album) },
             )
-            // Through one of its songs, as on the phone: AudioMuse knows songs, and the album's own id it answered with
-            // "doesn't know this song" (issue #967).
+            // Through one of its songs, as on the phone: the sound is known by song, and the album's own id was answered
+            // with "doesn't know this song" (issue #967). Shown whenever Siansa Beats or AudioMuse-AI can answer, as on
+            // the phone: the TV asked for AudioMuse-AI alone, so with Siansa Beats there was no button.
             val seed = similarAlbumsSeed(songs)
-            if (settings.audioMuseReady && seed != null) {
-                TvButton("Similar albums", null, onClick = {
+            if (settings.soundReady && seed != null) {
+                TvButton("Similar albums", Icons.Rounded.GraphicEq, onClick = {
                     AppLog.i("Tv", "Similar albums to \"${album.name}\" through its song $seed")
                     nav.navigate("similar/albums/${android.net.Uri.encode(seed)}")
                 })
@@ -251,9 +254,9 @@ fun TvPlaylist(id: String) {
         shortcut = Shortcut("playlist/$id", d.playlist.name, cover),
         about = listOfNotNull("Playlist", "${d.songs.size} songs", "$total min".takeIf { total > 0 }).joinToString(" · "),
         note = d.playlist.comment?.takeIf { it.isNotBlank() },
-        // AudioMuse's song alchemy: songs that blend the sound of this playlist's songs.
-        buttons = if (settings.audioMuseReady) {
-            { TvButton("Song alchemy", null, onClick = { nav.navigate("blend/${android.net.Uri.encode(id)}") }) }
+        // Songs that blend the sound of this playlist's songs, named as on the phone's playlist menu.
+        buttons = if (settings.soundReady) {
+            { TvButton("More like this playlist", Icons.Rounded.AutoAwesome, onClick = { nav.navigate("blend/${android.net.Uri.encode(id)}") }) }
         } else {
             null
         },
@@ -395,7 +398,6 @@ private fun CollectionPage(
     about: String,
     values: (@Composable () -> Unit)? = null,
     buttons: (@Composable () -> Unit)? = null,
-    animated: Boolean = false,
     note: String? = null,
 ) {
     val graph = LocalGraph.current
@@ -407,12 +409,8 @@ private fun CollectionPage(
                 horizontalArrangement = Arrangement.spacedBy(Space.Large),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                // An album's animated cover moves here, as on the phone's album page.
-                if (animated) {
-                    app.siansa.ui.BigCover(coverId, coverId, Modifier.size(HEADER_COVER), RoundedCornerShape(Space.Medium))
-                } else {
-                    Cover(coverId, LARGE_COVER, Modifier.size(HEADER_COVER), RoundedCornerShape(Space.Medium))
-                }
+                // Always the still cover: the TV doesn't play animated covers (the owner, 14 Nov: they cost it too much).
+                Cover(coverId, LARGE_COVER, Modifier.size(HEADER_COVER), RoundedCornerShape(Space.Medium))
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
                     Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -482,6 +480,56 @@ fun SongList(songs: List<Song>, shortcut: Shortcut? = null, header: (@Composable
         songRows(songs, player.current?.id, shortcut)
     }
 }
+
+/**
+ * Songs that sound like one song (the owner, 14 Nov): the list itself, under a small band in the colour of the song's
+ * cover with the cover small at its side, and Play and Shuffle as pills. The phone's page opened here had the cover as
+ * large as an album's.
+ */
+@Composable
+fun TvSimilarSongs(id: String) {
+    val graph = LocalGraph.current
+    val seed by produceState<Song?>(null, id) {
+        value = runCatching { graph.library.song(id) ?: graph.source.song(id) }
+            .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it; AppLog.w("Tv", "Similar songs: couldn't read song $id: ${it.message}") }.getOrNull()
+    }
+    val found by produceState<Result<List<Song>>?>(null, seed) {
+        val s = seed ?: return@produceState
+        value = runCatching { graph.similar.songs(s) }
+            .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it; AppLog.w("Tv", "Similar songs to ${s.id}: ${it.message}") }
+    }
+    val song = seed
+    val songs = found?.getOrNull()
+    val tint = app.siansa.ui.rememberCoverColor(song?.cover)
+    val player by graph.player.state.collectAsStateWithLifecycle()
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = Space.Large), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
+        item("header") {
+            Row(
+                Modifier.padding(start = TV_EDGE, end = TV_EDGE, bottom = Space.Page).fillMaxWidth()
+                    .background(tint, RoundedCornerShape(Space.Page)).padding(Space.Page).testTag("tvSimilarHeader"),
+                horizontalArrangement = Arrangement.spacedBy(Space.Page),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Cover(song?.cover, null, Modifier.size(SEED_COVER), RoundedCornerShape(Space.Small))
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
+                    Text(song?.let { "Like ${it.title}" } ?: "Similar songs", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(listOfNotNull(song?.artist?.ifBlank { null }, songs?.let { "${it.size} songs" }).joinToString(" · "),
+                        style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                if (!songs.isNullOrEmpty()) PlayButtons(play = { songs }, note = null, focusFirst = true)
+            }
+        }
+        when {
+            seed == null || found == null -> item("loading") { Box(Modifier.fillMaxWidth().padding(Space.Large), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
+            songs == null -> item("error") { EmptyNote(app.siansa.playback.ProfileStore.friendly(found?.exceptionOrNull()?.message)) }
+            songs.isEmpty() -> item("empty") { EmptyNote("No songs that sound like this one were found.") }
+            else -> songRows(songs, player.current?.id, null)
+        }
+    }
+}
+
+private val SEED_COVER = 72.dp
 
 @Composable
 private fun SectionTitle(text: String) {
@@ -581,10 +629,10 @@ fun SongActions(song: Song, liked: Boolean, onDismiss: () -> Unit) {
         // As on the phone: while a mix plays, this stops it; otherwise Steady or DJ is asked (RadioChooserHost).
         if (radioSeed != null) add("Stop the mix" to { graph.songRadio.stop(); say("Mix off") })
         else add("Start a mix" to { app.siansa.ui.RadioChooser.song.value = song })
-        // AudioMuse (or the server) finds songs that sound like it, on the phone's page for it.
-        add("Similar songs" to { nav.navigate("similar/songs/${android.net.Uri.encode(song.id)}") })
-        // AudioMuse's song path: from this song to another, through songs that sound in between.
-        if (graph.settings.current.audioMuseReady) add("Song path from here" to { nav.openSongPath(song.id) })
+        // Songs that sound like it, as a plain list (TvSimilarSongs).
+        add("Similar songs" to { nav.navigate(TvRoutes.similarSongs(song.id)) })
+        // The song path: from this song to another, through songs that sound in between.
+        if (graph.settings.current.soundReady) add("Song path from here" to { nav.openSongPath(song.id) })
         song.albumId?.let { id -> add("Go to album: ${song.album}" to { nav.navigate(TvRoutes.album(id)) }) }
         val artists = song.artists.ifEmpty { listOfNotNull(song.artistId?.let { ArtistRef(it, song.artist) }) }
         for (a in artists.take(MAX_ARTISTS)) add("Go to artist: ${a.name}" to { nav.navigate(TvRoutes.artist(a.id)) })

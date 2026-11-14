@@ -7,6 +7,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.Column
@@ -21,6 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Shuffle
+import androidx.compose.material.icons.rounded.Sync
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -49,6 +52,8 @@ import app.siansa.mix.MixGenerator
 import app.siansa.mix.MixRules
 import app.siansa.mix.MoodRadio
 import app.siansa.mix.moodRadios
+import app.siansa.net.soundReady
+import app.siansa.net.wordsReady
 import app.siansa.ui.browseGenres
 import app.siansa.ui.LocalGraph
 import app.siansa.ui.LocalNav
@@ -81,11 +86,35 @@ sealed interface TvItem {
     data class OfShortcut(val play: RecentPlay) : TvItem { override val key get() = "sc:" + play.route }
     /** Today's personal mix of a kind (Your sound, On repeat, Discover for you): made when picked, then played. */
     data class OfPersonal(val kind: MixGenerator.Personal) : TvItem { override val key get() = "pm:" + kind.id }
-    /** Today's mix isn't made yet: making it, then playing it. */
-    data object MakeToday : TvItem { override val key get() = "make-today" }
+    /** One of the day's mixes that isn't made yet (Morning, Daytime, Evening, Night, or a vibe of your own): made when picked, then played. */
+    data class MakeVibe(val vibe: app.siansa.data.Selector) : TvItem { override val key get() = "mv:" + vibe.id }
 }
 
-data class TvRow(val title: String, val items: List<TvItem>)
+/** [landscape]: wide cards that scroll sideways, however many there are (Today's mixes). */
+data class TvRow(val title: String, val items: List<TvItem>, val landscape: Boolean = false)
+
+/**
+ * Today's mixes on the TV: a card for every mix of the day, in the vibes' order, the one already made today or one
+ * that makes it. The TV showed only the mixes already made, and with none a single "Make today's mix"; the day's
+ * other mixes couldn't be reached. Mixes made today from something else (a carousel's) follow.
+ */
+internal fun todayTiles(vibes: List<app.siansa.data.Selector>, made: List<Mix>, today: String = java.time.LocalDate.now().toString()): List<TvItem> {
+    // With no vibe switched on, the day's four from the start (Morning, Daytime, Evening, Night), so there's always a mix to make.
+    val mine = vibes.filter { it.enabled }.ifEmpty { app.siansa.data.DefaultSelectors.all }
+    val byVibe = mine.map { vibe -> made.firstOrNull { it.id == "$today-${vibe.id}" }?.let { TvItem.OfMix(it) } ?: TvItem.MakeVibe(vibe) }
+    val ids = mine.map { "$today-${it.id}" }.toSet()
+    return byVibe + made.filter { it.id !in ids }.map { TvItem.OfMix(it) }
+}
+
+/** What Home's Sync pill shows: at rest, turning while a sync runs, red when the last one failed. */
+enum class SyncPill(val label: String) { IDLE("Sync"), SYNCING("Syncing…"), FAILED("Sync failed") }
+
+/** Failed only for a sync that was asked for: the quiet check at start says nothing. */
+internal fun syncPill(sync: app.siansa.data.SyncProgress): SyncPill = when {
+    sync.running -> SyncPill.SYNCING
+    sync.error != null && !sync.quiet -> SyncPill.FAILED
+    else -> SyncPill.IDLE
+}
 
 /** How many covers a row on Home holds. */
 private const val ROW_SIZE = 24
@@ -145,18 +174,15 @@ private suspend fun homeRow(graph: AppGraph, section: Section): TvRow? {
         Section.QUICK -> TvRow("Jump back in", graph.recentPlays.all().filter { shortcutOpens(it.route) }.take(ROW_SIZE).map { TvItem.OfShortcut(it) })
         // Today's personal mixes first (AudioMuse's need it set up), then the mixes made so far.
         // The daily mixes made today (Today's mix and the ones for each time of day, Settings › Auto Generated Mixes).
-        Section.TODAY -> {
-            val made = todaysMixes(graph)
-            TvRow("Today's mixes", if (made.isEmpty()) listOf(TvItem.MakeToday) else made.map { TvItem.OfMix(it) })
-        }
+        Section.TODAY -> TvRow("Today's mixes", todayTiles(graph.selectors.all(), todaysMixes(graph)), landscape = true)
         Section.MADE_FOR_YOU -> TvRow(
             "Your mixes",
-            MixGenerator.Personal.entries.filter { MixRules.showsPersonal(it, settings(graph).audioMuseReady) }.map { TvItem.OfPersonal(it) } +
+            MixGenerator.Personal.entries.filter { MixRules.showsPersonal(it, settings(graph).soundReady) }.map { TvItem.OfPersonal(it) } +
                 latestMixes(graph.mixes.all()).filter { mix -> MixGenerator.Personal.entries.none { mix.selectorId == it.id } && !madeToday(mix) }
                     .take(ROW_SIZE).map { TvItem.OfMix(it) },
         )
         Section.REDISCOVER -> TvRow("Rediscover", graph.insights.rediscover().take(ROW_SIZE).map { TvItem.OfAlbum(it.album, rediscoverSubtitle(it)) })
-        Section.RADIOS -> if (settings(graph).audioMuseReady) TvRow("Radios", moodRadios.map { TvItem.OfMood(it) }) else null
+        Section.RADIOS -> if (settings(graph).wordsReady) TvRow("Radios", moodRadios.map { TvItem.OfMood(it) }) else null
         Section.PLAYLISTS -> TvRow("Your playlists", graph.playlists.removed.visible(library.playlists()).take(ROW_SIZE).map { TvItem.OfPlaylist(it) })
         Section.RECENT -> TvRow("Recently played", albums(recentlyPlayedAlbums(graph, ROW_SIZE)))
         Section.ARTIST_RADIOS -> TvRow("Artist radios", artistRadioArtists(graph, ROW_SIZE).also { picked ->
@@ -236,6 +262,9 @@ fun TvHome() {
                         play.label("your liked songs", shuffle = true) { app.siansa.ui.likedSongs(graph) }
                     })
                 }
+                // Sync, here on Home (the owner, 14 Nov): OK syncs the library and its covers; no page opens and
+                // nothing pops up. The arrows turn while it runs and go red when it failed.
+                item("sync") { SyncPillButton(sync) }
                 if (notices.isNotEmpty()) {
                     item("divider") { TvPillDivider() }
                 }
@@ -293,7 +322,15 @@ internal const val WIDE_SLOTS = 3
 fun TvItemRow(row: TvRow) {
     Column(verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
         Text(row.title, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(horizontal = TV_EDGE))
-        when (rowLook(row.items.size)) {
+        if (row.landscape) {
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = TV_EDGE, vertical = Space.Small),
+                horizontalArrangement = Arrangement.spacedBy(Space.Page),
+                modifier = Modifier.testTag("tvLandscapeRow"),
+            ) {
+                items(row.items, key = { it.key }) { item -> TvItemTile(item, Modifier.width(LANDSCAPE_CARD), wide = true) }
+            }
+        } else when (rowLook(row.items.size)) {
             RowLook.SCROLLING -> LazyRow(
                 contentPadding = PaddingValues(horizontal = TV_EDGE, vertical = Space.Small),
                 horizontalArrangement = Arrangement.spacedBy(Space.Page),
@@ -338,8 +375,8 @@ fun TvItemTile(item: TvItem, modifier: Modifier = Modifier, width: Dp = TILE_WID
             TvTile(item.play.title, shortcutKind(item.play.route), if (own != null) null else item.play.cover, { nav.navigate(item.play.route) }, modifier,
                 width = width, wide = wide, colors = own)
         }
-        TvItem.MakeToday -> TvTile("Make today's mix", "From what you play at this time of day", null, { play.todaysMix() }, modifier, width = width,
-            colors = tileColors("Today's mix"), wide = wide)
+        is TvItem.MakeVibe -> TvTile(item.vibe.name, "Make today's ${item.vibe.name} mix", null, { play.vibe(item.vibe) }, modifier, width = width,
+            colors = tileColors(item.vibe.name), wide = wide)
         is TvItem.OfPersonal -> TvTile(item.kind.title, "Made for you today", null, { play.personal(item.kind) }, modifier, width = width, colors = tileColors(item.kind.title), wide = wide)
     }
 }
@@ -367,14 +404,32 @@ class TvPlay(private val graph: AppGraph, private val launcher: app.siansa.ui.Pl
     fun todaysMix() {
         scope.launch {
             notify("Making today's mix…")
-            val mix = runCatching { graph.generator.ensureToday() }.onFailure { AppLog.w("Tv", "Today's mix failed: ${it.message}") }.getOrNull()
-            if (mix == null || mix.songs.isEmpty()) {
-                notify("Today's mix isn't ready yet. Try again once your library has synced.")
-                return@launch
-            }
-            graph.player.play(mix.songs)
-            graph.recentPlays.note("mix/${mix.id}", mix.title, mix.songs.firstOrNull()?.cover)
+            // Asked for here, so it's made even when Today's mix doesn't update by itself (the TV has no ↻ for that).
+            val made = runCatching { graph.generator.ensureToday() ?: graph.generator.ensureCurrent() }
+                .onFailure { if (it is CancellationException) throw it; AppLog.w("Tv", "Today's mix failed: ${it.message}") }
+            play(made, "Today's mix")
         }
+    }
+
+    /** One of the day's mixes ([TvItem.MakeVibe]): made now, then played. */
+    fun vibe(vibe: app.siansa.data.Selector) {
+        scope.launch {
+            notify("Making ${vibe.name}…")
+            val made = runCatching { graph.generator.ensure(vibe, force = false) }
+                .onFailure { if (it is CancellationException) throw it; AppLog.w("Tv", "${vibe.name} mix failed: ${it.message}") }
+            play(made, vibe.name)
+        }
+    }
+
+    /** Plays a mix just made, or says why there is none: the reason the maker gave, not a guess at it. */
+    private suspend fun play(made: Result<Mix?>, what: String) {
+        val mix = made.getOrNull()
+        if (mix == null || mix.songs.isEmpty()) {
+            notify(noMixReason(what, made.exceptionOrNull()?.message))
+            return
+        }
+        graph.player.play(mix.songs)
+        graph.recentPlays.note("mix/${mix.id}", mix.title, mix.songs.firstOrNull()?.cover)
     }
 
     /** Today's personal mix of [kind], made if it isn't yet (it can take a moment with AudioMuse), then played. */
@@ -418,6 +473,45 @@ fun rememberTvPlay(): TvPlay {
         TvPlay(graph, app.siansa.ui.PlayLauncher(graph, snack, scope), scope) { message -> scope.launch { snack.showSnackbar(message) } }
     }
 }
+
+/** Why a mix couldn't be made, for the TV: the maker's own [reason] when it gave one. */
+internal fun noMixReason(what: String, reason: String?): String =
+    if (reason.isNullOrBlank()) "$what has no songs yet. Try again once your library has synced." else "$what couldn't be made: $reason"
+
+/** Home's Sync pill: the circle of arrows Sync all has on the phone, turning while a sync runs, red after one failed. */
+@Composable
+private fun SyncPillButton(sync: app.siansa.data.SyncProgress) {
+    val graph = LocalGraph.current
+    val state = syncPill(sync)
+    val turn = if (state == SyncPill.SYNCING) {
+        val turning = androidx.compose.animation.core.rememberInfiniteTransition(label = "sync")
+        turning.animateFloat(
+            0f, -FULL_TURN,
+            androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(SYNC_TURN_MS, easing = androidx.compose.animation.core.LinearEasing)),
+            label = "sync-turn",
+        ).value
+    } else {
+        0f
+    }
+    TvButton(
+        state.label, Icons.Rounded.Sync, quiet = true,
+        iconTint = if (state == SyncPill.FAILED) MaterialTheme.colorScheme.error else null,
+        iconTurn = turn,
+        modifier = Modifier.testTag("tvSync"),
+        onClick = {
+            if (state == SyncPill.SYNCING) return@TvButton
+            AppLog.i("Tv", "Sync from Home's pill")
+            graph.refreshCovers(afterSync = true)
+            graph.sync.start(full = true)
+        },
+    )
+}
+
+private const val FULL_TURN = 360f
+private const val SYNC_TURN_MS = 1_400
+
+/** A landscape card's width: three and a bit across the screen, so it shows there are more to the right. */
+private val LANDSCAPE_CARD = 280.dp
 
 private const val SHUFFLE_SONGS = 200
 private const val RELOAD_PAUSE_MS = 4_000L

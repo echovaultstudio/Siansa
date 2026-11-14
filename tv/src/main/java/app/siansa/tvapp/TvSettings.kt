@@ -10,6 +10,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Logout
+import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.Dns
 import androidx.compose.material.icons.rounded.Equalizer
@@ -95,12 +96,16 @@ fun TvSettingsHub() {
                 AppLog.i("Tv", "Added user ${id + 1} on the TV")
                 Users.switchTo(context, id)
             }, icon = Icons.Rounded.PersonAdd)
-            TvSettingRow("Connections", "${AppLog.redact(settings.navidromeUrl)} · ${settings.navidromeUser.ifBlank { "API key" }} · AudioMuse-AI, Last.fm and more",
+            TvSettingRow("Connections", "${AppLog.redact(settings.navidromeUrl)} · ${settings.navidromeUser.ifBlank { "API key" }} · Siansa Beats, Last.fm and more",
                 onClick = { nav.navigate("settings/connections") }, icon = Icons.Rounded.Dns)
         }
         Group("Music") {
             TvSettingRow("Library sync", syncSummary(progress, library), onClick = { nav.navigate("sync") }, icon = Icons.Rounded.Sync)
-            TvSettingRow("Radios & mixes", "How far a radio wanders, what plays when the queue ends, and your daily mixes", onClick = { nav.navigate("settings/radios") }, icon = Icons.Rounded.Schedule)
+            TvSettingRow("Radios & mixes", "How far a radio wanders and what plays when the queue ends", onClick = { nav.navigate("settings/radios") }, icon = Icons.Rounded.Schedule)
+            // The day's mixes and their vibes (Morning, Daytime, Evening, Night): the phone has them on its Settings start
+            // page, which the TV doesn't open, so they couldn't be reached here.
+            TvSettingRow("Today's mixes and vibes", if (settings.dailyMix.autoUpdate) "Made by themselves each day" else "Made when you pick one",
+                onClick = { nav.navigate("vibes") }, icon = Icons.Rounded.AutoAwesome)
             TvSettingRow("Scrobbling & history", "Last.fm, ListenBrainz and what you've played", onClick = { nav.navigate("settings/scrobbling") }, icon = Icons.Rounded.GraphicEq)
         }
         Group("Sound") {
@@ -112,17 +117,8 @@ fun TvSettingsHub() {
                 onClick = { nav.navigate("settings/streaming") }, icon = Icons.Rounded.SwapVert)
         }
         Group("Look") {
+            // No Animated covers here (the owner, 14 Nov): the TV never plays them, to save what it has.
             TvSettingRow("Colours", "Siansa's colours on the TV (always dark)", onClick = { nav.navigate("settings/themes") }, icon = Icons.Rounded.Palette)
-            // Off from the start on the TV (issue #945): they cost the TV a lot to play.
-            TvSwitchRow(
-                "Animated covers",
-                "Covers that move, in Now playing and on album pages. Off makes the TV quicker.",
-                on = settings.animatedCovers,
-                onChange = { on ->
-                    graph.settings.setAnimatedCovers(on)
-                    AppLog.i("Tv", "Animated covers: $on")
-                },
-            )
         }
         Group("Help") {
             TvSwitchRow(

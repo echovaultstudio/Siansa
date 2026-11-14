@@ -42,10 +42,12 @@ To sign out, go to **Settings › Sign out** on the TV. Your phone stays signed 
 Everything works with the remote's arrows and the centre button; what the remote is on is lit or ringed in the accent colour, buttons on the settings pages included. The tabs along the top (Home, Library, Search,
 Settings) always open that tab's own page, wherever you are.
 
-- **Home**: one bar of pills at the top: Today's mix, Shuffle your library and Liked songs, then your notices, as on
+- **Home**: one bar of pills at the top: Today's mix, Shuffle your library, Liked songs and **Sync**, then your notices, as on
   the phone (what needs you, what you're partway through, what's new; shown or hidden in Settings › Home page ›
-  Notices). Then the rows of your phone's Home, in the same order
-  and with the same rows hidden: Today's mixes (the daily mixes made today), Jump back in, Your mixes, Rediscover, Radios, Your playlists, Recently played, Artist
+  Notices). **Sync** syncs your library and its covers without opening a page: its circle of arrows turns while it
+  runs, and goes red if the sync failed. Then the rows of your phone's Home, in the same order
+  and with the same rows hidden: Today's mixes (a wide card for each of the day's mixes, Morning, Daytime, Evening and
+  Night or your own vibes, scrolling sideways: OK plays one made today, or makes it first), Jump back in, Your mixes, Rediscover, Radios, Your playlists, Recently played, Artist
   radios, Recently added, Your genres and Random picks. A radio starts playing straight away. Rows fill the screen: a
   row of only two or three is wide cards, a third of the screen each, with the cover beside the name. Coming back to
   Home, its rows are there at once, and brought up to date a moment later.
@@ -53,9 +55,11 @@ Settings) always open that tab's own page, wherever you are.
   favourite artists. Time machine is on the phone only for now. Similar albums and the other pages with many albums
   (a genre, a label, Appears on) are six across too.
 - **Albums, playlists and mixes**: the cover (a playlist's own cover from the server) and what it is at the top, with the artists, genre and label in
-  plain words to open, then Play, Shuffle and Add to favourites in line under them; down from them goes straight to the songs. The button at the end of each
+  plain words to open, then Play, Shuffle and Add to favourites in line under them (an album also has **Similar albums**,
+  and a playlist **More like this playlist**, with Siansa Beats or AudioMuse-AI); down from them goes straight to the songs. The button at the end of each
   song has Play next, Add to queue, Add to playlist, Like, Start (or Stop) a mix, Similar songs, Go to album or
-  artist, and Song details.
+  artist, and Song details. **Similar songs** is a list of songs under a small band in the colour of the song's cover,
+  with Play and Shuffle.
 - **Artists**: their photo (looked up again, so one Navidrome found since your library was read shows instead of a
   placeholder), Play, Shuffle, Artist radio and Add to favourites, then their top three songs (**Show all** for the rest), a row for each kind of release (Albums, EPs, Singles,
   DJ-mixes…) and similar artists.
@@ -73,9 +77,9 @@ Settings) always open that tab's own page, wherever you are.
   (Stop the mix while one plays), Go to the artist, Go to the album, Song path (with AudioMuse), Add to playlist,
   Similar songs and Song details. Lyrics and Up next open on the right: press right to move into them (up and down
   scroll the lyrics; OK on a song in Up next plays from it) and Back to close them. In Up next, songs Siansa added on its
-  own (a radio, Keep playing) have a star, as in the phone's queue; synced lyrics follow the song. Animated covers can
-  move here and on album pages, as on the phone: they're off from the start on the TV, and **Settings › Animated
-  covers** turns them on. The **Now playing** chip at the top of the pages takes you here; its wave moves while the
+  own (a radio, Keep playing) have a star, as in the phone's queue; synced lyrics follow the song. With the lyrics
+  open, they sit in a soft dark box, and the remote's guide and Siansa's logo step aside. Covers don't move on the TV:
+  it shows animated covers as stills, to save what the TV has. The **Now playing** chip at the top of the pages takes you here; its wave moves while the
   music plays. The TV app has no sleep timer: the TV's own sleep setting turns everything off.
 - **Typing**: text fields are the TV's own, in the page: move to one (its border lights up) and press OK for the
   keyboard (in Search it comes up as soon as you open it). Type with the remote, say it with the microphone button, or
@@ -96,7 +100,7 @@ the phone:
 - **Songs that sound like…** in Search: type or say a few words ("rainy sunday morning").
 - **Your sound** in the Library: the sound of your library.
 - **Song path** in Now playing and in a song's actions: from that song to another, through songs that sound in between.
-- **Song alchemy** on a playlist's page: songs that blend the sound of its songs.
+- **More like this playlist** on a playlist's page: songs that blend the sound of its songs.
 - Loudness and fade shapes from the Siansa plugin for crossfades and levelling, and the vibes of your daily mixes, as
   on the phone.
 
@@ -110,10 +114,11 @@ The TV has the settings that matter on a TV, each the same page as on the phone:
 - **Servers and users**: every server and user on the TV; pick one to switch (Siansa starts again as them). **Add a
   server or user** signs in with the code on the TV, like the first time, and keeps its own library and settings.
 - **Show music from**: whose music shows on the TV and which of their libraries, as in the phone's Sources.
-- **Connections** (AudioMuse, Last.fm and more), **Library sync**, **Radios & mixes** and **Scrobbling & history**.
+- **Connections** (Siansa Beats, Last.fm and more), **Library sync**, **Radios & mixes**, **Today's mixes and vibes**
+  (the day's mixes and when each plays) and **Scrobbling & history**.
 - **Audio passthrough** (below), **Playback** (crossfades, DJ blends, levelling, the equaliser, keep playing) and
   **Streaming quality** (on the Playback page).
-- **Colours**: the TV is always dark. **Animated covers** (off from the start: they make the TV slower) is beside it.
+- **Colours**: the TV is always dark.
 - **Help**: debug logs, **Report a problem**, the log, What's new and About.
 - **Open Now playing when a song starts**: on from the start; picking a song, an album or a radio goes straight to the
   player.
@@ -129,8 +134,7 @@ The TV app plays from your server at home, so it keeps little on the TV, and not
 
 - up to 512 MB of songs it has played, so they start at once the next time;
 - up to 200 MB of covers;
-- up to 300 MB of animated covers, when **Animated covers** is on. One that's removed plays again after downloading
-  it once more; lists keep their still of it.
+- up to 300 MB of animated covers kept from before: the TV no longer plays them, so this only goes down.
 
 That's about 1 GB together. Siansa also leaves 1 GB of the TV's storage free: on a TV with less room it keeps less of
 each, animated covers first. Each time the app starts it removes what was played longest ago until it's within these
