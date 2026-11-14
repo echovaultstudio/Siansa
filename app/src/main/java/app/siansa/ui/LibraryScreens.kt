@@ -373,8 +373,10 @@ fun AlbumScreen(nav: NavController, id: String) {
         albumBar = true,
         resume = d?.let { album -> pick?.let { PlayResume(it.continueIndex, PickUps.trackLabel(album.songs, it.continueIndex)) } },
         offline = d?.album?.offlineItem(),
-        // A heart for favourite albums, starred in Navidrome (issue #275).
-        actions = { d?.album?.let { FavouriteAlbumButton(it) } },
+        // A heart for favourite albums, starred in Navidrome (issue #275): beside Download, and in the title bar before
+        // Play once the buttons have scrolled away, as on an artist's page (the owner, 14 Nov; it was at the top right).
+        rowExtras = { d?.album?.let { FavouriteAlbumButton(it) } },
+        barExtras = { d?.album?.let { FavouriteAlbumButton(it, tag = "barHeart", offTint = Color.White) } },
         // "Find similar albums" beside Shuffle (issue #228), through any of its songs; needs AudioMuse.
         onSimilar = d?.songs?.firstOrNull()?.id?.takeIf { graph.settings.current.soundReady }?.let { id -> { nav.openSimilarAlbums(id) } },
         // Genres, labels, the version and the length at the foot of the page (#558).
@@ -512,16 +514,17 @@ internal fun SongSortPicker(selected: ListSort, defaultLabel: String, onPick: (L
 
 /** The heart on an album page (issue #275): marks it as a favourite, in Navidrome too. */
 @Composable
-internal fun FavouriteAlbumButton(album: Album) {
+internal fun FavouriteAlbumButton(album: Album, tag: String = "favouriteAlbum", offTint: Color = LocalContentColor.current) {
     val graph = LocalGraph.current
     val launcher = rememberPlayLauncher()
     val ids by graph.favouriteAlbums.ids.collectAsStateWithLifecycle()
     val on = isFavouriteAlbum(album, ids)
-    IconButton(onClick = { graph.favouriteAlbums.toggle(album) { launcher.notify(it) } }, modifier = Modifier.testTag("favouriteAlbum")) {
+    IconButton(onClick = { graph.favouriteAlbums.toggle(album) { launcher.notify(it) } }, modifier = Modifier.testTag(tag)) {
         Icon(
             if (on) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
             if (on) "Remove from favourite albums" else "Add to favourite albums",
-            tint = if (on) Accent else LocalContentColor.current,
+            tint = if (on) Accent else offTint,
+            modifier = Modifier.size(ICON_SIZE),
         )
     }
 }

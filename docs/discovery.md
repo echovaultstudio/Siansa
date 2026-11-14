@@ -96,8 +96,8 @@ queue.
 
 From a song's menu: **Similar songs** and **Similar albums**. On an artist's page: **Fans also like**.
 
-On an album's page, the buttons under its details: **add to a playlist** (the plus) and **Download** on the left,
-**Similar albums** (with AudioMuse-AI), **Shuffle** and **Play** on the right.
+On an album's page, the buttons under its details: **add to a playlist** (the plus), **Download** and the album's
+**heart** (a favourite album) on the left, **Similar albums** (with AudioMuse-AI), **Shuffle** and **Play** on the right.
 
 - **Play** carries on where you stopped, when you left the album part way: a ring round it shows how far you got,
   and the details line says **Continue from 8**. Press and hold Play to start from the first song instead.

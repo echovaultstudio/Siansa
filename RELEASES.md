@@ -3,6 +3,11 @@
 Every release of Siansa and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [1.5.1](https://github.com/echovaultstudio/Siansa/releases/tag/v1.5.1) — 2026-11-14
+
+- [#1167](https://github.com/echovaultstudio/Siansa/pull/1167) Crossfade test: time the next song from when it's heard, not the handover (@Th3K1ngP1n)
+- [#1169](https://github.com/echovaultstudio/Siansa/pull/1169) Album page: the heart beside Download, and a long title fades out before the bar's buttons (@Th3K1ngP1n)
+
 ## [1.5.0](https://github.com/echovaultstudio/Siansa/releases/tag/v1.5.0) — 2026-11-14
 
 - [#1011](https://github.com/echovaultstudio/Siansa/pull/1011) main into dev: v1.0.0 history and the new branch flow (@Th3K1ngP1n)
