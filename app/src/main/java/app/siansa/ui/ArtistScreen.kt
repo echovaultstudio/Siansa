@@ -174,10 +174,23 @@ fun ArtistScreen(nav: NavController, id: String) {
     // id from its last sync, which may still stand for the placeholder star (the owner, 10 Nov: Rezident). Looked up
     // once a run, as Home's artist radios are (ArtistPhotos), and the new id kept.
     val freshCovers by graph.artistPhotos.covers.collectAsStateWithLifecycle()
-    LaunchedEffect(p?.artist?.id) { p?.artist?.let { graph.artistPhotos.refresh(listOf(it)) } }
+    // Whether the photo has been looked up: until then the page's colours wait, so they're taken from the picture the
+    // page ends up with, not from the one before it (the owner, 14 Nov: colours changing while the page is open).
+    var photoLookedUp by remember(id) { mutableStateOf(graph.artistPhotos.lookedUp(id)) }
+    LaunchedEffect(p?.artist?.id) {
+        val artist = p?.artist ?: return@LaunchedEffect
+        try {
+            graph.artistPhotos.refresh(listOf(artist))
+            // Looked up from somewhere else at this moment (Home's artist radios): its answer is waited for, a few seconds at most.
+            kotlinx.coroutines.withTimeoutOrNull(3_000) { while (!graph.artistPhotos.lookedUp(artist.id)) kotlinx.coroutines.delay(50) }
+        } finally {
+            photoLookedUp = true
+        }
+    }
     val artistCover = p?.artist?.let { freshCovers[it.id] ?: it.coverArt }
     val pictureId = artistCover ?: p?.albums?.firstOrNull()?.coverArt
-    val tint = rememberCoverColor(pictureId)
+    val colourOf = pictureId.takeIf { photoLookedUp }
+    val tint = rememberCoverColor(colourOf)
 
     // Release types as tabs at the top (issue #1029): All, Albums, EPs, Singles, DJ-mixes… one at a time, only while
     // the page is open. Once scrolled up to the title bar, they stay pinned under it.
@@ -231,7 +244,7 @@ fun ArtistScreen(nav: NavController, id: String) {
 
     // With Dynamic colours, only Play takes the picture's colour (the owner, 10 Nov): Radio, Shuffle and the heart stay
     // as they are, so the row doesn't shout.
-    val playColours = rememberPageColours(pictureId, pageBackdrop(MaterialTheme.colorScheme.surface, tint), where = "Artist page", tint = tint)
+    val playColours = rememberPageColours(colourOf, pageBackdrop(MaterialTheme.colorScheme.surface, tint), where = "Artist page", tint = tint)
     HeroPage(
         title = p?.artist?.name ?: "Artist",
         heroHeight = HERO,
