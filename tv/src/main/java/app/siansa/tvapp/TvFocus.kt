@@ -268,8 +268,27 @@ fun Modifier.tvRow(): Modifier = this
 @Composable
 fun Modifier.initialFocus(): Modifier {
     val requester = remember { FocusRequester() }
-    LaunchedEffect(Unit) { runCatching { requester.requestFocus() } }
+    val page = LocalStartFocus.current
+    LaunchedEffect(Unit) {
+        // Once for each time the page is opened (the owner, 14 Nov: going right along Today's mixes, Home jumped to
+        // its top). The button this is on sits in a list that scrolls: when it scrolled out of sight and came back,
+        // even by the few pixels a focused card moves the page, it took the focus again, from wherever the remote was.
+        if (page != null && page.given) return@LaunchedEffect
+        page?.given = true
+        runCatching { requester.requestFocus() }
+    }
     return focusRequester(requester)
+}
+
+/** Whether a page has put the remote where it starts yet: once for each time the page is opened ([TvPage]). */
+class StartFocus { var given = false }
+
+val LocalStartFocus = androidx.compose.runtime.staticCompositionLocalOf<StartFocus?> { null }
+
+/** One of the TV's pages: where the remote starts on it is set once, when it opens, not again as it scrolls. */
+@Composable
+fun TvPage(content: @Composable () -> Unit) {
+    androidx.compose.runtime.CompositionLocalProvider(LocalStartFocus provides remember { StartFocus() }, content = content)
 }
 
 /**
