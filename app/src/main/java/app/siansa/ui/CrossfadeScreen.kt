@@ -44,7 +44,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import app.siansa.data.AppSettings
 import app.siansa.data.ReplayGainMode
-import app.siansa.playback.BeatMatchMode
 import app.siansa.playback.CrossfadeMode
 import app.siansa.playback.Levelling
 import app.siansa.playback.LoudnessSource
@@ -176,7 +175,7 @@ private fun levellingHint(s: AppSettings): String = when {
 internal fun crossfadeLengthHint(s: AppSettings): String? =
     if (s.crossfade != CrossfadeMode.SMART || s.loudnessSource != LoudnessSource.PLUGIN) null
     else "The longest a fade can be. Most are shorter: the songs decide. The full length is used for songs not measured yet" +
-        if (s.beatMatch != BeatMatchMode.OFF) " and for a quiet intro without a beat in DJ blends." else "."
+        " and for a quiet intro without a beat in DJ blends."
 
 /** The section's summary: Smart has nothing to set; Fixed says its length and bars. */
 internal fun crossfadeFoldSummary(s: AppSettings): String = when (s.crossfade) {

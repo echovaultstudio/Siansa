@@ -176,7 +176,7 @@ class SiansaApp : Application(), SingletonImageLoader.Factory {
             "quality Wi-Fi ${if (s.transcodeWifiKbps > 0) "Opus ${s.transcodeWifiKbps}" else "original"}, mobile ${if (s.transcodeMobileKbps > 0) "Opus ${s.transcodeMobileKbps}" else "original"}",
             "ReplayGain ${s.replayGain.label}",
             // How songs blend, so a DJ session's log says what it was set to (0.52.0-dev).
-            "crossfade ${s.crossfade.name.lowercase()} ${s.crossfadeSeconds} s, beat-matched ${s.beatMatch.name.lowercase()}, ${s.blendBars} bars, bass swap ${if (s.bassSwap) "on" else "off"}",
+            "crossfade ${s.crossfade.name.lowercase()} ${s.crossfadeSeconds} s, beat-matched in DJ playback, ${s.blendBars} bars",
             if (BuildConfig.TV_APP) app.siansa.data.StorageBudget.ofTv(this).let { "song cache ${it.songsMb} MB, image cache ${it.picturesMb} MB, animated covers kept ${it.animatedMb} MB" }
             else "song cache ${mb(s.songCacheMb)}, image cache ${mb(s.imageCacheMb)}",
             "animated covers ${if (s.animatedCovers) "on" else "off"}, download all covers ${if (s.coverDownload) (if (s.coverDownloadAnyWifi) "any Wi-Fi" else "home") else "off"}",

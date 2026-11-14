@@ -171,7 +171,7 @@ is about 15 seconds at 128 BPM, 16 bars about 30. A blend starts on a bar, so it
 longer, and it never takes more than a third of a song: into a short song it's laid over fewer bars, still beat
 on beat.
 
-**Bass swap** (on by default): over the first half of a blend the old song's bass is taken away (a filter sweeping
+**Bass swap** (always on, with no setting): over the first half of a blend the old song's bass is taken away (a filter sweeping
 up to about 200 Hz) while the new song's, held back at first, is let in, as a DJ does with the EQ: two kick drums
 never play at once, so a blend a few ms out of step is heard as a mix, not a flam.
 

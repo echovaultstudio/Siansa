@@ -1,7 +1,6 @@
 package app.siansa.ui
 
 import app.siansa.data.AppSettings
-import app.siansa.playback.BeatMatchMode
 import app.siansa.playback.CrossfadeMode
 import app.siansa.playback.LoudnessSource
 import org.junit.Assert.assertEquals
@@ -15,12 +14,8 @@ class CrossfadeLengthHintTest {
     @Test fun withSmartTheLengthIsTheLongestAFadeCanBe() {
         val hint = crossfadeLengthHint(smart)!!
         assertTrue(hint, hint.startsWith("The longest a fade can be."))
-        assertTrue(hint, hint.endsWith("songs not measured yet."))
-    }
-
-    @Test fun withDjBlendsItAlsoSaysWhenTheFullLengthIsUsed() {
-        val hint = crossfadeLengthHint(smart.copy(beatMatch = BeatMatchMode.DJ_RADIO))!!
-        assertTrue(hint, hint.endsWith("and for a quiet intro without a beat in DJ blends."))
+        // DJ blends are always on in DJ playback (no setting any more), so it always says when the full length is used.
+        assertTrue(hint, hint.endsWith("songs not measured yet and for a quiet intro without a beat in DJ blends."))
     }
 
     @Test fun otherwiseTheModesOwnHintSaysIt() {
