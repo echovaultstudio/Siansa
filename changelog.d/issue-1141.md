@@ -11,4 +11,5 @@
 - TV: with the lyrics open in Now playing, they sit in a soft dark box, and the remote's guide and Siansa's logo step aside.
 - TV: the Library's **Your sound** is called **Sonic fingerprint**, as on the phone, so it isn't mistaken for Home's Your sound mix.
 - TV: the choices in a menu are pills, like every other button on the TV.
+- TV: Settings › Streaming & storage shows the song cache Siansa keeps on the TV instead of sizes that did nothing there, and the remote reaches Clear song cache. The TV no longer shows a mobile-data choice for loading songs ahead.
 - TV: covers no longer move, and the Animated covers setting is gone from the TV.
