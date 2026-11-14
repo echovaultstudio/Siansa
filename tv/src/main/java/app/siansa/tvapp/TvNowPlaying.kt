@@ -27,6 +27,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.produceState
 import app.siansa.log.AppLog
+import app.siansa.net.soundReady
 import app.siansa.ui.openSongDetails
 import app.siansa.ui.openSongPath
 import androidx.compose.material.icons.rounded.FastForward
@@ -168,8 +169,9 @@ fun TvNowPlaying() {
                 }
                 ProgressBlock(progress, details(state.codec, state.transcodeKbps), windTo, windForward)
                 // What the remote does here, on one line centred under the bar (the owner, 12 Nov; was under the
-                // cover, #1077): the keys bold, the words soft, the three an even gap apart.
-                RemoteGuide(Modifier.fillMaxWidth().testTag("tvRemoteHint"))
+                // cover, #1077): the keys bold, the words soft, the three an even gap apart. Not with the lyrics open,
+                // where it was in their way (the owner, 14 Nov).
+                if (showsGuide(panel)) RemoteGuide(Modifier.fillMaxWidth().testTag("tvRemoteHint"))
             }
             when (panel) {
                 Panel.QUEUE -> UpNext(state.queue, state.index, state.auto)
@@ -179,7 +181,7 @@ fun TvNowPlaying() {
         }
         // With the list of songs open there's no cover to sit under: what the remote does there stays at the foot of the
         // page. Siansa's logo is in the corner.
-        if (queue) {
+        if (panel == Panel.QUEUE) {
             Text(
                 "Right  into the list  ·  Back  closes it  ·  ▼  more",
                 style = MaterialTheme.typography.titleSmall,
@@ -187,7 +189,8 @@ fun TvNowPlaying() {
                 modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = Space.Section).testTag("tvRemoteHint"),
             )
         }
-        TvBrand(Modifier.align(Alignment.BottomEnd).padding(end = TV_EDGE * 2, bottom = Space.Section))
+        // Siansa's logo, except with the lyrics open: it sat over their last lines.
+        if (showsGuide(panel)) TvBrand(Modifier.align(Alignment.BottomEnd).padding(end = TV_EDGE * 2, bottom = Space.Section))
     }
     val snack = app.siansa.ui.LocalSnack.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
@@ -206,9 +209,9 @@ fun TvNowPlaying() {
             if (artistId != null) add("Go to the artist" to { nav.navigate(TvRoutes.artist(artistId)) })
             if (albumId != null && song.album.isNotBlank()) add("Go to the album" to { nav.navigate(TvRoutes.album(albumId)) })
             // AudioMuse's song path from this song, queued after it once ready (as on the phone's player).
-            if (graph.settings.current.audioMuseReady) add("Song path" to { nav.openSongPath(song.id, fromNowPlaying = true) })
+            if (graph.settings.current.soundReady) add("Song path" to { nav.openSongPath(song.id, fromNowPlaying = true) })
             add("Add to playlist" to { pickPlaylist = true })
-            add("Similar songs" to { nav.navigate("similar/songs/${android.net.Uri.encode(song.id)}") })
+            add("Similar songs" to { nav.navigate(TvRoutes.similarSongs(song.id)) })
             add("Song details" to { nav.openSongDetails(song.id) })
         }
         TvChoices(song.title, choices, onDismiss = { menu = false })
@@ -221,6 +224,9 @@ fun TvNowPlaying() {
         }
     }
 }
+
+/** Whether the remote's guide and Siansa's logo show: not over the lyrics. */
+internal fun showsGuide(panel: Panel): Boolean = panel != Panel.LYRICS
 
 /** Siansa's logo, quietly in the corner (issue #974): the icon and the wordmark, its S in amber, as on the Chromecast screen. */
 @Composable
@@ -282,7 +288,7 @@ private fun ProgressBlock(
     }
 }
 
-private enum class Panel { NONE, QUEUE, LYRICS }
+internal enum class Panel { NONE, QUEUE, LYRICS }
 
 /**
  * The song's lyrics from the server, as on the phone: synced ones follow the song, the line being sung lit and kept in
@@ -314,7 +320,14 @@ private fun LyricsPanel(song: app.siansa.data.Song?, positionMs: () -> Long) {
         following = true
     }
     LaunchedEffect(current, following) { if (following && current >= 0) list.animateScrollToItem((current - LINES_ABOVE).coerceAtLeast(0)) }
-    Column(Modifier.width(QUEUE_WIDTH).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
+    // A soft frosted box just around the lyrics (the owner, 14 Nov): the page behind is the cover blurred, darkened
+    // under the words so they read over any cover.
+    Column(
+        Modifier.width(QUEUE_WIDTH).fillMaxHeight()
+            .background(Color.Black.copy(alpha = LYRICS_BOX_SHADE), RoundedCornerShape(Space.Page))
+            .padding(Space.Section).testTag("tvLyricsBox"),
+        verticalArrangement = Arrangement.spacedBy(Space.Medium),
+    ) {
         Text(
             if (focused) "Lyrics · up and down scroll" else "Lyrics",
             style = MaterialTheme.typography.titleLarge,
@@ -426,6 +439,9 @@ private const val QUEUE_SHOWN = 100
 private val AUTO_MARK = 20.dp
 private val PROGRESS_HEIGHT = 4.dp
 private const val PAUSED_SHADE = 0.45f
+
+/** How dark the box behind the lyrics is. */
+private const val LYRICS_BOX_SHADE = 0.4f
 private val PAUSE_SIGN = 96.dp
 private const val HINT_ALPHA = 0.7f
 /** Between the cover and what the remote does, under it: a section's gap, clear of the cover without drifting off. */

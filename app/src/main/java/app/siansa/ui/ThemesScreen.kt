@@ -195,10 +195,13 @@ fun ThemesScreen(nav: NavController) {
                         }
                     }
                 }
-                HorizontalDivider()
-                FoldSection("Animated covers", if (settings.animatedCovers) "On" else "Off") {
-                    SwitchRow("Animated covers", settings.animatedCovers) { on -> graph.settings.setAnimatedCovers(on) }
-                    Hint("An animated cover (cover.gif or cover.webp in the album's folder) moves on the album page and in now playing; lists show its first frame. It's downloaded once in full and kept on the phone.")  // server-name: ok (an example of a server that can't)
+                // Not on the TV (the owner, 14 Nov): it never plays animated covers, to save what it has.
+                if (!app.siansa.BuildConfig.TV_APP) {
+                    HorizontalDivider()
+                    FoldSection("Animated covers", if (settings.animatedCovers) "On" else "Off") {
+                        SwitchRow("Animated covers", settings.animatedCovers) { on -> graph.settings.setAnimatedCovers(on) }
+                        Hint("An animated cover (cover.gif or cover.webp in the album's folder) moves on the album page and in now playing; lists show its first frame. It's downloaded once in full and kept on the phone.")  // server-name: ok (an example of a server that can't)
+                    }
                 }
             }
         }

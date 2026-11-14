@@ -44,6 +44,11 @@ class TvActivity : ComponentActivity() {
         graph.player.connect()
         searches.value = queryOf(intent)
         AppLog.i("Tv", "TV app opened")
+        // The TV never plays animated covers (the owner, 14 Nov): one switched on before is switched off for good.
+        if (graph.settings.current.animatedCovers) {
+            graph.settings.setAnimatedCovers(false)
+            AppLog.i("Tv", "Animated covers switched off: the TV app doesn't play them")
+        }
         logOutput(graph)
         setContent {
             val settings by graph.settings.state.collectAsStateWithLifecycle()

@@ -35,6 +35,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.platform.testTag
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Switch
 import androidx.compose.runtime.LaunchedEffect
@@ -143,7 +144,17 @@ private fun WideTile(title: String, subtitle: String?, coverId: String?, onClick
  * notices, issue #996); the bar is the background, and the remote's ring shows which one it's on.
  */
 @Composable
-fun TvButton(text: String, icon: ImageVector?, onClick: () -> Unit, modifier: Modifier = Modifier, strong: Boolean = false, quiet: Boolean = false) {
+fun TvButton(
+    text: String,
+    icon: ImageVector?,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    strong: Boolean = false,
+    quiet: Boolean = false,
+    // The icon in a colour of its own (red for something that failed) and turned by this many degrees (Home's Sync).
+    iconTint: Color? = null,
+    iconTurn: Float = 0f,
+) {
     val shape = RoundedCornerShape(percent = 50)
     val back = when {
         strong -> MaterialTheme.colorScheme.primary
@@ -156,25 +167,8 @@ fun TvButton(text: String, icon: ImageVector?, onClick: () -> Unit, modifier: Mo
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Space.Small),
     ) {
-        if (icon != null) Icon(icon, null, tint = fore)
+        if (icon != null) Icon(icon, null, tint = iconTint ?: fore, modifier = Modifier.graphicsLayer { rotationZ = iconTurn })
         Text(text, color = fore, style = MaterialTheme.typography.titleMedium)
-    }
-}
-
-/** A round button with only an icon, for now playing's controls; [on] marks a switch that's on (shuffle, repeat). */
-@Composable
-fun TvIconButton(icon: ImageVector, label: String, onClick: () -> Unit, modifier: Modifier = Modifier, big: Boolean = false, on: Boolean = false) {
-    val back = if (big) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
-    val fore = when {
-        big -> MaterialTheme.colorScheme.onPrimary
-        on -> MaterialTheme.colorScheme.primary
-        else -> MaterialTheme.colorScheme.onSurfaceVariant
-    }
-    Box(
-        modifier.size(if (big) BIG_CONTROL else CONTROL).tvFocus(CircleShape, onClick, grow = BUTTON_GROW).background(back, CircleShape),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(icon, label, tint = fore, modifier = Modifier.size(if (big) BIG_CONTROL_ICON else CONTROL_ICON))
     }
 }
 
@@ -226,11 +220,27 @@ fun TvChoices(
             Text(title, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface, maxLines = 2, overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(bottom = Space.Small))
             choices.forEachIndexed { i, (label, action) ->
-                TvSettingRow(label, null, onClick = { if (label !in keepOpen) onDismiss(); action() }, modifier = if (i == 0) Modifier.focusRequester(first) else Modifier)
+                // Pills, as every button on the TV (the owner, 14 Nov), one under the other.
+                TvChoicePill(label, onClick = { if (label !in keepOpen) onDismiss(); action() }, modifier = if (i == 0) Modifier.focusRequester(first) else Modifier)
             }
         }
     }
     LaunchedEffect(Unit) { runCatching { first.requestFocus() } }
+}
+
+/** One choice of [TvChoices]: a pill as wide as the list, its words at the start. */
+@Composable
+private fun TvChoicePill(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val shape = RoundedCornerShape(percent = 50)
+    Text(
+        text,
+        style = MaterialTheme.typography.titleMedium,
+        color = MaterialTheme.colorScheme.onSurface,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = modifier.fillMaxWidth().tvFocus(shape, onClick, grow = BUTTON_GROW).background(MaterialTheme.colorScheme.surfaceVariant, shape)
+            .padding(horizontal = Space.Section, vertical = Space.Medium).testTag("tvChoice"),
+    )
 }
 
 /**
@@ -303,7 +313,3 @@ private const val WIDE_SUBTITLE_ALPHA = 0.85f
 private const val LINK_QUIET_ALPHA = 0.82f
 private val PILL_DIVIDER_WIDTH = 1.dp
 private val PILL_DIVIDER_HEIGHT = 24.dp
-private val CONTROL = 56.dp
-private val BIG_CONTROL = 76.dp
-private val CONTROL_ICON = 28.dp
-private val BIG_CONTROL_ICON = 40.dp

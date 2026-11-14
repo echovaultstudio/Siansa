@@ -68,14 +68,16 @@ object TvRoutes {
     const val ARTIST = "artist/{id}"
     const val PLAYLIST = "playlist/{id}"
     const val MIX = "mix/{id}"
+    const val SIMILAR_SONGS = "similar/songs/{id}"
 
     /** The phone's pages the TV puts its own in place of. */
-    val own = setOf(HOME, LIBRARY, SEARCH, SETTINGS, ALBUM, ARTIST, PLAYLIST, MIX)
+    val own = setOf(HOME, LIBRARY, SEARCH, SETTINGS, ALBUM, ARTIST, PLAYLIST, MIX, SIMILAR_SONGS)
 
     fun album(id: String) = "album/${Uri.encode(id)}"
     fun artist(id: String) = "artist/${Uri.encode(id)}"
     fun playlist(id: String) = "playlist/${Uri.encode(id)}"
     fun mix(id: String) = "mix/${Uri.encode(id)}"
+    fun similarSongs(songId: String) = "similar/songs/${Uri.encode(songId)}"
 }
 
 /** The tabs along the top, in order. */
@@ -172,6 +174,7 @@ fun TvRoot(searches: MutableStateFlow<String?>) {
                     composable(TvRoutes.ARTIST) { TvArtist(it.arguments?.getString("id").orEmpty()) }
                     composable(TvRoutes.PLAYLIST) { TvPlaylist(it.arguments?.getString("id").orEmpty()) }
                     composable(TvRoutes.MIX) { TvMix(it.arguments?.getString("id").orEmpty()) }
+                    composable(TvRoutes.SIMILAR_SONGS) { TvSimilarSongs(it.arguments?.getString("id").orEmpty()) }
                     // The rest of the app's pages, the phone's own, for what the TV doesn't redo (settings, sync…).
                     siansaRoutes(nav, except = TvRoutes.own)
                 }
