@@ -98,7 +98,7 @@ the phone:
 - **Similar songs** in a song's actions, and **Start a mix** with DJ blends. A DJ mix is offered only when Siansa Beats
   answers with the songs' sound, as on the phone; otherwise its choice is greyed out with the reason, and Steady still plays.
 - **Songs that sound like…** in Search: type or say a few words ("rainy sunday morning").
-- **Your sound** in the Library: the sound of your library.
+- **Sonic fingerprint** in the Library: how your library sounds, as on the phone.
 - **Song path** in Now playing and in a song's actions: from that song to another, through songs that sound in between.
 - **More like this playlist** on a playlist's page: songs that blend the sound of its songs.
 - Loudness and fade shapes from the Siansa plugin for crossfades and levelling, and the vibes of your daily mixes, as

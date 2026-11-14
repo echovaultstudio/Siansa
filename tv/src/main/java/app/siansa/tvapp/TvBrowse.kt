@@ -138,7 +138,8 @@ fun TvLibrary() {
             // (issue #949): laying it out froze a SHIELD for seconds.
             if (settings.soundReady) {
                 item { TvPillDivider() }
-                item { TvButton("Your sound", null, quiet = true, onClick = { nav.navigate("fingerprint") }) }
+                // Named as on the phone (the owner, 14 Nov): "Your sound" is Home's mix; this page is about your library's sound.
+                item { TvButton("Sonic fingerprint", null, quiet = true, onClick = { nav.navigate("fingerprint") }) }
             }
         }
         val empty = when (shelf) {
