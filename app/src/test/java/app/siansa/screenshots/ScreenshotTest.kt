@@ -623,10 +623,10 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                 val heroPx = with(density) { hero.toPx() }
                 Column(verticalArrangement = Arrangement.spacedBy(Space.Small)) {
                     listOf(
-                        "Joy Orbison" to 0f, "Joy Orbison" to heroPx * 0.25f, "Joy Orbison" to heroPx * 0.62f,
+                        "Joy Orbison" to 0f, "Joy Orbison" to heroPx * 0.62f,
                         "Joy Orbison" to heroPx * 2f, "Tayo Meets Acid Rockers Uptown" to heroPx * 0.62f,
                         // A name too long for the bar, settled there with the heart and Play: it fades out before them
-                        // (the owner, 14 Nov).
+                        // (the owner, 14 Nov). Five rows, so this last one still fits in the picture.
                         "Stevie Ray Vaughan and Double Trouble" to heroPx * 2f,
                     ).forEach { (name, scrolled) ->
                         Box(Modifier.fillMaxWidth().height(170.dp)) {
