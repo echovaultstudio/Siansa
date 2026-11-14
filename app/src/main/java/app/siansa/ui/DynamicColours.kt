@@ -2,6 +2,7 @@ package app.siansa.ui
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -299,7 +300,17 @@ private val tonesCache = ConcurrentHashMap<String, CoverTones>()
  * cover; [where] names the page in the log.
  */
 @Composable
-fun rememberDynamicColours(coverId: String?, on: Boolean, backdrop: Color? = null, where: String = "Now playing", tint: Color? = null): DynamicColours? {
+fun rememberDynamicColours(
+    coverId: String?,
+    on: Boolean,
+    backdrop: Color? = null,
+    where: String = "Now playing",
+    tint: Color? = null,
+    /** Something the colours depend on isn't known yet (a page's header colour): nothing is worked out until it is. */
+    waiting: Boolean = false,
+    /** What shows until the colours are known, in place of the theme's; they fade from it once. */
+    until: DynamicColours? = null,
+): DynamicColours? {
     val graph = LocalGraph.current
     val context = LocalContext.current
     var tones by remember(coverId, on) { mutableStateOf(if (on) coverId?.let { tonesCache[it] } else null) }
@@ -329,24 +340,32 @@ fun rememberDynamicColours(coverId: String?, on: Boolean, backdrop: Color? = nul
         if (read != null) {
             tonesCache[coverId] = read
             tones = read
+        } else {
+            tones = UNREADABLE  // not kept: another visit tries again
         }
     }
-    val colours = tones?.let { t -> t.seed?.let { DynamicAccent.of(it, backdrop ?: DynamicAccent.backdropOf(t.average), tint) } }
+    val known = tones.takeIf { !waiting }
+    val colours = remember(known, backdrop, tint) {
+        known?.let { t -> t.seed?.let { DynamicAccent.of(it, backdrop ?: DynamicAccent.backdropOf(t.average), tint) } }
+    }
     // Once per cover, not on every frame of a page colour fading in.
-    LaunchedEffect(tones?.seed) {
+    LaunchedEffect(colours) {
         if (colours != null) AppLog.d("Colours", "$where in the cover's colours: controls ${hex(colours.controls)}, text ${hex(colours.text)}")
     }
     // While the next cover is read, the last song's colours stay, so the theme's doesn't flash in between; a cover that
     // couldn't be read gives the theme's.
     var last by remember { mutableStateOf<DynamicColours?>(null) }
-    androidx.compose.runtime.SideEffect { if (tones != null) last = colours }
+    androidx.compose.runtime.SideEffect { if (known != null) last = colours }
     if (!on) return null
-    // Fade between songs; until the first cover is read, nothing (the theme's colour).
-    val target = (if (tones != null) colours else last) ?: return null
+    // Fade between songs; until the first cover is read, [until], or nothing (the theme's colour).
+    val target = (if (known != null) colours else last ?: until) ?: return null
     val controls by animateColorAsState(target.controls, tween(FADE_MS), label = "dynamicControls")
     val text by animateColorAsState(target.text, tween(FADE_MS), label = "dynamicText")
     return DynamicColours(controls, text, target.onControls)
 }
+
+/** A cover that couldn't be read: no colours of its own. */
+private val UNREADABLE = CoverTones(null, Color.Unspecified)
 
 /** The page's colours for its Play button only (Dynamic colours), set by the page around its content. */
 val LocalPlayColours = androidx.compose.runtime.staticCompositionLocalOf<DynamicColours?> { null }
@@ -358,7 +377,24 @@ val LocalPlayColours = androidx.compose.runtime.staticCompositionLocalOf<Dynamic
 @Composable
 fun rememberPageColours(coverId: String?, backdrop: Color, where: String, tint: Color? = null): DynamicColours? {
     val on = LocalGraph.current.settings.state.collectAsStateWithLifecycle().value.dynamicColours
-    return rememberDynamicColours(coverId, on && coverId != null, backdrop, where, tint)
+    if (tint == null) return rememberDynamicColours(coverId, on && coverId != null, backdrop, where)
+    // A page with a painted header: its colours are worked out once, from the header's colour as it will be, not from
+    // each shade it fades through (the owner, 14 Nov: Play was blue while the header was still grey, then turned to
+    // the header's family). Until the cover has been looked at, Play is the silver a page without a colour has, and
+    // fades to its colour once, with the header.
+    val surface = MaterialTheme.colorScheme.surface
+    val grey = MaterialTheme.colorScheme.surfaceVariant
+    val main = rememberCoverTarget(coverId)
+    val settled = main?.takeIf { it != Color.Unspecified }?.let { coverTone(it) }
+    val silver = remember(surface, grey) { DynamicAccent.of(coverTone(grey), pageBackdrop(surface, coverTone(grey))) }
+    return rememberDynamicColours(
+        coverId, on && coverId != null,
+        backdrop = pageBackdrop(surface, settled ?: coverTone(grey)),
+        where = where,
+        tint = settled,
+        waiting = main == null,
+        until = silver,
+    )
 }
 
 /**
