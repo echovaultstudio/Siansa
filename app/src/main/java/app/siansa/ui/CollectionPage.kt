@@ -97,6 +97,9 @@ import app.siansa.data.Song
 import app.siansa.data.discHeaders
 import app.siansa.offline.OfflineItem
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.geometry.Size
 
 /**
@@ -161,6 +164,8 @@ fun CollectionPage(
     radioRow: @Composable RowScope.() -> Unit = { Spacer(Modifier.weight(1f)) },
     // Shown in the title bar once the page's buttons have scrolled away (a radio's heart, the owner, 10 Nov).
     barExtras: @Composable () -> Unit = {},
+    // An album's bar: what stands beside Download (its heart, the owner, 14 Nov: no longer at the top right).
+    rowExtras: @Composable () -> Unit = {},
 ) {
     val graph = LocalGraph.current
     val djSettings by graph.settings.state.collectAsStateWithLifecycle()
@@ -330,6 +335,7 @@ fun CollectionPage(
                         // Only when a DJ mix's needs are met (AudioMuse and Siansa Beats): otherwise a plain Shuffle.
                         onDjMix = if (((albumBar && onSimilar != null) || djMix) && djPossible && playAs == null) ({ graph.scope.launch { app.siansa.mix.AlbumDjMix.start(graph, title, songs.orEmpty()) } }) else null,
                         djSlide = djSlide, onDjSlide = { djSlide = it }, dim = slideDim, albumBar = albumBar, resume = resume,
+                        rowExtras = rowExtras,
                     )
                     }
                 }
@@ -418,7 +424,13 @@ fun CollectionPage(
             }
             actions()
         }
-        FadingTitleBar(nav, title, color, barAlpha, barActions, showTitle = !showTitle)
+        // How wide the bar's buttons are, so a long title fades out before them (the owner, 14 Nov: an album's long
+        // title ran under Play, as an artist's long name did under the heart).
+        var barActionsPx by remember { mutableIntStateOf(0) }
+        val screenWidthPx = with(density) { LocalConfiguration.current.screenWidthDp.dp.toPx() }
+        val fadeEndPx = screenWidthPx - with(density) { (Space.Tight + Space.Small).toPx() } - barActionsPx
+        val fadePx = with(density) { TITLE_FADE.toPx() }
+        FadingTitleBar(nav, title, color, barAlpha, barActions, showTitle = !showTitle, onActionsWidth = { barActionsPx = it })
         // The title, one all the way: under the cover, then up into the bar, shrinking, as an artist's name.
         if (titleFrame != null) {
             val restColour = MaterialTheme.colorScheme.onSurface
@@ -440,6 +452,24 @@ fun CollectionPage(
                         scaleX = sc
                         scaleY = sc
                         alpha = if (titleFrame.t > 0f) 1f else slideDim
+                        compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen
+                    }
+                    .drawWithContent {
+                        drawContent()
+                        if (barActionsPx > 0 && titleFrame.t > 0f) {
+                            val restLeft = Space.Page.toPx()
+                            val shift = nameShift((Space.Tight + BACK_BUTTON + Space.Small).toPx() - restLeft, titleFrame.t)
+                            val sc = nameScale(dockScale, titleFrame.t)
+                            // Where the bar's buttons start, in the title's own (unmoved, unscaled) place.
+                            val end = titleFadeEnd(nameFadeEnd(fadeEndPx, restLeft, shift, sc), size.width + fadePx / sc, titleFrame.t)
+                            val start = end - fadePx / sc
+                            if (start < size.width) {
+                                drawRect(
+                                    Brush.horizontalGradient(0f to Color.Black, 1f to Color.Transparent, startX = start, endX = end),
+                                    blendMode = androidx.compose.ui.graphics.BlendMode.DstIn,
+                                )
+                            }
+                        }
                     }
                     .testTag("collectionTitle"),
             )
@@ -471,7 +501,16 @@ internal fun roomBelow(maxScrollPx: Float, coverPx: Float): Float = (coverPx * F
  * colour until the page scrolls, then a solid bar in that colour with the title.
  */
 @Composable
-internal fun FadingTitleBar(nav: NavController, title: String, color: Color, barAlpha: Float, actions: @Composable () -> Unit = {}, showTitle: Boolean = true) {
+internal fun FadingTitleBar(
+    nav: NavController,
+    title: String,
+    color: Color,
+    barAlpha: Float,
+    actions: @Composable () -> Unit = {},
+    showTitle: Boolean = true,
+    // How wide the bar's buttons are, in px, for a page that fades its own gliding title out before them.
+    onActionsWidth: (Int) -> Unit = {},
+) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -495,9 +534,20 @@ internal fun FadingTitleBar(nav: NavController, title: String, color: Color, bar
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f).graphicsLayer { alpha = if (showTitle) barAlpha else 0f },
         )
-        actions()
+        Row(Modifier.onSizeChanged { onActionsWidth(it.width) }, verticalAlignment = Alignment.CenterVertically) { actions() }
     }
 }
+
+/**
+ * Where a page's long title has faded out on its way into the title bar, [t] of the way (0–1): not at all under the
+ * cover ([whole], past the title's end), and before the bar's buttons once it's in the bar ([docked]), so the fade
+ * comes in as the title does and never cuts a title still on the page.
+ */
+internal fun titleFadeEnd(docked: Float, whole: Float, t: Float): Float =
+    if (docked >= whole) whole else whole + (docked - whole) * smooth(t.coerceIn(0f, 1f))
+
+/** How long a title's fade-out before the bar's buttons is, as an artist's name's. */
+private val TITLE_FADE = Space.Large
 
 /** The colours of a disc heading's band: [start] on the left, fading out to the right, with [text] on it. */
 internal data class DiscBand(val start: Color, val text: Color)
@@ -556,6 +606,7 @@ private fun ActionRow(
     playAs: ((first: Song?) -> Unit)? = null,
     radioColour: Color? = null,
     radioRow: @Composable RowScope.() -> Unit = { Spacer(Modifier.weight(1f)) },
+    rowExtras: @Composable () -> Unit = {},
 ) {
     val graph = LocalGraph.current
     // A list too long to play whole (a genre): one button, its radio, in the page's own colour (the owner, 10 Nov).
@@ -610,6 +661,7 @@ private fun ActionRow(
         dim = dim,
         mixOn = mixOn,
         albumBar = albumBar,
+        rowExtras = rowExtras,
         onAddToPlaylist = if (albumBar && songs.isNotEmpty()) ({ adding = true }) else null,
         resume = resume?.takeIf { !playback.loaded && it.index in songs.indices }?.let { it to songs.size },
     )
@@ -642,6 +694,8 @@ internal fun ActionButtons(
     onAddToPlaylist: (() -> Unit)? = null,
     // False for a list too long to queue whole (a genre): no Add all to queue.
     queueAll: Boolean = true,
+    // An album's bar: what stands beside Download (its heart).
+    rowExtras: @Composable () -> Unit = {},
 ) {
     // How far right of shuffle's middle Play's near edge is: sliding there starts the DJ mix.
     var shuffleX by remember { mutableStateOf<Float?>(null) }
@@ -695,7 +749,10 @@ internal fun ActionButtons(
                     Icon(Icons.Rounded.AddCircleOutline, "Add to a playlist", Modifier.size(ICON_SIZE))
                 }
             }
-            Box(Modifier.offset(x = if (onAddToPlaylist != null) -ICON_INSET else 0.dp).alpha(dim)) { download() }  // spacing: exact
+            val shift = if (onAddToPlaylist != null) -ICON_INSET else 0.dp
+            Box(Modifier.offset(x = shift).alpha(dim)) { download() }  // spacing: exact
+            // Moved as far as the two before it, so the three stand evenly apart.
+            Box(Modifier.offset(x = shift).alpha(dim)) { rowExtras() }  // spacing: exact
             Spacer(Modifier.weight(1f))
             Box(Modifier.alpha(dim)) { similarButton() }
             Box(Modifier.alpha(if (djSlide != null) 1f else dim)) { shuffleButton() }
