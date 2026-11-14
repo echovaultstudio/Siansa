@@ -273,7 +273,7 @@ fun Modifier.initialFocus(): Modifier {
         // Once for each time the page is opened (the owner, 14 Nov: going right along Today's mixes, Home jumped to
         // its top). The button this is on sits in a list that scrolls: when it scrolled out of sight and came back,
         // even by the few pixels a focused card moves the page, it took the focus again, from wherever the remote was.
-        if (page != null && page.given) return@LaunchedEffect
+        // CHECK ONLY: the guard taken out, to see the test fail
         page?.given = true
         runCatching { requester.requestFocus() }
     }
