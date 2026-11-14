@@ -713,6 +713,7 @@ class EmbyApi(
             isCompilation = isVariousArtists(o.str("AlbumArtist") ?: albumArtist?.str("Name").orEmpty()),
             // Emby's Studios are the labels (#558).
             labels = o.arr("Studios").mapNotNull { it.str("Name")?.trim()?.takeIf(String::isNotEmpty) }.distinct(),
+            artists = o.arr("AlbumArtists").mapNotNull { a -> a.str("Id")?.let { ArtistRef(it, a.str("Name").orEmpty()) } },
         )
     }
 
