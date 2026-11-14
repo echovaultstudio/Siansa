@@ -165,20 +165,20 @@ fun TvRoot(searches: MutableStateFlow<String?>) {
                     popEnterTransition = { EnterTransition.None },
                     popExitTransition = { ExitTransition.None },
                 ) {
-                    composable(TvRoutes.HOME) { TvHome() }
-                    composable(TvRoutes.LIBRARY) { TvLibrary() }
-                    composable(TvRoutes.SEARCH) { TvSearch(search, onDone = { searches.value = null }) }
-                    composable(TvRoutes.SETTINGS) { TvSettingsHub() }
-                    composable(TvRoutes.PASSTHROUGH) { TvPassthrough() }
-                    composable(TvRoutes.SOURCES) { TvSources() }
-                    composable(TvRoutes.NOW_PLAYING) { TvNowPlaying() }
-                    composable(TvRoutes.ALBUM) { TvAlbum(it.arguments?.getString("id").orEmpty()) }
-                    composable(TvRoutes.ARTIST) { TvArtist(it.arguments?.getString("id").orEmpty()) }
-                    composable(TvRoutes.PLAYLIST) { TvPlaylist(it.arguments?.getString("id").orEmpty()) }
-                    composable(TvRoutes.MIX) { TvMix(it.arguments?.getString("id").orEmpty()) }
-                    composable(TvRoutes.LIKED) { TvLiked() }
-                    composable(TvRoutes.LOG) { TvLog() }
-                    composable(TvRoutes.SIMILAR_SONGS) { TvSimilarSongs(it.arguments?.getString("id").orEmpty()) }
+                    composable(TvRoutes.HOME) { TvPage { TvHome() } }
+                    composable(TvRoutes.LIBRARY) { TvPage { TvLibrary() } }
+                    composable(TvRoutes.SEARCH) { TvPage { TvSearch(search, onDone = { searches.value = null }) } }
+                    composable(TvRoutes.SETTINGS) { TvPage { TvSettingsHub() } }
+                    composable(TvRoutes.PASSTHROUGH) { TvPage { TvPassthrough() } }
+                    composable(TvRoutes.SOURCES) { TvPage { TvSources() } }
+                    composable(TvRoutes.NOW_PLAYING) { TvPage { TvNowPlaying() } }
+                    composable(TvRoutes.ALBUM) { TvPage { TvAlbum(it.arguments?.getString("id").orEmpty()) } }
+                    composable(TvRoutes.ARTIST) { TvPage { TvArtist(it.arguments?.getString("id").orEmpty()) } }
+                    composable(TvRoutes.PLAYLIST) { TvPage { TvPlaylist(it.arguments?.getString("id").orEmpty()) } }
+                    composable(TvRoutes.MIX) { TvPage { TvMix(it.arguments?.getString("id").orEmpty()) } }
+                    composable(TvRoutes.LIKED) { TvPage { TvLiked() } }
+                    composable(TvRoutes.LOG) { TvPage { TvLog() } }
+                    composable(TvRoutes.SIMILAR_SONGS) { TvPage { TvSimilarSongs(it.arguments?.getString("id").orEmpty()) } }
                     // The rest of the app's pages, the phone's own, for what the TV doesn't redo (settings, sync…).
                     siansaRoutes(nav, except = TvRoutes.own)
                 }

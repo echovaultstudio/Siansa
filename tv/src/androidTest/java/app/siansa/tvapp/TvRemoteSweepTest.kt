@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -253,6 +254,30 @@ class TvRemoteSweepTest {
         compose.waitUntil(10_000) {
             compose.onAllNodesWithTag("tvLogBlock").fetchSemanticsNodes().sumOf { wordsOf(it).count { w -> "to be cleared" in w } } == 0
         }
+    }
+
+    /**
+     * Where the remote starts is set once (the owner, 14 Nov: going right along Today's mixes, Home jumped to its top):
+     * the button it starts on is in a list, and when it scrolled out of sight and back it took the focus again.
+     */
+    @Test fun aStartButtonScrolledBackIntoSightDoesntTakeTheFocus() {
+        page {
+            TvPage {
+                androidx.compose.foundation.lazy.LazyColumn {
+                    item { TvButton("Start here", null, onClick = {}, modifier = Modifier.initialFocus()) }
+                    items(40) { TvSettingRow("Row ${it + 1}", null, onClick = {}) }
+                }
+            }
+        }
+        assertTrue("The remote starts on the button", focused()?.let { "Start here" in wordsOf(it) } == true)
+        repeat(30) { press(KeyEvent.KEYCODE_DPAD_DOWN) }
+        assertTrue("Down went through the rows", focused()?.let { "Row 30" in wordsOf(it) } == true)
+        assertTrue("The start button is out of sight", compose.onAllNodes(androidx.compose.ui.test.hasText("Start here")).fetchSemanticsNodes().isEmpty())
+        // Up until it's composed again, a row short of it: it mustn't pull the focus to itself.
+        var steps = 0
+        while (compose.onAllNodes(androidx.compose.ui.test.hasText("Start here")).fetchSemanticsNodes().isEmpty() && steps++ < 40) press(KeyEvent.KEYCODE_DPAD_UP)
+        val on = focused()?.let(::label).orEmpty()
+        assertTrue("The start button took the focus as it came back into sight (focus on: $on)", on.startsWith("Row "))
     }
 
     /**
