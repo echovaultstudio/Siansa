@@ -58,7 +58,7 @@ class SongPath(private val graph: AppGraph) {
                 if (fromMood != null || toMood != null) steps.distinct() else songPathIds(fromId, toId, steps, length)
             }
             fromMood != null || toMood != null ->
-                throw MixException("Set up Siansa Beats or AudioMuse-AI in Settings › Connections to end a path on a mood")
+                throw MixException("Set up AudioMuse in Settings to end a path on a mood")
             graph.source.hasSonicMatch() -> {
                 val steps = graph.source.sonicPath(fromId, toId, length).map { it.id }
                 if (steps.isEmpty()) throw MixException("Your server found no path between these songs")
