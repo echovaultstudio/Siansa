@@ -164,7 +164,7 @@ class Connection(
             }
             val s = settings()
             val server = if (s.navidromeUrl.isBlank()) null else answers(reachabilityUrl(s.navidromeUrl))
-            val audioMuse = if (s.audioMuseUrl.isBlank()) null else answers(s.audioMuseUrl.trimEnd('/') + "/")
+            val audioMuse = audioMuseToAsk(s)?.let { answers(it) }
             // Replaced by a newer check while asking (the network changed): that one has the answer.
             ensureActive()
             val before = _state.value
@@ -203,3 +203,10 @@ internal fun retryDelayMs(attempt: Int): Long = when (attempt) {
     2 -> 30_000L
     else -> 3 * 60_000L
 }
+
+/**
+ * The AudioMuse-AI address a connection check asks, or null when there's nothing to ask: no address, or the service
+ * switched off in Settings › Services (it was still asked every check while off).
+ */
+internal fun audioMuseToAsk(s: app.siansa.data.AppSettings): String? =
+    if (s.audioMuseReady) s.audioMuseUrl.trimEnd('/') + "/" else null
