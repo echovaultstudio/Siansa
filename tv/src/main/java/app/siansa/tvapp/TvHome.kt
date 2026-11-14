@@ -20,7 +20,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material.icons.rounded.Sync
@@ -60,7 +59,6 @@ import app.siansa.ui.LocalNav
 import app.siansa.ui.LocalSnack
 import app.siansa.ui.Space
 import app.siansa.ui.artistRadioArtists
-import app.siansa.ui.recentlyPlayedAlbums
 import app.siansa.ui.rediscoverSubtitle
 import app.siansa.ui.tileColors
 import kotlinx.coroutines.CancellationException
@@ -184,7 +182,8 @@ private suspend fun homeRow(graph: AppGraph, section: Section): TvRow? {
         Section.REDISCOVER -> TvRow("Rediscover", graph.insights.rediscover().take(ROW_SIZE).map { TvItem.OfAlbum(it.album, rediscoverSubtitle(it)) })
         Section.RADIOS -> if (settings(graph).wordsReady) TvRow("Radios", moodRadios.map { TvItem.OfMood(it) }) else null
         Section.PLAYLISTS -> TvRow("Your playlists", graph.playlists.removed.visible(library.playlists()).take(ROW_SIZE).map { TvItem.OfPlaylist(it) })
-        Section.RECENT -> TvRow("Recently played", albums(recentlyPlayedAlbums(graph, ROW_SIZE)))
+        // Not on the TV (the owner, 14 Nov): Jump back in already has what was played lately, albums included.
+        Section.RECENT -> null
         Section.ARTIST_RADIOS -> TvRow("Artist radios", artistRadioArtists(graph, ROW_SIZE).also { picked ->
             // Their photos as the phone's Home: Navidrome finds an artist's photo when they're looked up (ArtistPhotos).
             graph.scope.launch { graph.artistPhotos.refresh(picked) }
@@ -251,12 +250,15 @@ fun TvHome() {
         contentPadding = PaddingValues(top = Space.Small, bottom = Space.Large),
         verticalArrangement = Arrangement.spacedBy(Space.Section),
     ) {
-        // One bar of pills (issue #996): Today's mix, Shuffle and Liked songs, then the notices, side by side in one
-        // track instead of a row of notices over a row of buttons.
+        // One bar of pills (issue #996): Shuffle, Liked songs and Sync, then the notices, side by side in one track
+        // instead of a row of notices over a row of buttons. No Today's mix pill (the owner, 14 Nov): it played the
+        // hour's mix, which is a card in Today's mixes.
         item("quick") {
             TvPillBar(Modifier.testTag("tvPillBar")) {
-                item("today") { TvButton("Today's mix", Icons.Rounded.AutoAwesome, strong = true, onClick = { play.todaysMix() }, modifier = Modifier.initialFocus()) }
-                item("shuffle") { TvButton("Shuffle your library", Icons.Rounded.Shuffle, quiet = true, onClick = { play.label("your library") { graph.library.randomSongs(SHUFFLE_SONGS) } }) }
+                item("shuffle") {
+                    TvButton("Shuffle your library", Icons.Rounded.Shuffle, quiet = true, modifier = Modifier.initialFocus(),
+                        onClick = { play.label("your library") { graph.library.randomSongs(SHUFFLE_SONGS) } })
+                }
                 item("liked") {
                     TvButton("Liked songs", Icons.Rounded.Favorite, quiet = true, onClick = {
                         play.label("your liked songs", shuffle = true) { app.siansa.ui.likedSongs(graph) }
@@ -398,16 +400,6 @@ class TvPlay(private val graph: AppGraph, private val launcher: app.siansa.ui.Pl
         scope.launch {
             val list = runCatching { songs() }.onFailure { AppLog.w("Tv", "Couldn't start $what: ${it.message}") }.getOrDefault(emptyList())
             if (list.isEmpty()) notify("Nothing to play in $what yet.") else graph.player.play(list, shuffle = shuffle)
-        }
-    }
-
-    fun todaysMix() {
-        scope.launch {
-            notify("Making today's mix…")
-            // Asked for here, so it's made even when Today's mix doesn't update by itself (the TV has no ↻ for that).
-            val made = runCatching { graph.generator.ensureToday() ?: graph.generator.ensureCurrent() }
-                .onFailure { if (it is CancellationException) throw it; AppLog.w("Tv", "Today's mix failed: ${it.message}") }
-            play(made, "Today's mix")
         }
     }
 

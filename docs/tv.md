@@ -42,12 +42,12 @@ To sign out, go to **Settings › Sign out** on the TV. Your phone stays signed 
 Everything works with the remote's arrows and the centre button; what the remote is on is lit or ringed in the accent colour, buttons on the settings pages included. The tabs along the top (Home, Library, Search,
 Settings) always open that tab's own page, wherever you are.
 
-- **Home**: one bar of pills at the top: Today's mix, Shuffle your library, Liked songs and **Sync**, then your notices, as on
+- **Home**: one bar of pills at the top: Shuffle your library, Liked songs and **Sync**, then your notices, as on
   the phone (what needs you, what you're partway through, what's new; shown or hidden in Settings › Home page ›
   Notices). **Sync** syncs your library and its covers without opening a page: its circle of arrows turns while it
   runs, and goes red if the sync failed. Then the rows of your phone's Home, in the same order
   and with the same rows hidden: Today's mixes (a wide card for each of the day's mixes, Morning, Daytime, Evening and
-  Night or your own vibes, scrolling sideways: OK plays one made today, or makes it first), Jump back in, Your mixes, Rediscover, Radios, Your playlists, Recently played, Artist
+  Night or your own vibes, scrolling sideways: OK plays one made today, or makes it first), Jump back in (what you played lately, albums included), Your mixes, Rediscover, Radios, Your playlists, Artist
   radios, Recently added, Your genres and Random picks. A radio starts playing straight away. Rows fill the screen: a
   row of only two or three is wide cards, a third of the screen each, with the cover beside the name. Coming back to
   Home, its rows are there at once, and brought up to date a moment later.
