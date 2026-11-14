@@ -561,12 +561,23 @@ fun StreamingDataScreen(nav: NavController) {
                 Hint("While a song plays, Siansa loads the next ones, one at a time, so they start at once and keep playing if the connection drops. Fewer means less data. Only original files are loaded ahead.")
                 if (settings.songCacheMb <= 0) Hint("The song cache is off (below), so up to 3 songs are loaded ahead, and each is removed once it has played.")
                 PreloadRow("On Wi-Fi", settings.preloadWifi.coerceIn(preloadChoices), "preload-wifi", preloadChoices) { graph.settings.save(graph.settings.current.copy(preloadWifi = it)) }
-                PreloadRow("On mobile data", settings.preloadMobile.coerceIn(preloadChoices), "preload-mobile", preloadChoices) { graph.settings.save(graph.settings.current.copy(preloadMobile = it)) }
+                // A TV has no mobile data (as Streaming quality above).
+                if (!tv) PreloadRow("On mobile data", settings.preloadMobile.coerceIn(preloadChoices), "preload-mobile", preloadChoices) { graph.settings.save(graph.settings.current.copy(preloadMobile = it)) }
             }
 
             HorizontalDivider()
-            val songSummary = if (settings.songCacheMb <= 0) "Off" else u?.let { "${formatBytes(it.songs)} of ${formatMb(settings.songCacheMb)}" } ?: formatMb(settings.songCacheMb)
+            // The TV sets its own size (StorageBudget, issue #1104): the sizes to pick from did nothing there.
+            val tvSongsMb = if (tv) app.siansa.data.StorageBudget.ofTv(context).songsMb else null
+            val songSummary = when {
+                tvSongsMb != null -> u?.let { "${formatBytes(it.songs)} of ${formatMb(tvSongsMb)}" } ?: formatMb(tvSongsMb)
+                settings.songCacheMb <= 0 -> "Off"
+                else -> u?.let { "${formatBytes(it.songs)} of ${formatMb(settings.songCacheMb)}" } ?: formatMb(settings.songCacheMb)
+            }
             FoldSection("Song cache", songSummary) {
+            if (tvSongsMb != null) {
+                Hint("Songs are kept on the TV as they play, so replays start at once. Siansa sets how much by the room the TV has.")
+                usage.valueOrNull()?.let { u -> Text("In use: ${formatBytes(u.songs)} of ${formatMb(tvSongsMb)}", style = MaterialTheme.typography.bodyLarge) }
+            } else {
             Hint("Songs are kept on the phone as they play, so replays and skips start at once and survive a bad connection. Only original-quality streams are kept. Off keeps nothing once it has played.")
             usage.valueOrNull()?.let { u ->
                 Text(
@@ -596,7 +607,8 @@ fun StreamingDataScreen(nav: NavController) {
                     )
                 }
             }
-            OutlinedButton(modifier = Modifier.focusRing(), onClick = {
+            }
+            val clearSongs = {
                 scope.launch {
                     withContext(Dispatchers.IO) {
                         val cache = graph.songCache
@@ -605,11 +617,16 @@ fun StreamingDataScreen(nav: NavController) {
                     AppLog.i("Storage", "Song cache cleared")
                     refresh++
                 }
-            }) { Text("Clear song cache") }
+                Unit
+            }
+            // A row the remote lands on (TvActionRow): under the row of sizes, a narrow button alone was skipped.
+            TvActionRow(onClick = clearSongs) { button ->
+                OutlinedButton(modifier = button.focusRing(), onClick = clearSongs) { Text("Clear song cache") }
+            }
             }
 
             // Switching the song cache off applies from the next song; a new size needs a restart.
-            if (settings.songCacheMb != songsAtStart && settings.songCacheMb > 0) {
+            if (!tv && settings.songCacheMb != songsAtStart && settings.songCacheMb > 0) {
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(Space.Medium), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
                         Text("New cache sizes apply after the app restarts.", style = MaterialTheme.typography.bodyMedium)
