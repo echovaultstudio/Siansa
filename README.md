@@ -8,6 +8,9 @@ Siansa is **open source** under the GNU GPL, version 3 or later ([LICENSE](LICEN
 
 <p align="center"><img src="docs/screenshots/hero.png" alt="Siansa: Your year, Home and now playing" width="900"></p>
 
+> ⭐ **Like Siansa? Give it a star.** Navidrome lists open-source apps on its website once they have 15 stars on
+> GitHub, so every star helps more people find Siansa. It takes one click, at the top of this page. Thank you!
+
 ## Get Siansa
 
 **Help bring Siansa to Google Play, free for everyone.** Before a new developer can publish an app for everyone, Google
