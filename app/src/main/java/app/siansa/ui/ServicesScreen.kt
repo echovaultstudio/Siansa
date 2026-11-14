@@ -25,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -148,10 +149,17 @@ internal fun bestLines(s: AppSettings, health: Map<String, ServiceCheck>): List<
     return out
 }
 
+/**
+ * The green of "working", in a shade that can be seen on [background]: the light green of the dark themes is
+ * 1.7 to 1 on a light page, so a light page gets a dark green (5 to 1).
+ */
+internal fun okGreen(background: Color): Color =
+    if (background.luminance() > 0.5f) Color(0xFF1E7A46) else Color(0xFF7FD1A0)
+
 /** A dot: green when a check passed, red when it failed, grey while unchecked or off. */
 @Composable
 internal fun ServiceDot(ok: Boolean?, modifier: Modifier = Modifier) {
-    val colour = when (ok) { true -> Color(0xFF7FD1A0); false -> MaterialTheme.colorScheme.error; null -> MaterialTheme.colorScheme.outline }
+    val colour = when (ok) { true -> okGreen(MaterialTheme.colorScheme.background); false -> MaterialTheme.colorScheme.error; null -> MaterialTheme.colorScheme.outline }
     Box(modifier.size(8.dp).background(colour, CircleShape))  // spacing: exact
 }
 
@@ -182,7 +190,7 @@ fun ServicesScreen(nav: NavController) {
                                 when (line.mark) { "ok" -> "✓"; "bad" -> "✕"; "warn" -> "!"; "dash" -> "–"; else -> "○" },
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = when (line.mark) { "ok" -> Color(0xFF7FD1A0); "bad" -> MaterialTheme.colorScheme.error; "warn" -> MaterialTheme.colorScheme.primary; else -> MaterialTheme.colorScheme.onSurfaceVariant },
+                                color = when (line.mark) { "ok" -> okGreen(MaterialTheme.colorScheme.background); "bad" -> MaterialTheme.colorScheme.error; "warn" -> MaterialTheme.colorScheme.primary; else -> MaterialTheme.colorScheme.onSurfaceVariant },
                             )
                         }
                         Column(Modifier.weight(1f)) {
