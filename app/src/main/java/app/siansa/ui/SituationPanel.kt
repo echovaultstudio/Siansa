@@ -105,11 +105,5 @@ internal fun SituationSwitches(options: SituationOptions, onChange: (SituationOp
 
 @Composable
 private fun SituationRow(title: String, detail: String, checked: Boolean, onChange: (Boolean) -> Unit) {
-    Row(Modifier.fillMaxWidth().padding(vertical = Space.Small).testTag("situation-$title"), verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f).padding(end = Space.Medium)) {
-            Text(title, style = MaterialTheme.typography.bodyLarge)
-            Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        Switch(checked = checked, onCheckedChange = onChange)
-    }
+    SwitchRow(title, detail, checked, tag = "situation-$title", onChange = onChange)
 }

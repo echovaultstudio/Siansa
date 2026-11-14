@@ -772,12 +772,8 @@ private fun HeroMix(
                 // ⏸ while this mix plays: a tap pauses it, or plays on (#562).
                 val graph = LocalGraph.current
                 val card = rememberCardPlay(mix.songs)
-                FilledIconButton(
-                    onClick = { if (card.loaded) graph.player.togglePlay() else onPlay() },
-                    modifier = Modifier.size(52.dp).testTag("heroPlay"),
-                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = Accent, contentColor = OnAccent),
-                ) {
-                    Icon(if (card.playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, if (card.playing) "Pause" else "Play", Modifier.size(30.dp))
+                RoundPlayButton(card.playing, if (card.playing) "Pause" else "Play", 52.dp, 30.dp, Modifier.testTag("heroPlay")) {
+                    if (card.loaded) graph.player.togglePlay() else onPlay()
                 }
             }
         }

@@ -244,16 +244,13 @@ private fun BookCard(book: Book, progress: BookProgress?, label: String, onOpen:
             Cover(book.cover, 300, Modifier.size(width = CARD_COVER_WIDTH, height = 148.dp), RoundedCornerShape(8.dp))
             if (progress?.started == true && !progress.finished) {
                 // ▶ on the cover continues where you were (owner's decision on #521).
-                FilledIconButton(
-                    onClick = { graph.bookPlayer.playOrToggle(book, progress.currentSec); AppLog.i("Books", "Continue \"${book.title}\" from Home") },
-                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = Space.Small).size(40.dp).testTag("bookContinue"),
-                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = Accent, contentColor = OnAccent),
-                ) {
-                    // ⏸ while this book plays: the button pauses it (#553).
-                    val playing by graph.bookPlayer.state.collectAsStateWithLifecycle()
-                    val now = playing.book?.id == book.id && playing.playing
-                    Icon(if (now) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, if (now) "Pause ${book.title}" else "Continue ${book.title}", Modifier.size(24.dp))
-                }
+                // ⏸ while this book plays: the button pauses it (#553).
+                val playing by graph.bookPlayer.state.collectAsStateWithLifecycle()
+                val now = playing.book?.id == book.id && playing.playing
+                RoundPlayButton(
+                    now, if (now) "Pause ${book.title}" else "Continue ${book.title}", 40.dp, 24.dp,
+                    Modifier.align(Alignment.BottomCenter).padding(bottom = Space.Small).testTag("bookContinue"),
+                ) { graph.bookPlayer.playOrToggle(book, progress.currentSec); AppLog.i("Books", "Continue \"${book.title}\" from Home") }
             }
         }
         // The words start a page's gap after the cover, which sits a page's gap in: the cover's width plus both.

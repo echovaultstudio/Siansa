@@ -485,3 +485,27 @@ fun SwitchRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
         Switch(checked = checked, onCheckedChange = null)
     }
 }
+
+/**
+ * A switch with a line under its name saying what it does: the one way such a row is built (six pages each had
+ * their own, with different gaps and some switching only on the switch). The whole row switches, as [SwitchRow]
+ * above; [tag] names the row for tests.
+ */
+@Composable
+fun SwitchRow(label: String, hint: String, checked: Boolean, modifier: Modifier = Modifier, tag: String? = null, onChange: (Boolean) -> Unit) {
+    Row(
+        modifier.fillMaxWidth()
+            .then(if (tag != null) Modifier.testTag(tag) else Modifier)
+            .toggleable(checked, role = Role.Switch, onValueChange = onChange)
+            .focusRing(MaterialTheme.shapes.small)
+            .padding(vertical = Space.Small),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(label, style = MaterialTheme.typography.bodyLarge)
+            Text(hint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Spacer(Modifier.width(Space.Medium))
+        Switch(checked = checked, onCheckedChange = null)
+    }
+}
