@@ -629,8 +629,8 @@ internal fun AudioMuseFields(graph: AppGraph, draft: AppSettings, onChange: (App
     TestRow(result) { test(graph, draft, scope, { result = it }, "AudioMuse") { s -> testAudioMuse(graph, s) } }
 }
 
-/** Siansa Beats' card shows in Siansa Dev (and test builds) first, not yet in the app everyone has. */
-internal val BEATS_OFFERED: Boolean = BuildConfig.BUILD_TYPE != "release"
+/** Whether Siansa Beats' card shows: in every build now ([app.siansa.data.Offered]). */
+internal val BEATS_OFFERED: Boolean = app.siansa.data.Offered.beats
 
 internal fun beatsLine(ready: Boolean): String = if (ready) "Beats, loudness and genres · set up" else "Beats, loudness and genres · not set up"
 
@@ -642,7 +642,7 @@ internal fun beatsLine(ready: Boolean): String = if (ready) "Beats, loudness and
 internal fun BeatsFields(graph: AppGraph, draft: AppSettings, onChange: (AppSettings) -> Unit) {
     val scope = rememberCoroutineScope()
     var result by remember { mutableStateOf<String?>(null) }
-    Hint("Measures each song's beats, loudness and key for DJ blends and smooth fades, and sorts songs into genres. Leave the address empty to use the Siansa plugin on AudioMuse instead, or the songs' tags.")
+    Hint("Measures each song's beats, loudness and key for DJ blends and smooth fades, and sorts songs into genres. Leave the address empty to use the Siansa plugin on AudioMuse-AI instead, or the songs' tags.")
     Field("Server address", draft.beatsUrl, "192.168.1.10:8090") { onChange(draft.copy(beatsUrl = it)) }
     SecretField("API key or password", draft.beatsKey) { onChange(draft.copy(beatsKey = it)) }
     Hint("Only if Siansa Beats asks for one (BEATS_API_KEY or BEATS_PASSWORD).")

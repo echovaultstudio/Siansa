@@ -60,7 +60,7 @@ class DjReady(private val now: () -> Long = System::currentTimeMillis) {
         /** The longer reason, for a message when a DJ mix is asked for and can't start. */
         fun explain(problem: String): String = when (problem) {
             "Needs Siansa Beats" -> "A DJ mix needs Siansa Beats (Settings › Connections): its beat grids for the blends, and each song's tempo, key and energy to put them in order."
-            NEEDS_SOUND -> "A DJ mix needs Siansa Beats 0.25 or newer with the songs' sound: on its page, Setup › AudioMuse-AI takes it over."
+            NEEDS_SOUND -> "A DJ mix needs Siansa Beats 0.25 or newer with the songs' sound, which it works out as it analyses your library."
             "Checking…" -> "Still checking for Siansa Beats: try again in a moment."
             else -> "A DJ mix needs Siansa Beats, which can't be reached right now."
         }

@@ -141,7 +141,7 @@ fun CardsSettingsScreen(nav: NavController) {
             Spacer(Modifier.height(Space.Medium))
             HorizontalDivider()
             Heading("Custom cards")
-            Hint("Cards of your own on Home, in its Your cards section (move it under Arrange Home). A card lists songs or whole albums: by a sound described to AudioMuse, or by rules on your library, like a record label, years or a genre, each one to include or leave out. Tap a card to change it.")
+            Hint("Cards of your own on Home, in its Your cards section (move it under Arrange Home). A card lists songs or whole albums: by a sound you describe in words, or by rules on your library, like a record label, years or a genre, each one to include or leave out. Tap a card to change it.")
             val pins = pinned.orEmpty()
             if (pins.isEmpty()) Hint("No custom cards yet.")
             pins.forEachIndexed { i, card ->

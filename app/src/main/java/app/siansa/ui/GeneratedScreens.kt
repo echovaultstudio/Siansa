@@ -224,7 +224,7 @@ fun RadioScreen(nav: NavController, kind: String, key: String) {
         barExtras = { RadioHeart(nav, "$title radio", colors) },
         header = {
             PicksRow(
-                (when (kind) { "mood" -> "Sound radio"; "centre" -> "AudioMuse mood radio"; else -> "Genre radio" }) + (songs.valueOrNull()?.let { " · ${it.size} songs" } ?: ""),
+                (when (kind) { "mood" -> "Sound radio"; "centre" -> "Mood radio"; else -> "Genre radio" }) + (songs.valueOrNull()?.let { " · ${it.size} songs" } ?: ""),
                 onNewPicks = { round++ },
             ) { RadioHeart(nav, "$title radio", colors, onBar = false) }
         },
