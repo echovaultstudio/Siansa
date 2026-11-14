@@ -3,7 +3,8 @@
 echovaultstudio/siansa-beats, reading the showcase's Navidrome, with a stand-in for the beat model (PyTorch and the
 model files would take the run's time and disk). The stand-in gives every song a steady grid, four beats a bar, at
 one of a few close tempos, so DJ mixes can be started and blended. Loudness, fades and keys are measured for real.
-Genres and "what songs sound like" aren't in it: the app takes those from the songs' tags and the AudioMuse-AI stand-in.
+The sound models are stood in for too (Hearer): each song gets vectors of its own. Genres aren't in it: the app
+takes those from the songs' tags.
 
     python3 beats_service.py <siansa-beats checkout>/beats <port> <Navidrome address> <data folder>
 
@@ -29,6 +30,33 @@ class Tracker:
         return beats, beats[::4]
 
 
+class Hearer:
+    """A stand-in for the models that hear a song's sound (MusiCNN and CLAP, hundreds of megabytes): each song gets
+    vectors of its own, from its file, and a middling energy. A DJ mix needs the songs' sound to put them in order."""
+
+    available, loaded, load_seconds = True, True, 0.0
+
+    def __call__(self, path):
+        import hashlib
+
+        import numpy as np
+
+        with open(path, "rb") as f:
+            seed = int.from_bytes(hashlib.sha256(f.read()).digest()[:8], "little")
+        rng = np.random.default_rng(seed)
+        clap = rng.normal(size=512).astype(np.float32)
+        clap /= np.linalg.norm(clap)
+        return {"musicnn": rng.normal(size=200).astype(np.float32).tobytes(), "clap": clap.tobytes(),
+                "moods": "electronic:0.500,chillout:0.400", "other": "danceable:0.50,happy:0.50,relaxed:0.50",
+                "energy": float(rng.uniform(0.35, 0.75))}
+
+    def unload(self):
+        return False
+
+    def feelings(self):
+        return None
+
+
 def call(base, path, body=None):
     request = urllib.request.Request(base + path, data=None if body is None else json.dumps(body).encode(),
                                      headers={"Content-Type": "application/json"}, method="GET" if body is None else "POST")
@@ -44,7 +72,7 @@ def main(code, port, navidrome, data):
     os.makedirs(data, exist_ok=True)
     log.setup("info")
     app = App(Config({"NAVIDROME_URL": navidrome, "NAVIDROME_USER": os.environ.get("ND_USER", "admin"), "NAVIDROME_PASSWORD": os.environ.get("ND_PASSWORD", "admin"),
-                      "DATA_DIR": data, "PORT": str(port)}), tracker=Tracker())
+                      "DATA_DIR": data, "PORT": str(port)}), tracker=Tracker(), hearer=Hearer())
     app.worker.start()
     threading.Thread(target=lambda: make_server(app, host="0.0.0.0", port=port).serve_forever(), daemon=True).start()
 
@@ -65,9 +93,10 @@ def main(code, port, navidrome, data):
     while time.time() < end:
         caps = call(base, "/api/v1/capabilities")["features"]
         grids, loud = caps["beat_grids"]["songs"], caps["loudness"]["songs"]
-        print(f"Siansa Beats: {grids} grids, {loud} loudness", flush=True)
+        heard = call(base, "/api/status")["sound"]["sound"]
+        print(f"Siansa Beats: {grids} grids, {loud} loudness, {heard} heard", flush=True)
         # Every song with its grid and loudness (a song or two the stand-in can't read doesn't hold it up).
-        if wanted and grids >= wanted - 2 and loud >= wanted - 2:
+        if wanted and min(grids, loud, heard) >= wanted - 2:
             break
         time.sleep(5)
     print("Siansa Beats ready", flush=True)
