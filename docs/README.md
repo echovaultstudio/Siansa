@@ -9,9 +9,10 @@ the hood, and what to do when something goes wrong.
 ## Start here
 
 - [Getting started](getting-started.md): what you need, installing, first setup.
-- [Install and report a problem](testing.md): Google Play and F-Droid, the AudioMuse-AI plugin, how to report a bug.
+- [Install and report a problem](testing.md): Google Play and F-Droid, how to report a bug.
 - [Servers, users and libraries](servers-and-users.md): Navidrome, Jellyfin and Emby, several users, the source filter.
-- [AudioMuse-AI and the Siansa plugin](audiomuse.md): the smart parts and how to connect them.
+- [Siansa Beats](siansa-beats.md): the companion service behind the smart parts, and how to connect it.
+- [AudioMuse-AI and the Siansa plugin](audiomuse.md): the other way to the smart parts, for those who use AudioMuse-AI.
 
 ## Using Siansa
 

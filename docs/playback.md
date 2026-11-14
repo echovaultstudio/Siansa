@@ -380,7 +380,7 @@ takes in one list. Picking a song still plays the whole list from it; search for
 loaded by the phone and handed to the car, so the car never needs to reach your server.
 
 **Siansa not in Android Auto?** Android Auto only lists apps installed from Google Play, unless you allow others.
-Siansa from F-Droid, GitHub or Siansa Dev needs this once:
+Siansa from F-Droid, or Siansa Dev, needs this once:
 
 1. On the phone, open Android Auto's settings (**Settings › Connected devices › Connection preferences › Android
    Auto**, or search the phone's settings for "Android Auto").

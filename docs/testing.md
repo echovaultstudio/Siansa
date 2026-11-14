@@ -48,7 +48,7 @@ Open Siansa, go to **Settings**, enter these, use **Test** next to each, then **
 
 1. **Your music server**: Navidrome or Emby. Address (for example `http://192.168.1.10:4533`), user name, password.
 2. **AudioMuse-AI**: its address (for example `http://192.168.1.10:8000`) and its API token if you use one.
-   If your AudioMuse-AI serves several music servers, also fill in **Server name in AudioMuse**.
+   If your AudioMuse-AI serves several music servers, also fill in **Server name in AudioMuse-AI**.
 3. Optional: **AI**: the service, its key and model.
 
 ## Install the plugin in AudioMuse-AI

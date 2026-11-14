@@ -91,7 +91,7 @@ Both update on their own. Or build it from this source (below): a build of your 
    under Settings › Sound. It measures each song's loudness and how it starts and ends, for
    levelling and smooth crossfades, and finds similar albums and artists.
 
-Inside the app, with **Settings › Help › Debug logs** on, the log records each start (version, phone, settings that change behaviour), why the app last closed (crash, freeze, killed for memory, swiped away; Android 11+), every error in background work, playback decisions, downloads and covers. **Report a problem** on the same page sends it with your words.
+Inside the app, with **Settings › Help & feedback › Debug logs** on, the log records each start (version, phone, settings that change behaviour), why the app last closed (crash, freeze, killed for memory, swiped away; Android 11+), every error in background work, playback decisions, downloads and covers. **Report a problem** on the same page sends it with your words.
 
 ## Quality checks
 
@@ -124,7 +124,7 @@ To build locally: `gradle :app:assembleRelease` with Gradle 8.14+, JDK 17 and th
 
 ## Contributing and reporting
 
-Bug reports and feature requests go in this repository's [issues](issues), or **Settings › Help › Report a problem** in the app, which sends the log along. Pull requests are welcome here: one issue per pull request, with a note in `changelog.d/` and tests for what changes (see `CLAUDE.md` for the conventions CI checks).
+Bug reports and feature requests go in this repository's [issues](issues), or **Settings › Help & feedback › Report a problem** in the app, which sends the log along. Pull requests are welcome here: one issue per pull request, with a note in `changelog.d/` and tests for what changes (see `CLAUDE.md` for the conventions CI checks).
 
 ## Licence
 

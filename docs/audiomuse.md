@@ -1,5 +1,8 @@
 # AudioMuse-AI and the Siansa plugin
 
+> New to Siansa? [Siansa Beats](siansa-beats.md) is the recommended way to the smart parts. This page is for those
+> who use AudioMuse-AI.
+
 [AudioMuse-AI](https://github.com/NeptuneHub/AudioMuse-AI) runs on your own server next to your music server. It
 listens to every song once (its "analysis") and can then answer questions like "what sounds like this song?" or
 "find songs that sound like *rainy jazz piano*". Siansa asks it those questions. Your music never leaves your
@@ -30,7 +33,7 @@ how it starts and ends, and similar albums and artists.
 2. If AudioMuse-AI has a login: either an **API token**, or its **user name and password**.
 3. **Test** runs a text search ("calm piano") to check it all works, then **Save**.
 
-Only if AudioMuse-AI serves more than one music server: **Server name in AudioMuse**, in the card of your music
+Only if AudioMuse-AI serves more than one music server: **Server name in AudioMuse-AI**, in the card of your music
 server under **Servers** (see below).
 
 The AudioMuse-AI connection is the same for every user. The server name is kept per user (see below).
@@ -103,7 +106,7 @@ AudioMuse-AI 3 can serve several music servers (for example Navidrome and Emby).
 name** in AudioMuse-AI (Setup › Music Servers). Siansa must name the right server in every request, or AudioMuse
 answers with the other server's songs or says it doesn't know the song.
 
-In **Settings › Connections**, in the card of your music server, **Server name in AudioMuse** is its name,
+In **Settings › Connections**, in the card of your music server, **Server name in AudioMuse-AI** is its name,
 as AudioMuse-AI shows it (capitals don't matter). Leave it empty for AudioMuse-AI's default server. Each user keeps
 their own: enter the Emby server's name in your Emby user's card, and Navidrome's in your Navidrome user's.
 
@@ -122,42 +125,6 @@ straight away, so more servers don't make it take longer.
 
 ## Siansa Beats
 
-Siansa Beats is a separate service (its own container, next to Navidrome) that finds every beat and downbeat of each
-song, measures its loudness, fades and key, and sorts songs into genres by their sound. Siansa asks it directly:
-set its address in **Settings › Connections › Siansa Beats**. Then levelling, smart crossfades, DJ blends and the
-genres come from Siansa Beats, and the Siansa plugin isn't needed for them.
-
-**From Siansa Beats 0.25, it also answers what songs sound like.** Siansa Beats works this out from the songs
-itself (from 0.43 it no longer connects to AudioMuse-AI), and Siansa asks Siansa Beats first for:
-
-- songs like a song (song radio, Similar songs, Keep playing, Wind down),
-- similar albums and "Fans also like",
-- Song path and Flow,
-- radios blended from several songs, and the mood radios,
-- Your sound (your sonic fingerprint) and the mixes made from it,
-- each song's tempo, key, moods and energy, which DJ mixes and Keep playing choose by.
-
-**From Siansa Beats 0.26, it also finds music from a description**, with the same models AudioMuse-AI uses: the
-mood radios (Chill, Energy, Focus…), "Describe what you want to hear" in Flow, vibes and their sliders, the daily
-mixes made from a description, cards made from a sound, and "Songs that sound like…" in Search.
-
-With Siansa Beats answering these, **AudioMuse-AI can be left out of Siansa's own settings**: its address can be
-empty and all of the above still work.
-
-When Siansa Beats can't answer (a song whose sound it doesn't have yet) and AudioMuse-AI is set up in Siansa,
-AudioMuse-AI is asked, as before. Without Siansa Beats nothing changes.
-
-Without Siansa Beats set up, everything works as before: through the Siansa plugin when it's installed, otherwise
-from the songs' tags. A DJ mix is only offered when beat grids are there (from Siansa Beats or through its plugin)
-and AudioMuse-AI answers.
-
-Songs Siansa Beats analysed before version 0.20 are measured for loudness, fades and key while it has nothing else
-to do; until then they're levelled by their tags.
-
-**Emby and Jellyfin.** Siansa Beats 0.23 reads Emby and Jellyfin as well as Navidrome, several servers at once and
-several users of one: add them on its page under **Setup › Music servers** and tick their libraries. A song two
-servers have (the same files) is analysed once, so adding Emby or Jellyfin beside a Navidrome that's already analysed
-takes a read of the library, not a new analysis. Siansa tells Siansa Beats which server it plays from (by its kind,
-your user name and its address), so levelling, crossfades, DJ blends and genres work whichever of them you're signed
-in to. **Test** under Settings › Connections › Siansa Beats says when Siansa Beats doesn't read your server yet.
-
+Siansa Beats does everything on this page by itself, and more (DJ mixes, genres from the sound, your listening
+history), with no AudioMuse-AI: see [Siansa Beats](siansa-beats.md). With both set up, Siansa asks Siansa Beats first
+and AudioMuse-AI when Siansa Beats can't answer.
