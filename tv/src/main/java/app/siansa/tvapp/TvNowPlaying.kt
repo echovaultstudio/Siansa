@@ -92,6 +92,7 @@ fun TvNowPlaying() {
     val liked = song != null && (likes[song.id] ?: song.starred)
     val nav = app.siansa.ui.LocalNav.current
     val radioSeed by graph.songRadio.seed.collectAsStateWithLifecycle()
+    val listMix by app.siansa.mix.AlbumDjMix.playing.collectAsStateWithLifecycle()
     var menu by remember { mutableStateOf(false) }
     var pickPlaylist by remember { mutableStateOf(false) }
     val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
@@ -192,7 +193,10 @@ fun TvNowPlaying() {
         }
         // Siansa's logo, except with the lyrics open: it sat over their last lines.
         // Its half circles turn round the bars like a record while a DJ mix plays (the owner, 14 Nov), at 33⅓.
-        val djMix = radioSeed != null && graph.songRadio.mode == app.siansa.mix.ContinuousMode.DJ
+        // Either kind of DJ mix, as now playing on the phone has it: a DJ radio from a song, or a DJ mix of an album or a
+        // list of songs (AlbumDjMix), which the radio's seed doesn't show.
+        val djMix = (radioSeed != null && graph.songRadio.mode == app.siansa.mix.ContinuousMode.DJ) ||
+            (state.current?.id?.let { it in listMix } == true)
         if (showsGuide(panel)) TvBrand(spinning = djMix && state.isPlaying, modifier = Modifier.align(Alignment.BottomEnd).padding(end = TV_EDGE * 2, bottom = Space.Section))
     }
     val snack = app.siansa.ui.LocalSnack.current
