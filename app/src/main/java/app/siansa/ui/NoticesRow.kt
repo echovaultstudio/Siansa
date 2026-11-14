@@ -16,6 +16,7 @@ import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.BarChart
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.SystemUpdate
 import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Icon
@@ -193,6 +194,7 @@ private fun NoticePillContent(icon: ImageVector, text: String) {
 
 internal fun noticeIcon(kind: NoticeKind): ImageVector = when (kind) {
     NoticeKind.NEEDS_YOU -> Icons.Rounded.Warning
+    NoticeKind.UPDATE -> Icons.Rounded.SystemUpdate
     NoticeKind.CARRY_ON -> Icons.Rounded.PlayArrow
     NoticeKind.NEW_ALBUMS -> Icons.Rounded.Album
     NoticeKind.YOUR_MONTH -> Icons.Rounded.BarChart
@@ -204,6 +206,9 @@ internal fun noticeIcon(kind: NoticeKind): ImageVector = when (kind) {
 private suspend fun noticeCandidates(graph: AppGraph, settings: AppSettings, syncFailed: Boolean): List<Notice> = buildList {
     val today = LocalDate.now()
     if (syncFailed) add(Notices.needsYou())
+    if (settings.notices.modeOf(NoticeKind.UPDATE) != app.siansa.mix.NoticeMode.OFF) {
+        app.siansa.update.UpdateCheck.newer(graph.app, graph.http)?.let { add(Notices.update(it)) }
+    }
     if (settings.booksReady) {
         try {
             // Progress is only loaded by the Books screens otherwise: without this, Carry on missed on a cold start.
