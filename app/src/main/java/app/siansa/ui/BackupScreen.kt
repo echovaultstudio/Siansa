@@ -97,9 +97,7 @@ fun BackupScreen(nav: NavController) {
             verticalArrangement = Arrangement.spacedBy(Space.Medium),
         ) {
             Hint(
-                "A backup holds your settings, vibes, mixes, play history, Home and library layout, and anything else " +
-                    "you set up in Siansa. Passwords, tokens and API keys are never included: after restoring on a new phone, " +
-                    "enter them again under Settings › Connections. Your library comes back with the next sync.",
+                "A backup holds your settings, vibes, mixes, play history and layout. Passwords, tokens and API keys are never included: enter them again under Settings › Connections after restoring.",
             )
             Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
                 Button(enabled = !busy, onClick = { saver.launch("siansa-backup-${stamp()}.json") }) {

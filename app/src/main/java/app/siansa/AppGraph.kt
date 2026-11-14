@@ -319,7 +319,15 @@ class AppGraph(val app: Application) {
     /** Which mini player shows: the player started last (beta #45). */
     val activePlayer: ActivePlayer by lazy { ActivePlayer(scope, player.state, bookPlayer.state) }
     /** Siansa Beats, asked directly when it's set up (Siansa Dev, the owner, 10 Nov). */
-    val beats = BeatsApi(http) { settings.current }
+    // Users shown together are logins of their own to Siansa Beats, as to AudioMuse-AI above: a shown user's songs
+    // are asked about under that user's login (the owner, 14 Nov).
+    val beats = BeatsApi(
+        http,
+        whoseSongs = { ids ->
+            val user = audioMuseUserFor(ids, { guests.ownerOf(it) }, Users.active, guests.shown.value, library.ownHidden.value)
+            if (user == Users.active) settings.current else guests.settingsOf(user).current
+        },
+    ) { settings.current }
 
     /**
      * A GET of the Siansa Beats (dev) plugin's [pluginPath], answered by Siansa Beats itself when it's set up (its v1
@@ -540,11 +548,14 @@ class AppGraph(val app: Application) {
 
     init {
         val prefs = app.getSharedPreferences("beats_sound", android.content.Context.MODE_PRIVATE)
-        BeatsSound.restore(prefs.getStringSet("answers", emptySet()).orEmpty())
-        BeatsSound.onChanged = { paths ->
+        // Its own path for each answer (Siansa Beats 0.44), kept as "name=path".
+        val own = prefs.getStringSet("paths", emptySet()).orEmpty().mapNotNull { it.split("=", limit = 2).takeIf { p -> p.size == 2 }?.let { p -> p[0] to p[1] } }.toMap()
+        BeatsSound.restore(prefs.getStringSet("answers", emptySet()).orEmpty(), own)
+        BeatsSound.onChanged = { paths, where ->
             AppLog.i("Beats", if (paths.isEmpty()) "Siansa Beats doesn't answer what songs sound like (yet)"
-            else "Siansa Beats answers what songs sound like: ${paths.joinToString { it.removePrefix("/api/") }}")
-            QuietWrites.save(prefs) { putStringSet("answers", paths) }
+            else "Siansa Beats answers what songs sound like: ${paths.joinToString { it.removePrefix("/api/") }}" +
+                if (where.isEmpty()) " (at the paths from before 0.44)" else " (at its own paths)")
+            QuietWrites.save(prefs) { putStringSet("answers", paths).putStringSet("paths", where.map { (name, path) -> "$name=$path" }.toSet()) }
         }
         // Asked at the start and whenever Siansa Beats' address or key changes, so what the app offers is current.
         scope.launch(CoroutineName("beats-sound")) {

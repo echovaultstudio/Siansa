@@ -38,7 +38,7 @@ import kotlin.math.pow
 import kotlin.math.roundToInt
 
 /**
- * Settings › Playback › Equaliser: on/off, presets, ten bands and the one pre-amp. Levelling (ReplayGain) is
+ * Settings › Sound › Equaliser: on/off, presets, ten bands and the one pre-amp. Levelling (ReplayGain) is
  * under Crossfade and levelling (issue #214).
  */
 @Composable

@@ -44,7 +44,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import app.siansa.data.AppSettings
 import app.siansa.data.ReplayGainMode
-import app.siansa.playback.BeatMatchMode
 import app.siansa.playback.CrossfadeMode
 import app.siansa.playback.Levelling
 import app.siansa.playback.LoudnessSource
@@ -83,7 +82,7 @@ fun CrossfadeScreen(nav: NavController) {
             Hint(if (settings.loudnessSource == LoudnessSource.PLUGIN && settings.beatsReady) "Measured by Siansa Beats." else settings.loudnessSource.detail + ".")
             if (settings.loudnessSource == LoudnessSource.PLUGIN) {
                 if (!settings.audioMuseReady && !settings.beatsReady) {
-                    Hint("Set up Siansa Beats or AudioMuse in Settings › Connections first. Until then, song tags are used.")
+                    Hint("Set up Siansa Beats or AudioMuse-AI in Settings › Connections first. Until then, song tags are used.")
                 } else {
                     Row(Modifier.tvFocusGroup(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
                         OutlinedButton(modifier = Modifier.focusRing(), onClick = {
@@ -113,10 +112,7 @@ fun CrossfadeScreen(nav: NavController) {
                 FoldSection("Dolby songs on your receiver", if (louder == 0) "As they are" else "+$louder dB", tag = "dolby-louder") {
                     DolbyLouderRow(louder, graph.settings::setDolbyLouder)
                     Hint(
-                        "Dolby Atmos and Dolby Digital Plus songs go to your receiver as they are, and most play quieter than other " +
-                            "music at the same volume. Raise them until they match: the receiver plays them louder, the sound itself " +
-                            "isn't changed. A song can't go past the receiver's full level, so some get less. Not for Dolby TrueHD, " +
-                            "DTS or plain Dolby Digital.",
+                        "Dolby Atmos and Dolby Digital Plus songs often play quieter than other music. Raise them until they match: the receiver plays them louder, the sound isn't changed. Not for Dolby TrueHD, DTS or plain Dolby Digital.",
                     )
                 }
                 HorizontalDivider()
@@ -176,7 +172,7 @@ private fun levellingHint(s: AppSettings): String = when {
 internal fun crossfadeLengthHint(s: AppSettings): String? =
     if (s.crossfade != CrossfadeMode.SMART || s.loudnessSource != LoudnessSource.PLUGIN) null
     else "The longest a fade can be. Most are shorter: the songs decide. The full length is used for songs not measured yet" +
-        if (s.beatMatch != BeatMatchMode.OFF) " and for a quiet intro without a beat in DJ blends." else "."
+        " and for a quiet intro without a beat in DJ blends."
 
 /** The section's summary: Smart has nothing to set; Fixed says its length and bars. */
 internal fun crossfadeFoldSummary(s: AppSettings): String = when (s.crossfade) {
@@ -207,59 +203,6 @@ internal fun FixedBlendBars(bars: Int, onBars: (Int) -> Unit) {
         }
     }
     Hint("8 bars is about 15 seconds at 128 BPM. A blend never takes more than a third of a song.")
-}
-
-/** The beat-matched blends' choice, its hint, the echo at the end (issue #759), the bass swap (issue #807) and keeping the key (issue #816), for the page and its screenshot. */
-@Composable
-internal fun BeatMatchSection(
-    mode: BeatMatchMode,
-    bars: Int,
-    echo: Boolean,
-    bassSwap: Boolean,
-    keepKey: Boolean,
-    onMode: (BeatMatchMode) -> Unit,
-    onBars: (Int) -> Unit,
-    onEcho: (Boolean) -> Unit,
-    onBassSwap: (Boolean) -> Unit,
-    onKeepKey: (Boolean) -> Unit,
-    /** Who measures the beats: [app.siansa.playback.measurer]. */
-    measurer: String = "the Siansa plugin",
-) {
-    BeatMatchRow(mode, onMode)
-    Hint(beatMatchHint(mode, measurer))
-    if (mode != BeatMatchMode.OFF) {
-        Text("Blend length", style = MaterialTheme.typography.bodyLarge)
-        Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
-            AppSettings.BLEND_BAR_CHOICES.forEach { n ->
-                FilterChip(selected = bars == n, onClick = { onBars(n) }, label = { Text("$n bars") })
-            }
-        }
-        Hint("Apart from the crossfade length: 8 bars is about 15 seconds at 128 BPM. A blend never takes more than a third of a song.")
-        SwitchRow("Bass swap", bassSwap, onBassSwap)
-        Hint("Over the first half of a blend the old song's bass is taken away as the new song's comes in, as a DJ does with the EQ, so two kick drums never play at once.")
-        if (AppSettings.BLEND_EXTRAS) {
-            SwitchRow("Echo at the end", echo, onEcho)
-            Hint("Over the last bar of a blend the old song's last beats repeat on the beat and die away, as a DJ echoes a track out.")
-            SwitchRow("Keep the key", keepKey, onKeepKey)
-            Hint("The next song plays a touch faster or slower to match. Off, its pitch moves with it, like a DJ's pitch fader. On, its key is kept by stretching the sound.")
-        }
-    }
-}
-
-private fun beatMatchHint(mode: BeatMatchMode, measurer: String): String = when (mode) {
-    BeatMatchMode.OFF -> "Fades don't follow the beat. Two songs that both keep a beat get a short fade, so their beats don't clash for long."
-    BeatMatchMode.DJ_RADIO -> "In DJ radio, a song that keeps a beat blends into the next one like a DJ mix: phrase on phrase where $measurer found the phrases a song is built from, else bar for bar. The next song comes in on its first phrase, a touch faster or slower to match, then eases back to its own speed."
-    BeatMatchMode.EVERYWHERE -> "Every smart crossfade blends phrase on phrase or bar for bar when both songs keep a beat, with the next song a touch faster or slower to match (up to 8 %). Uses the beats and phrases $measurer measures."
-}
-
-/** Off, DJ radio or Everywhere: where blends are beat-matched (issue #646). */
-@Composable
-internal fun BeatMatchRow(selected: BeatMatchMode, onPick: (BeatMatchMode) -> Unit) {
-    Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
-        BeatMatchMode.entries.forEach { mode ->
-            FilterChip(selected = selected == mode, onClick = { onPick(mode) }, label = { Text(mode.label) })
-        }
-    }
 }
 
 /** The choice of where loudness and fades come from. */

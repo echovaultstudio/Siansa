@@ -73,7 +73,7 @@ private fun FingerprintPage(nav: NavController) {
     val scope = rememberCoroutineScope()
     var round by rememberSaveable { mutableIntStateOf(0) }
     val profile by loadStateFresh("fingerprint-$round") {
-        if (!graph.settings.current.soundReady) error("Set up AudioMuse in Settings to see your sonic fingerprint.")
+        if (!graph.settings.current.soundReady) error("Set up ${app.siansa.data.Offered.soundServices} in Settings › Connections to see your sonic fingerprint.")
         graph.fingerprint.today(force = round > 0)
     }
     val p = profile.valueOrNull()
@@ -120,18 +120,10 @@ private fun FingerprintPage(nav: NavController) {
                         }
                         Spacer(Modifier.weight(1f))
                         val playback = rememberListPlayback(list)
-                        FilledIconButton(
-                            onClick = { playback.press { scope.launch { graph.player.play(list.shuffled()) } } },
+                        RoundPlayButton(
+                            playback.playing, if (playback.playing) "Pause your fingerprint" else "Play your fingerprint", 52.dp, 30.dp,
                             enabled = list.isNotEmpty(),
-                            modifier = Modifier.size(52.dp),
-                            colors = IconButtonDefaults.filledIconButtonColors(containerColor = Accent, contentColor = OnAccent),
-                        ) {
-                            Icon(
-                                if (playback.playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                                if (playback.playing) "Pause your fingerprint" else "Play your fingerprint",
-                                Modifier.size(30.dp),
-                            )
-                        }
+                        ) { playback.press { scope.launch { graph.player.play(list.shuffled()) } } }
                     }
                 }
             }

@@ -1,2 +1,0 @@
-### Changed
-- **Genres by what songs sound like (Siansa Dev, with Siansa Beats).** Search's genres, a genre's page and its radio come straight from what Siansa Beats hears in each song: a song is in every genre it sounds like, and a genre's page lists all its songs. A song with the wrong genre tag no longer turns up, and a song without one does. The genre on an album's or an artist's page is still the one in its tags. Without Siansa Beats, genres go by the songs' tags, as before.

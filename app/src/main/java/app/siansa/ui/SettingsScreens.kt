@@ -147,7 +147,7 @@ fun ConnectionsScreen(nav: NavController, sourceName: String? = null, extras: Bo
             if (firstRun) {
                 Text(
                     if (fromPicker) "Enter your server's address and login. Test checks them before you save."
-                    else "Welcome! Connect your server to get started. AudioMuse and an AI service can be added now or later.",
+                    else "Welcome! Connect your server to get started. ${smartExtrasName(BEATS_OFFERED)} and an AI service can be added now or later.",
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 // A user being added: a way back to the users already set up.
@@ -176,18 +176,23 @@ fun ConnectionsScreen(nav: NavController, sourceName: String? = null, extras: Bo
             }
             // Smart extras turned down on the first run (issue #113): only the server. They're here later in Settings.
             if (extras || !firstRun) {
+                if (BEATS_OFFERED) {
+                    HorizontalDivider()
+                    Heading("Siansa Beats")
+                    BeatsFields(graph, draft) { draft = it }
+                }
                 HorizontalDivider()
-                Heading("AudioMuse-AI")
+                Heading(if (BEATS_OFFERED) "AudioMuse-AI (optional)" else "AudioMuse-AI")
                 Field("Server address", draft.audioMuseUrl, "192.168.1.10:8000") { draft = draft.copy(audioMuseUrl = it) }
-                Hint("Leave the address empty if this user has no AudioMuse.")
-                Hint("If AudioMuse has a login, use either an API token or its username and password.")
+                Hint("Leave the address empty if this user has no AudioMuse-AI.")
+                Hint("If AudioMuse-AI has a login, use either an API token or its username and password.")
                 SecretField("API token", draft.audioMuseToken) { draft = draft.copy(audioMuseToken = it) }
                 Field("Username", draft.audioMuseUser, keyboard = KeyboardType.Text) { draft = draft.copy(audioMuseUser = it) }
                 SecretField("Password", draft.audioMusePassword) { draft = draft.copy(audioMusePassword = it) }
-                Field("Server name in AudioMuse", draft.audioMuseServer, keyboard = KeyboardType.Text) { draft = draft.copy(audioMuseServer = it) }
+                Field("Server name in AudioMuse-AI", draft.audioMuseServer, keyboard = KeyboardType.Text) { draft = draft.copy(audioMuseServer = it) }
                 Hint(
-                    if (kind.embyLike) "AudioMuse reads your ${ServerWords.name(kind)} library for everything smart. If AudioMuse has more than one music server, enter this ${ServerWords.name(kind)} server's name as it is in AudioMuse. Each user keeps their own."
-                    else "Only if AudioMuse has more than one music server: this server's name as it is in AudioMuse. Leave empty for its main one. Each user keeps their own."
+                    if (kind.embyLike) "AudioMuse-AI reads your ${ServerWords.name(kind)} library for everything smart. If AudioMuse-AI has more than one music server, enter this ${ServerWords.name(kind)} server's name as it is in AudioMuse-AI. Each user keeps their own."
+                    else "Only if AudioMuse-AI has more than one music server: this server's name as it is in AudioMuse-AI. Leave empty for its main one. Each user keeps their own."
                 )
                 TestRow(audioMuseTest) { runTest({ audioMuseTest = it }) { s -> testAudioMuse(graph, s) } }
 

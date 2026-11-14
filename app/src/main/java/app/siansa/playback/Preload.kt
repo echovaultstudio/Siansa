@@ -4,7 +4,7 @@ import app.siansa.data.AppSettings
 
 /**
  * How many upcoming songs are loaded ahead into the song cache while one plays (issue #254), set apart for
- * Wi-Fi and mobile data in Settings › Playback. Fewer means fewer downloads on mobile data; more means songs
+ * Wi-Fi and mobile data in Settings › Streaming & storage. Fewer means fewer downloads on mobile data; more means songs
  * keep playing through a dropped connection. Songs are loaded one at a time, only once the current one is in.
  */
 object Preload {

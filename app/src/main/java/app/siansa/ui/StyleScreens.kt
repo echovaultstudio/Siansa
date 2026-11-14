@@ -125,26 +125,13 @@ fun NowPlayingStyleScreen(nav: NavController) {
             verticalArrangement = Arrangement.spacedBy(Space.Medium),
         ) {
             FoldSection("Buttons", if (settings.nowPlayingLyricsButton) "Lyrics, device and queue" else "Lyrics card peeking in") {
-                Row(
-                    Modifier.fillMaxWidth().clickable { setLyricsButton(graph, !settings.nowPlayingLyricsButton) },
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text("Lyrics button", style = MaterialTheme.typography.bodyLarge)
-                        Text(
-                            if (settings.nowPlayingLyricsButton) "Lyrics, where it plays and the queue under the controls"
-                            else "Classic: where it plays and the queue, with the lyrics card peeking in below",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    Spacer(Modifier.width(Space.Medium))
-                    Switch(
-                        checked = settings.nowPlayingLyricsButton,
-                        onCheckedChange = { setLyricsButton(graph, it) },
-                        modifier = Modifier.testTag("lyricsButtonSwitch"),
-                    )
-                }
+                SwitchRow(
+                    "Lyrics button",
+                    if (settings.nowPlayingLyricsButton) "Lyrics, where it plays and the queue under the controls"
+                    else "Classic: where it plays and the queue, with the lyrics card peeking in below",
+                    settings.nowPlayingLyricsButton,
+                    tag = "lyricsButtonSwitch",
+                ) { setLyricsButton(graph, it) }
             }
             HorizontalDivider()
             FoldSection("Play button", "Slides ${if (settings.playSlides.on) "on" else "off"} · grooves ${if (settings.playSlides.grooves) "on" else "off"}") {
@@ -227,17 +214,7 @@ internal fun PlaySlidesSettings(slides: PlaySlides, heading: Boolean = true, onC
 
 @Composable
 private fun StyleSwitchRow(title: String, hint: String, on: Boolean, tag: String, onChange: (Boolean) -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().clickable { onChange(!on) }.padding(vertical = Space.Medium),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.bodyLarge)
-            Text(hint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        Spacer(Modifier.width(Space.Medium))
-        Switch(checked = on, onCheckedChange = onChange, modifier = Modifier.testTag(tag))
-    }
+    SwitchRow(title, hint, on, tag = tag, onChange = onChange)
 }
 
 /** One way to slide: its arrow and name, and what it does, picked from a menu. */

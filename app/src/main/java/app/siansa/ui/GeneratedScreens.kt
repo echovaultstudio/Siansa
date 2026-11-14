@@ -58,8 +58,6 @@ import app.siansa.mix.moodRadios
 
 fun NavController.openMoodRadio(id: String) = navigate("radio/mood/${Uri.encode(id)}")
 fun NavController.openGenreRadio(name: String) = navigate("radio/genre/${Uri.encode(name)}")
-fun NavController.openCentreRadio(key: String) = navigate("radio/centre/${Uri.encode(key)}")
-fun NavController.openMoodPlaylist(text: String) = navigate("mood/${Uri.encode(text)}")
 
 /**
  * The colours of a page whose cover Siansa draws (a radio, a mood playlist, More like this playlist) from its [route],
@@ -205,7 +203,7 @@ fun RadioScreen(nav: NavController, kind: String, key: String) {
             }
             "centre" -> {
                 val c = graph.audioMuse.moodCentres().firstOrNull { AudioMuseApi.centreKey(it) == key }
-                    ?: throw IllegalStateException("AudioMuse doesn't have this mood any more")
+                    ?: throw IllegalStateException("AudioMuse-AI doesn't have this mood any more")
                 graph.radios.centre(c)
             }
             else -> graph.radios.genre(key)
@@ -226,7 +224,7 @@ fun RadioScreen(nav: NavController, kind: String, key: String) {
         barExtras = { RadioHeart(nav, "$title radio", colors) },
         header = {
             PicksRow(
-                (when (kind) { "mood" -> "Sound radio"; "centre" -> "AudioMuse mood radio"; else -> "Genre radio" }) + (songs.valueOrNull()?.let { " · ${it.size} songs" } ?: ""),
+                (when (kind) { "mood" -> "Sound radio"; "centre" -> "Mood radio"; else -> "Genre radio" }) + (songs.valueOrNull()?.let { " · ${it.size} songs" } ?: ""),
                 onNewPicks = { round++ },
             ) { RadioHeart(nav, "$title radio", colors, onBar = false) }
         },

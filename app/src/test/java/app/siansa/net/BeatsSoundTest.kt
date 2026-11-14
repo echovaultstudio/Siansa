@@ -121,12 +121,8 @@ class BeatsSoundTest {
         // One that answers some: the rest are still AudioMuse-AI's.
         BeatsSound.heard(setOf("/api/similar_tracks"))
         assertEquals(listOf("s2"), api(both).findPath("s1", "s3", 5).map { it.id })
-        // A path through the lyrics' meaning is AudioMuse-AI's own.
-        BeatsSound.heard(everything)
-        assertEquals(listOf("s2"), api(both).findPath("s1", "s3", 5, lyrics = true).map { it.id })
         assertEquals(emptyList<Pair<String, String?>>(), askedOfBeats.toList())
-        assertEquals(3, askedOfAudioMuse.size)
-        assertTrue(askedOfAudioMuse.last(), askedOfAudioMuse.last().contains("path_space=lyrics"))
+        assertEquals(2, askedOfAudioMuse.size)
     }
 
     @Test fun withoutSiansaBeatsNothingChanges() = runBlocking {
@@ -159,6 +155,39 @@ class BeatsSoundTest {
         assertEquals("/api/v1/audiomuse/api/sync?ids=a", BeatsSound.path("/api/sync?ids=a"))
     }
 
+    /**
+     * Siansa Beats 0.44 (the owner, 13 Nov) has paths of its own for what songs sound like and says them in its
+     * capabilities: the app asks there. An older one says none, and is asked where it always was.
+     */
+    @Test fun siansaBeatsIsAskedAtItsOwnPathsWhenItSaysThem() {
+        val caps = BeatsApi.Capabilities.parse(AppJson.parseToJsonElement(
+            """{"version":"0.44.0","api":1,"features":{"sound":{"available":true,"songs":46000,"prefix":"/api/v1/audiomuse",
+               "answers":["/api/similar_tracks","/api/sync","/api/clap/search"],
+               "paths":{"/api/similar_tracks":"/api/v1/sound/similar","/api/sync":"/api/v1/sound/songs",
+                        "/api/clap/search":"/api/v1/sound/search","/api/not_answered":"/api/v1/sound/else","/api/find_path":"http://elsewhere/x"}}}}""",
+        ) as JsonObject)
+        assertEquals("/api/v1/sound/similar", caps.soundPaths["/api/similar_tracks"])
+        var kept: Map<String, String>? = null
+        BeatsSound.onChanged = { _, where -> kept = where }
+        try {
+            BeatsSound.heard(caps.sound, caps.soundPaths)
+            assertEquals("/api/v1/sound/similar?item_id=s1&n=5", BeatsSound.path("/api/similar_tracks?item_id=s1&n=5"))
+            assertEquals("/api/v1/sound/songs?ids=a", BeatsSound.path("/api/sync?ids=a"))
+            assertEquals("/api/v1/sound/search", BeatsSound.path("/api/clap/search"))
+            // Only for what it answers, and only a path of its own: anything else is asked where it always was.
+            assertEquals(setOf("/api/similar_tracks", "/api/sync", "/api/clap/search"), kept!!.keys)
+            assertEquals("/api/v1/audiomuse/api/find_path?start_song_id=a", BeatsSound.path("/api/find_path?start_song_id=a"))
+            // Kept for the next start, and an older Siansa Beats (no paths) is asked under the old prefix again.
+            BeatsSound.restore(caps.sound, kept!!)
+            assertEquals("/api/v1/sound/songs?ids=a", BeatsSound.path("/api/sync?ids=a"))
+            BeatsSound.heard(caps.sound)
+            assertEquals("/api/v1/audiomuse/api/sync?ids=a", BeatsSound.path("/api/sync?ids=a"))
+            assertEquals(emptyMap<String, String>(), kept)
+        } finally {
+            BeatsSound.onChanged = null
+        }
+    }
+
     /** From the owner's log, 11 Nov: similar songs still came from Navidrome's AudioMuse-AI plugin. */
     @Test fun similarSongsAreAskedOfSiansaBeatsBeforeTheMusicServersPlugin() {
         assertEquals(app.siansa.mix.SonicRoute.BEATS, app.siansa.mix.sonicRoute(navidromeSonic = true, audioMuseReady = true, beatsSound = true))
@@ -169,17 +198,17 @@ class BeatsSoundTest {
     /** From the same log: with AudioMuse-AI's address cleared, Song path and the mix slides said "not available". */
     @Test fun theSoundFeaturesArentHeldBackByAudioMuseBeingOff() {
         val connection = ConnectionState(network = true, server = true, audioMuse = null)
-        assertEquals("AudioMuse isn't set up. Add it in Settings › Connections.", connection.soundProblem(beatsOnly))
+        assertEquals("Siansa Beats or AudioMuse-AI isn't set up. Add it in Settings › Connections.", connection.soundProblem(beatsOnly))
         BeatsSound.heard(everything)
         assertEquals(null, connection.soundProblem(beatsOnly))
         assertEquals(null, ConnectionState(audioMuse = false).soundProblem(both))  // AudioMuse-AI down: Siansa Beats answers
         assertEquals("You're offline.", ConnectionState(network = false).soundProblem(beatsOnly))
         assertEquals("Only downloaded music is on.", connection.soundProblem(beatsOnly.copy(downloadedOnly = true)))
         // The search by words is still AudioMuse-AI's, and says so plainly.
-        assertEquals("Describing music in words needs Siansa Beats 0.26 or newer, or AudioMuse (Settings › Connections).", connection.aiProblem(beatsOnly))
+        assertEquals("Describing music in words needs Siansa Beats 0.26 or newer, or AudioMuse-AI (Settings › Connections).", connection.aiProblem(beatsOnly))
         assertEquals(null, connection.aiProblem(both))
         // Without Siansa Beats, as before.
-        assertEquals("AudioMuse isn't answering.", ConnectionState(audioMuse = false).soundProblem(audioMuseOnly))
+        assertEquals("AudioMuse-AI isn't answering.", ConnectionState(audioMuse = false).soundProblem(audioMuseOnly))
     }
 
     /** The owner, 11 Nov: "only and always, don't use AudioMuse tempos": a DJ mix's song analysis is Siansa Beats' or none. */
@@ -231,5 +260,11 @@ class BeatsSoundTest {
         assertEquals(listOf("choir", "piano"), api.conceptCatalogue().categories.single().terms)
         assertEquals(listOf("piano", "choir"), api.concepts())
         assertEquals(emptyList<String>(), askedOfAudioMuse)
+    }
+
+    /** A build that doesn't offer Siansa Beats yet doesn't send anyone to set it up. */
+    @Test fun aMessageNamesOnlyTheServicesThisBuildOffers() {
+        assertEquals("Siansa Beats or AudioMuse-AI", app.siansa.data.Offered.soundServices(beats = true))
+        assertEquals("AudioMuse-AI", app.siansa.data.Offered.soundServices(beats = false))
     }
 }

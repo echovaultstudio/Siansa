@@ -45,13 +45,17 @@ class CarProgressDeviceTest {
         val what = if (kbps > 0) "a song converted to Opus $kbps" else "a song as the original file"
         graph.settings.save(graph.settings.current.copy(transcodeWifiKbps = kbps, transcodeMobileKbps = kbps))
         instrumentation.runOnMainSync { graph.player.play(listOf(song)) }
-        waitFor(30_000, { "$what to play" }) { graph.player.state.value.let { it.isPlaying && it.current?.id == song.id } }
+        // The same song may still be playing from the round before, part-way in and at the other quality: wait for
+        // this round's own stream, from its start. A jump sent before it loads is undone when it does.
+        waitFor(30_000, { "$what to play (now Opus ${graph.player.state.value.transcodeKbps})" }) {
+            graph.player.state.value.let { it.isPlaying && it.current?.id == song.id && it.transcodeKbps == kbps }
+        }
         fun length() = car.controller.metadata?.getLong(MediaMetadata.METADATA_KEY_DURATION) ?: 0L
         fun state() = car.controller.playbackState
         val told = { "$what: the car is told length ${length()} ms, position ${state()?.position} ms, speed ${state()?.playbackSpeed}, seeking ${(state()?.actions ?: 0L) and PlaybackState.ACTION_SEEK_TO != 0L}" }
         waitFor(20_000, told) {
             val s = state() ?: return@waitFor false
-            length() > 0 && s.state == PlaybackState.STATE_PLAYING && s.position >= 0 && s.playbackSpeed > 0f && s.actions and PlaybackState.ACTION_SEEK_TO != 0L
+            length() > 0 && s.state == PlaybackState.STATE_PLAYING && s.position in 0 until 30_000 && s.playbackSpeed > 0f && s.actions and PlaybackState.ACTION_SEEK_TO != 0L
         }
         println("Car test setup: " + told())
         val real = song.durationSec * 1000L

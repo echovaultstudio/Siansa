@@ -322,6 +322,34 @@ class SpacingLibraryTest : SpacingCheck() {
         assertTrue("Radio right next to Shuffle (${(shuffle.left - radio.right).value} dp)", shuffle.left - radio.right <= Space.Small + 0.5.dp)
     }
 
+    /**
+     * Artist page (the owner, 14 Nov): the release types are a bar of pills like Your Library's, starting at the page's
+     * edge, close under the buttons; with more than fit, the › that scrolls on is centred under Play.
+     */
+    @Test fun releaseTypesMoreIsUnderPlay() {
+        compose.setContent {
+            SiansaTheme {
+                Column(Modifier.width(360.dp)) {
+                    Column(Modifier.padding(horizontal = Space.Page)) {
+                        app.siansa.ui.ArtistButtons(
+                            heart = { m -> app.siansa.ui.FavouriteHeart(on = false, modifier = m, iconSize = 28.dp) { } },
+                            onRadio = {}, onShuffle = {}, playing = false, onPlay = {}, below = Space.Tight,
+                        )
+                    }
+                    ReleaseTypeTabs(AlbumCategory.entries.toList(), null, moreInset = app.siansa.ui.ARTIST_MORE_INSET) { }
+                }
+            }
+        }
+        compose.waitForIdle()
+        val play = compose.onNodeWithTag("bigPlay").getBoundsInRoot()
+        val more = compose.onNodeWithTag("releaseTypesMore").getBoundsInRoot()
+        val first = compose.onAllNodesWithTag("releaseTypeTabChosen")[0].getBoundsInRoot()
+        assertEven("The › centred under Play", (more.left + more.right) / 2, (play.left + play.right) / 2, 1.dp)
+        assertEven("The first pill at the page's edge", first.left, Space.Page, 1.dp)
+        // 4 under the buttons, 4 of the bar's, and 6 of the pill's 48 dp touch area round its 36: 14 (the mockup had 12).
+        assertEven("The pills close under the buttons", first.top - play.bottom, Space.Medium + 2.dp, 1.dp)
+    }
+
     /** Album page (issue #367): the last-played line is drawn behind its row, so the title keeps its even room. */
     @Test fun lastPlayedLineKeepsTheRowEven() {
         compose.setContent {

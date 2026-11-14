@@ -108,23 +108,6 @@ class SpacingSettingsTest : SpacingCheck() {
         assertEven("Crossfade chips", mode.top - hint.bottom, hint2.top - mode.bottom)
     }
 
-    /** Beat-matched blends (issue #646): the Off / DJ radio / Everywhere chips sit evenly between their heading and hint. */
-    @Test fun beatMatchChipsAreEvenlySpaced() {
-        compose.setContent {
-            SiansaTheme {
-                Column(verticalArrangement = Arrangement.spacedBy(app.siansa.ui.CROSSFADE_GAP)) {
-                    Box(Modifier.fillMaxWidth().height(24.dp).testTag("heading"))
-                    app.siansa.ui.BeatMatchRow(app.siansa.playback.BeatMatchMode.DJ_RADIO) { }
-                    Box(Modifier.fillMaxWidth().height(16.dp).testTag("hint"))
-                }
-            }
-        }
-        val heading = compose.onNodeWithTag("heading").getBoundsInRoot()
-        val chips = compose.onNode(hasClickAction() and hasAnyDescendant(hasText("DJ radio")), useUnmergedTree = true).getBoundsInRoot()
-        val hint = compose.onNodeWithTag("hint").getBoundsInRoot()
-        assertEven("Beat-match chips", chips.top - heading.bottom, hint.top - chips.bottom)
-    }
-
     /** Today's mix tuning (issue #776): a row of chips sits evenly between its label and the next label. */
     @Test fun todaysMixTuningChipsAreEvenlySpaced() {
         compose.setContent {
@@ -187,21 +170,6 @@ class SpacingSettingsTest : SpacingCheck() {
         // The size beside the slider is centred on it.
         val size = compose.onNodeWithTag("imageCacheSize").getBoundsInRoot()
         assertEven("Image cache size against its slider", size.top - slider.top, slider.bottom - size.bottom, 1.dp)
-    }
-
-    /** Beat-matched blends (issue #759): the 4 / 8 / 16 bars chips sit evenly between "Blend length" and their hint. */
-    @Test fun blendLengthChipsAreEvenlySpaced() {
-        compose.setContent {
-            SiansaTheme {
-                Column(verticalArrangement = Arrangement.spacedBy(app.siansa.ui.CROSSFADE_GAP)) {
-                    app.siansa.ui.BeatMatchSection(app.siansa.playback.BeatMatchMode.DJ_RADIO, 8, true, true, false, { }, { }, { }, { }, { })
-                }
-            }
-        }
-        val label = compose.onNodeWithText("Blend length").getBoundsInRoot()
-        val chips = compose.onNode(hasClickAction() and hasAnyDescendant(hasText("8 bars")), useUnmergedTree = true).getBoundsInRoot()
-        val hint = compose.onNode(hasText("Apart from the crossfade length", substring = true)).getBoundsInRoot()
-        assertEven("Blend length chips", chips.top - label.bottom, hint.top - chips.bottom)
     }
 
     /** A music server being added (issue #828): the server type chips sit evenly between their label and the hint. */

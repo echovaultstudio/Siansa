@@ -54,7 +54,7 @@ def bump(version, level="patch"):
     return f"{major}.{minor}.{patch + 1}{rest}"
 
 
-RELEASE_MARK = re.compile(r"^\s*<!--\s*release:\s*(patch|minor|major)\s*-->\s*$", re.I)
+RELEASE_MARK = re.compile(r"^\s*<!--\s*release:\s*(patch|minor|major|\d+\.\d+\.\d+)\s*-->\s*$", re.I)
 
 
 def level_of(files):
@@ -64,11 +64,27 @@ def level_of(files):
     for f in files:
         text = open(f, encoding="utf-8").read()
         asked = [RELEASE_MARK.match(l)[1].lower() for l in text.splitlines() if RELEASE_MARK.match(l)]
+        asked = [a for a in asked if a in LEVELS]  # a note that names the version itself: see named()
         found = asked + (["minor"] if re.search(r"^#{2,4}\s+Added\b", text, re.M | re.I) else [])
         for l in found:
             if LEVELS.index(l) > LEVELS.index(level):
                 level = l
     return level
+
+
+def named(files, current):
+    """The version a note names itself (<!-- release: 1.5.0 -->, the owner's choice of number), when it's above
+    [current]; the highest when several do. None when no note names one."""
+    def parts(v):
+        m = re.match(r"^(\d+)\.(\d+)\.(\d+)", v)
+        return tuple(int(x) for x in m.groups()) if m else None
+    found = []
+    for f in files:
+        for line in open(f, encoding="utf-8").read().splitlines():
+            m = RELEASE_MARK.match(line)
+            if m and parts(m[1]) and parts(current) and parts(m[1]) > parts(current):
+                found.append(m[1])
+    return max(found, key=parts) if found else None
 
 
 def combine(files):
@@ -114,7 +130,7 @@ def prepare():
     current = open("version.txt").read().strip()
     files = fragments()
     if files:
-        version = bump(current, level_of(files))
+        version = named(files, current) or bump(current, level_of(files))
         body = combine(files)
         open("version.txt", "w").write(version + "\n")
         write_changelog(version, body)

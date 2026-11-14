@@ -195,10 +195,13 @@ fun ThemesScreen(nav: NavController) {
                         }
                     }
                 }
-                HorizontalDivider()
-                FoldSection("Animated covers", if (settings.animatedCovers) "On" else "Off") {
-                    SwitchRow("Animated covers", settings.animatedCovers) { on -> graph.settings.setAnimatedCovers(on) }
-                    Hint("When an album folder has an animated cover (cover.gif or cover.webp), it moves on the album page and in now playing; lists show its first frame. Your server may not shrink an animated WebP (Navidrome can't), so it's downloaded once in full and kept on the phone.")  // server-name: ok (an example of a server that can't)
+                // Not on the TV (the owner, 14 Nov): it never plays animated covers, to save what it has.
+                if (!app.siansa.BuildConfig.TV_APP) {
+                    HorizontalDivider()
+                    FoldSection("Animated covers", if (settings.animatedCovers) "On" else "Off") {
+                        SwitchRow("Animated covers", settings.animatedCovers) { on -> graph.settings.setAnimatedCovers(on) }
+                        Hint("An animated cover (cover.gif or cover.webp in the album's folder) moves on the album page and in now playing; lists show its first frame. It's downloaded once in full and kept on the phone.")  // server-name: ok (an example of a server that can't)
+                    }
                 }
             }
         }
@@ -297,7 +300,7 @@ private fun ThemePreview(modifier: Modifier) {
             }
             Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
                 PreviewTile("Liked songs", Modifier.weight(1f), Brush.linearGradient(BrandGradient), heart = true)
-                PreviewTile("Daily mix", Modifier.weight(1f), Brush.linearGradient(listOf(MaterialTheme.colorScheme.tertiary, MaterialTheme.colorScheme.secondary)))
+                PreviewTile("Today's mix", Modifier.weight(1f), Brush.linearGradient(listOf(MaterialTheme.colorScheme.tertiary, MaterialTheme.colorScheme.secondary)))
             }
             Row(
                 Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceContainerHighest).padding(Space.Small),

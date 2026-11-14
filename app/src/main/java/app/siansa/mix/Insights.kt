@@ -466,9 +466,6 @@ class Insights(private val graph: AppGraph) {
         if (finished) keptPlays.update { it + (key to plays) } else recentPlays[key] = System.currentTimeMillis() to plays
     }
 
-    /** The finished list for [month] of [year]; [timeMachineUpdates] shows it as it comes in. */
-    suspend fun timeMachine(year: Int, month: Int?, limit: Int = 50): TimeMachine = timeMachineUpdates(year, month, limit).last()
-
     /**
      * Your most played songs in [month] of [year] (or the whole year when [month] is null), as they come in
      * (issue #319): what's already on the phone and the first service to answer show at once, then each further

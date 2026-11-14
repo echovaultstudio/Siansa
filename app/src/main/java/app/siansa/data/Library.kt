@@ -361,6 +361,20 @@ class LibraryRepository(context: Context) {
             .also { AppLog.d("Library", "Appears on: ${it.size} albums from ${songs.size} songs checked") }
     }
 
+    /**
+     * The songs [artist] is credited on, on others' albums (a feature, a compilation), of what's shown: what their page
+     * plays when they have no releases of their own (the owner, 14 Nov). Ordered by album and track.
+     */
+    suspend fun songsCredited(artist: Artist): List<Song> {
+        val own = albumsOf(artist).map { it.id }.toSet()
+        val found = dao.songsCrediting(artist.id, "%" + likeEscape(artist.name) + "%").map { it.toSong() }
+        val songs = creditedSongs(found, artist.id, artist.name) { it in own }
+            .sortedWith(compareBy<Song>({ it.album }, { it.disc ?: 0 }, { it.track ?: 0 }))
+        val shown = onlyDownloaded()?.songs(songs) ?: songs
+        AppLog.d("Library", "Songs crediting ${artist.name}: ${shown.size} of ${found.size} checked")
+        return shown
+    }
+
     suspend fun genres(limit: Int = 60): List<Genre> {
         val only = onlyDownloaded() ?: return dao.genres(limit).map { Genre(it.name, it.songCount) }
         val songs = only.shelf.songs.toList().chunked(CHUNK).flatMap { dao.songsWithGenre(it) }.map { it.toSong() }

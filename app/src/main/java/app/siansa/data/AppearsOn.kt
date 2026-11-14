@@ -35,5 +35,12 @@ fun appearsOnAlbumIds(songs: List<Song>, artistId: String, name: String, isOwnAl
         .filterNot(isOwnAlbum)
         .toList()
 
+/**
+ * The songs the artist is credited on, on albums that aren't their own ([isOwnAlbum]), in the order given: what an
+ * artist with no releases of their own has to play (the owner, 14 Nov). The same rule as [appearsOnAlbumIds].
+ */
+fun creditedSongs(songs: List<Song>, artistId: String, name: String, isOwnAlbum: (String) -> Boolean): List<Song> =
+    songs.filter { isCredited(it, artistId, name) && it.albumId?.let(isOwnAlbum) != true }.distinctBy { it.id }
+
 /** Escapes [value] for a SQL LIKE pattern used with ESCAPE '\'. */
 fun likeEscape(value: String): String = value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")

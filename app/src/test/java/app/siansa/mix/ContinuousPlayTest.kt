@@ -115,7 +115,7 @@ class ContinuousPlayTest {
 
     @Test fun djSaysWhenItCantOrderWithoutAudioMuse() {
         assertEquals(ContinuousMode.DJ.hint, continuousHint(ContinuousMode.DJ, audioMuseReady = true))
-        assertTrue(continuousHint(ContinuousMode.DJ, audioMuseReady = false).contains("Neither Siansa Beats nor AudioMuse is set up"))
+        assertTrue(continuousHint(ContinuousMode.DJ, audioMuseReady = false).contains("Neither Siansa Beats nor AudioMuse-AI is set up"))
         assertTrue(continuousHint(ContinuousMode.DJ, audioMuseReady = true, djProblem = "Needs Siansa Beats 0.25").contains("doesn't have the songs' sound yet"))
         assertEquals(ContinuousMode.STEADY.hint, continuousHint(ContinuousMode.STEADY, audioMuseReady = false))
     }

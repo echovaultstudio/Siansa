@@ -302,7 +302,8 @@ fun HomeScreen(nav: NavController) {
                 onOpen = { notice ->
                     AppLog.i("Home", "Notice opened: ${notice.kind.id}")
                     graph.notices.tap(notice.kind)
-                    nav.navigate(notice.route)
+                    if (notice.route == app.siansa.mix.Notices.UPDATE_ROUTE) app.siansa.update.UpdateCheck.openStore(graph.app)
+                    else nav.navigate(notice.route)
                 },
                 modifier = Modifier.statusBarsPadding().padding(top = Space.Medium),
                 menuOpen = menuOpen,
@@ -482,7 +483,7 @@ fun HomeScreen(nav: NavController) {
                                     )
                                 })
                             }
-                            // Your own cards, added and named in Settings › Made for you cards (issue #274).
+                            // Your own cards, added and named in Settings › Home page › Cards (issue #274).
                             customCards.orEmpty().forEach { card ->
                                 add(card.id to @Composable {
                                     GradientTile(
@@ -628,7 +629,7 @@ fun HomeScreen(nav: NavController) {
     }
     }
     panel?.let { sources ->
-        // The same panel opens from Settings › Home (issue #780).
+        // The same panel opens from Settings › Home page (issue #780).
         HomeSettingsSheet(nav, startOnSources = sources) { panel = null }
     }
     if (castOpen) CastSheet(onDismiss = { castOpen = false })
@@ -772,12 +773,8 @@ private fun HeroMix(
                 // ⏸ while this mix plays: a tap pauses it, or plays on (#562).
                 val graph = LocalGraph.current
                 val card = rememberCardPlay(mix.songs)
-                FilledIconButton(
-                    onClick = { if (card.loaded) graph.player.togglePlay() else onPlay() },
-                    modifier = Modifier.size(52.dp).testTag("heroPlay"),
-                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = Accent, contentColor = OnAccent),
-                ) {
-                    Icon(if (card.playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, if (card.playing) "Pause" else "Play", Modifier.size(30.dp))
+                RoundPlayButton(card.playing, if (card.playing) "Pause" else "Play", 52.dp, 30.dp, Modifier.testTag("heroPlay")) {
+                    if (card.loaded) graph.player.togglePlay() else onPlay()
                 }
             }
         }
@@ -830,25 +827,6 @@ fun CoverMosaic(mix: Mix, modifier: Modifier = Modifier) {
                     Cover(covers[row * 2 + col], 150, Modifier.weight(1f).fillMaxSize(), shape)
                 }
             }
-        }
-    }
-}
-
-@Composable
-fun MixRow(mix: Mix, onClick: () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = Space.Page, vertical = Space.Small),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        CoverMosaic(mix, Modifier.size(56.dp))
-        Spacer(Modifier.width(Space.Medium))
-        Column(Modifier.weight(1f)) {
-            Text(mix.title, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(
-                "${mix.songs.size} tracks",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
         }
     }
 }

@@ -1,2 +1,0 @@
-### Changed
-- **A Steady vibes mix keeps to the kind of music it started with.** At the same tempo it could still jump from melodic house to minimal techno, or play songs that hardly sounded alike. With Surprises at None, a song now also has to be among the most alike, of the first song's kind of music (house, techno, trance, drum and bass… from Siansa Beats' genres, 0.32 or newer) and within a quarter of its energy. A shorter mix is preferred to one that drifts. Each place of Surprises loosens this.

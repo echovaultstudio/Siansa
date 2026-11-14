@@ -121,7 +121,7 @@ class TvTextBoxFocusTest {
                     ) {
                         TvTextBox("", {}, "Username", Modifier.fillMaxWidth())
                         TvTextBox("", {}, "Password", Modifier.fillMaxWidth(), kind = TvTextKind.SECRET)
-                        Text("With several music servers in AudioMuse, each server's own name there is under Servers.")
+                        Text("With several music servers in AudioMuse-AI, each server's own name there is under Servers.")
                         // As TestRow on the TV: the row is what the remote stops on.
                         TvActionRow(onClick = { tested++ }, modifier = Modifier.testTag("test"), tv = true) { button ->
                             OutlinedButton(onClick = {}, modifier = button) { Text("Test") }

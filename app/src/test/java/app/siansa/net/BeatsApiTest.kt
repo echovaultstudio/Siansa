@@ -166,4 +166,45 @@ class BeatsApiTest {
         runBlocking { api.get("/api/v1/genres") }
         assertEquals(listOf("/api/v1/capabilities", "/api/v1/genres?server=main"), seen)
     }
+
+    /** The owner, 14 Nov: Kids shown beside the main login, and a Kids album's similar albums were the main login's. */
+    @Test fun aShownUsersSongsAreAskedAboutUnderThatUsersLogin() {
+        val seen = mutableListOf<String>()
+        var version = "0.44.1"
+        fun caps() = """{"service":"siansa-beats","version":"$version","api":1,"music_server":{"kind":"navidrome","set_up":true,"id":"main"},
+            "servers":[{"id":"main","kind":"navidrome","name":"Navidrome","url":"http://nas:4533","user":"max","default":true,"songs":9},
+                       {"id":"kids","kind":"navidrome","name":"Kids","url":"http://nas:4533","user":"kids","default":false,"songs":3}],
+            "features":{"beat_grids":{"available":true,"songs":9}}}"""
+        val http = OkHttpClient.Builder().addInterceptor(Interceptor { chain ->
+            val url = chain.request().url
+            seen += url.encodedPath + (url.encodedQuery?.let { "?$it" } ?: "")
+            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1).code(200).message("x")
+                .body((if (url.encodedPath.endsWith("/capabilities")) caps() else "{}").toResponseBody("application/json".toMediaType())).build()
+        }).build()
+        val max = AppSettings(beatsUrl = "http://beats:8090", navidromeUrl = "http://nas:4533", navidromeUser = "max")
+        val kids = AppSettings(navidromeUrl = "http://nas:4533", navidromeUser = "kids")  // a shown user has no Siansa Beats of their own
+        fun api() = BeatsApi(http, whoseSongs = { ids -> if (ids.any { it.startsWith("k") }) kids else max }) { max }
+        val now = api()
+        runBlocking { now.get("/api/v1/similar/albums?track_id=k1") }
+        runBlocking { now.get("/api/v1/similar/albums?track_id=m1") }
+        runBlocking { now.get("/api/v1/similar/artists?artist=Tractor+Ted") }  // no song to go by: the user in use
+        runBlocking { now.post("/api/v1/profiles", """{"ids":["k1","k2"]}""") }
+        assertEquals(listOf(
+            "/api/v1/capabilities", "/api/v1/similar/albums?track_id=k1&server=kids",
+            "/api/v1/capabilities", "/api/v1/similar/albums?track_id=m1&server=main",
+            "/api/v1/similar/artists?artist=Tractor+Ted&server=main",
+            "/api/v1/profiles?server=kids",
+        ), seen)
+        // Before 0.43 similar albums and artists went on to AudioMuse-AI, whose server names are its own: not named.
+        seen.clear(); version = "0.42.3"
+        val before = api()
+        runBlocking { before.get("/api/v1/similar/albums?track_id=k1") }
+        runBlocking { before.get("/api/v1/genres?ids=k1") }
+        assertEquals(listOf("/api/v1/capabilities", "/api/v1/similar/albums?track_id=k1", "/api/v1/genres?ids=k1&server=kids"), seen)
+        assertTrue(BeatsApi.atLeast("0.44.1", "0.43.0"))
+        assertTrue(BeatsApi.atLeast("0.43.0", "0.43.0"))
+        assertFalse(BeatsApi.atLeast("0.42.9", "0.43.0"))
+        assertFalse(BeatsApi.atLeast("?", "0.43.0"))
+        assertEquals(listOf("a", "b", "c"), songIdsInBody("""{"ids":["a","b"],"track_id":"c","limit":5}"""))
+    }
 }

@@ -13,7 +13,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
 /**
- * Song loudness and fade shapes (issue #60), from wherever Settings › Playback says they come from: Siansa Beats when
+ * Song loudness and fade shapes (issue #60), from wherever Settings › Sound says they come from: Siansa Beats when
  * it's set up in Settings › Connections (Siansa Dev), else the Siansa plugin on the AudioMuse server; with song tags,
  * there are no profiles and everything falls back to ReplayGain and plain crossfades.
  *
@@ -126,12 +126,12 @@ class ProfileStore(
             synchronized(lock) { backOffUntil = 0L }
             return checkBeats(s)
         }
-        if (!s.audioMuseReady) return CheckResult(false, "Set up Siansa Beats or AudioMuse in Settings › Connections first")
+        if (!s.audioMuseReady) return CheckResult(false, "Set up Siansa Beats or AudioMuse-AI in Settings › Connections first")
         synchronized(lock) { backOffUntil = 0L }
         return try {
             val health = get(HEALTH_PATH) as? JsonObject
             if (health == null || health.str("plugin") !in PLUGIN_NAMES) {
-                CheckResult(false, "AudioMuse answered, but not as Siansa Beats (dev): install it from the dev catalog")
+                CheckResult(false, "AudioMuse-AI answered, but not as Siansa Beats (dev): install it from the dev catalog")
             } else if (health.str("status") != "ok") {
                 CheckResult(false, "The Siansa plugin is there but not ready (${health.str("status") ?: "no status"})")
             } else {
@@ -211,7 +211,7 @@ class ProfileStore(
             return when {
                 app.siansa.net.AudioMuseErrors.PLUGIN_MISSING in text || "HTTP 404" in text -> app.siansa.net.AudioMuseErrors.PLUGIN_MISSING
                 // Without a login, AudioMuse sends its login page instead of an answer.
-                "isn't JSON" in text || "needs a login" in text -> "AudioMuse wants a login for the plugin: check the AudioMuse login in Settings › Connections"
+                "isn't JSON" in text || "needs a login" in text -> "AudioMuse-AI wants a login for the plugin: check the AudioMuse-AI login in Settings › Connections"
                 text.isBlank() -> "Couldn't reach the Siansa plugin"
                 else -> text
             }

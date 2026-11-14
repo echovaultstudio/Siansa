@@ -1,2 +1,0 @@
-### Fixed
-- **Music stopping on its own with the screen off.** After a long pause, playing again from the notification or headphones could leave Siansa running without Android's permission to use the network in the background, so the next song couldn't load and the music stopped. It now asks for that again, loads the next song as soon as the current one is in, and keeps trying for a couple of minutes when the connection drops, carrying on once it's back.

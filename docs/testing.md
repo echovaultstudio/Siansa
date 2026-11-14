@@ -48,7 +48,7 @@ Open Siansa, go to **Settings**, enter these, use **Test** next to each, then **
 
 1. **Your music server**: Navidrome or Emby. Address (for example `http://192.168.1.10:4533`), user name, password.
 2. **AudioMuse-AI**: its address (for example `http://192.168.1.10:8000`) and its API token if you use one.
-   If your AudioMuse-AI serves several music servers, also fill in **Server name in AudioMuse**.
+   If your AudioMuse-AI serves several music servers, also fill in **Server name in AudioMuse-AI**.
 3. Optional: **AI**: the service, its key and model.
 
 ## Install the plugin in AudioMuse-AI
@@ -60,7 +60,7 @@ Open Siansa, go to **Settings**, enter these, use **Test** next to each, then **
 2. On the **Catalog** tab, install **Siansa Analysis** and apply the restart.
 3. Open **Plugins › Siansa Analysis › Settings** and use **Measure all songs** to measure your library.
    A big library takes hours or days, and AudioMuse-AI pauses its own jobs while a round runs.
-4. In Siansa, go to **Settings › Crossfade and levelling** and choose the plugin.
+4. In Siansa, go to **Settings › Sound** and choose the plugin.
 
 ## Report a problem
 

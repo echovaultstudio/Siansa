@@ -6,20 +6,6 @@ import kotlin.math.floor
 import kotlin.math.ln
 import kotlin.math.roundToLong
 
-/** Where beat-matched blends are used (issue #646): nowhere, in DJ radio, or in every smart crossfade. */
-enum class BeatMatchMode(val label: String) {
-    OFF("Off"),
-    DJ_RADIO("DJ radio"),
-    EVERYWHERE("Everywhere");
-
-    fun appliesTo(djRadio: Boolean): Boolean = this == EVERYWHERE || (this == DJ_RADIO && djRadio)
-
-    companion object {
-        /** Off unless chosen (issue #822): blends laid on the beat still drift out of step on many phones. */
-        fun parse(value: String?): BeatMatchMode = entries.firstOrNull { it.name == value } ?: OFF
-    }
-}
-
 /**
  * Beat-matched blends (issue #646), the way a DJ mixes: the blend starts on a bar of the song going out, the
  * next song starts on its first downbeat, and it plays a little faster or slower so its beats keep time with

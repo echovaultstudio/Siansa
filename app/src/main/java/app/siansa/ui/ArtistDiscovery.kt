@@ -392,9 +392,3 @@ private fun ReasonCard(artist: SuggestedArtist, reasons: List<String>, onClick: 
         }
     }
 }
-
-/** The smallest angle between two directions, in radians. */
-internal fun angleGap(a: Float, b: Float): Float {
-    val d = abs(a - b) % (2 * PI).toFloat()
-    return if (d > PI) (2 * PI).toFloat() - d else d
-}

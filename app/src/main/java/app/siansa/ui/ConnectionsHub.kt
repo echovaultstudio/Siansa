@@ -465,10 +465,10 @@ private fun ServerFields(
     }
     Field("Name shown in Siansa", serverName, "Like Home or Kids", keyboard = KeyboardType.Text) { onServerName(it.replace("\n", " ").take(UserFiles.SERVER_NAME_MAX)) }
     Hint("Shown instead of the address, so two logins can be told apart. Leave empty to show the address.")
-    Field("Server name in AudioMuse", draft.audioMuseServer, keyboard = KeyboardType.Text) { onChange(draft.copy(audioMuseServer = it)) }
+    Field("Server name in AudioMuse-AI", draft.audioMuseServer, keyboard = KeyboardType.Text) { onChange(draft.copy(audioMuseServer = it)) }
     Hint(
-        if (kind.embyLike) "AudioMuse reads your ${ServerWords.name(kind)} library for everything smart. If AudioMuse has more than one music server, enter this ${ServerWords.name(kind)} server's name as it is in AudioMuse."
-        else "Only if AudioMuse has more than one music server: this server's name as it is in AudioMuse. Leave empty for its main one.",
+        if (kind.embyLike) "AudioMuse-AI reads your ${ServerWords.name(kind)} library for everything smart. If AudioMuse-AI has more than one music server, enter this ${ServerWords.name(kind)} server's name as it is in AudioMuse-AI."
+        else "Only if AudioMuse-AI has more than one music server: this server's name as it is in AudioMuse-AI. Leave empty for its main one.",
     )
     if (!inUse) return
     val progress by graph.sync.progress.collectAsStateWithLifecycle()
@@ -621,16 +621,16 @@ internal fun AudioMuseFields(graph: AppGraph, draft: AppSettings, onChange: (App
     var result by remember { mutableStateOf<String?>(null) }
     Hint("The sound analysis behind mixes, radios, similar music and sound search. One for every server; leave the address empty for none.")
     Field("Server address", draft.audioMuseUrl, "192.168.1.10:8000") { onChange(draft.copy(audioMuseUrl = it)) }
-    Hint("If AudioMuse has a login, use either an API token or its username and password.")
+    Hint("If AudioMuse-AI has a login, use either an API token or its username and password.")
     SecretField("API token", draft.audioMuseToken) { onChange(draft.copy(audioMuseToken = it)) }
     Field("Username", draft.audioMuseUser, keyboard = KeyboardType.Text) { onChange(draft.copy(audioMuseUser = it)) }
     SecretField("Password", draft.audioMusePassword) { onChange(draft.copy(audioMusePassword = it)) }
-    Hint("With several music servers in AudioMuse, each server's own name there is under Servers.")
-    TestRow(result) { test(graph, draft, scope, { result = it }, "AudioMuse") { s -> testAudioMuse(graph, s) } }
+    Hint("With several music servers in AudioMuse-AI, each server's own name there is under Servers.")
+    TestRow(result) { test(graph, draft, scope, { result = it }, "AudioMuse-AI") { s -> testAudioMuse(graph, s) } }
 }
 
-/** Siansa Beats' card shows in Siansa Dev (and test builds) first, not yet in the app everyone has. */
-internal val BEATS_OFFERED: Boolean = BuildConfig.BUILD_TYPE != "release"
+/** Whether Siansa Beats' card shows: in every build now ([app.siansa.data.Offered]). */
+internal val BEATS_OFFERED: Boolean = app.siansa.data.Offered.beats
 
 internal fun beatsLine(ready: Boolean): String = if (ready) "Beats, loudness and genres · set up" else "Beats, loudness and genres · not set up"
 
@@ -642,7 +642,7 @@ internal fun beatsLine(ready: Boolean): String = if (ready) "Beats, loudness and
 internal fun BeatsFields(graph: AppGraph, draft: AppSettings, onChange: (AppSettings) -> Unit) {
     val scope = rememberCoroutineScope()
     var result by remember { mutableStateOf<String?>(null) }
-    Hint("Measures each song's beats, loudness and key for DJ blends and smooth fades, and sorts songs into genres. Leave the address empty to use the Siansa plugin on AudioMuse instead, or the songs' tags.")
+    Hint("Measures each song's beats, loudness and key for DJ blends and smooth fades, and sorts songs into genres. Leave the address empty to use the Siansa plugin on AudioMuse-AI instead, or the songs' tags.")
     Field("Server address", draft.beatsUrl, "192.168.1.10:8090") { onChange(draft.copy(beatsUrl = it)) }
     SecretField("API key or password", draft.beatsKey) { onChange(draft.copy(beatsKey = it)) }
     Hint("Only if Siansa Beats asks for one (BEATS_API_KEY or BEATS_PASSWORD).")

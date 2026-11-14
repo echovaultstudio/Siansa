@@ -290,7 +290,7 @@ fun DownloadsScreen(nav: NavController) {
             item {
                 Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
                     HorizontalDivider()
-                    // How music downloads and the covers kept on the phone are in Settings › Data (v1.0, the owner).
+                    // How music downloads and the covers kept on the phone are in Settings › Streaming & storage (v1.0, the owner).
                     PageLink(
                         "Download settings",
                         "${if (settings.downloadWifiOnly) "Wi-Fi only" else "Any connection"} · ${qualityLabel(settings.downloadKbps)} · " +
@@ -613,7 +613,7 @@ private fun StopAllButton(onStop: () -> Unit) {
 internal fun DownloadControlForTest() = DownloadControl(Icons.Rounded.Pause, "Pause") { }
 
 /**
- * Settings › Data's downloads (v1.0, the owner: everything Downloads had in Settings): the music kept on the phone
+ * Settings › Streaming & storage's downloads (v1.0, the owner: everything Downloads had in Settings): the music kept on the phone
  * (opening Downloads to see, add or remove it), on which connections and at what quality it downloads, the storage
  * limit, Remove all downloads, and the covers kept on the phone (Download all covers and the image cache).
  */
@@ -699,7 +699,7 @@ internal fun ImageCacheSlider(selected: Int, onPick: (Int) -> Unit) {
 }
 
 /**
- * Download all covers (issue #302), in Settings › Data's Covers on the phone: the switch, when it may run, a
+ * Download all covers (issue #302), in Settings › Streaming & storage's Covers on the phone: the switch, when it may run, a
  * network check, and its progress with Stop or Download covers now.
  */
 @Composable
@@ -709,7 +709,7 @@ private fun CoverDownloadSection() {
     val settings by graph.settings.state.collectAsStateWithLifecycle()
     var refresh by remember { mutableIntStateOf(0) }
     Heading("Download all covers")
-    Hint("Fetches every album, artist and playlist cover in the background, so browsing never waits for one. Runs after each library sync and once a day, and only fetches covers that aren't on the phone yet. Choose No limit under Image cache, below, so none are removed again.")
+    Hint("Fetches every cover in the background, after each sync and once a day, so browsing never waits. Choose No limit under Image cache, below, so none are removed again.")
     val download by CoverDownload.progress.collectAsStateWithLifecycle()
     // Check the network again once a download finishes.
     var wasRunning by remember { mutableStateOf(false) }
@@ -791,7 +791,7 @@ internal fun ImageCacheSection() {
     }
     HorizontalDivider()
     Heading("Image cache")
-    Hint("Covers and artist photos are saved as they load, so they show instantly next time and without a connection. The oldest are removed when the cache is full. With no limit nothing is removed, and Android won't clear them when the phone runs low on space.")
+    Hint("Covers and artist photos are saved as they load, so they show at once next time, also offline. The oldest are removed when the cache is full; with no limit nothing is removed.")
     used.valueOrNull()?.let { bytes ->
         Text(
             if (settings.imageCacheMb <= 0) "In use: ${formatBytes(bytes)}" else "In use: ${formatBytes(bytes)} of ${formatMb(settings.imageCacheMb)}",

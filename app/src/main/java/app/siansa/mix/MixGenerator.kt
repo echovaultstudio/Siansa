@@ -262,7 +262,7 @@ class MixGenerator(private val graph: AppGraph) {
         AppLog.i(
             "Mix",
             "${selector.name}: ${more.size} songs from the library (${more.count { LibraryMix.fit(it, vibe, emptySet()) == 2 }} " +
-                "by the vibe's genres) of ${candidates.size} looked at, after ${first.size} from AudioMuse",
+                "by the vibe's genres) of ${candidates.size} looked at, after ${first.size} from AudioMuse-AI",
         )
         val songs = first + more
         if (songs.isEmpty()) throw MixException("There's no music to make a mix from. Check the source filter on Home.")
@@ -399,12 +399,12 @@ class MixGenerator(private val graph: AppGraph) {
     /** AudioMuse's sonic fingerprint: the songs closest to the sound of what you play most. */
     private suspend fun soundMix(skipped: Set<String>): Pair<List<Song>, String> {
         val s = graph.settings.current
-        if (!s.soundReady) throw MixException("Set up AudioMuse in Settings first")
+        if (!s.soundReady) throw MixException("Set up AudioMuse-AI in Settings first")
         val recent = graph.history.playedSince(System.currentTimeMillis() - 2 * DAY_MS)
         val hits = graph.audioMuse.sonicFingerprint(150, s.fingerprintUser, s.fingerprintPassword)
             .filter { it.id !in skipped && it.id !in recent }
         val picked = capPerArtist(hits.map { it to it.similarity * (0.85 + Random.nextDouble() * 0.15) }, 3, 40)
-        return spreadArtists(resolveHits(picked)) to "The sound of what you play most, found by AudioMuse"
+        return spreadArtists(resolveHits(picked)) to "The sound of what you play most, found by AudioMuse-AI"
     }
 
     /**
@@ -440,7 +440,7 @@ class MixGenerator(private val graph: AppGraph) {
      */
     private suspend fun discoverMix(taste: TasteProfile?, skipped: Set<String>): Pair<List<Song>, String> {
         val s = graph.settings.current
-        if (!s.soundReady) throw MixException("Set up AudioMuse in Settings first")
+        if (!s.soundReady) throw MixException("Set up AudioMuse-AI in Settings first")
         val heard = graph.history.all().map { it.id }.toSet()
         var seeds = taste?.favouriteSongs.orEmpty().shuffled().take(8)
         if (seeds.size < 3) {
@@ -477,7 +477,7 @@ class MixGenerator(private val graph: AppGraph) {
     suspend fun moodPlaylist(mood: String, size: Int = 50): MoodResult {
         val text = mood.trim()
         if (text.length < 3) throw MixException("Describe your mood in a few words")
-        if (!graph.settings.current.wordsReady) throw MixException("Set up AudioMuse in Settings first")
+        if (!graph.settings.current.wordsReady) throw MixException("Set up AudioMuse-AI in Settings first")
         var plan = Plan(text.replaceFirstChar { it.uppercase() }, text, "From your description", ai = false)
         if (graph.settings.current.aiReady) {
             runCatching { aiMoodPlan(text) }
@@ -486,7 +486,7 @@ class MixGenerator(private val graph: AppGraph) {
         }
         AppLog.i("Mood", "\"$text\" → \"${plan.title}\" · search \"${plan.query}\" · ai=${plan.ai}")
         val found = searchHere(plan.query, size, plan.steering)
-        if (found.hits.isEmpty()) throw MixException("AudioMuse found nothing for that mood")
+        if (found.hits.isEmpty()) throw MixException("AudioMuse-AI found nothing for that mood")
         val hits = hitsToPick(found)
         val ranked = hits
             .map { it to it.similarity * (0.85 + Random.nextDouble() * 0.15) }
@@ -509,7 +509,7 @@ class MixGenerator(private val graph: AppGraph) {
      * set up, otherwise the words searched as they are. With no words, the sliders make the search ([tuning]).
      */
     suspend fun vibePlan(text: String, tuning: VibeTuning): VibePlan {
-        if (!graph.settings.current.wordsReady) throw MixException("Set up AudioMuse in Settings first")
+        if (!graph.settings.current.wordsReady) throw MixException("Set up AudioMuse-AI in Settings first")
         val words = text.trim()
         if (words.isEmpty()) {
             val query = sliderQuery(tuning) ?: throw MixException("Describe your aura, or move a slider")
@@ -557,7 +557,7 @@ class MixGenerator(private val graph: AppGraph) {
         // The dials start at the AI's concepts, so once any is shown they say everything; before that, the AI's.
         val steering = if (tuning.sounds.isNotEmpty()) dials else aiSteering
         val found = searchHere(query, size, steering)
-        if (found.hits.isEmpty()) throw MixException("AudioMuse found nothing for that vibe")
+        if (found.hits.isEmpty()) throw MixException("AudioMuse-AI found nothing for that vibe")
         val hits = hitsToPick(found)
         val features = if (tuning.energy != 0 || tuning.tempo != 0) {
             runCatching { graph.audioMuse.features(hits.map { it.id }).associateBy { it.id } }
@@ -697,7 +697,7 @@ class MixGenerator(private val graph: AppGraph) {
         if (missing.isNotEmpty()) {
             AppLog.i(
                 "Mix",
-                "AudioMuse's ${hits.size} songs: ${local.size} by id, ${byName.size} by name in the library " +
+                "AudioMuse-AI's ${hits.size} songs: ${local.size} by id, ${byName.size} by name in the library " +
                     "(${songIndex().size} songs on the phone), ${fetched.size} fetched, ${onServer.size} found on the server by name, " +
                     "${unresolved.size - onServer.size} not found",
             )
@@ -724,7 +724,7 @@ class MixGenerator(private val graph: AppGraph) {
                 }
             }
         }.awaitAll().filterNotNull()
-        val kept = graph.library.keepSyncedSongs(found.map { it.second }, "AudioMuse").map { it.id }.toSet()
+        val kept = graph.library.keepSyncedSongs(found.map { it.second }, "AudioMuse-AI").map { it.id }.toSet()
         found.filter { it.second.id in kept }.toMap()
     }
 
@@ -745,7 +745,7 @@ class MixGenerator(private val graph: AppGraph) {
             if (result.foreign) {
                 AppLog.w(
                     "Mix",
-                    "The server knows none of AudioMuse's songs (${missing.size} asked about): AudioMuse may have " +
+                    "The server knows none of AudioMuse-AI's songs (${missing.size} asked about): AudioMuse-AI may have " +
                         "analysed another server; not asking for the rest",
                 )
             }
@@ -821,7 +821,7 @@ fun parseSteering(element: kotlinx.serialization.json.JsonElement?, concepts: Li
  * What a vibe or mood playlist says when none of AudioMuse's songs could be found on this server, instead of an
  * empty list (beta testers #40). The AudioMuse test in Settings says which case it is.
  */
-const val NOT_ON_THIS_SERVER = "None of the songs AudioMuse found are on this server. Test AudioMuse in Settings › Connections to see why."
+const val NOT_ON_THIS_SERVER = "None of the songs AudioMuse-AI found are on this server. Test AudioMuse-AI in Settings › Connections to see why."
 
 /**
  * A sound search's [hits], and which of them are songs here ([here], by AudioMuse's id); [foreign] when none of

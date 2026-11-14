@@ -279,21 +279,6 @@ internal fun HubTiles(tiles: List<HubTile>, onOpen: (String) -> Unit) {
     }
 }
 
-/** A group's label on the Settings start page (issue #780): not a page, just a heading over its rows. */
-@Composable
-internal fun HubGroup(label: String, first: Boolean = false) {
-    Text(
-        label.uppercase(),
-        style = MaterialTheme.typography.labelLarge,
-        fontWeight = FontWeight.Bold,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = Space.Page, end = Space.Page, top = if (first) Space.Small else Space.Section, bottom = Space.Tight)
-            .testTag("hubGroup"),
-    )
-}
-
 @Composable
 fun HelpScreen(nav: NavController) {
     val graph = LocalGraph.current
@@ -357,18 +342,6 @@ internal fun HubRow(icon: ImageVector, title: String, onClick: () -> Unit) {
         Icon(icon, null, tint = MaterialTheme.colorScheme.primary)
         Text(title, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f).padding(start = Space.Page))
     }
-}
-
-/** "Crossfade 6 s · levelling track by the Siansa plugin", "No crossfade · levelling album by ReplayGain tags", "… · no levelling". */
-internal fun crossfadeSummary(s: AppSettings): String {
-    val fade = when (s.crossfade) {
-        CrossfadeMode.OFF -> "No crossfade"
-        CrossfadeMode.FIXED -> "Crossfade ${s.crossfadeSeconds} s"
-        CrossfadeMode.SMART -> "Smart crossfade"
-    }
-    val levelling = if (s.replayGain == ReplayGainMode.OFF) "no levelling" else
-        "levelling ${s.replayGain.label.lowercase()} by " + if (s.loudnessSource == LoudnessSource.PLUGIN) s.measurer else "ReplayGain tags"
-    return "$fade · $levelling"
 }
 
 internal fun formatMb(mb: Int): String = if (mb >= 1024) "${"%.0f".format(mb / 1024.0)} GB" else "$mb MB"
@@ -491,7 +464,7 @@ internal fun ContinuousChips(selected: ContinuousMode, onPick: (ContinuousMode) 
 /** The line under the keep playing choices; DJ says when it can't run (no AudioMuse or Siansa Beats), and songs come as in Steady. */
 internal fun continuousHint(mode: ContinuousMode, audioMuseReady: Boolean, djProblem: String? = null): String = when {
     mode != ContinuousMode.DJ -> mode.hint
-    !audioMuseReady -> "${mode.hint} Neither Siansa Beats nor AudioMuse is set up, so songs are added as in Steady."
+    !audioMuseReady -> "${mode.hint} Neither Siansa Beats nor AudioMuse-AI is set up, so songs are added as in Steady."
     djProblem == "Needs Siansa Beats" -> "${mode.hint} Siansa Beats isn't set up or isn't answering, so songs are added as in Steady."
     djProblem == app.siansa.mix.DjReady.NEEDS_SOUND -> "${mode.hint} Siansa Beats doesn't have the songs' sound yet (it needs 0.25), so songs are added as in Steady."
     else -> mode.hint
@@ -588,13 +561,24 @@ fun StreamingDataScreen(nav: NavController) {
                 Hint("While a song plays, Siansa loads the next ones, one at a time, so they start at once and keep playing if the connection drops. Fewer means less data. Only original files are loaded ahead.")
                 if (settings.songCacheMb <= 0) Hint("The song cache is off (below), so up to 3 songs are loaded ahead, and each is removed once it has played.")
                 PreloadRow("On Wi-Fi", settings.preloadWifi.coerceIn(preloadChoices), "preload-wifi", preloadChoices) { graph.settings.save(graph.settings.current.copy(preloadWifi = it)) }
-                PreloadRow("On mobile data", settings.preloadMobile.coerceIn(preloadChoices), "preload-mobile", preloadChoices) { graph.settings.save(graph.settings.current.copy(preloadMobile = it)) }
+                // A TV has no mobile data (as Streaming quality above).
+                if (!tv) PreloadRow("On mobile data", settings.preloadMobile.coerceIn(preloadChoices), "preload-mobile", preloadChoices) { graph.settings.save(graph.settings.current.copy(preloadMobile = it)) }
             }
 
             HorizontalDivider()
-            val songSummary = if (settings.songCacheMb <= 0) "Off" else u?.let { "${formatBytes(it.songs)} of ${formatMb(settings.songCacheMb)}" } ?: formatMb(settings.songCacheMb)
+            // The TV sets its own size (StorageBudget, issue #1104): the sizes to pick from did nothing there.
+            val tvSongsMb = if (tv) app.siansa.data.StorageBudget.ofTv(context).songsMb else null
+            val songSummary = when {
+                tvSongsMb != null -> u?.let { "${formatBytes(it.songs)} of ${formatMb(tvSongsMb)}" } ?: formatMb(tvSongsMb)
+                settings.songCacheMb <= 0 -> "Off"
+                else -> u?.let { "${formatBytes(it.songs)} of ${formatMb(settings.songCacheMb)}" } ?: formatMb(settings.songCacheMb)
+            }
             FoldSection("Song cache", songSummary) {
-            Hint("Songs are kept on the phone as they play, and the next song in the queue is fetched ahead, so replays and skips start at once and survive a bad connection. Only original-quality streams are cached. Off keeps nothing once it has played; songs loaded ahead (above) are held only until they play.")
+            if (tvSongsMb != null) {
+                Hint("Songs are kept on the TV as they play, so replays start at once. Siansa sets how much by the room the TV has.")
+                usage.valueOrNull()?.let { u -> Text("In use: ${formatBytes(u.songs)} of ${formatMb(tvSongsMb)}", style = MaterialTheme.typography.bodyLarge) }
+            } else {
+            Hint("Songs are kept on the phone as they play, so replays and skips start at once and survive a bad connection. Only original-quality streams are kept. Off keeps nothing once it has played.")
             usage.valueOrNull()?.let { u ->
                 Text(
                     if (settings.songCacheMb <= 0) "Off: songs aren't kept after they play"
@@ -623,7 +607,8 @@ fun StreamingDataScreen(nav: NavController) {
                     )
                 }
             }
-            OutlinedButton(modifier = Modifier.focusRing(), onClick = {
+            }
+            val clearSongs = {
                 scope.launch {
                     withContext(Dispatchers.IO) {
                         val cache = graph.songCache
@@ -632,11 +617,16 @@ fun StreamingDataScreen(nav: NavController) {
                     AppLog.i("Storage", "Song cache cleared")
                     refresh++
                 }
-            }) { Text("Clear song cache") }
+                Unit
+            }
+            // A row the remote lands on (TvActionRow): under the row of sizes, a narrow button alone was skipped.
+            TvActionRow(onClick = clearSongs) { button ->
+                OutlinedButton(modifier = button.focusRing(), onClick = clearSongs) { Text("Clear song cache") }
+            }
             }
 
             // Switching the song cache off applies from the next song; a new size needs a restart.
-            if (settings.songCacheMb != songsAtStart && settings.songCacheMb > 0) {
+            if (!tv && settings.songCacheMb != songsAtStart && settings.songCacheMb > 0) {
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(Space.Medium), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
                         Text("New cache sizes apply after the app restarts.", style = MaterialTheme.typography.bodyMedium)
@@ -717,15 +707,7 @@ fun LogsScreen(nav: NavController) {
                         refresh++
                     }
                     Hint(
-                        "Save logs writes a text file (choose Downloads), which you can then upload anywhere. " +
-                            "While on, it records everything that can help trace a problem: every request in full (server, IP address, parameters, headers, " +
-                            "size and time, covers and song streams included), sync, mixes, playback and buffering, " +
-                            "every download and cache read, cover downloads, slow screen frames and freezes (with what the app was doing), " +
-                            "audio format, phone memory, temperature and battery saver, errors and crashes. " +
-                            "Logs can grow large; it's meant for tracing problems. Passwords, tokens and API keys are removed. " +
-                            "Nothing is recorded while this is off, and nothing leaves the phone unless you share it. " +
-                            "If the app crashes, its last few hundred steps are kept on the phone so the crash can be looked into. " +
-                            "Share sends a ZIP with the log, the same entries as data for tools, and what's in it.",
+                        "While on, Siansa records what helps trace a problem: every request in full (with your server's address), playback, downloads and errors. Passwords, tokens and API keys are removed. Nothing is recorded while this is off, and nothing leaves the phone unless you share it.",
                     )
                     androidx.compose.foundation.layout.FlowRow(
                         Modifier.tvFocusGroup(),

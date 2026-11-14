@@ -82,7 +82,7 @@ look, and **As Home** follows the choice made under Cards, or pick one for this 
 | **Recently played** | Albums you played lately, only from music the source filter shows. |
 | **Artist radios** | Artists you played lately, mixed with artists like them. |
 | **Recently added** | The newest albums on your server. |
-| **Your genres** | Genre radios from your library: the songs tagged with that genre. In Siansa Dev with Siansa Beats, every song that sounds like it, whatever its tags say (a remix tagged with its album's genre, but sounding like trance, plays in Trance), as long as the genre is among the song's three best guesses (Siansa Beats 0.36: a faint fourth guess doesn't count); without Siansa Beats, or until it has heard enough of them, the tags as always. |
+| **Your genres** | Genre radios from your library: the songs tagged with that genre. With Siansa Beats, every song that sounds like it, whatever its tags say (a remix tagged with its album's genre, but sounding like trance, plays in Trance), as long as the genre is among the song's three best guesses (Siansa Beats 0.36: a faint fourth guess doesn't count); without Siansa Beats, or until it has heard enough of them, the tags as always. |
 | **Random picks** | A random selection to dig into. |
 
 ## Notices
@@ -93,6 +93,7 @@ their own: a finished book, albums older than three days or last month's report 
 | Notice | When it shows | Opens |
 |---|---|---|
 | **Library sync failed** | The last library sync didn't finish. | Connections |
+| **Siansa 1.5.0 is out** | A newer Siansa is out. Siansa looks once a day, on siansa.app (the list of its F-Droid repo, which every release updates as it goes to Google Play), and sends nothing about you. Set it to **Off** to stop looking. | Google Play or F-Droid, wherever you installed Siansa from |
 | **Carry on: …** | A book or podcast episode you played in the last week and haven't finished. | The book |
 | **3 new albums** | Albums added to your library in the last 30 days. It shows as soon as Home opens. | Recently added |
 | **Your October** | The first week of a month: last month's listening. | The month's report |

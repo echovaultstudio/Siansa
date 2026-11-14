@@ -1,5 +1,6 @@
 package app.siansa.ui
 
+import androidx.compose.ui.graphics.luminance
 import app.siansa.data.AppSettings
 import app.siansa.data.Service
 import org.junit.Assert.assertEquals
@@ -70,5 +71,24 @@ class ServicesTest {
         ServiceHealth.check("probe") { throw java.io.IOException("No route to host") }
         assertEquals(ServiceCheck(false, "No route to host").words, ServiceHealth.state.value["probe"]?.words)
         assertEquals(false, ServiceHealth.state.value["probe"]?.ok)
+    }
+
+    /** The green of "working" can be seen on a light page as well as a dark one (3 to 1 at least). */
+    @Test fun theWorkingGreenShowsOnLightAndDark() {
+        fun contrast(a: androidx.compose.ui.graphics.Color, b: androidx.compose.ui.graphics.Color): Float {
+            val (hi, lo) = listOf(a.luminance(), b.luminance()).sortedDescending()
+            return (hi + 0.05f) / (lo + 0.05f)
+        }
+        for (page in listOf(androidx.compose.ui.graphics.Color(0xFFFBF8FF), androidx.compose.ui.graphics.Color.White, androidx.compose.ui.graphics.Color(0xFF110D1C), androidx.compose.ui.graphics.Color.Black)) {
+            assertTrue("on $page", contrast(okGreen(page), page) >= 3f)
+        }
+    }
+
+    /** A service switched off isn't asked whether it's there. */
+    @Test fun aSwitchedOffAudioMuseIsntAsked() {
+        val on = app.siansa.data.AppSettings(audioMuseUrl = "http://am.example:8000/")
+        assertEquals("http://am.example:8000/", app.siansa.net.audioMuseToAsk(on))
+        assertEquals(null, app.siansa.net.audioMuseToAsk(on.copy(servicesOff = setOf(app.siansa.data.Service.AUDIOMUSE.id))))
+        assertEquals(null, app.siansa.net.audioMuseToAsk(app.siansa.data.AppSettings()))
     }
 }

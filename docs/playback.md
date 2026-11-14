@@ -113,8 +113,8 @@ DJ radio, Keep playing in DJ mode and the DJ mix of an album or playlist leave o
 whole DJ set or a live recording in one file): they're mixes themselves. You can still start one from such a song.
 
 In DJ playback only: DJ radio, songs Keep playing adds in DJ mode, and the DJ mix of an album or playlist (slide
-Shuffle onto Play). An album or playlist playing on its own never beat-matches. Needs the Siansa plugin (in Siansa Dev,
-the Siansa Beats (dev) plugin). Two songs that both keep a beat can clash at the changeover when their beats land at different moments,
+Shuffle onto Play). An album or playlist playing on its own never beat-matches. Needs Siansa Beats, or the Siansa plugin
+on AudioMuse-AI. Two songs that both keep a beat can clash at the changeover when their beats land at different moments,
 like a bad DJ set. The Siansa plugin for AudioMuse measures the beat grid at each end of every song, so Siansa can
 blend them the way a DJ mixes:
 
@@ -128,7 +128,7 @@ blend them the way a DJ mixes:
   to 8 %) so its beats keep time with the old song's, then eases back to its own speed over about 25
   seconds, in small steps too slight to hear. A shift of more than 4 % is kept to 8 bars, however long the Blend
   length, so the song is back at its own speed sooner.
-- **Smart picks how to blend (Siansa Dev, with Siansa Beats' readings at both ends, and the keys from AudioMuse-AI):**
+- **Smart picks how to blend (with Siansa Beats' readings at both ends, and the keys from AudioMuse-AI):**
   - **Long blend**, 32 bars with the bass swapped in the middle: tempos within 2 %, keys that mix, both ends sure of
     their beat, and 8 bars or more without bass at one end.
   - **Drop swap**: the next song comes in 16 (or 8) bars before its first drop, so the drop lands where the old song
@@ -143,7 +143,7 @@ blend them the way a DJ mixes:
     slides in under the old song instead.
   - **Bass swap**, 16 bars: the usual. Never the same technique twice running when another fits as well.
   - Fixed always uses the bass swap over the bars set. The log says which was picked and why ("smart: …").
-- **Siansa Beats (Siansa Dev)**: each end of a song is read from where its beat locks onto its grid (the first and
+- **Siansa Beats**: each end of a song is read from where its beat locks onto its grid (the first and
   last 4 bars it all keeps to). A blend stays inside that, and an end needs 80 % of its beats on the grid there to be
   beat-matched, and 80 % of them sitting on the grid. A track cut from a mixed CD carries the DJ's own changeovers at
   its ends: its blends are laid inside its lock and kept to 8 bars, and without a lock it gets a short blend.
@@ -152,7 +152,7 @@ blend them the way a DJ mixes:
   - A song whose beat comes in more than 8 seconds into it (an ambient intro) isn't beat-matched from there, which
     would skip its intro: it slides in under the old song from its start, and the old song is gone a bar before
     its beat comes in.
-  - Siansa Dev asks for a song's readings again after half an hour when Siansa Beats hadn't analysed it yet, so a
+  - Siansa asks for a song's readings again after half an hour when Siansa Beats hadn't analysed it yet, so a
     song analysed since is blended on its grid.
 
 In DJ playback, a blend where one end has no beat at all (a beatless
@@ -171,7 +171,7 @@ is about 15 seconds at 128 BPM, 16 bars about 30. A blend starts on a bar, so it
 longer, and it never takes more than a third of a song: into a short song it's laid over fewer bars, still beat
 on beat.
 
-**Bass swap** (on by default): over the first half of a blend the old song's bass is taken away (a filter sweeping
+**Bass swap** (always on, with no setting): over the first half of a blend the old song's bass is taken away (a filter sweeping
 up to about 200 Hz) while the new song's, held back at first, is let in, as a DJ does with the EQ: two kick drums
 never play at once, so a blend a few ms out of step is heard as a mix, not a flam.
 
@@ -370,6 +370,10 @@ Siansa shows up in Android Auto as a music app. On the car's screen you can brow
   album exactly plays that artist or album; otherwise the songs found play. "Play music on Siansa" plays your newest
   mix.
 
+The car's player has **Like**, **Shuffle** and **Repeat** beside play, previous and next, each showing how it's set.
+Repeat goes round as in the app: off, all, this song. A radio station has no heart. The same buttons show in the
+phone's own notification and on the lock screen, as many as Android has room for there.
+
 Picking a song plays its whole list from that song, the same as tapping it on the phone. Mood radios play straight
 away. Albums, playlists and mixes played from the car show up in **Recently played** on the phone's Home too.
 
@@ -380,7 +384,7 @@ takes in one list. Picking a song still plays the whole list from it; search for
 loaded by the phone and handed to the car, so the car never needs to reach your server.
 
 **Siansa not in Android Auto?** Android Auto only lists apps installed from Google Play, unless you allow others.
-Siansa from F-Droid, GitHub or Siansa Dev needs this once:
+Siansa from F-Droid, or Siansa Dev, needs this once:
 
 1. On the phone, open Android Auto's settings (**Settings › Connected devices › Connection preferences › Android
    Auto**, or search the phone's settings for "Android Auto").

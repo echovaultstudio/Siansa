@@ -82,7 +82,7 @@ internal val SOURCE_ICON = 40.dp
 /** The gap between a row's words and its libraries. */
 internal val SOURCE_CARD_GAP = Space.Small
 
-/** The Sources sheet, from Home's menu and Settings › Home (issue #780): [SourcesPanel] in a sheet of its own. */
+/** The Sources sheet, from Home's menu and Settings › Home page (issue #780): [SourcesPanel] in a sheet of its own. */
 @Composable
 fun SourcesSheet(onDismiss: () -> Unit) {
     androidx.compose.material3.ModalBottomSheet(onDismissRequest = onDismiss, sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true)) {

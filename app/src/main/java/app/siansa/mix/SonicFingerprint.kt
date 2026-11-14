@@ -59,9 +59,9 @@ class SonicFingerprint(private val graph: AppGraph) {
         val date = LocalDate.now().toString()
         if (!force) saved()?.takeIf { it.date == date }?.let { return it }
         val s = graph.settings.current
-        if (!s.soundReady) throw MixException("Set up AudioMuse in Settings first")
+        if (!s.soundReady) throw MixException("Set up AudioMuse-AI in Settings first")
         val hits = graph.audioMuse.sonicFingerprint(FINGERPRINT_SONGS, s.fingerprintUser, s.fingerprintPassword)
-        if (hits.isEmpty()) throw MixException("AudioMuse found no fingerprint yet. Play some more and try again later.")
+        if (hits.isEmpty()) throw MixException("AudioMuse-AI found no fingerprint yet. Play some more and try again later.")
         val ids = hits.map { it.id }
         val features = runCatching { graph.audioMuse.features(ids) }
             .onFailure { AppLog.w("Fingerprint", "No analysis for the fingerprint songs: ${it.message}") }

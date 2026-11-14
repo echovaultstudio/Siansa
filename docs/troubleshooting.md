@@ -27,7 +27,7 @@ Song radio, similar songs or similar albums say "AudioMuse doesn't know this son
 
 1. **Has AudioMuse-AI analysed it?** New songs need its analysis first. Check in AudioMuse-AI, or run an analysis.
 2. **Several music servers in AudioMuse-AI?** Each server's name must be set in **Settings › Connections**, in the
-   card of that music server (Server name in AudioMuse), exactly as AudioMuse-AI shows it. See
+   card of that music server (Server name in AudioMuse-AI), exactly as AudioMuse-AI shows it. See
    [Several music servers](audiomuse.md#several-music-servers-in-one-audiomuse-ai).
 3. **Does AudioMuse-AI know the song on that server?** It links a second server's songs by analysis or by
    **Align** in its setup. To check, ask AudioMuse-AI directly, replacing `TOKEN`, `NAME` and `ID`:
@@ -95,8 +95,9 @@ closed. Siansa tries once more by itself; it's only a problem if the second try 
 - Levelling needs ReplayGain tags in your files, or the Siansa plugin as the source.
 - Smart crossfades need the plugin's measurements; until a song is measured, the fixed length is used.
 - Crossfades don't happen while casting, with Repeat one, or while the sleep timer lets a song finish.
-- Repeat and shuffle are changed in Siansa only: a car's or a headset's own repeat or shuffle button doesn't change
-  them (some cars switched repeat on by themselves when the song changed). The log says when one asked.
+- Repeat and shuffle are changed in Siansa only, in the app or with Siansa's own Shuffle and Repeat buttons in
+  Android Auto and the notification: a car's or a headset's own repeat or shuffle button doesn't change them (some
+  cars switched repeat on by themselves when the song changed). The log says when one asked.
 
 ## Nothing on a TV or speaker when casting
 

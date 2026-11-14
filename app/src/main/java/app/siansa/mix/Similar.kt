@@ -140,7 +140,7 @@ class Similar(private val graph: AppGraph) {
     private suspend fun ask(query: String): JsonObject {
         val settings = graph.settings.current
         val order = askOrder(settings.audioMuseReady, settings.beatsReady, BeatsSound.available)
-        if (order.isEmpty()) throw IllegalStateException("Set up AudioMuse in Settings › Connections first")
+        if (order.isEmpty()) throw IllegalStateException("Set up AudioMuse-AI in Settings › Connections first")
         var failed: Exception? = null
         for (from in order) {
             try {

@@ -89,15 +89,6 @@ class BeatMatchTest {
         assertEquals(1f, BeatMatch.eased(1.016f, BeatMatch.EASE_MS + 1), 1e-5f)
     }
 
-    @Test fun theSettingSaysWhereItApplies() {
-        assertTrue(BeatMatchMode.DJ_RADIO.appliesTo(djRadio = true))
-        assertFalse(BeatMatchMode.DJ_RADIO.appliesTo(djRadio = false))
-        assertTrue(BeatMatchMode.EVERYWHERE.appliesTo(djRadio = false))
-        assertFalse(BeatMatchMode.OFF.appliesTo(djRadio = true))
-        assertEquals(BeatMatchMode.OFF, BeatMatchMode.parse(null))  // off unless chosen (issue #822)
-        assertEquals(BeatMatchMode.DJ_RADIO, BeatMatchMode.parse("DJ_RADIO"))
-    }
-
     // ---- In a crossfade plan ----
 
     private fun profile(id: String, outro: BeatEnd?, intro: BeatEnd?, quietTailMs: Long = 0L, headMs: Long = 0L) =

@@ -179,7 +179,7 @@ fun CardEditorScreen(nav: NavController, id: String) {
                     change(c.copy(size = v.toIntOrNull()?.coerceIn(0, PinnedCard.SIZE) ?: 0))
                 }
             } else if (c.source == CardSource.SOUND && c.contents == CardContents.SONGS) {
-                if (!audioMuseReady) Hint("Needs Siansa Beats or AudioMuse-AI, set up in Settings › Connections.")
+                if (!audioMuseReady) Hint("Needs ${app.siansa.data.Offered.soundServices}, set up in Settings › Connections.")
                 OutlinedTextField(c.sound, { change(c.copy(sound = it)) }, label = { Text("The sound") }, placeholder = { Text("rainy jazz piano") }, modifier = Modifier.fillMaxWidth().testTag("pinnedSound"))
             } else {
                 EditorHeading("Rules")

@@ -266,11 +266,9 @@ private fun CarouselCard(
         Box(Modifier.align(Alignment.BottomEnd).padding(Space.Page)) {
             when {
                 busy -> CircularProgressIndicator(Modifier.size(28.dp), color = Color.White, strokeWidth = 2.dp) // spacing: exact
-                onPlay != null -> FilledIconButton(
-                    onClick = { if (card.loaded) graph.player.togglePlay() else onPlay() },
-                    modifier = Modifier.size(48.dp).testTag("carouselPlay"),
-                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = Accent, contentColor = OnAccent),
-                ) { Icon(if (card.playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, if (card.playing) "Pause $name" else "Play $name", Modifier.size(28.dp)) }
+                onPlay != null -> RoundPlayButton(card.playing, if (card.playing) "Pause $name" else "Play $name", 48.dp, 28.dp, Modifier.testTag("carouselPlay")) {
+                    if (card.loaded) graph.player.togglePlay() else onPlay()
+                }
             }
         }
     }

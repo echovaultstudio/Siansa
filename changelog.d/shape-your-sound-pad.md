@@ -1,3 +1,0 @@
-### Changed
-- **Shape your sound has a sound pad.** On Flow and on a vibe's page, one dot now sets energy (up and down) and speed (left and right) together, in the look of the queue's Shape your mix. Niche ↔ Familiar and the sound dials are pills in the same look. On a vibe's page each small dot on the pad is one of its songs.
-- **A vibe's sound dials suit the mix.** With Siansa Beats (0.32 or newer), the dials on a vibe's page are the sounds the AI picked and the mix's own: genres some of its songs are in and others aren't. An ambient mix is no longer offered "more acoustic" from a fixed list. "Also in this mix" lists its other sounds to add, and Reset puts everything back in the middle.

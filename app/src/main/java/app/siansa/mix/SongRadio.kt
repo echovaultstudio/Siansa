@@ -15,7 +15,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * How far a song radio may wander from the song it started from (issue #256), set in Settings › Playback.
+ * How far a song radio may wander from the song it started from (issue #256), set in Settings › Radios & mixes.
  */
 enum class RadioDrift(val label: String, val hint: String) {
     CLOSE("Stay close", "Every song is like the one the radio started from."),

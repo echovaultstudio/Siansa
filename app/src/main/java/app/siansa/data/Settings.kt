@@ -4,7 +4,6 @@ import android.content.Context
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import app.siansa.playback.BeatMatchMode
 import app.siansa.playback.CrossfadeMode
 import app.siansa.playback.LoudnessSource
 import app.siansa.mix.ContinuousMode
@@ -221,7 +220,7 @@ data class AppSettings(
     val timeMachineMissing: Boolean = true,
     /**
      * Now playing shows "Bad blend" during a DJ blend and for a minute after it, to mark a change that sounded wrong
-     * (Settings › Help; the owner, 12 Nov). On by default in Siansa Dev only.
+     * (Settings › Help & feedback; the owner, 12 Nov). On by default in Siansa Dev only.
      */
     val badBlendButton: Boolean = app.siansa.playback.LastBlend.onByDefault,
     /** How each kind of notice on Home shows (issue #784): pinned, automatic (the default) or off. */
@@ -249,14 +248,6 @@ data class AppSettings(
     val windDownSongs: Int = DEFAULT_WIND_DOWN_SONGS,
     /** The crossfade length; in smart mode, the longest a fade may be. */
     val crossfadeSeconds: Int = DEFAULT_CROSSFADE_SECONDS,
-    /** Where smart crossfades are beat-matched like a DJ's (issue #646, experimental): off, DJ radio, everywhere. */
-    val beatMatch: BeatMatchMode = BeatMatchMode.OFF,
-    /** The old song rings out in a hall over the last bar of a beat-matched blend (issue #759). */
-    val echoTail: Boolean = true,
-    /** The bass swaps from the old song to the new over the first half of a beat-matched blend (issue #807). */
-    val bassSwap: Boolean = true,
-    /** A beat-matched blend keeps the next song's key by time-stretching it (issue #816); off, the pitch follows the speed. */
-    val keepKey: Boolean = false,
     /** How many bars a beat-matched blend aims at, apart from the crossfade length (issue #759). */
     val blendBars: Int = DEFAULT_BLEND_BARS,
     /** The shape of a DJ mix (issue #649): what the energy does over the next songs. */
@@ -353,11 +344,6 @@ data class AppSettings(
         val CROSSFADE_SECONDS = 1..30
         /** A beat-matched blend's length: 8 bars is about 15 s at 128 BPM (issue #759). */
         const val DEFAULT_BLEND_BARS = 8
-        /**
-         * Echo at the end and Keep the key: hidden and off for now (owner, 0.52.0-dev), the blends plain without them;
-         * the audio engine keeps both, for later.
-         */
-        const val BLEND_EXTRAS = false
         val BLEND_BAR_CHOICES = listOf(4, 8, 16)
         const val DEFAULT_WIND_DOWN_SONGS = 20
         val WIND_DOWN_CHOICES = listOf(10, 20, 30)
@@ -548,10 +534,6 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         windDownSongs = prefs.getInt("wind_down_songs", AppSettings.DEFAULT_WIND_DOWN_SONGS)
             .takeIf { it in AppSettings.WIND_DOWN_CHOICES } ?: AppSettings.DEFAULT_WIND_DOWN_SONGS,
         crossfadeSeconds = prefs.getInt("crossfade_s", AppSettings.DEFAULT_CROSSFADE_SECONDS).coerceIn(AppSettings.CROSSFADE_SECONDS),
-        beatMatch = BeatMatchMode.parse(prefs.getString("beat_match", null)),
-        echoTail = AppSettings.BLEND_EXTRAS && prefs.getBoolean("echo_tail", true),
-        bassSwap = prefs.getBoolean("bass_swap", true),
-        keepKey = AppSettings.BLEND_EXTRAS && prefs.getBoolean("keep_key", false),
         blendBars = prefs.getInt("blend_bars", AppSettings.DEFAULT_BLEND_BARS)
             .takeIf { it in AppSettings.BLEND_BAR_CHOICES } ?: AppSettings.DEFAULT_BLEND_BARS,
         mixShape = MixShape.parse(prefs.getString("mix_shape", null)),
@@ -920,35 +902,11 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         _state.value = _state.value.copy(crossfade = mode, crossfadeSeconds = length)
     }
 
-    fun setBeatMatch(mode: BeatMatchMode) {
-        noteBlend("Beat-matched blends", _state.value.beatMatch.name.lowercase(), mode.name.lowercase())
-        prefs.edit().putString("beat_match", mode.name).apply()
-        _state.value = _state.value.copy(beatMatch = mode)
-    }
-
     fun setBlendBars(bars: Int) {
         val length = bars.takeIf { it in AppSettings.BLEND_BAR_CHOICES } ?: AppSettings.DEFAULT_BLEND_BARS
         noteBlend("Blend length", "${_state.value.blendBars} bars", "$length bars")
         prefs.edit().putInt("blend_bars", length).apply()
         _state.value = _state.value.copy(blendBars = length)
-    }
-
-    fun setEchoTail(on: Boolean) {
-        noteBlend("Echo at the end", _state.value.echoTail, on)
-        prefs.edit().putBoolean("echo_tail", on).apply()
-        _state.value = _state.value.copy(echoTail = on)
-    }
-
-    fun setBassSwap(on: Boolean) {
-        noteBlend("Bass swap", _state.value.bassSwap, on)
-        prefs.edit().putBoolean("bass_swap", on).apply()
-        _state.value = _state.value.copy(bassSwap = on)
-    }
-
-    fun setKeepKey(on: Boolean) {
-        noteBlend("Keep the key", _state.value.keepKey, on)
-        prefs.edit().putBoolean("keep_key", on).apply()
-        _state.value = _state.value.copy(keepKey = on)
     }
 
     /** The shape and surprise of a DJ mix (issue #649). */
