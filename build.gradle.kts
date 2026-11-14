@@ -5,5 +5,5 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization") version "2.4.21" apply false
     id("com.google.devtools.ksp") version "2.3.12" apply false
     // Screenshot tests (issue #710): renders parts of the app on the build machine and compares them with approved images.
-    id("io.github.takahirom.roborazzi") version "1.77.0" apply false
+    id("io.github.takahirom.roborazzi") version "1.78.0" apply false
 }
