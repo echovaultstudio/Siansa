@@ -1,14 +1,24 @@
 package app.siansa.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -16,28 +26,23 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import app.siansa.data.Album
 import app.siansa.data.AlbumCategory
+import kotlinx.coroutines.launch
 import app.siansa.data.category
 import app.siansa.log.AppLog
 
@@ -66,26 +71,29 @@ val TABS_GAP = Space.Small
 fun rememberReleaseTypeFilter(): MutableState<String?> = rememberSaveable { mutableStateOf<String?>(null) }
 
 /**
- * The artist's release types as tabs at the top of their page (issue #1029): **All**, then each type they have
- * (Albums, EPs, Singles, Live, DJ-mixes…). The chosen one is bold with a line under it in the accent colour. An
- * artist with many types scrolls them sideways, fading out at an edge that has more, and the chosen tab is
- * scrolled into view. [content] is the words' colour: the page's, or white under the title bar.
+ * The artist's release types at the top of their page (issue #1029), as one bar of pills like Your Library's (the owner,
+ * 14 Nov): **All**, then each type they have (Albums, EPs, Singles, Live, DJ-mixes…). The chosen one is filled in the
+ * accent colour. The first pill starts at the page's edge; with more than fit, the row scrolls sideways, and while some
+ * are hidden off the right, it fades out there into [fade] (the page's colour, or the title bar's when pinned) with a ›
+ * that scrolls on, [moreInset] in from the right edge (on the artist page, under the Play button). The chosen one is
+ * scrolled into view. Tapping the chosen one goes back to All.
  */
 @Composable
 fun ReleaseTypeTabs(
     choices: List<AlbumCategory>,
     selected: AlbumCategory?,
     modifier: Modifier = Modifier,
-    content: Color = MaterialTheme.colorScheme.onSurface,
+    fade: Color = MaterialTheme.colorScheme.surface,
+    moreInset: Dp = Space.Small,
     onSelect: (AlbumCategory?) -> Unit,
 ) {
     val pick: (AlbumCategory?) -> Unit = { type ->
-        AppLog.d("Artist", "Release type tab: ${type?.name ?: "all"}")
+        AppLog.d("Artist", "Release type: ${type?.name ?: "all"}")
         onSelect(type)
     }
     val scroll = rememberScrollState()
     val tabs = listOf<AlbumCategory?>(null) + choices
-    // Where each tab starts and ends in the row, to bring the chosen one into view.
+    // Where each pill starts and ends in the row, to bring the chosen one into view.
     val spans = remember(tabs) { mutableStateMapOf<Int, Pair<Int, Int>>() }
     val chosen = tabs.indexOf(selected).coerceAtLeast(0)
     LaunchedEffect(chosen, spans[chosen]) {
@@ -93,70 +101,73 @@ fun ReleaseTypeTabs(
         val view = scroll.viewportSize
         if (view > 0 && (from < scroll.value || to > scroll.value + view)) scroll.animateScrollTo((from - (view - (to - from)) / 2).coerceAtLeast(0))
     }
-    val edge = with(LocalDensity.current) { TABS_EDGE.toPx() }
-    Row(
-        modifier
-            .fillMaxWidth()
-            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-            .drawWithContent {
-                drawContent()
-                // Fade out at an edge with more tabs beyond it, so it's clear the row scrolls.
-                val left = if (scroll.value > 0) edge else 0f
-                val right = if (scroll.value < scroll.maxValue) edge else 0f
-                if (left > 0f) drawRect(Brush.horizontalGradient(0f to Color.Transparent, 1f to Color.Black, startX = 0f, endX = left), blendMode = BlendMode.DstIn)
-                if (right > 0f) drawRect(Brush.horizontalGradient(0f to Color.Black, 1f to Color.Transparent, startX = size.width - right, endX = size.width), blendMode = BlendMode.DstIn)
+    Box(modifier.fillMaxWidth()) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .horizontalScroll(scroll)
+                .padding(horizontal = Space.Page, vertical = Space.Small)
+                .selectableGroup()
+                .testTag("releaseTypeTabs"),
+            horizontalArrangement = Arrangement.spacedBy(Space.Small),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            tabs.forEachIndexed { i, type ->
+                TypePill(
+                    text = type?.plural ?: "All",
+                    active = i == chosen,
+                    modifier = Modifier.onGloballyPositioned { spans[i] = it.positionInParent().x.toInt() to (it.positionInParent().x + it.size.width).toInt() },
+                ) { pick(if (i == chosen) null else type) }
             }
-            .horizontalScroll(scroll)
-            .padding(horizontal = Space.Tight)
-            .selectableGroup()
-            .testTag("releaseTypeTabs"),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        tabs.forEachIndexed { i, type ->
-            TypeTab(
-                text = type?.plural ?: "All",
-                active = i == chosen,
-                content = content,
-                modifier = Modifier.onGloballyPositioned { spans[i] = it.positionInParent().x.toInt() to (it.positionInParent().x + it.size.width).toInt() },
-            ) { pick(if (i == chosen) null else type) }
+        }
+        if (scroll.canScrollForward) {
+            val rowScope = rememberCoroutineScope()
+            Box(Modifier.matchParentSize(), contentAlignment = Alignment.CenterEnd) {
+                // Clear to [fade] from the middle of the blend: the ›'s space, nothing shows through it.
+                Box(
+                    Modifier.fillMaxHeight().width(moreInset + MORE_BUTTON + MORE_BLEND).testTag("releaseTypesFade")
+                        .background(Brush.horizontalGradient(0f to fade.copy(alpha = 0f), 0.45f to fade, 1f to fade)),
+                )
+            }
+            Surface(
+                onClick = { rowScope.launch { scroll.animateScrollBy(scroll.viewportSize * 0.7f) } },
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                modifier = Modifier.align(Alignment.CenterEnd).padding(end = moreInset).size(MORE_BUTTON).testTag("releaseTypesMore"),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, "More release types", Modifier.size(MORE_ICON), tint = Accent)
+                }
+            }
         }
     }
 }
 
-/** One tab: its name, with the accent line under it while chosen. Tapping the chosen tab goes back to All. */
+/** One pill, as Your Library's: filled in the accent colour while chosen. */
 @Composable
-private fun TypeTab(text: String, active: Boolean, content: Color, modifier: Modifier, onClick: () -> Unit) {
-    val line = Accent
-    val lineWidth = with(LocalDensity.current) { TAB_LINE.toPx() }
-    Box(
-        modifier
-            .selectable(selected = active, role = Role.Tab, onClick = onClick)
-            .padding(horizontal = Space.Medium, vertical = Space.Medium)
-            .testTag(if (active) "releaseTypeTabChosen" else "releaseTypeTab"),
-        contentAlignment = Alignment.Center,
+private fun TypePill(text: String, active: Boolean, modifier: Modifier, onClick: () -> Unit) {
+    Surface(
+        selected = active,
+        onClick = onClick,
+        shape = CircleShape,
+        color = if (active) Selected else MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = if (active) OnSelected else MaterialTheme.colorScheme.onSurface,
+        modifier = modifier.semantics { role = Role.Tab }.testTag(if (active) "releaseTypeTabChosen" else "releaseTypeTab"),
     ) {
         Text(
             text,
-            style = MaterialTheme.typography.titleSmall,
-            fontSize = 15.sp,
-            fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
-            color = if (active) content else content.copy(alpha = INACTIVE_TAB),
+            style = MaterialTheme.typography.labelLarge,
+            fontSize = PILL_FONT,
             maxLines = 1,
-            modifier = Modifier.drawBehind {
-                if (active) {
-                    val y = size.height + lineWidth * 2.5f
-                    drawLine(line, Offset(0f, y), Offset(size.width, y), strokeWidth = lineWidth, cap = StrokeCap.Round)
-                }
-            },
+            softWrap = false,
+            modifier = Modifier.padding(horizontal = Space.Page, vertical = Space.Small),
         )
     }
 }
 
-/** How faint a tab that isn't chosen is. */
-private const val INACTIVE_TAB = 0.66f
+/** The › that scrolls the pills on, and its arrow. */
+internal val MORE_BUTTON = 32.dp
+private val MORE_ICON = 20.dp
 
-/** The chosen tab's line. */
-private val TAB_LINE = 3.dp
-
-/** How wide the fade is at an edge of the tabs with more beyond it. */
-private val TABS_EDGE = 28.dp
+/** How far the pills blend out before the ›'s own space. */
+private val MORE_BLEND = 64.dp

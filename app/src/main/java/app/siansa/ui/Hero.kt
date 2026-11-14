@@ -73,6 +73,8 @@ fun HeroPage(
     actions: @Composable RowScope.() -> Unit = {},
     // Kept under the title bar while it's given (the artist's release-type tabs once scrolled to, issue #1029).
     pinned: (@Composable () -> Unit)? = null,
+    // How much higher the name rests on the picture, for a line under it there (the artist's releases and songs).
+    nameLiftPx: Float = 0f,
     content: @Composable (pageModifier: Modifier) -> Unit,
 ) {
     val density = LocalDensity.current
@@ -161,7 +163,7 @@ fun HeroPage(
         val restLeftPx = with(density) { Space.Page.toPx() }
         // Where the bar's title starts: the bar's padding, the back arrow's button and the gap after it.
         val dockLeftPx = with(density) { (Space.Tight + BACK_BUTTON + Space.Small).toPx() }
-        val restBottomPx = with(density) { Space.Medium.toPx() }
+        val restBottomPx = with(density) { Space.Medium.toPx() } + nameLiftPx
         val startGapPx = with(density) { DOCK_START_GAP.toPx() }
         var nameHeight by remember { mutableIntStateOf(0) }
         val restTop = heroPx - nameHeight - restBottomPx
