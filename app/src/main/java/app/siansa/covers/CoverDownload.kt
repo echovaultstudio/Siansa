@@ -370,6 +370,19 @@ object CoverDownload {
                 }
             }
         }
+        // The colours of every album, artist and playlist cover, so their pages have them in their first frame and
+        // nothing on them changes colour while they're open (CoverToneStore; kept on the phone, read once).
+        if (stoppedBecause == null) {
+            val todo = main.filterNot { app.siansa.ui.CoverToneStore.has(it) }
+            if (todo.isNotEmpty()) {
+                AppLog.i("Covers", "Working out the colours of ${todo.size} covers")
+                todo.forEachIndexed { i, id ->
+                    if (i % 50 == 0) update { it.copy(note = "Cover colours: $i of ${todo.size}") }
+                    app.siansa.ui.CoverToneStore.read(context, graph, id)?.let { app.siansa.ui.CoverToneStore.put(id, it) }
+                }
+                update { it.copy(note = null) }
+            }
+        }
         val seconds = (System.currentTimeMillis() - started) / 1000
         val summary = summary(downloaded.get(), done.get() - downloaded.get() - failed.get() - none.get(), none.get(), failed.get(), seconds)
         AppLog.i("Covers", "Covers: $summary" + (stoppedBecause?.let { ". Stopped: $it" } ?: ""))

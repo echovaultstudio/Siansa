@@ -38,6 +38,8 @@ class SiansaApp : Application(), SingletonImageLoader.Factory {
         AppLog.init(this, graph.settings.current.logging)
         AppLog.watchLifecycle(this)
         graph.mixResume.watch()
+        // The cover colours kept on the phone, so pages seen before have theirs in their first frame (CoverToneStore).
+        Thread({ app.siansa.ui.CoverToneStore.load(this) }, "cover-tones").start()
         // A step count each time the app comes to the front, so the next mix can tell walking from sitting
         // (issue #247): one reading, only while movement is switched on for the vibes.
         registerActivityLifecycleCallbacks(object : Application.ActivityLifecycleCallbacks {
