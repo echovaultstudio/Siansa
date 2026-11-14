@@ -4,6 +4,7 @@
 # made-up books and podcasts.
 #   Navidrome: http://127.0.0.1:4533 (10.0.2.2:4533 from the emulator)
 #   AudioMuse and AI stand-ins: http://127.0.0.1:8000 (10.0.2.2:8000), AI at /v1
+#   Siansa Beats: http://127.0.0.1:8090 (10.0.2.2:8090), the real service with a stand-in for the beat model
 #   Audiobookshelf: http://127.0.0.1:13378 (10.0.2.2:13378), admin/admin
 # Needs ffmpeg, Python 3 with Pillow and numpy, the Inter font (fonts-inter) for the covers' lettering, and Docker.
 set -euo pipefail
@@ -38,6 +39,17 @@ python3 "$HERE/showcase/seed.py" http://127.0.0.1:4533
 nohup python3 "$HERE/showcase/fake_services.py" 8000 http://127.0.0.1:4533 > "$DIR/services.log" 2>&1 &
 for i in $(seq 1 20); do curl -s localhost:8000/api/health >/dev/null && break; sleep 0.5; done
 curl -s -X POST localhost:8000/api/clap/search -d '{"query":"warm soulful evening","limit":3}'; echo
+
+# Siansa Beats: the real service from its repository, with a stand-in for the beat model (beats_service.py), so DJ
+# mixes can be shown. It reads the showcase's Navidrome and analyses every song before the pictures are taken.
+BEATS_REF="${BEATS_REF:-main}"
+[ -d siansa-beats ] || git clone -q --depth 1 -b "$BEATS_REF" https://github.com/echovaultstudio/siansa-beats.git siansa-beats
+python3 -m pip install --quiet --break-system-packages numpy cryptography tzdata pillow 2>/dev/null || python3 -m pip install --quiet numpy cryptography tzdata pillow
+nohup python3 "$HERE/showcase/beats_service.py" "$DIR/siansa-beats/beats" 8090 http://127.0.0.1:4533 "$DIR/beats-data" > "$DIR/beats.log" 2>&1 &
+for i in $(seq 1 240); do grep -q "Siansa Beats ready" "$DIR/beats.log" && break; sleep 5; done
+grep "Siansa Beats\|Libraries" "$DIR/beats.log" | tail -3
+grep -q "Siansa Beats ready" "$DIR/beats.log" || { echo "::error::Siansa Beats didn't finish analysing the showcase library"; tail -30 "$DIR/beats.log"; exit 1; }
+curl -s localhost:8090/api/v1/capabilities | head -c 600; echo
 
 # Audiobookshelf, its books and podcasts made up (books.py), set up by its API (abs_seed.py).
 [ -d books ] || python3 "$HERE/showcase/books.py" "$DIR/books" "$DIR/podcasts"
