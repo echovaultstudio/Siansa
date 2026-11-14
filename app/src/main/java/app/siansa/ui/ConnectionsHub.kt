@@ -630,7 +630,7 @@ internal fun AudioMuseFields(graph: AppGraph, draft: AppSettings, onChange: (App
 }
 
 /** Siansa Beats' card shows in Siansa Dev (and test builds) first, not yet in the app everyone has. */
-internal val BEATS_OFFERED: Boolean = BuildConfig.BUILD_TYPE != "release"
+internal val BEATS_OFFERED: Boolean = app.siansa.data.Offered.beats
 
 internal fun beatsLine(ready: Boolean): String = if (ready) "Beats, loudness and genres · set up" else "Beats, loudness and genres · not set up"
 

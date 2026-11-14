@@ -540,7 +540,7 @@ private const val GLINT_TURN_MS = 4_000
  */
 fun slideUnavailable(slide: PlaySlide, settings: app.siansa.data.AppSettings, aiProblem: String?, djProblem: String? = null): String? = when (slide) {
     PlaySlide.SONG_PATH -> when {
-        !settings.soundReady -> "Needs Siansa Beats"
+        !settings.soundReady -> app.siansa.data.Offered.needsSound
         aiProblem != null -> "Not available now"
         else -> null
     }

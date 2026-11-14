@@ -46,7 +46,7 @@ data class ConnectionState(
         // A Siansa Beats before 0.26 has the songs' sound but doesn't search by words: said as it is, not as a fault.
         !settings.wordsReady && settings.beatsReady && BeatsSound.available ->
             "Describing music in words needs Siansa Beats 0.26 or newer, or AudioMuse-AI (Settings › Connections)."
-        !settings.wordsReady -> "Needs Siansa Beats or AudioMuse-AI. Add one in Settings › Connections."
+        !settings.wordsReady -> "Needs ${app.siansa.data.Offered.soundServices}. Add it in Settings › Connections."
         !network -> "You're offline."
         // Its picks would mostly be songs that aren't on the phone.
         settings.downloadedOnly -> "Only downloaded music is on."

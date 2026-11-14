@@ -191,7 +191,7 @@ fun SleepTimerSheet(hasSong: Boolean, onDismiss: () -> Unit) {
                 Column(Modifier.weight(1f)) {
                     Text("Wind down", style = MaterialTheme.typography.bodyLarge, color = if (audioMuse) SheetText else SheetSubtle)
                     Text(
-                        if (audioMuse) "From this song toward calmer, quieter ones. Without a time, the music stops after them" else "Needs Siansa Beats or AudioMuse-AI, set up in Settings › Connections",
+                        if (audioMuse) "From this song toward calmer, quieter ones. Without a time, the music stops after them" else "Needs ${app.siansa.data.Offered.soundServices}, set up in Settings › Connections",
                         style = MaterialTheme.typography.bodySmall,
                         color = SheetSubtle,
                     )

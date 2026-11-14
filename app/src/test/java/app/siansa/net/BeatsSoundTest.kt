@@ -202,7 +202,7 @@ class BeatsSoundTest {
     /** From the same log: with AudioMuse-AI's address cleared, Song path and the mix slides said "not available". */
     @Test fun theSoundFeaturesArentHeldBackByAudioMuseBeingOff() {
         val connection = ConnectionState(network = true, server = true, audioMuse = null)
-        assertEquals("Needs Siansa Beats or AudioMuse-AI. Add one in Settings › Connections.", connection.soundProblem(beatsOnly))
+        assertEquals("Needs Siansa Beats or AudioMuse-AI. Add it in Settings › Connections.", connection.soundProblem(beatsOnly))
         BeatsSound.heard(everything)
         assertEquals(null, connection.soundProblem(beatsOnly))
         assertEquals(null, ConnectionState(audioMuse = false).soundProblem(both))  // AudioMuse-AI down: Siansa Beats answers
@@ -264,5 +264,11 @@ class BeatsSoundTest {
         assertEquals(listOf("choir", "piano"), api.conceptCatalogue().categories.single().terms)
         assertEquals(listOf("piano", "choir"), api.concepts())
         assertEquals(emptyList<String>(), askedOfAudioMuse)
+    }
+
+    /** A build that doesn't offer Siansa Beats yet doesn't send anyone to set it up. */
+    @Test fun aMessageNamesOnlyTheServicesThisBuildOffers() {
+        assertEquals("Siansa Beats or AudioMuse-AI", app.siansa.data.Offered.soundServices(beats = true))
+        assertEquals("AudioMuse-AI", app.siansa.data.Offered.soundServices(beats = false))
     }
 }
