@@ -138,6 +138,7 @@ class SpacingLibraryTest : SpacingCheck() {
                         download = { androidx.compose.foundation.layout.Box(Modifier.size(48.dp).testTag("download")) },
                         resume = app.siansa.ui.PlayResume(7, "8") to 12,
                         onAddToPlaylist = {},
+                        rowExtras = { androidx.compose.foundation.layout.Box(Modifier.size(48.dp).testTag("heart")) },
                     )
                 }
             }
@@ -152,6 +153,12 @@ class SpacingLibraryTest : SpacingCheck() {
         assertEven("The plus in line with the details", (plus.left + plus.right) / 2 - 14.dp + 28.dp * 2 / 24, details.left, 1.dp)
         val line = (play.top + play.bottom) / 2
         listOf(plus, similar, shuffle).forEach { assertEven("On Play's middle line", (it.top + it.bottom) / 2, line, 1.dp) }
+        // The album's heart beside Download (the owner, 14 Nov): as far from it as Download is from the plus.
+        val download = compose.onNodeWithTag("download").getBoundsInRoot()
+        val heart = compose.onNodeWithTag("heart").getBoundsInRoot()
+        assertEven("The heart on Play's middle line", (heart.top + heart.bottom) / 2, line, 1.dp)
+        assertEven("Plus to Download as Download to the heart", (download.left + download.right) / 2 - (plus.left + plus.right) / 2, (heart.left + heart.right) / 2 - (download.left + download.right) / 2, 1.dp)
+        assertTrue("The heart stays left of Similar albums", heart.right <= similar.left + 0.5.dp)
         assertTrue("Similar, shuffle, then Play, left to right", similar.right <= shuffle.left + 0.5.dp && shuffle.right <= play.left + 0.5.dp)
         assertTrue("Nothing hangs under Play", compose.onAllNodesWithTag("playFrom").fetchSemanticsNodes().isEmpty())
     }
