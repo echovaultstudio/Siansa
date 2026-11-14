@@ -260,9 +260,8 @@ fun TvHome() {
                         onClick = { play.label("your library") { graph.library.randomSongs(SHUFFLE_SONGS) } })
                 }
                 item("liked") {
-                    TvButton("Liked songs", Icons.Rounded.Favorite, quiet = true, onClick = {
-                        play.label("your liked songs", shuffle = true) { app.siansa.ui.likedSongs(graph) }
-                    })
+                    // Opens the list, as Liked songs does on the phone (the owner, 14 Nov: it started playing instead).
+                    TvButton("Liked songs", Icons.Rounded.Favorite, quiet = true, onClick = { nav.navigate(TvRoutes.LIKED) })
                 }
                 // Sync, here on Home (the owner, 14 Nov): OK syncs the library and its covers; no page opens and
                 // nothing pops up. The arrows turn while it runs and go red when it failed.

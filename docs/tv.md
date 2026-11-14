@@ -42,7 +42,7 @@ To sign out, go to **Settings › Sign out** on the TV. Your phone stays signed 
 Everything works with the remote's arrows and the centre button; what the remote is on is lit or ringed in the accent colour, buttons on the settings pages included. The tabs along the top (Home, Library, Search,
 Settings) always open that tab's own page, wherever you are.
 
-- **Home**: one bar of pills at the top: Shuffle your library, Liked songs and **Sync**, then your notices, as on
+- **Home**: one bar of pills at the top: Shuffle your library, Liked songs (opens the list) and **Sync**, then your notices, as on
   the phone (what needs you, what you're partway through, what's new; shown or hidden in Settings › Home page ›
   Notices). **Sync** syncs your library and its covers without opening a page: its circle of arrows turns while it
   runs, and goes red if the sync failed. Then the rows of your phone's Home, in the same order
