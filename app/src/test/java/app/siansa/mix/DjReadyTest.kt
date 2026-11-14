@@ -29,7 +29,7 @@ class DjReadyTest {
     @Test fun siansaBeatsNeedsTheSongsSound() {
         // Before 0.25, or with nothing taken over yet: the order would have to go by AudioMuse-AI's tempos.
         assertEquals("Needs Siansa Beats 0.25", DjReady.problem(withBoth, answering.copy(audioMuse = true), true, beatsSound = false))
-        assertTrue(DjReady.explain(DjReady.NEEDS_SOUND).contains("Setup › AudioMuse-AI"))
+        assertTrue(DjReady.explain(DjReady.NEEDS_SOUND).contains("analyses your library"))
     }
 
     @Test fun offlineMeansNotNow() {
