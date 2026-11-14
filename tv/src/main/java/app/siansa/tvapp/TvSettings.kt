@@ -95,7 +95,7 @@ fun TvSettingsHub() {
                 AppLog.i("Tv", "Added user ${id + 1} on the TV")
                 Users.switchTo(context, id)
             }, icon = Icons.Rounded.PersonAdd)
-            TvSettingRow("Connections", "${AppLog.redact(settings.navidromeUrl)} · ${settings.navidromeUser.ifBlank { "API key" }} · AudioMuse, Last.fm and more",
+            TvSettingRow("Connections", "${AppLog.redact(settings.navidromeUrl)} · ${settings.navidromeUser.ifBlank { "API key" }} · AudioMuse-AI, Last.fm and more",
                 onClick = { nav.navigate("settings/connections") }, icon = Icons.Rounded.Dns)
         }
         Group("Music") {

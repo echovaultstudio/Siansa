@@ -42,7 +42,7 @@ enum class CardLook(val label: String, val hint: String) {
 /** Where a custom card's songs come from. */
 enum class CardSource(val label: String, val hint: String) {
     LIBRARY("From your library", "Songs whose tags match: a genre, years, an artist, an album, words in the title, your favourites"),
-    SOUND("By sound", "Describe a sound, like \"rainy jazz piano\", and AudioMuse finds songs that match"),
+    SOUND("By sound", "Describe a sound, like \"rainy jazz piano\", and AudioMuse-AI finds songs that match"),
     // The owner, 10 Nov: a radio you hearted, its songs on Home.
     RADIO("A favourite radio", "A radio you hearted on its page: its songs, new each day"),
 }

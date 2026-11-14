@@ -82,7 +82,7 @@ fun CrossfadeScreen(nav: NavController) {
             Hint(if (settings.loudnessSource == LoudnessSource.PLUGIN && settings.beatsReady) "Measured by Siansa Beats." else settings.loudnessSource.detail + ".")
             if (settings.loudnessSource == LoudnessSource.PLUGIN) {
                 if (!settings.audioMuseReady && !settings.beatsReady) {
-                    Hint("Set up Siansa Beats or AudioMuse in Settings › Connections first. Until then, song tags are used.")
+                    Hint("Set up Siansa Beats or AudioMuse-AI in Settings › Connections first. Until then, song tags are used.")
                 } else {
                     Row(Modifier.tvFocusGroup(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
                         OutlinedButton(modifier = Modifier.focusRing(), onClick = {
@@ -112,10 +112,7 @@ fun CrossfadeScreen(nav: NavController) {
                 FoldSection("Dolby songs on your receiver", if (louder == 0) "As they are" else "+$louder dB", tag = "dolby-louder") {
                     DolbyLouderRow(louder, graph.settings::setDolbyLouder)
                     Hint(
-                        "Dolby Atmos and Dolby Digital Plus songs go to your receiver as they are, and most play quieter than other " +
-                            "music at the same volume. Raise them until they match: the receiver plays them louder, the sound itself " +
-                            "isn't changed. A song can't go past the receiver's full level, so some get less. Not for Dolby TrueHD, " +
-                            "DTS or plain Dolby Digital.",
+                        "Dolby Atmos and Dolby Digital Plus songs often play quieter than other music. Raise them until they match: the receiver plays them louder, the sound isn't changed. Not for Dolby TrueHD, DTS or plain Dolby Digital.",
                     )
                 }
                 HorizontalDivider()

@@ -16,7 +16,7 @@ import java.util.Base64
  */
 enum class LoudnessSource(val label: String, val detail: String) {
     TAGS("Song tags", "ReplayGain tags in the files; plain crossfades"),
-    PLUGIN("Siansa plugin", "Measured by the Siansa plugin on your AudioMuse server");
+    PLUGIN("Siansa plugin", "Measured by the Siansa plugin on your AudioMuse-AI server");
 
     companion object {
         /** The stored choice. */

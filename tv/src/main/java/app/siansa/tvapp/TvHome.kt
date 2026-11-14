@@ -92,7 +92,7 @@ data class TvRow(val title: String, val items: List<TvItem>)
 private const val ROW_SIZE = 24
 
 /**
- * Home's rows (issue #860), the phone's Home for the TV: in the order Home has on the phone (Settings › Home there), the
+ * Home's rows (issue #860), the phone's Home for the TV: in the order Home has on the phone (Settings › Home page there), the
  * sections hidden there left out, and the ones only a phone can show (notices, cards, books…) skipped. Each row is read
  * on its own, so one that fails leaves the others.
  */
@@ -214,7 +214,7 @@ fun TvHome() {
     val play = rememberTvPlay()
     val nav = LocalNav.current
     // The phone's notices (issue #784): what needs you, what you're partway through, what's new; shown or hidden in
-    // Settings › Notices and Cards › Notices, as on the phone.
+    // Settings › Home page › Notices, as on the phone.
     val notices = app.siansa.ui.rememberNotices(graph, settings, shown = app.siansa.data.HomeSection.NOTICES !in settings.homeHidden)
     val loaded = rows
     if (loaded == null) {

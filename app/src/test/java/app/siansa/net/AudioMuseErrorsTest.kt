@@ -23,6 +23,6 @@ class AudioMuseErrorsTest {
         assertEquals(AudioMuseErrors.NOT_KNOWN, AudioMuseErrors.pluginMessage(null, 404, "track not found", body))
         assertEquals(AudioMuseErrors.NOT_KNOWN, AudioMuseErrors.pluginMessage(1004, 404, "track not found", body))
         // Other failures keep their own message.
-        assertEquals("AudioMuse's index isn't ready yet (index building)", AudioMuseErrors.pluginMessage(null, 503, "index building", "index building"))
+        assertEquals("AudioMuse-AI's index isn't ready yet (index building)", AudioMuseErrors.pluginMessage(null, 503, "index building", "index building"))
     }
 }

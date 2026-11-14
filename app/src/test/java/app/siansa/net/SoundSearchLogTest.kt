@@ -25,7 +25,7 @@ class SoundSearchLogTest {
     @Test fun nothingFoundAndAudioMuseNotes() {
         val root = AppJson.parseToJsonElement("""{"results":[],"steering_warnings":["unknown concept 'acustic' ignored"]}""").jsonObject
         val line = AudioMuseApi.searchSummary("sad", emptyList(), emptyList(), AudioMuseApi.warningsOf(root))
-        assertEquals("Search \"sad\" · concepts none · 0 songs · AudioMuse: unknown concept 'acustic' ignored", line)
+        assertEquals("Search \"sad\" · concepts none · 0 songs · AudioMuse-AI: unknown concept 'acustic' ignored", line)
         assertTrue(AudioMuseApi.warningsOf(AppJson.parseToJsonElement("""{"results":[]}""").jsonObject).isEmpty())
     }
 }

@@ -62,11 +62,11 @@ class PlaySlidesTest {
 
     @Test fun songPathNeedsAudioMuseAndMixesWaitForIt() {
         val without = AppSettings()
-        assertEquals("Needs Siansa Beats", slideUnavailable(PlaySlide.SONG_PATH, without, "AudioMuse isn't set up."))
+        assertEquals("Needs Siansa Beats", slideUnavailable(PlaySlide.SONG_PATH, without, "AudioMuse-AI isn't set up."))
         // Without AudioMuse a Steady radio still starts, from the server's similar songs; a DJ mix doesn't (DjReady).
-        assertNull(slideUnavailable(PlaySlide.STEADY, without, "AudioMuse isn't set up."))
-        assertEquals("Needs Siansa Beats", slideUnavailable(PlaySlide.DJ_MIX, without, "AudioMuse isn't set up.", "Needs Siansa Beats"))
-        assertNull(slideUnavailable(PlaySlide.SONIC_MATCH, without, "AudioMuse isn't set up."))
+        assertNull(slideUnavailable(PlaySlide.STEADY, without, "AudioMuse-AI isn't set up."))
+        assertEquals("Needs Siansa Beats", slideUnavailable(PlaySlide.DJ_MIX, without, "AudioMuse-AI isn't set up.", "Needs Siansa Beats"))
+        assertNull(slideUnavailable(PlaySlide.SONIC_MATCH, without, "AudioMuse-AI isn't set up."))
     }
 
     @Test fun withAudioMuseUnreachableNothingButSonicMatchRuns() {

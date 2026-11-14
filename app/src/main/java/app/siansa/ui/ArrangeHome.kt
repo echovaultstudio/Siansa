@@ -73,7 +73,7 @@ import app.siansa.data.moved
 import app.siansa.data.movesFirstVisible
 
 /**
- * Home's settings panel with the saved settings, from Home's button or Settings › Home (issue #780): Sources
+ * Home's settings panel with the saved settings, from Home's button or Settings › Home page (issue #780): Sources
  * ([startOnSources]) or Arrange. Your cards' cog closes it and opens Settings › Home page › Cards.
  */
 @Composable

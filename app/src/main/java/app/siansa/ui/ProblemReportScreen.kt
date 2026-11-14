@@ -182,10 +182,7 @@ internal fun ReportBody(
             else "Debug logs are off, so nothing is being recorded. Turn them on and repeat the problem.",
         )
         Hint(
-            "Tell us what went wrong. Your words are posted as a short note in Siansa's public GitHub repository. " +
-                "The whole log stays private: it's kept on the Siansa server and in a private GitHub repository, and may be " +
-                "read with AI tools to find the problem. It records every request in full, including your server's address " +
-                "and what you played. Passwords, tokens and API keys are removed.",
+            "Tell us what went wrong. Your words are posted in Siansa's public GitHub repository. The log stays private: it holds your server's address and what you played, with passwords, tokens and API keys removed, and may be read with AI tools.",
         )
         if (app.siansa.BuildConfig.TV_APP) {
             // On the TV, Android's own text box, which a phone's keyboard can type and paste into (issue #860).

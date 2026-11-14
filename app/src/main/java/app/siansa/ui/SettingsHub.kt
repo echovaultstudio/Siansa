@@ -464,7 +464,7 @@ internal fun ContinuousChips(selected: ContinuousMode, onPick: (ContinuousMode) 
 /** The line under the keep playing choices; DJ says when it can't run (no AudioMuse or Siansa Beats), and songs come as in Steady. */
 internal fun continuousHint(mode: ContinuousMode, audioMuseReady: Boolean, djProblem: String? = null): String = when {
     mode != ContinuousMode.DJ -> mode.hint
-    !audioMuseReady -> "${mode.hint} Neither Siansa Beats nor AudioMuse is set up, so songs are added as in Steady."
+    !audioMuseReady -> "${mode.hint} Neither Siansa Beats nor AudioMuse-AI is set up, so songs are added as in Steady."
     djProblem == "Needs Siansa Beats" -> "${mode.hint} Siansa Beats isn't set up or isn't answering, so songs are added as in Steady."
     djProblem == app.siansa.mix.DjReady.NEEDS_SOUND -> "${mode.hint} Siansa Beats doesn't have the songs' sound yet (it needs 0.25), so songs are added as in Steady."
     else -> mode.hint
@@ -567,7 +567,7 @@ fun StreamingDataScreen(nav: NavController) {
             HorizontalDivider()
             val songSummary = if (settings.songCacheMb <= 0) "Off" else u?.let { "${formatBytes(it.songs)} of ${formatMb(settings.songCacheMb)}" } ?: formatMb(settings.songCacheMb)
             FoldSection("Song cache", songSummary) {
-            Hint("Songs are kept on the phone as they play, and the next song in the queue is fetched ahead, so replays and skips start at once and survive a bad connection. Only original-quality streams are cached. Off keeps nothing once it has played; songs loaded ahead (above) are held only until they play.")
+            Hint("Songs are kept on the phone as they play, so replays and skips start at once and survive a bad connection. Only original-quality streams are kept. Off keeps nothing once it has played.")
             usage.valueOrNull()?.let { u ->
                 Text(
                     if (settings.songCacheMb <= 0) "Off: songs aren't kept after they play"
@@ -690,15 +690,7 @@ fun LogsScreen(nav: NavController) {
                         refresh++
                     }
                     Hint(
-                        "Save logs writes a text file (choose Downloads), which you can then upload anywhere. " +
-                            "While on, it records everything that can help trace a problem: every request in full (server, IP address, parameters, headers, " +
-                            "size and time, covers and song streams included), sync, mixes, playback and buffering, " +
-                            "every download and cache read, cover downloads, slow screen frames and freezes (with what the app was doing), " +
-                            "audio format, phone memory, temperature and battery saver, errors and crashes. " +
-                            "Logs can grow large; it's meant for tracing problems. Passwords, tokens and API keys are removed. " +
-                            "Nothing is recorded while this is off, and nothing leaves the phone unless you share it. " +
-                            "If the app crashes, its last few hundred steps are kept on the phone so the crash can be looked into. " +
-                            "Share sends a ZIP with the log, the same entries as data for tools, and what's in it.",
+                        "While on, Siansa records what helps trace a problem: every request in full (with your server's address), playback, downloads and errors. Passwords, tokens and API keys are removed. Nothing is recorded while this is off, and nothing leaves the phone unless you share it.",
                     )
                     androidx.compose.foundation.layout.FlowRow(
                         Modifier.tvFocusGroup(),
