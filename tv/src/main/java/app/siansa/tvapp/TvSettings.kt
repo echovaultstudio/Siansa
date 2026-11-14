@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
@@ -21,6 +22,7 @@ import androidx.compose.material.icons.rounded.NewReleases
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.SpeakerGroup
+import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.SwapVert
 import androidx.compose.material.icons.rounded.Sync
@@ -34,6 +36,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.siansa.data.Users
@@ -223,6 +226,94 @@ fun TvPassthrough() {
         }
     }
 }
+
+/**
+ * The log on the TV (the owner, 14 Nov: on the phone's page here the remote couldn't press Clear, and each press froze
+ * the TV while it looked through hundreds of lines for something to land on). The TV's own page: Clear, what to show
+ * and Refresh as the TV's buttons in one row, and the log in blocks the remote steps through, newest first. Nothing to
+ * copy or save: a TV has no clipboard to paste from, and its log goes in a report (Settings › Report a problem).
+ */
+@Composable
+fun TvLog() {
+    val graph = LocalGraph.current
+    val settings by graph.settings.state.collectAsStateWithLifecycle()
+    var refresh by remember { mutableStateOf(0) }
+    var problemsOnly by remember { mutableStateOf(false) }
+    val entries by produceState<List<app.siansa.log.LogEntry>?>(null, refresh, settings.logging) {
+        value = withContext(Dispatchers.IO) { app.siansa.log.logEntries(AppLog.tail(LOG_LINES_READ)) }
+    }
+    val all = entries.orEmpty()
+    val blocks = remember(all, problemsOnly) { logBlocks(all, problemsOnly) }
+    val problems = all.count { it.problem }
+    androidx.compose.foundation.lazy.LazyColumn(
+        Modifier.fillMaxSize(),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(start = TV_EDGE, end = TV_EDGE, bottom = Space.Large),
+        verticalArrangement = Arrangement.spacedBy(Space.Small),
+    ) {
+        item("title") {
+            Column(verticalArrangement = Arrangement.spacedBy(Space.Small)) {
+                Text("The log", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurface)
+                Note(
+                    if (settings.logging) "What the TV app did, newest first. To send it, use Report a problem in Settings."
+                    else "Debug logs are off: nothing is recorded. Switch them on in Settings › Help.",
+                )
+            }
+        }
+        item("buttons") {
+            Row(Modifier.tvRow().padding(vertical = Space.Small).testTag("tvLogButtons"), horizontalArrangement = Arrangement.spacedBy(Space.Page)) {
+                TvButton("Clear the log", Icons.Rounded.Delete, modifier = Modifier.initialFocus().testTag("tvLogClear"), onClick = {
+                    AppLog.clear()
+                    AppLog.i("Help", "Log cleared (TV)")
+                    refresh++
+                })
+                TvButton("Everything", null, strong = !problemsOnly, onClick = { problemsOnly = false })
+                TvButton("Problems ($problems)", null, strong = problemsOnly, onClick = { problemsOnly = true })
+                TvButton("Refresh", Icons.Rounded.Sync, onClick = { refresh++ })
+            }
+        }
+        if (entries != null && blocks.isEmpty()) {
+            item("empty") { Note(if (problemsOnly) "No errors or warnings in the log." else "Nothing logged yet.") }
+        }
+        items(blocks.size, key = { it }) { at ->
+            val shape = androidx.compose.foundation.shape.RoundedCornerShape(Space.Small)
+            Column(Modifier.fillMaxWidth().tvFocus(shape, onClick = {}, grow = 1f).padding(Space.Small).testTag("tvLogBlock")) {
+                for (line in blocks[at]) {
+                    Text(
+                        line,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = LOG_LINE_ROWS,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        color = when {
+                            " E/" in line -> MaterialTheme.colorScheme.error
+                            " W/" in line -> MaterialTheme.colorScheme.tertiary
+                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * The log as the TV shows it: whole entries, newest first (errors and warnings alone with [problemsOnly]), their lines
+ * in blocks of [perBlock] that the remote steps through one at a time.
+ */
+internal fun logBlocks(entries: List<app.siansa.log.LogEntry>, problemsOnly: Boolean, perBlock: Int = LOG_BLOCK_LINES): List<List<String>> =
+    (if (problemsOnly) entries.filter { it.problem } else entries.takeLast(LOG_ENTRIES_SHOWN))
+        .asReversed()
+        .flatMap { it.lines.take(LOG_ENTRY_LINES) }
+        .chunked(perBlock)
+
+/** How much of the log the TV's page reads and shows: enough to see what just happened. */
+private const val LOG_LINES_READ = 3000
+private const val LOG_ENTRIES_SHOWN = 400
+/** An entry's first lines: an error's message and the top of its stack trace, not all forty lines of it. */
+private const val LOG_ENTRY_LINES = 8
+private const val LOG_BLOCK_LINES = 10
+/** A long line (a request's address) wraps this far, then ends in "…". */
+private const val LOG_LINE_ROWS = 2
 
 @Composable
 private fun Group(title: String, content: @Composable () -> Unit) {
