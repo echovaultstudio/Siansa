@@ -87,7 +87,7 @@ Both update on their own. Or build it from this source (below): a build of your 
    - **OpenRouter** (optional): API key and model id (default `google/gemini-2.5-flash`; any OpenRouter model id works).
    - **Audiobookshelf** (optional, under Settings › Connections): address and an API token or login.
 2. Use **Test** next to each section, then **Save**.
-3. Optional: install the **Siansa plugin** on AudioMuse-AI (see [`audiomuse-plugin/`](audiomuse-plugin/README.md)) and choose it
+3. Optional: install the **Siansa plugin** on AudioMuse-AI (see [siansa-beats](https://github.com/echovaultstudio/siansa-beats)) and choose it
    under Settings › Sound. It measures each song's loudness and how it starts and ends, for
    levelling and smooth crossfades, and finds similar albums and artists.
 
