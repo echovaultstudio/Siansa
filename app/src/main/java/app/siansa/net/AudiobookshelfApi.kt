@@ -242,10 +242,6 @@ class AudiobookshelfApi(private val http: OkHttpClient, private val settings: ()
         return Bookmark(bookId, b.dbl("time") ?: timeSec, b.str("title") ?: title, b.long("createdAt") ?: System.currentTimeMillis())
     }
 
-    suspend fun removeBookmark(bookId: String, timeSec: Double) {
-        call("/api/me/item/$bookId/bookmark/${timeSec.toInt()}", method = "DELETE")
-    }
-
     /** A podcast's episodes, newest first, with each one's progress when the user has any. */
     suspend fun episodes(podcastId: String): List<Episode> {
         val root = call("/api/items/$podcastId?expanded=1").jsonObject

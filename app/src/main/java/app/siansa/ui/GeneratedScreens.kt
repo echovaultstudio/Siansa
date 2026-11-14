@@ -58,8 +58,6 @@ import app.siansa.mix.moodRadios
 
 fun NavController.openMoodRadio(id: String) = navigate("radio/mood/${Uri.encode(id)}")
 fun NavController.openGenreRadio(name: String) = navigate("radio/genre/${Uri.encode(name)}")
-fun NavController.openCentreRadio(key: String) = navigate("radio/centre/${Uri.encode(key)}")
-fun NavController.openMoodPlaylist(text: String) = navigate("mood/${Uri.encode(text)}")
 
 /**
  * The colours of a page whose cover Siansa draws (a radio, a mood playlist, More like this playlist) from its [route],

@@ -443,22 +443,6 @@ fun albumFoot(album: Album, info: AlbumInfo, songCount: Int, length: String): Al
 )
 
 @Composable
-fun PlayButtons(songs: List<Song>) {
-    val graph = LocalGraph.current
-    Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
-        val playback = rememberListPlayback(songs)
-        Button(onClick = { playback.press { graph.player.play(songs) } }, enabled = songs.isNotEmpty()) {
-            PlayPauseLabel(playback.playing)
-        }
-        FilledTonalButton(onClick = { graph.player.play(songs, shuffle = true) }, enabled = songs.isNotEmpty()) {
-            Icon(Icons.Rounded.Shuffle, null)
-            Spacer(Modifier.width(Space.Tight))
-            Text("Shuffle")
-        }
-    }
-}
-
-@Composable
 fun MixScreen(nav: NavController, id: String) {
     val graph = LocalGraph.current
     // Bumped when On repeat changed on the server, to show it again (issue #495).
