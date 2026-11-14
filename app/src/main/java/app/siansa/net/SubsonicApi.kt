@@ -584,6 +584,7 @@ class SubsonicApi(
     }
 
     private fun parseAlbum(o: JsonObject) = Album(
+        artists = o.arr("artists").mapNotNull { a -> a.str("id")?.let { ArtistRef(it, a.str("name").orEmpty()) } },
         id = o.str("id").orEmpty(),
         name = o.str("name") ?: o.str("title") ?: "Unknown album",
         artist = o.str("artist") ?: o.str("displayArtist") ?: "",

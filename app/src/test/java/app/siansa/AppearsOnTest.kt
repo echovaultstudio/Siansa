@@ -4,6 +4,7 @@ import app.siansa.data.ArtistRef
 import app.siansa.data.Song
 import app.siansa.data.appearsOnAlbumIds
 import app.siansa.data.creditedNames
+import app.siansa.data.creditedSongs
 import app.siansa.data.isCredited
 import app.siansa.data.likeEscape
 import org.junit.Assert.assertEquals
@@ -55,6 +56,21 @@ class AppearsOnTest {
             song("Host", "unrelated"),
         )
         assertEquals(listOf("feature", "comp"), appearsOnAlbumIds(songs, "guest", "Guest") { it == "own" })
+    }
+
+    // An artist with no releases of their own plays the songs they're on (the owner, 14 Nov).
+    @Test fun theSongsAnArtistIsCreditedOnLeaveOutTheirOwnAlbumsAndOthersSongs() {
+        val songs = listOf(
+            song("Guest", "own"),
+            song("Host feat. Guest", "feature"),
+            song("Host feat. Guest", "feature"),
+            song("Various", "comp", artistId = "guest"),
+            song("Host", "unrelated"),
+            Song(id = "loose", title = "T", artist = "Guest", albumId = null),
+        )
+        val theirs = creditedSongs(songs, "guest", "Guest") { it == "own" }
+        assertEquals(listOf("feature-Host feat. Guest", "comp-Various", "loose"), theirs.map { it.id })
+        assertTrue(creditedSongs(songs, "nobody", "Nobody") { false }.isEmpty())
     }
 
     @Test fun escapesLikePatterns() {

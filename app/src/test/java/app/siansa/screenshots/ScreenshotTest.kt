@@ -600,9 +600,9 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     }
                 }
             },
-            // An artist's release types as tabs at the top of their page (issue #1029): All chosen; Singles chosen; every
-            // type with DJ-mixes chosen, scrolled into view and fading at the edges; and pinned under the title bar, white on
-            // its colour.
+            // An artist's release types as a bar of pills at the top of their page (the owner, 14 Nov): All chosen; Singles
+            // chosen; every type with DJ-mixes chosen, scrolled into view; and pinned under the title bar on its colour, every
+            // type with All chosen, fading out at the right with the › under where Play is.
             Scene("artist_tabs") {
                 val few = listOf(app.siansa.data.AlbumCategory.ALBUM, app.siansa.data.AlbumCategory.EP, app.siansa.data.AlbumCategory.SINGLE)
                 val all = app.siansa.data.AlbumCategory.entries.toList()
@@ -611,7 +611,7 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     app.siansa.ui.ReleaseTypeTabs(few, app.siansa.data.AlbumCategory.SINGLE) {}
                     app.siansa.ui.ReleaseTypeTabs(all, app.siansa.data.AlbumCategory.DJMIX) {}
                     Box(Modifier.fillMaxWidth().background(Color(0xFF3A2A20))) {
-                        app.siansa.ui.ReleaseTypeTabs(all, null, content = Color.White) {}
+                        app.siansa.ui.ReleaseTypeTabs(all, null, fade = Color(0xFF3A2A20), moreInset = app.siansa.ui.ARTIST_MORE_INSET) {}
                     }
                 }
             },
@@ -623,13 +623,22 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                 val heroPx = with(density) { hero.toPx() }
                 Column(verticalArrangement = Arrangement.spacedBy(Space.Small)) {
                     listOf(
-                        "Joy Orbison" to 0f, "Joy Orbison" to heroPx * 0.25f, "Joy Orbison" to heroPx * 0.62f,
+                        "Joy Orbison" to 0f, "Joy Orbison" to heroPx * 0.62f,
                         "Joy Orbison" to heroPx * 2f, "Tayo Meets Acid Rockers Uptown" to heroPx * 0.62f,
+                        // A name too long for the bar, settled there with the heart and Play: it fades out before them
+                        // (the owner, 14 Nov). Five rows, so this last one still fits in the picture.
+                        "Stevie Ray Vaughan and Double Trouble" to heroPx * 2f,
                     ).forEach { (name, scrolled) ->
                         Box(Modifier.fillMaxWidth().height(170.dp)) {
                             app.siansa.ui.HeroPage(
                                 title = name, heroHeight = hero, scrolledPx = scrolled, onBack = {}, color = Color(0xFF4A2A26),
                                 image = { m -> Box(m.background(androidx.compose.ui.graphics.Brush.radialGradient(listOf(Color(0xFF7A5A4C), Color(0xFF26171A))))) },
+                                actions = {
+                                    if (name.startsWith("Stevie")) {
+                                        app.siansa.ui.FavouriteHeart(on = true, iconSize = 28.dp) { }
+                                        app.siansa.ui.BarPlayButton(radio = false, colour = Color(0xFFD9A0A0), onColour = Color.Black, playing = false, onClick = {})
+                                    }
+                                },
                             ) { page -> Box(page.fillMaxSize()) }
                         }
                     }

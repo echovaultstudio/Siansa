@@ -114,15 +114,21 @@ album's mix plays.
 The same slide works on every list of songs: a playlist, a radio, a mix, a card, Liked songs and the others (not
 search results). A list of more than 300 songs mixes a random 300 of them.
 
-On an artist's page, the buttons under the release count: the **heart** on the left makes the artist a favourite
-(in your server too); **Radio**, **Shuffle** and **Play** on the right.
+On an artist's page, the picture is at the top with the artist's name and how many releases and songs they have
+on it. Straight under it are the buttons: the **heart** on the left makes the artist a favourite (in your server too);
+**Radio**, **Shuffle** and **Play** on the right.
 
-Under the buttons, the artist's release types are tabs: **All**, then each type they have (**Albums**, **EPs**,
-**Singles**, **Live**, **DJ-mixes**…). Pick one to see only those releases; **All** (or tapping the chosen tab again)
-shows the whole page: popular songs, every release, **Appears on**, **About** and **Fans also like**. An artist with
-many types scrolls the tabs sideways. As you scroll down, the page slides softly over the artist's picture and the tabs
-stay pinned under the title bar. The artist's name, large at the foot of the picture, moves up with the page and
-then glides into the title bar, shrinking as it goes, to become the page's title; scroll back and it glides out again.
+Under the buttons, the artist's release types are a bar of pills, as in Your Library: **All**, then each type they
+have (**Albums**, **EPs**, **Singles**, **Live**, **DJ-mixes**…). Pick one to see only those releases; **All** (or
+tapping the chosen one again) shows the whole page: popular songs, every release, **Appears on**, **About** and **Fans
+also like**. With more types than fit, the bar scrolls sideways: it fades out at the right, and the › under the Play
+button scrolls it on. As you scroll down, the page slides softly over the artist's picture and the bar stays pinned
+under the title bar. The artist's name, large at the foot of the picture, moves up with the page and then glides into
+the title bar, shrinking as it goes, to become the page's title; scroll back and it glides out again.
+
+An artist with no releases of their own in your library (one who only features on others' songs, or is on a
+compilation) shows **Their songs**, the songs they're credited on, in place of popular songs, and **Play** and
+**Shuffle** play those. **Appears on** lists the albums they're on.
 
 - **Similar songs** come from the best source your setup has: Navidrome's sonic similarity (if the AudioMuse-AI
   Navidrome plugin is installed), else AudioMuse-AI directly, else Navidrome's similar songs (or Emby's Instant
