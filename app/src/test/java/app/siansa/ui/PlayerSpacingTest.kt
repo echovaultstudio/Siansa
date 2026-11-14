@@ -17,6 +17,19 @@ class PlayerSpacingTest {
     @Test fun tallScreensDoNotPushEverythingDown() {
         assertEquals(28f, playerTopGapDp(1400), 0.001f)
     }
+
+    @Test fun theTopRowSitsHalfwayToTheCover() {
+        // A 20 gap, a 48 row, 16 above the cover, and 60 of room left over above and below it.
+        val coverTop = playerCoverTop(topGap = 20, rowHeight = 48, above = 16, room = 460, cover = 400)
+        assertEquals(20 + 48 + 16 + 30, coverTop)
+        val rowY = playerTopRowY(coverTop, 48)
+        // As much room above the row as below it, down to the cover.
+        assertEquals(rowY, coverTop - (rowY + 48))
+    }
+
+    @Test fun theTopRowNeverGoesAboveTheTop() {
+        assertEquals(0, playerTopRowY(coverTop = 20, rowHeight = 48))
+    }
 }
 
 /** The rounded top corners of now playing while it is dragged down. */

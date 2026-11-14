@@ -105,7 +105,7 @@ class PairingTest {
         val key = Pairing.newKey()
         val arrived = Pairing.open(Pairing.seal(sent, key), key)
         assertEquals(sent, arrived)
-        assertEquals(listOf("AudioMuse", "Last.fm"), arrived!!.services!!.names)
+        assertEquals(listOf("AudioMuse-AI", "Last.fm"), arrived!!.services!!.names)
         // A TV with its own ListenBrainz keeps it: the phone's is switched off, so it isn't sent.
         val tv = arrived.into(AppSettings(listenBrainzEnabled = true, listenBrainzToken = "tv-lb"))
         assertEquals("http://192.168.1.10:8000", tv.audioMuseUrl)

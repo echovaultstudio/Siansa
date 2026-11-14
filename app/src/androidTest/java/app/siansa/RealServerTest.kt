@@ -26,6 +26,8 @@ import app.siansa.data.ReplayGainMode
 import app.siansa.log.AppLog
 import app.siansa.playback.CrossfadeMode
 import app.siansa.playback.LoudnessSource
+import app.siansa.playback.PluginProfiles
+import app.siansa.playback.ProfileStore
 import app.siansa.ui.AnimatedCover
 import app.siansa.ui.AnimatedCovers
 import app.siansa.ui.LocalGraph
@@ -452,8 +454,9 @@ class RealServerTest {
             while (reader.readLine()?.isNotEmpty() == true) Unit
             asked += path
             val body = when {
-                path.startsWith("/plugins/siansa_analysis/api/health") -> """{"plugin":"siansa_analysis","plugin_version":"test","status":"ok"}"""
-                path.startsWith("/plugins/siansa_analysis/api/profiles") -> {
+                // Answers as the plugin the app asks for (Siansa Beats (dev) in Siansa Dev), at the app's own paths.
+                path.startsWith(ProfileStore.HEALTH_PATH) -> """{"plugin":"${ProfileStore.PLUGIN_NAME}","plugin_version":"test","status":"ok"}"""
+                path.startsWith(PluginProfiles.PATH) -> {
                     val ids = URLDecoder.decode(path.substringAfter("ids="), "UTF-8").split(",")
                     val profiles = ids.joinToString(",") { id ->
                         """{"track_id":"$id","source":"waveform","ref_lufs":$lufs,"start_ramp":"${ramp(-18, introChunks)}","end_ramp":"${ramp(-18, tailChunks)}"}"""

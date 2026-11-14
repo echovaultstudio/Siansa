@@ -25,6 +25,7 @@ import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Dns
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.GraphicEq
+import androidx.compose.material.icons.rounded.Speed
 import androidx.compose.material.icons.rounded.Sync
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -57,6 +58,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import app.siansa.AppGraph
+import app.siansa.BuildConfig
+import app.siansa.net.BeatsApi
+import app.siansa.playback.ProfileStore
 import app.siansa.data.AiProvider
 import app.siansa.data.AppSettings
 import app.siansa.data.SettingsRepository
@@ -247,14 +251,15 @@ fun ConnectionsHub(nav: NavController, open: String? = null) {
                             )
                         }
                         Button(onClick = ::save, modifier = Modifier.focusRing().fillMaxWidth().testTag("saveUser-${user.id}")) { Text("Save") }
-                        Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+                        Row(Modifier.tvFocusGroup(), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
                             Button(onClick = { scope.launch { if (keysChecked() && saveOther(user)) Users.switchTo(context, user.id) } }, modifier = Modifier.focusRing()) { Text("Switch to it") }
                             OutlinedButton(onClick = { removing = user }, modifier = Modifier.focusRing()) { Text("Remove") }
                         }
                     }
                 }
             }
-            FoldCard(
+            // The TV has no books (issue #860; the owner, 12 Nov): Audiobookshelf is set up on the phone.
+            if (!app.siansa.BuildConfig.TV_APP) FoldCard(
                 icon = Icons.AutoMirrored.Rounded.MenuBook,
                 title = "Audiobookshelf",
                 subtitle = absLine(draft.booksReady),
@@ -303,6 +308,19 @@ fun ConnectionsHub(nav: NavController, open: String? = null) {
             ) {
                 AudioMuseFields(graph, draft) { draft = it; problem = null }
                 Button(onClick = ::save, modifier = Modifier.focusRing().fillMaxWidth()) { Text("Save") }
+            }
+            if (BEATS_OFFERED) {
+                FoldCard(
+                    icon = Icons.Rounded.Speed,
+                    title = "Siansa Beats",
+                    subtitle = beatsLine(draft.beatsReady),
+                    expanded = "beats" in opened,
+                    onToggle = { toggle("beats") },
+                    tag = "fold-beats",
+                ) {
+                    BeatsFields(graph, draft) { draft = it; problem = null }
+                    Button(onClick = ::save, modifier = Modifier.focusRing().fillMaxWidth()) { Text("Save") }
+                }
             }
             FoldCard(
                 icon = Icons.Rounded.AutoAwesome,
@@ -440,17 +458,17 @@ private fun ServerFields(
         Field("Proxy username", draft.proxyUser, keyboard = KeyboardType.Text) { onChange(draft.copy(proxyUser = it)) }
         SecretField("Proxy password", draft.proxyPassword) { onChange(draft.copy(proxyPassword = it)) }
     } else {
-        TextButton(onClick = { showProxy = true }, modifier = Modifier.focusRing()) { Text("Server behind a login page? Add a proxy login") }
+        Box(Modifier.tvFocusGroup()) { TextButton(onClick = { showProxy = true }, modifier = Modifier.focusRing()) { Text("Server behind a login page? Add a proxy login") } }
     }
     TestRow(result) {
         test(graph, draft, scope, { result = it }, "the music server") { s -> testServer(graph, s, kind) }
     }
     Field("Name shown in Siansa", serverName, "Like Home or Kids", keyboard = KeyboardType.Text) { onServerName(it.replace("\n", " ").take(UserFiles.SERVER_NAME_MAX)) }
     Hint("Shown instead of the address, so two logins can be told apart. Leave empty to show the address.")
-    Field("Server name in AudioMuse", draft.audioMuseServer, keyboard = KeyboardType.Text) { onChange(draft.copy(audioMuseServer = it)) }
+    Field("Server name in AudioMuse-AI", draft.audioMuseServer, keyboard = KeyboardType.Text) { onChange(draft.copy(audioMuseServer = it)) }
     Hint(
-        if (kind.embyLike) "AudioMuse reads your ${ServerWords.name(kind)} library for everything smart. If AudioMuse has more than one music server, enter this ${ServerWords.name(kind)} server's name as it is in AudioMuse."
-        else "Only if AudioMuse has more than one music server: this server's name as it is in AudioMuse. Leave empty for its main one.",
+        if (kind.embyLike) "AudioMuse-AI reads your ${ServerWords.name(kind)} library for everything smart. If AudioMuse-AI has more than one music server, enter this ${ServerWords.name(kind)} server's name as it is in AudioMuse-AI."
+        else "Only if AudioMuse-AI has more than one music server: this server's name as it is in AudioMuse-AI. Leave empty for its main one.",
     )
     if (!inUse) return
     val progress by graph.sync.progress.collectAsStateWithLifecycle()
@@ -603,12 +621,41 @@ internal fun AudioMuseFields(graph: AppGraph, draft: AppSettings, onChange: (App
     var result by remember { mutableStateOf<String?>(null) }
     Hint("The sound analysis behind mixes, radios, similar music and sound search. One for every server; leave the address empty for none.")
     Field("Server address", draft.audioMuseUrl, "192.168.1.10:8000") { onChange(draft.copy(audioMuseUrl = it)) }
-    Hint("If AudioMuse has a login, use either an API token or its username and password.")
+    Hint("If AudioMuse-AI has a login, use either an API token or its username and password.")
     SecretField("API token", draft.audioMuseToken) { onChange(draft.copy(audioMuseToken = it)) }
     Field("Username", draft.audioMuseUser, keyboard = KeyboardType.Text) { onChange(draft.copy(audioMuseUser = it)) }
     SecretField("Password", draft.audioMusePassword) { onChange(draft.copy(audioMusePassword = it)) }
-    Hint("With several music servers in AudioMuse, each server's own name there is under Servers.")
-    TestRow(result) { test(graph, draft, scope, { result = it }, "AudioMuse") { s -> testAudioMuse(graph, s) } }
+    Hint("With several music servers in AudioMuse-AI, each server's own name there is under Servers.")
+    TestRow(result) { test(graph, draft, scope, { result = it }, "AudioMuse-AI") { s -> testAudioMuse(graph, s) } }
+}
+
+/** Whether Siansa Beats' card shows: in every build now ([app.siansa.data.Offered]). */
+internal val BEATS_OFFERED: Boolean = app.siansa.data.Offered.beats
+
+internal fun beatsLine(ready: Boolean): String = if (ready) "Beats, loudness and genres · set up" else "Beats, loudness and genres · not set up"
+
+/**
+ * Siansa Beats (Siansa Dev, the owner, 10 Nov): its address and API key, and Test. Once set, the app asks it for each
+ * song's loudness, fades, key and beat grid and for the genres, instead of the plugin on AudioMuse.
+ */
+@Composable
+internal fun BeatsFields(graph: AppGraph, draft: AppSettings, onChange: (AppSettings) -> Unit) {
+    val scope = rememberCoroutineScope()
+    var result by remember { mutableStateOf<String?>(null) }
+    Hint("Measures each song's beats, loudness and key for DJ blends and smooth fades, and sorts songs into genres. Leave the address empty to use the Siansa plugin on AudioMuse-AI instead, or the songs' tags.")
+    Field("Server address", draft.beatsUrl, "192.168.1.10:8090") { onChange(draft.copy(beatsUrl = it)) }
+    SecretField("API key or password", draft.beatsKey) { onChange(draft.copy(beatsKey = it)) }
+    Hint("Only if Siansa Beats asks for one (BEATS_API_KEY or BEATS_PASSWORD).")
+    TestRow(result) { test(graph, draft, scope, { result = it }, "Siansa Beats") { s -> testBeats(graph, s) } }
+}
+
+/** Siansa Beats' Test: what it can do, said as the DJ check says it. */
+internal suspend fun testBeats(graph: AppGraph, s: AppSettings): String {
+    if (!s.beatsReady) throw ApiException("Enter Siansa Beats' address first")
+    val caps = BeatsApi(graph.http) { s }.capabilities()
+    val result = ProfileStore.beatsResult(caps, s.sourceKind)
+    if (!result.ok) throw ApiException(result.message)
+    return result.message
 }
 
 /** AudioMuse's Test: a sound search, and whether its songs are this server's (only known once it's synced). */
@@ -633,7 +680,7 @@ internal fun AiFields(graph: AppGraph, draft: AppSettings, onChange: (AppSetting
     val scope = rememberCoroutineScope()
     var result by remember { mutableStateOf<String?>(null) }
     Hint("Optional: writes the mix titles and sound searches. Only the vibe's guidance, the time and your last 20 plays are sent.")
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.Small), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
+    FlowRow(Modifier.tvFocusGroup(), horizontalArrangement = Arrangement.spacedBy(Space.Small), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
         AiProvider.entries.forEach { p ->
             FilterChip(
                 selected = draft.aiProvider == p,
@@ -675,7 +722,7 @@ internal fun absLine(ready: Boolean): String = if (ready) "Audiobooks and podcas
 @Composable
 internal fun ServerKindChips(kind: SourceKind, onKind: (SourceKind) -> Unit) {
     Text("Server type", style = MaterialTheme.typography.bodyLarge)
-    FlowRow(Modifier.testTag("serverKinds"), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+    FlowRow(Modifier.tvFocusGroup().testTag("serverKinds"), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
         SourceKind.entries.filter { it.ready }.forEach { k ->
             FilterChip(selected = kind == k, onClick = { onKind(k) }, label = { Text(k.label) }, modifier = Modifier.testTag("serverKind-${k.name}"))
         }
@@ -686,7 +733,7 @@ internal fun ServerKindChips(kind: SourceKind, onKind: (SourceKind) -> Unit) {
 @Composable
 internal fun NewServerButtons(onSave: () -> Unit, onCancel: () -> Unit) {
     Hint("Saved, it shows above as another login. Switch to it there when you want to use it (Siansa restarts).")
-    Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+    Row(Modifier.tvFocusGroup(), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
         Button(onClick = onSave, modifier = Modifier.focusRing().testTag("saveNewServer")) { Text("Save") }
         OutlinedButton(onClick = onCancel, modifier = Modifier.focusRing()) { Text("Cancel") }
     }

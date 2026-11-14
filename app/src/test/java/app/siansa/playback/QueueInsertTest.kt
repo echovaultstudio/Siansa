@@ -3,7 +3,7 @@ package app.siansa.playback
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** Where "Add to queue" (and swiping a song to the left) puts a song, Spotify style. */
+/** Where "Add to queue" (and swiping a song to the left) puts a song. */
 class QueueInsertTest {
     private fun at(current: Int, queued: Set<Int>, count: Int) = queueInsertIndex(current, count) { it in queued }
 

@@ -49,7 +49,7 @@ class OfflineTest {
 
     @Test fun aiToolsSayWhyTheyCantRun() {
         assertEquals("You're offline.", ConnectionState(network = false).aiProblem(withAudioMuse))
-        assertEquals("AudioMuse isn't answering.", ConnectionState(network = true, audioMuse = false).aiProblem(withAudioMuse))
+        assertEquals("AudioMuse-AI isn't answering.", ConnectionState(network = true, audioMuse = false).aiProblem(withAudioMuse))
         assertNull(ConnectionState(network = true, audioMuse = true).aiProblem(withAudioMuse))
         assertNull(ConnectionState(network = true, audioMuse = null).aiProblem(withAudioMuse))
         assertTrue(ConnectionState().aiProblem(AppSettings())!!.contains("isn't set up"))

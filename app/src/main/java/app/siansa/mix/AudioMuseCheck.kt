@@ -12,14 +12,14 @@ data class LibraryMatch(val total: Int, val byId: Int, val byName: Int, val libr
  * empty. Returns whether all is well, and the words to show.
  */
 fun audioMuseCheck(match: LibraryMatch, otherServer: Boolean): Pair<Boolean, String> = when {
-    match.total == 0 -> false to "Connected, but AudioMuse found no songs. Has it analysed your music yet?"
+    match.total == 0 -> false to "Connected, but AudioMuse-AI found no songs. Has it analysed your music yet?"
     otherServer || match.librarySongs == 0 ->
-        true to "Connected: AudioMuse found ${match.total} songs. Save and sync to check they're in your library."
-    match.byId > 0 -> true to "Connected: AudioMuse's songs are in your library."
+        true to "Connected: AudioMuse-AI found ${match.total} songs. Save and sync to check they're in your library."
+    match.byId > 0 -> true to "Connected: AudioMuse-AI's songs are in your library."
     match.byName > 0 -> true to
-        "Connected. AudioMuse knows this music from another server, so songs are matched by title and artist " +
-        "(${match.byName} of ${match.total} found here). If AudioMuse also reads this server, enter its name below."
+        "Connected. AudioMuse-AI knows this music from another server, so songs are matched by title and artist " +
+        "(${match.byName} of ${match.total} found here). If AudioMuse-AI also reads this server, enter its name below."
     else -> false to
-        "Connected, but none of AudioMuse's songs are in your library here. AudioMuse may read another server: " +
-        "enter this server's name in AudioMuse below, or have AudioMuse analyse it."
+        "Connected, but none of AudioMuse-AI's songs are in your library here. AudioMuse-AI may read another server: " +
+        "enter this server's name in AudioMuse-AI below, or have AudioMuse-AI analyse it."
 }

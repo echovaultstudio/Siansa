@@ -1,5 +1,6 @@
 package app.siansa.car
 
+import app.siansa.net.soundReady
 import app.siansa.AppGraph
 import app.siansa.data.Album
 import app.siansa.data.Artist
@@ -16,7 +17,7 @@ import app.siansa.mix.moodRadios
 class GraphCarLibrary(private val graph: AppGraph) : CarLibrary {
     override suspend fun mixes(): List<Mix> = latestMixes(graph.mixes.all())
     override suspend fun mix(id: String): Mix? = graph.mixes.get(id)
-    override fun moods(): List<MoodRadio> = if (graph.settings.current.audioMuseReady) moodRadios else emptyList()
+    override fun moods(): List<MoodRadio> = if (graph.settings.current.soundReady) moodRadios else emptyList()
     override suspend fun moodSongs(id: String): List<Song> = moodRadios.firstOrNull { it.id == id }?.let { graph.radios.mood(it) }.orEmpty()
     override suspend fun recent(): List<RecentPlay> = graph.recentPlays.all()
     override suspend fun playlists(): List<Playlist> = graph.library.playlists()
@@ -30,6 +31,34 @@ class GraphCarLibrary(private val graph: AppGraph) : CarLibrary {
     override suspend fun artistSongs(id: String): List<Song> = graph.library.artist(id)?.let { graph.library.songsOf(it) }.orEmpty()
     override suspend fun search(query: String): SearchResults = graph.source.search(query)
     override suspend fun anything(): List<Song> = graph.library.randomSongs(100)
+}
+
+/**
+ * What the car browses: the phone's library, or the one the emulator's car test has put in [standIn], so the test can
+ * ask the real service, as a car does, about a library far larger than the test server's (issues #1040, #1041).
+ */
+class CarLibraryOrStandIn(private val real: CarLibrary) : CarLibrary {
+    private val now: CarLibrary get() = standIn ?: real
+    override suspend fun mixes() = now.mixes()
+    override suspend fun mix(id: String) = now.mix(id)
+    override fun moods() = now.moods()
+    override suspend fun moodSongs(id: String) = now.moodSongs(id)
+    override suspend fun recent() = now.recent()
+    override suspend fun playlists() = now.playlists()
+    override suspend fun playlist(id: String) = now.playlist(id)
+    override suspend fun albums() = now.albums()
+    override suspend fun album(id: String) = now.album(id)
+    override suspend fun albumSongs(id: String) = now.albumSongs(id)
+    override suspend fun artists() = now.artists()
+    override suspend fun artist(id: String) = now.artist(id)
+    override suspend fun artistSongs(id: String) = now.artistSongs(id)
+    override suspend fun search(query: String) = now.search(query)
+    override suspend fun anything() = now.anything()
+
+    companion object {
+        /** Only ever set by a test. */
+        @Volatile var standIn: CarLibrary? = null
+    }
 }
 
 /** The newest mix of each vibe, newest first: what Home shows as today's mixes. */

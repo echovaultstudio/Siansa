@@ -6,7 +6,23 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalDensity
+import android.os.Build
+import androidx.compose.animation.Crossfade
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.ui.semantics.Role
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.unit.sp
+import app.siansa.data.picture
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -15,6 +31,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -27,8 +44,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
-import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.MusicOff
 import androidx.compose.material.icons.rounded.PlayArrow
@@ -128,8 +143,14 @@ private fun TimeMachinePage(nav: NavController) {
             if (value !is Load.Ok) value = Load.Ok(null)
         }
     }
+    // Going to another month keeps the last one on the page, dimmed, until the new one is there: no spinner in
+    // between and nothing jumping (the owner, 12 Nov). The spinner only shows the first time.
+    val shownResult = rememberSettled(result)
+    val shownReport = rememberSettled(report)
+    val waiting = (result is Load.Loading && shownResult !is Load.Loading) || (report is Load.Loading && shownReport !is Load.Loading)
+    val bodyAlpha by animateFloatAsState(if (waiting) WAITING_ALPHA else 1f, tween(120), label = "time-machine-body")
     val songs: @Composable () -> Unit = {
-        LoadBox(result) { tm ->
+        LoadBox(shownResult) { tm ->
             Column {
                 TimeMachineSongs(tm, showMissing, onShowMissing = graph.settings::setTimeMachineMissing, onCreate = { creating = true })
                 TimeMachineSongRows(tm, showMissing)
@@ -137,12 +158,24 @@ private fun TimeMachinePage(nav: NavController) {
         }
     }
 
+    // The top artist of the month or year, behind the header. Nothing waits for it: the page shows at once, and the
+    // picture fades in when the report (kept on the phone for a finished month) and the picture (kept on the phone
+    // once seen) are there. The last one stays while the next month loads.
+    val shown = shownReport.valueOrNull()
+    val picture = rememberHeaderPicture(shown?.topArtists?.firstOrNull()?.artist?.picture, report is Load.Loading)
+    val tint = rememberHeaderTint(picture, "time-machine-tint")
+    val n = remember { java.text.NumberFormat.getIntegerInstance() }
+    val summary = shown?.takeIf { it.plays > 0 }?.let { "${n.format(it.plays)} plays · ${n.format(it.minutes / 60)} hours" }
+        ?: "How you listened, any month or year."
+    val mostPlayed = shown?.topArtists?.firstOrNull()?.let { "Most played: ${it.name}" }.orEmpty()
+
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomBarPadding(Space.Large))) {
             item {
-                ListeningHeader(nav, "Time machine", "How you listened, any month or year.") {
-                    Spacer(Modifier.height(Space.Small))
+                PictureHeader(nav, listOfNotNull(picture), tint) {
+                    TimeMachineName()
                     TimePicker(
+                        under = { TimeMachineWords(summary, mostPlayed) },
                         year = year,
                         month = month,
                         today = today,
@@ -155,9 +188,9 @@ private fun TimeMachinePage(nav: NavController) {
                     )
                 }
             }
-            item(key = "report-$year-$month") {
-                LoadBox(report) { r ->
-                    Column(Modifier.padding(top = Space.Medium)) {
+            item(key = "report") {
+                LoadBox(shownReport) { r ->
+                    Column(Modifier.padding(top = Space.Medium).alpha(bodyAlpha)) {
                         if (r == null) songs() else ReportBody(r, nav, songs = songs)
                     }
                 }
@@ -169,6 +202,128 @@ private fun TimeMachinePage(nav: NavController) {
     }
 }
 
+/** How soft a picture is behind a listening page's header. */
+private val HEADER_BLUR = 48.dp
+
+/** How much of a bright picture shows behind the header: the rest is the page, so white words stay easy to read. */
+private const val HEADER_PICTURE_ALPHA = 0.7f
+
+/** A header's colour (before Android 12, which can't blur) while there's no picture to take one from: a quiet grey, never the app's own colours. */
+internal val NO_ARTIST_TINT = Color(0xFF7A7A80)
+
+/** How faint the last month is while the next one loads. */
+internal const val WAITING_ALPHA = 0.4f
+
+/**
+ * [load], or while it's loading, what it was before: a page keeps showing the last thing it had instead of a spinner.
+ * Loading only shows through when there was nothing before.
+ */
+@Composable
+internal fun <T> rememberSettled(load: Load<T>): Load<T> {
+    val last = remember { arrayOfNulls<Any>(1) }
+    val settled = settledLoad(load, @Suppress("UNCHECKED_CAST") (last[0] as Load<T>?))
+    last[0] = settled
+    return settled
+}
+
+/** What [rememberSettled] shows: [load] itself, unless it's loading and there's a [last] one to keep. */
+internal fun <T> settledLoad(load: Load<T>, last: Load<T>?): Load<T> = if (load is Load.Loading && last != null) last else load
+
+/**
+ * A listening page's header (the time machine, your sonic fingerprint): [pictures] side by side, soft and dark,
+ * fading into the page, with back and [content] on it. One picture fills it; several (a few covers) blur into a mix
+ * of their colours. Without any (nothing played, still loading) the header is the plain dark page, so no other
+ * colours show before the pictures do. Before Android 12, which can't blur, a wash of [tint].
+ *
+ * Give it pictures that are already in memory ([rememberLoadedPictures]): one put here before it's loaded shows an
+ * empty box, then pops in.
+ */
+@Composable
+internal fun PictureHeader(nav: NavController, pictures: List<String>, tint: Color, content: @Composable ColumnScope.() -> Unit) {
+    val page = MaterialTheme.colorScheme.background
+    Box(Modifier.fillMaxWidth().clipToBounds()) {
+        Crossfade(pictures, Modifier.matchParentSize(), animationSpec = tween(HEADER_FADE), label = "header-pictures") { ids ->
+            if (ids.isNotEmpty()) {
+                Box(Modifier.fillMaxSize()) {
+                    if (Build.VERSION.SDK_INT >= 31) {
+                        Box(Modifier.fillMaxSize().background(page))
+                        Row(Modifier.fillMaxSize().alpha(HEADER_PICTURE_ALPHA).blur(HEADER_BLUR)) {
+                            ids.forEach { Cover(it, if (ids.size == 1) HEADER_PICTURE else HEADER_SMALL_PICTURE, Modifier.weight(1f).fillMaxHeight(), RectangleShape) }
+                        }
+                    } else {
+                        Box(Modifier.fillMaxSize().background(page).background(Brush.verticalGradient(listOf(tint, page))))
+                    }
+                    Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0f to page.copy(alpha = 0.35f), 0.45f to page.copy(alpha = 0.55f), 0.8f to page.copy(alpha = 0.9f), 1f to page)))
+                }
+            }
+        }
+        Column(Modifier.fillMaxWidth().statusBarsPadding().padding(bottom = Space.Page)) {
+            IconButton(onClick = { nav.popBackStack() }) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back", tint = Color.White) }
+            content()
+        }
+    }
+}
+
+/** The size a cover is asked for when several share a header: the one lists already show, so it's on the phone. */
+internal const val HEADER_SMALL_PICTURE = 150
+
+/**
+ * [wanted] once every one of them is in memory at [size] (the ones that can't be loaded are left out); until then
+ * what it gave last. So a header's pictures fade in whole and never show an empty box first.
+ */
+@Composable
+internal fun rememberLoadedPictures(wanted: List<String>, size: Int): List<String> {
+    val graph = LocalGraph.current
+    val context = LocalContext.current
+    var ready by remember { mutableStateOf(emptyList<String>()) }
+    LaunchedEffect(wanted, size) {
+        ready = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            wanted.filter { id ->
+                runCatching { coil3.SingletonImageLoader.get(context).execute(coverRequest(context, graph, id, size)) is coil3.request.SuccessResult }.getOrDefault(false)
+            }
+        }
+    }
+    return ready
+}
+
+/** A page's name, small and in the accent, above its title: "TIME MACHINE". */
+@Composable
+internal fun HeaderKicker(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelMedium,
+        fontWeight = FontWeight.Bold,
+        color = Accent,
+        letterSpacing = 2.sp,
+        modifier = modifier.padding(horizontal = Space.Page),
+    )
+}
+
+/** The time machine's name, small, above what it shows. */
+@Composable
+internal fun TimeMachineName() = HeaderKicker("TIME MACHINE", Modifier.testTag("timeMachineName"))
+
+/** Under the time machine's title: what was played, and by whom most. */
+@Composable
+internal fun TimeMachineWords(summary: String, mostPlayed: String) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = Space.Page).testTag("timeMachineWords"), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
+        Text(summary, style = MaterialTheme.typography.titleMedium, color = Color.White.copy(alpha = 0.85f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        // Always a line, also while it's empty, so the months don't jump when the name arrives.
+        Text(mostPlayed, style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.72f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+/** A year in the list of years, and how tall the list may be before it scrolls (five and a half years: more show there are more). */
+private val YEAR_ROW = 48.dp
+private val YEARS_HEIGHT = 280.dp
+
+/** The years the time machine can show, newest first. */
+internal fun timeMachineYears(thisYear: Int): List<Int> = (thisYear downTo TIME_MACHINE_FIRST_YEAR).toList()
+
+/** What the time machine shows, as its title: "2025", or "Oct 2025". */
+internal fun timeMachineTitle(year: Int, month: Int?, locale: Locale = Locale.getDefault()): String =
+    if (month == null) "$year" else "${Month.of(month).getDisplayName(TextStyle.SHORT, locale).trimEnd('.')} $year"
+
 /**
  * Where to scroll a row of chips so the chip at [left] (from the row's start, padding included) and [width] sits in
  * the middle of a [viewport]-wide window, within 0..[max] (issue #496).
@@ -176,26 +331,57 @@ private fun TimeMachinePage(nav: NavController) {
 internal fun chipScrollTarget(left: Int, width: Int, viewport: Int, max: Int): Int =
     (left + width / 2 - viewport / 2).coerceIn(0, max.coerceAtLeast(0))
 
-/** The year, with arrows either side, and the months under it (the whole year first). */
+/**
+ * What's shown, big ("Oct 2025"): tap it for the list of years, then
+ * [under] (the time machine's words) and the months (the whole year first), one even gap apart. */
 @Composable
-internal fun TimePicker(year: Int, month: Int?, today: LocalDate, onYear: (Int) -> Unit, onMonth: (Int?) -> Unit) {
+internal fun TimePicker(year: Int, month: Int?, today: LocalDate, onYear: (Int) -> Unit, onMonth: (Int?) -> Unit, under: @Composable () -> Unit = {}) {
     Column(Modifier.fillMaxWidth().testTag("timePicker"), verticalArrangement = Arrangement.spacedBy(TIME_MACHINE_GAP)) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = Space.Small).testTag("year"), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = { onYear(year - 1) }, enabled = year > TIME_MACHINE_FIRST_YEAR) {
-                Icon(Icons.AutoMirrored.Rounded.KeyboardArrowLeft, "Year before", tint = Color.White)
+        // The title opens the years (the owner, 12 Nov: no arrows). The list scrolls, newest first, and opens at the
+        // year that's showing.
+        var years by remember { mutableStateOf(false) }
+        Box(Modifier.fillMaxWidth().padding(horizontal = Space.Page).testTag("year")) {
+            Row(
+                Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable(onClickLabel = "Pick a year", role = Role.Button) { years = true }
+                    .testTag("timeMachineTitle"),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Space.Tight),
+            ) {
+                Text(
+                    timeMachineTitle(year, month),
+                    style = MaterialTheme.typography.displaySmall,
+                    fontWeight = FontWeight.Black,
+                    color = Color.White,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                Icon(Icons.Rounded.KeyboardArrowDown, null, tint = Color.White.copy(alpha = 0.72f), modifier = Modifier.size(28.dp))
             }
-            Text(
-                "$year",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
-                modifier = Modifier.weight(1f),
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-            )
-            IconButton(onClick = { onYear(year + 1) }, enabled = year < today.year) {
-                Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, "Year after", tint = Color.White)
+            val all = remember(today) { timeMachineYears(today.year) }
+            val rowPx = with(LocalDensity.current) { YEAR_ROW.roundToPx() }
+            // Opens with the chosen year a row from the top, so the year after it shows too.
+            val menuScroll = remember(years) { androidx.compose.foundation.ScrollState(((all.indexOf(year) - 1).coerceAtLeast(0)) * rowPx) }
+            DropdownMenu(
+                expanded = years,
+                onDismissRequest = { years = false },
+                scrollState = menuScroll,
+                modifier = Modifier.heightIn(max = YEARS_HEIGHT).testTag("years"),
+            ) {
+                for (y in all) {
+                    val chosen = y == year
+                    DropdownMenuItem(
+                        text = { Text("$y", style = MaterialTheme.typography.titleMedium, fontWeight = if (chosen) FontWeight.Bold else FontWeight.Medium, color = if (chosen) Accent else Color.Unspecified) },
+                        trailingIcon = if (chosen) ({ Icon(Icons.Rounded.Check, null, tint = Accent) }) else null,
+                        onClick = { years = false; if (!chosen) onYear(y) },
+                        modifier = Modifier.height(YEAR_ROW).testTag("year-$y"),
+                    )
+                }
             }
         }
+        under()
         val available = monthsAvailable(year, today)
         // The chosen month's chip is scrolled into view, centred (issue #496): October sat far off to the right.
         val scroll = rememberScrollState()

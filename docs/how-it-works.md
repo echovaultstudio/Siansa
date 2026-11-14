@@ -111,15 +111,22 @@ A random song you've never played: your server has no play for it, and it isn't 
 your server for random songs, a batch at a time, until it finds one. With libraries or users hidden, or other
 users shown, it rolls from the synced library instead, so it only picks from what's shown.
 
-## Flow sliders
+## Shape your sound
 
-Moving a slider doesn't ask the AI again. It re-runs AudioMuse-AI's search and re-ranks the results:
+Moving the pad's dot or a dial doesn't ask the AI again. It re-runs the sound search (three times as many songs
+as the vibe plays) and re-ranks the results:
 
-- **Energy** and **tempo** move songs up or down by AudioMuse-AI's energy and tempo for each song, compared with
-  the rest of the results.
-- **Familiar** moves songs by how often you play their artist.
-- **Sound dials** steer the search towards (+) or away from (−) a sound concept, with AudioMuse-AI's steering
-  weights 1, 2, 3, 5 and 10.
+- **The sound pad** (energy up and down, speed left and right, five steps each) moves songs up or down by their
+  energy and tempo, compared with the rest of the results. A vibe's songs are drawn on it by their own tempo
+  (60 to 180 beats a minute, left to right) and energy (bottom to top).
+- **Niche ↔ Familiar** moves songs by how often you play their artist.
+- **The AI's sound dials** steer the search towards (+) or away from (−) a sound concept, with AudioMuse-AI's
+  steering weights 1, 2, 3, 5 and 10.
+- **The mix's own sound dials** come from Siansa Beats (0.32 or newer), which says the genres each of the vibe's
+  songs is in by its sound. A genre becomes a dial when the songs differ in it: at least 3 songs have it, and
+  between about an eighth and four fifths of them. The ones that split the mix most evenly come first; up to
+  five dials show at once. These dials don't steer the search: they move each song found by how much it is of
+  that genre.
 
 ## Time Machine counts
 

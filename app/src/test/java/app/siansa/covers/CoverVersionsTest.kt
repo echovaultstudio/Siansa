@@ -39,4 +39,52 @@ class CoverVersionsTest {
         assertEquals("dc-A2:1", CoverVersions.cacheId("dc-A2:1"))
         CoverVersions.update(emptyMap())
     }
+
+    @Test fun anArtistsIdWithoutAVersionIsKeptUnderItself() {
+        // Its key no longer changes by the week: Navidrome's star is never kept, so there's nothing to wait out.
+        assertEquals("ar-6mWOWUK18NNBIh4Nk9xNvC", CoverVersions.cacheId("ar-6mWOWUK18NNBIh4Nk9xNvC"))
+    }
+
+    // ---- Emby and Jellyfin: a picture's tag (the owner, 11 Nov) ----
+
+    @Test fun anItemSeenWithANewTagHasItsCoversFetchedFresh() {
+        CoverVersions.forgetTags()
+        val changed = mutableListOf<String>()
+        CoverVersions.onChanged = { changed += it }
+        try {
+            CoverVersions.seen("52131", "tag-1")   // the first time: nothing kept to doubt
+            CoverVersions.seen("52131", "tag-1")
+            CoverVersions.seen(null, "tag-1")
+            CoverVersions.seen("52132", null)
+            assertEquals(emptyList<String>(), changed)
+            CoverVersions.seen("52131", "tag-2")   // the cover was replaced on the server
+            assertEquals(listOf("52131"), changed)
+        } finally {
+            CoverVersions.onChanged = null
+            CoverVersions.forgetTags()
+        }
+    }
+
+    @Test fun tagsAreKeptFromOneRunToTheNext() {
+        CoverVersions.forgetTags()
+        CoverVersions.seen("52131", "tag-1")
+        CoverVersions.seen("6f1df514408a4c898b01a0b305887968", "tag-9")
+        val text = CoverVersions.dump()!!
+        assertNull("nothing new to save", CoverVersions.dump())
+
+        // The next run: the tags are read before the first item is seen, so a change while the app was closed is noticed.
+        CoverVersions.forgetTags()
+        val changed = mutableListOf<String>()
+        CoverVersions.kept = { text }
+        CoverVersions.onChanged = { changed += it }
+        try {
+            CoverVersions.seen("6f1df514408a4c898b01a0b305887968", "tag-9")
+            CoverVersions.seen("52131", "tag-2")
+            assertEquals(listOf("52131"), changed)
+        } finally {
+            CoverVersions.kept = null
+            CoverVersions.onChanged = null
+            CoverVersions.forgetTags()
+        }
+    }
 }

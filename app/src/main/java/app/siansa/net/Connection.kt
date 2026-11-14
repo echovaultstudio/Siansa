@@ -43,12 +43,30 @@ data class ConnectionState(
 
     /** Why the AI tools can't be used, in plain words, or null when they can. */
     fun aiProblem(settings: AppSettings): String? = when {
-        !settings.audioMuseReady -> "AudioMuse isn't set up. Add it in Settings › Connections."
+        // A Siansa Beats before 0.26 has the songs' sound but doesn't search by words: said as it is, not as a fault.
+        !settings.wordsReady && settings.beatsReady && BeatsSound.available ->
+            "Describing music in words needs Siansa Beats 0.26 or newer, or AudioMuse-AI (Settings › Connections)."
+        !settings.wordsReady -> "${app.siansa.data.Offered.soundServices} isn't set up. Add it in Settings › Connections."
         !network -> "You're offline."
         // Its picks would mostly be songs that aren't on the phone.
         settings.downloadedOnly -> "Only downloaded music is on."
-        audioMuse == false -> "AudioMuse isn't answering."
+        // Siansa Beats searches by words itself (0.26): AudioMuse being away doesn't matter then.
+        audioMuse == false && !(settings.beatsReady && BeatsSound.answers(BeatsSound.WORDS)) -> "AudioMuse-AI isn't answering."
         else -> null
+    }
+
+    /**
+     * Why what's found from how songs sound (song radio, similar songs, Song path, Keep playing) can't be used, or
+     * null when it can: Siansa Beats answers those once it has the songs' sound ([BeatsSound]), so AudioMuse needn't
+     * be set up or answering; without Siansa Beats, as [aiProblem] (the owner, 11 Nov).
+     */
+    fun soundProblem(settings: AppSettings): String? = when {
+        settings.beatsReady && BeatsSound.available -> when {
+            !network -> "You're offline."
+            settings.downloadedOnly -> "Only downloaded music is on."
+            else -> null
+        }
+        else -> aiProblem(settings)
     }
 }
 
@@ -146,7 +164,7 @@ class Connection(
             }
             val s = settings()
             val server = if (s.navidromeUrl.isBlank()) null else answers(reachabilityUrl(s.navidromeUrl))
-            val audioMuse = if (s.audioMuseUrl.isBlank()) null else answers(s.audioMuseUrl.trimEnd('/') + "/")
+            val audioMuse = audioMuseToAsk(s)?.let { answers(it) }
             // Replaced by a newer check while asking (the network changed): that one has the answer.
             ensureActive()
             val before = _state.value
@@ -185,3 +203,10 @@ internal fun retryDelayMs(attempt: Int): Long = when (attempt) {
     2 -> 30_000L
     else -> 3 * 60_000L
 }
+
+/**
+ * The AudioMuse-AI address a connection check asks, or null when there's nothing to ask: no address, or the service
+ * switched off in Settings › Services (it was still asked every check while off).
+ */
+internal fun audioMuseToAsk(s: app.siansa.data.AppSettings): String? =
+    if (s.audioMuseReady) s.audioMuseUrl.trimEnd('/') + "/" else null

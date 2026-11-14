@@ -146,7 +146,7 @@ internal fun BookPageHeader(
     Column(
         Modifier
             .fillMaxWidth()
-            .background(Brush.verticalGradient(0f to color, 0.75f to color.copy(alpha = 0.35f), 1f to surface))
+            .softFade(color, surface)
             .statusBarsPadding()
             .padding(top = 56.dp, start = Space.Page, end = Space.Page),  // spacing: exact (below the top bar)
     ) {
@@ -228,14 +228,15 @@ private val CARD_COVER_WIDTH = 100.dp
 @Composable
 private fun BookCard(book: Book, progress: BookProgress?, label: String, onOpen: () -> Unit) {
     val graph = LocalGraph.current
-    val colors = tileColors("book-${book.id}")
+    // In the look chosen for Home's cards (the owner, 13 Nov): its own colours, softened, plain, or the cover's.
+    val paint = cardPaint(tileColors("book-${book.id}"), book.cover, "book-${book.id}")
     val chapter = progress?.let { book.chapterAt(it.currentSec) }
     Box(
         Modifier
             .fillMaxWidth()
             .height(180.dp)
             .clip(RoundedCornerShape(16.dp))
-            .background(Brush.linearGradient(listOf(colors.first, colors.second)))
+            .cardFill(paint, RoundedCornerShape(16.dp))
             .clickable(onClick = onOpen)
             .testTag("bookCard"),
     ) {
@@ -243,22 +244,19 @@ private fun BookCard(book: Book, progress: BookProgress?, label: String, onOpen:
             Cover(book.cover, 300, Modifier.size(width = CARD_COVER_WIDTH, height = 148.dp), RoundedCornerShape(8.dp))
             if (progress?.started == true && !progress.finished) {
                 // ▶ on the cover continues where you were (owner's decision on #521).
-                FilledIconButton(
-                    onClick = { graph.bookPlayer.playOrToggle(book, progress.currentSec); AppLog.i("Books", "Continue \"${book.title}\" from Home") },
-                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = Space.Small).size(40.dp).testTag("bookContinue"),
-                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = Accent, contentColor = OnAccent),
-                ) {
-                    // ⏸ while this book plays: the button pauses it (#553).
-                    val playing by graph.bookPlayer.state.collectAsStateWithLifecycle()
-                    val now = playing.book?.id == book.id && playing.playing
-                    Icon(if (now) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, if (now) "Pause ${book.title}" else "Continue ${book.title}", Modifier.size(24.dp))
-                }
+                // ⏸ while this book plays: the button pauses it (#553).
+                val playing by graph.bookPlayer.state.collectAsStateWithLifecycle()
+                val now = playing.book?.id == book.id && playing.playing
+                RoundPlayButton(
+                    now, if (now) "Pause ${book.title}" else "Continue ${book.title}", 40.dp, 24.dp,
+                    Modifier.align(Alignment.BottomCenter).padding(bottom = Space.Small).testTag("bookContinue"),
+                ) { graph.bookPlayer.playOrToggle(book, progress.currentSec); AppLog.i("Books", "Continue \"${book.title}\" from Home") }
             }
         }
         // The words start a page's gap after the cover, which sits a page's gap in: the cover's width plus both.
         Column(Modifier.align(Alignment.TopStart).padding(start = CARD_COVER_WIDTH + Space.Page + Space.Page, top = Space.Page, end = Space.Page)) {
             Text(label.uppercase(), style = MaterialTheme.typography.labelSmall, color = Accent, fontWeight = FontWeight.Bold)
-            WholeWordsText(book.title, MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold), color = Color.White, maxLines = 2)
+            WholeWordsText(book.title, MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold), color = paint.text, maxLines = 2)
             Text(
                 listOfNotNull(
                     book.author.takeIf { it.isNotBlank() },
@@ -266,20 +264,20 @@ private fun BookCard(book: Book, progress: BookProgress?, label: String, onOpen:
                     chapter?.let { "Chapter ${it.index + 1} of ${book.chapters.size}" },
                 ).joinToString("\n"),
                 style = MaterialTheme.typography.bodySmall,
-                color = Color.White.copy(alpha = 0.85f),
+                color = paint.faint,
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
             )
         }
         if (progress?.started == true && !progress.finished) {
             Column(Modifier.align(Alignment.BottomStart).padding(start = CARD_COVER_WIDTH + Space.Page + Space.Page, end = Space.Page, bottom = Space.Page)) {
-                Text("${bookLength(progress.leftSec)} left", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.85f))
+                Text("${bookLength(progress.leftSec)} left", style = MaterialTheme.typography.bodySmall, color = paint.faint)
                 Spacer(Modifier.height(Space.Tight))
                 LinearProgressIndicator(
                     progress = { progress.fraction.toFloat() },
                     modifier = Modifier.fillMaxWidth().height(4.dp), // spacing: exact (a hairline bar)
                     color = Accent,
-                    trackColor = Color.White.copy(alpha = 0.2f),
+                    trackColor = paint.text.copy(alpha = 0.2f),
                 )
             }
         }
@@ -308,6 +306,8 @@ fun BookScreen(nav: NavController, id: String) {
         derivedStateOf { if (listState.firstVisibleItemIndex == 0) listState.firstVisibleItemScrollOffset.toFloat() else 100_000f }
     }
     val barAlpha = titleBarAlpha(scrolled, headerPx)
+    // What the page's Play does now (it knows where you were, a podcast's episode too), for the bar's Play.
+    var barPlay by remember { mutableStateOf<() -> Unit>({}) }
     Box(Modifier.fillMaxSize().background(surface)) {
         LoadBox(page, Modifier) { b ->
             // Loaded here: a list's content block isn't composable (issue #521).
@@ -318,10 +318,16 @@ fun BookScreen(nav: NavController, id: String) {
             val current = position?.currentSec ?: 0.0
             val chapterNow = if (b.podcast) null else b.chapterAt(current)
             val finished = !b.podcast && progress?.finished == true
+            androidx.compose.runtime.SideEffect {
+                barPlay = { graph.bookPlayer.playOrToggle(b, if (position != null && !position.finished) position.currentSec else 0.0) }
+            }
             LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomBarPadding(Space.Section))) {
                 item {
                     BookPageHeader(b, color, surface, bookDetails(b, episodeList.size.takeIf { b.podcast && it > 0 }, finished), position) {
-                        BookActions(b, progress, position)
+                        // Dynamic colours: Play in the cover's colour, as an album's (the owner, 10 Nov: books and podcasts too).
+                        androidx.compose.runtime.CompositionLocalProvider(
+                            LocalPlayColours provides rememberPageColours(b.cover, pageBackdrop(surface, color), where = "Book page", tint = color),
+                        ) { BookActions(b, progress, position) }
                     }
                 }
                 if (b.podcast) {
@@ -369,7 +375,26 @@ fun BookScreen(nav: NavController, id: String) {
                 }
             }
         }
-        FadingTitleBar(nav, book?.title ?: "Book", color, barAlpha)
+        // Play in the bar once the page's own has scrolled under it, as on every page (the owner, 10 Nov).
+        val b = book
+        val barColours = rememberPageColours(b?.cover, pageBackdrop(surface, color), where = "Book page bar", tint = color)
+        FadingTitleBar(nav, book?.title ?: "Book", color, barAlpha, actions = {
+            BarReveal(b != null && listState.firstVisibleItemIndex > 0) {
+                if (b != null) {
+                    val now = playing.book?.id == b.id && playing.playing
+                    BarPlayButton(
+                        radio = false,
+                        colour = barColours?.controls ?: Accent,
+                        onColour = barColours?.onControls ?: MaterialTheme.colorScheme.onPrimary,
+                        playing = now,
+                        onClick = {
+                            barPlay()  // what the page's own Play does: carries on where you were, or pauses
+                            AppLog.i("Books", "${if (now) "Pause" else "Play"} \"${b.title}\" from its title bar")
+                        },
+                    )
+                }
+            }
+        })
     }
 }
 

@@ -1,5 +1,6 @@
 package app.siansa.ui
 
+import app.siansa.net.soundReady
 import androidx.compose.material.icons.rounded.AutoAwesome
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -387,7 +388,7 @@ fun PlaylistMenuButton(
                 )
             }
             // Song Alchemy (issue #208): new songs that sound like the whole playlist blended together.
-            if (graph.settings.current.audioMuseReady) {
+            if (graph.settings.current.soundReady) {
                 val nav = LocalNav.current
                 DropdownMenuItem(
                     text = { Text("More like this playlist") },

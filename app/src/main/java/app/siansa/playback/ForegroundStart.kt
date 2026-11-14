@@ -10,10 +10,19 @@ import android.app.ActivityManager
 internal fun mayStartForeground(startInForegroundRequired: Boolean, playing: Boolean, importance: Int): Boolean =
     !startInForegroundRequired ||
         importance <= ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND ||
-        // Playing is only enough while the service is still in the foreground (the app counts as running a foreground
-        // service): once Android has taken that away, asking again from the background is refused, and Media3 crashed
-        // on the refusal (0.52.0-dev, a cast update arriving in the background).
-        (playing && importance <= ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND_SERVICE)
+        // Playing may always ask: a resume from the notification or headphones after a long pause comes from the
+        // background, and without the foreground Android cut the app's network while the screen was off, so the next
+        // song couldn't load and the music stopped (the owner's, 10 Nov). Android's refusal (0.52.0-dev, a cast update)
+        // is caught now (PlaybackService.onUpdateNotification, SafeNotificationProvider), so asking no longer crashes.
+        playing
+
+/** Network errors worth trying again for a while: the connection may come back (a stalled tunnel, a blocked app). */
+internal fun keepsTryingAfter(errorCode: Int): Boolean =
+    errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED ||
+        errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT
+
+/** Checks after a network error (every 2.5 s): about two minutes. */
+internal const val NETWORK_RESCUES = 48
 
 /** Whether [e] is Android refusing to start a service in the foreground from the background (Android 12+). */
 internal fun refusedForeground(e: Throwable): Boolean =

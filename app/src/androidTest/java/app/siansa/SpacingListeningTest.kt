@@ -35,6 +35,22 @@ class SpacingListeningTest : SpacingCheck() {
         assertEven("Year to months", months.top - year.bottom, app.siansa.ui.TIME_MACHINE_GAP, tolerance = 1.dp)
     }
 
+    /** Your listening: the page's name, the period and the range chips are one even gap apart, as on the time machine (the owner, 12 Nov). */
+    @Test fun reportHeaderIsEvenlySpaced() {
+        compose.setContent {
+            SiansaTheme {
+                app.siansa.ui.ReportTitle("Your October", "October 2026") {
+                    androidx.compose.material3.FilterChip(selected = true, onClick = {}, label = { androidx.compose.material3.Text("This month") })
+                }
+            }
+        }
+        val name = compose.onNodeWithTag("reportName").getBoundsInRoot()
+        val title = compose.onNodeWithTag("reportTitle").getBoundsInRoot()
+        val ranges = compose.onNodeWithTag("ranges").getBoundsInRoot()
+        assertEven("Name to title", title.top - name.bottom, app.siansa.ui.TIME_MACHINE_GAP, tolerance = 1.dp)
+        assertEven("Title to ranges", ranges.top - title.bottom, app.siansa.ui.TIME_MACHINE_GAP, tolerance = 1.dp)
+    }
+
     /** Recent searches: the rows are one height, follow each other without gaps, and their words sit in the middle (issue #177). */
     @Test fun recentSearchRowsAreEvenlySpaced() {
         val searches = listOf("alt-j", "bonobo", "vance joy").map { app.siansa.data.RecentSearch(it) }
@@ -94,12 +110,12 @@ class SpacingListeningTest : SpacingCheck() {
             SiansaTheme {
                 Column {
                     Row(Modifier.height(androidx.compose.foundation.layout.IntrinsicSize.Min)) {
-                        app.siansa.ui.StatTile("2,241", "minutes listened", "37 hours", Modifier.weight(1f).fillMaxHeight(), app.siansa.ui.Brand.AmberDeep)
-                        app.siansa.ui.StatTile("585", "plays", null, Modifier.weight(1f).fillMaxHeight(), app.siansa.ui.Brand.VioletDeep)
+                        app.siansa.ui.StatTile("2,241", "minutes listened", "37 hours", Modifier.weight(1f).fillMaxHeight(), app.siansa.ui.Accent)
+                        app.siansa.ui.StatTile("585", "plays", null, Modifier.weight(1f).fillMaxHeight())
                     }
                     Row(Modifier.height(androidx.compose.foundation.layout.IntrinsicSize.Min)) {
-                        app.siansa.ui.StatTile("430", "artists", "95 new to you", Modifier.weight(1f).fillMaxHeight(), app.siansa.ui.Brand.PlumHigh)
-                        app.siansa.ui.StatTile("471", "different songs", null, Modifier.weight(1f).fillMaxHeight(), app.siansa.ui.Brand.PlumHigh)
+                        app.siansa.ui.StatTile("430", "artists", "95 new to you", Modifier.weight(1f).fillMaxHeight())
+                        app.siansa.ui.StatTile("471", "different songs", null, Modifier.weight(1f).fillMaxHeight())
                     }
                 }
             }

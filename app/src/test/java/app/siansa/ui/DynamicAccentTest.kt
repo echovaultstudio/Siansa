@@ -1,6 +1,7 @@
 package app.siansa.ui
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -86,8 +87,118 @@ class DynamicAccentTest {
         assertTrue("red: $seed", seed.red > 0.7f && seed.green < 0.3f)
     }
 
+    // Issue #1027: the owner's two covers, as their palettes read them.
+    private val moreData = swatches(
+        9119 to 0xFF1E1E1E, 626 to 0xFFA3938E, 621 to 0xFFBFBFBF, 575 to 0xFFDADADA, 560 to 0xFFD6D6D6, 496 to 0xFF24272D,
+        428 to 0xFF1D1D1C, 388 to 0xFF536A94, 325 to 0xFF6B3F3B, 283 to 0xFFCBCBCB, 233 to 0xFF8EBC82, 230 to 0xFF191919,
+    )
+    private val pianoDnb = swatches(
+        9740 to 0xFF000000, 481 to 0xFF37393A, 417 to 0xFF56595D, 407 to 0xFF131415, 383 to 0xFF949794, 364 to 0xFF4A4C4F,
+        362 to 0xFF838792, 346 to 0xFF424448, 333 to 0xFF62666B, 300 to 0xFF6D7072, 268 to 0xFF262726, 181 to 0xFFC1C069,
+    )
+
+    /** A cover's pixels: so many of each colour, as ARGB. */
+    private fun pixels(vararg runs: Pair<Int, Long>): IntArray = runs.flatMap { (n, c) -> List(n) { c.toInt() } }.toIntArray()
+
+    @Test
+    fun blackAndWhiteWithStripesOfThreeColoursIsSilver() {
+        // MORE D4TA: black and white, with red, green and blue stripes of the same size. Blue was a guess.
+        val seed = DynamicAccent.seedOf(moreData)!!
+        assertTrue("grey: $seed", DynamicAccent.chroma(seed) < 0.04f)
+        val c = DynamicAccent.of(seed, DynamicAccent.backdropOf(Color(0xFF3A3A3A)))!!.controls
+        assertTrue("silver: $c", DynamicAccent.chroma(c) < 0.02f && c.red > 0.7f)
+    }
+
+    @Test
+    fun aSmallYellowTitleIsYellowNotKhaki() {
+        // Piano Drum & Bass: black and grey, a bright yellow title. The palette blends its letters with the grey: khaki.
+        val cover = pixels(9800 to 0xFF000000, 3000 to 0xFF6E7174, 1200 to 0xFF3A3C3D, 220 to 0xFFE8E21E, 180 to 0xFFC1C069)
+        val seed = DynamicAccent.pick(pianoDnb, cover)!!
+        assertTrue("lively yellow, not khaki: $seed", DynamicAccent.chroma(seed) > 0.6f && seed.red > 0.8f && seed.green > 0.8f && seed.blue < 0.3f)
+        val c = DynamicAccent.of(seed, DynamicAccent.backdropOf(Color(0xFF151615)))!!.controls
+        assertTrue("a soft yellow on now playing: $c", c.red > c.blue + 0.2f && c.green > c.blue + 0.2f)
+    }
+
+    @Test
+    fun aBrightCoverGetsACalmerColourOfItsOwnHue() {
+        // A loud blue cover gives a steel blue that sits with it (the owner, 10 Nov), not the loud blue itself.
+        for (backdrop in listOf(DynamicAccent.backdropOf(Color(0xFF1E3A8A)), pageBackdrop(Color(0xFFF7F7F7), Color(0xFF1E3A8A)))) {
+            val c = DynamicAccent.of(Color(0xFF1E5BFF), backdrop)!!
+            assertTrue("blue: ${c.controls}", c.controls.blue > c.controls.red && c.controls.blue > c.controls.green)
+            assertTrue("calm: ${c.controls}", DynamicAccent.chroma(c.controls) <= 0.5f)
+            assertTrue("stands out", DynamicAccent.contrast(c.controls, backdrop) >= DynamicAccent.CONTROLS_CONTRAST)
+        }
+    }
+
+    @Test
+    fun aBigColourIsTakenAsItIs() {
+        // UKF's sepia fills the cover: its pixels aren't searched for a livelier tan, nor for the red lights near its hue.
+        val sepia = swatches(979 to 0xFF151413, 950 to 0xFF292421, 945 to 0xFFAD998D, 889 to 0xFF947D72, 872 to 0xFF6D5851, 120 to 0xFFD23A2A)
+        val cover = pixels(2000 to 0xFF151413, 1800 to 0xFFAD998D, 120 to 0xFFD23A2A)
+        assertTrue(DynamicAccent.pick(sepia, cover) == DynamicAccent.seedOf(sepia))
+    }
+
+    @Test
+    fun oneColourfulLogoOnBlackStillCounts() {
+        // One colour, however small, is the cover's colour: only spots of different colours are silver.
+        val seed = DynamicAccent.seedOf(swatches(9000 to 0xFF0A0A0C, 600 to 0xFFDADADA, 300 to 0xFF2050D0, 200 to 0xFF3060E0))!!
+        assertTrue("blue: $seed", seed.blue > 0.7f && seed.red < 0.3f)
+    }
+
+    @Test
+    fun tooFewPixelsKeepThePalettesColour() {
+        val seed = Color(0xFFC1C069)
+        assertTrue(DynamicAccent.vividOf(seed, pixels(5 to 0xFFE8E21E, 9000 to 0xFF000000)) == seed)
+    }
+
+    @Test
+    fun onAPageItStandsOutLightOrDark() {
+        // Issue #1028: album, artist and playlist pages, in the dark and the light theme, with a little of the cover's colour.
+        val pages = mapOf(
+            "dark" to pageBackdrop(Color(0xFF121212), Color(0xFF6A2E1E)),
+            "light" to pageBackdrop(Color(0xFFF7F7F7), Color(0xFF6A2E1E)),
+            "light, pale cover" to pageBackdrop(Color(0xFFFFFFFF), Color(0xFFE9E1CF)),
+        )
+        val seeds = covers.values.map { it.first } + Color(0xFF808080)
+        pages.forEach { (name, page) ->
+            seeds.forEach { seed ->
+                val c = DynamicAccent.of(seed, page)!!
+                assertTrue("$name, $seed: Play ${DynamicAccent.contrast(c.controls, page)}", DynamicAccent.contrast(c.controls, page) >= DynamicAccent.CONTROLS_CONTRAST)
+                assertTrue("$name, $seed: play symbol", DynamicAccent.contrast(c.onControls, c.controls) >= DynamicAccent.TEXT_CONTRAST)
+            }
+        }
+    }
+
+    @Test
+    fun aLightPageGetsADarkerColourOfTheSameHue() {
+        val page = pageBackdrop(Color(0xFFF7F7F7), Color(0xFF203440))
+        val c = DynamicAccent.of(Color(0xFF09A2E5), page)!!.controls
+        assertTrue("blue: $c", c.blue > c.red && c.blue > c.green)
+        assertTrue("darker than the page: $c", c.luminance() < page.luminance())
+    }
+
     @Test
     fun noSwatchesNoColour() {
         assertNull(DynamicAccent.seedOf(emptyList()))
+    }
+
+    /** The owner, 13 Nov: an artist page's header in khaki, its Play in steel blue (the picture's sky) — a clash. */
+    @Test
+    fun playKeepsToTheHeadersFamily() {
+        val khaki = Color(0xFF8A7B55)
+        val steelBlue = Color(0xFF4A7BB5)
+        // Another family: Play takes the header's colour, and its colours are then of khaki's hue (yellowish).
+        assertTrue(DynamicAccent.inFamily(steelBlue, khaki) == khaki)
+        val c = DynamicAccent.of(steelBlue, pageBackdrop(Color(0xFF121212), khaki), tint = khaki)!!.controls
+        assertTrue("of the header's family, not blue: $c", c.red > c.blue && c.green > c.blue)
+        // The same family (an orange logo on a red cover) keeps the seed; grey on either side changes nothing.
+        val red = Color(0xFFB02020)
+        val orange = Color(0xFFE08020)
+        assertTrue(DynamicAccent.inFamily(orange, red) == orange)
+        assertTrue(DynamicAccent.inFamily(steelBlue, Color(0xFF808080)) == steelBlue)
+        assertTrue(DynamicAccent.inFamily(Color(0xFF808080), khaki) == Color(0xFF808080))
+        assertTrue(DynamicAccent.inFamily(steelBlue, null) == steelBlue)
+        // Without a header tint (now playing), as before.
+        assertTrue(DynamicAccent.of(steelBlue, Color(0xFF101418))!!.controls.blue > 0.5f)
     }
 }

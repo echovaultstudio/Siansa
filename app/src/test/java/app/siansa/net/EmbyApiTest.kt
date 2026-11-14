@@ -264,6 +264,34 @@ class EmbyApiTest {
         assertEquals("a1", cover("""{"Id":"s1","AlbumId":"a1"}"""))
     }
 
+    /** A cover replaced on Emby or Jellyfin keeps its address: its tag is what tells (the owner, 11 Nov). */
+    @Test fun aReplacedAlbumCoverIsNoticedByItsTagOnEmbyAndJellyfin() {
+        for (jellyfin in listOf(false, true)) {
+            val covers = app.siansa.covers.CoverVersions
+            covers.forgetTags()
+            val changed = mutableListOf<String>()
+            covers.onChanged = { changed += it }
+            try {
+                val api = EmbyApi(OkHttpClient(), { settings }, jellyfin = jellyfin)
+                fun read(tag: String) = api.parseSong(
+                    app.siansa.data.AppJson.parseToJsonElement("""{"Id":"s1","Type":"Audio","AlbumId":"a1","AlbumPrimaryImageTag":"$tag"}""") as JsonObject,
+                )
+                read("one")
+                read("one")
+                assertEquals(emptyList<String>(), changed)
+                read("two")
+                assertEquals("jellyfin=$jellyfin", listOf("a1"), changed)
+                // A song's own picture isn't followed (one tag a song would be tens of thousands).
+                api.parseSong(app.siansa.data.AppJson.parseToJsonElement("""{"Id":"s2","Type":"Audio","ImageTags":{"Primary":"x"}}""") as JsonObject)
+                api.parseSong(app.siansa.data.AppJson.parseToJsonElement("""{"Id":"s2","Type":"Audio","ImageTags":{"Primary":"y"}}""") as JsonObject)
+                assertEquals(listOf("a1"), changed)
+            } finally {
+                covers.onChanged = null
+                covers.forgetTags()
+            }
+        }
+    }
+
     @Test fun anAlbumWithItsCoverOnlyInItsFolderShowsTheFolders() = runBlocking {
         val server = FakeEmby { seen ->
             when {

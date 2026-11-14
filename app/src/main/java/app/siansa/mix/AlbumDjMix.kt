@@ -1,5 +1,6 @@
 package app.siansa.mix
 
+import app.siansa.net.soundReady
 import app.siansa.AppGraph
 import app.siansa.data.Song
 import app.siansa.log.AppLog
@@ -21,6 +22,15 @@ object AlbumDjMix {
     /** The songs of the album DJ mix last started, in its order; empty when none was. */
     val playing: StateFlow<List<String>> = songs
 
+    /**
+     * Ends the album's DJ mix (issue #1033, the DJ mix bar's Stop): its songs play on in the order they're in, without
+     * blends, and the play buttons lose their grooves.
+     */
+    fun stop() {
+        if (songs.value.isNotEmpty()) AppLog.i("AlbumMix", "Stopped")
+        songs.value = emptyList()
+    }
+
     /** Whether [songId] plays as part of an album's DJ mix. */
     fun isOn(songId: String?): Boolean = songId != null && songId in songs.value
 
@@ -28,30 +38,60 @@ object AlbumDjMix {
      * Orders [album]'s songs for the best blends and plays them. Needs AudioMuse's tempo and key; without them the album
      * plays in its own order.
      */
-    suspend fun start(graph: AppGraph, title: String, album: List<Song>) {
-        if (album.isEmpty()) return
-        val ordered = arrange(graph, album)
+    suspend fun start(graph: AppGraph, title: String, list: List<Song>) {
+        if (list.isEmpty()) return
+        // Only when a DJ mix's needs are met (the button isn't offered otherwise; this is the last word).
+        graph.djProblem()?.let { problem ->
+            AppLog.i("AlbumMix", "No DJ mix of \"$title\": $problem")
+            return
+        }
+        // A long playlist or a liked list mixes a random [MAX_MIX_SONGS] of its songs: hours of music, ordered quickly.
+        // Without the songs too long for a DJ mix (a continuous mix of an hour on the album of its songs).
+        val fitting = djMixSongs(list)
+        if (fitting.size < list.size) AppLog.i("AlbumMix", "\"$title\": left out ${list.size - fitting.size} songs longer than ${DJ_LONGEST_SEC / 60} minutes")
+        val album = mixPortion(fitting, Random.Default)
+        if (album.size < fitting.size) AppLog.i("AlbumMix", "\"$title\" has ${list.size} songs: the mix takes ${album.size} of them")
+        val ordered = withContext(Dispatchers.Default) { arrange(graph, album) }
         songs.value = ordered.map { it.id }
         // The player takes commands on the main thread only: started from the background it refused, and nothing played
         // (the owner's log, 7 Nov).
         withContext(Dispatchers.Main) { graph.player.play(ordered) }
         val sorted = ordered.map { it.id } != album.map { it.id }
         AppLog.d("AlbumMix", "Starts with \"${ordered.first().title}\"")
-        AppLog.i("AlbumMix", "DJ mix of \"$title\": ${ordered.size} songs${if (sorted) " in the best order" else " in the album's order"}",
+        val how = when {
+            !lastArrangedByFlow -> " shuffled (no tempo and key to order them by)"
+            sorted -> " in the best order"
+            else -> " in the album's order"
+        }
+        AppLog.i("AlbumMix", "DJ mix of \"$title\": ${ordered.size} songs$how",
             event = "mix.album_dj", fields = mapOf("songs" to ordered.size, "reordered" to sorted))
     }
+
+    /** Whether the last mix was ordered by how its songs blend, or only shuffled: for the log. */
+    private var lastArrangedByFlow = true
 
     private suspend fun arrange(graph: AppGraph, album: List<Song>): List<Song> {
         // Never the same start twice running for one album (the owner): last time's first song, if it was this album.
         val lastFirst = songs.value.firstOrNull()?.takeIf { first -> album.any { it.id == first } }
-        if (album.size < 3 || !graph.settings.current.audioMuseReady) return album.shuffled()
-        val features = runCatching { graph.audioMuse.features(album.map { it.id }) }
+        lastArrangedByFlow = false
+        if (album.size < 3 || !graph.settings.current.soundReady) return album.shuffled()
+        // From Siansa Beats alone: a DJ mix never goes by AudioMuse's tempo (the owner, 11 Nov).
+        val features = runCatching { graph.audioMuse.features(album.map { it.id }, beatsOnly = true) }
             .onFailure { AppLog.w("AlbumMix", "Couldn't read tempo and key: ${it.message}; shuffled instead") }
             .getOrNull()?.associateBy { it.id } ?: return album.shuffled()
-        val energy = energyByRank(album.associate { it.id to features[it.id]?.energy })
+        lastArrangedByFlow = true
+        // Siansa Dev's experiment: the tempo of each song's beat grid (Siansa Beats', through Siansa Beats (dev),
+        // counted as a DJ counts: drum and bass at 174 where AudioMuse often reads 87) orders the mix, AudioMuse's
+        // for the songs without one.
+        val gridTempo = runCatching { graph.profiles.fetch(album.map { it.id }) }.getOrNull().orEmpty()
+            .mapValues { (_, p) -> (p.outro ?: p.intro)?.bpm }.filterValues { it != null }
+        if (gridTempo.isNotEmpty()) {
+            AppLog.i("AlbumMix", "Tempo from the beat grids for ${gridTempo.size} of ${album.size} songs")
+        }
+        val energy = energyByRank(album.associate { it.id to features[it.id]?.drive }, album.associate { it.id to features[it.id]?.driveScale })
         val tracks = album.map { s ->
             val f = features[s.id]
-            DjTrack(s.id, s.artist, 1.0, f?.tempo, f?.key, f?.scale, energy[s.id])
+            DjTrack(s.id, s.artist, 1.0, gridTempo[s.id] ?: f?.tempo, f?.key, f?.scale, energy[s.id])
         }
         val byId = album.associateBy { it.id }
         return pickAlbumOrder(tracks, Random.Default, lastFirst).mapNotNull { byId[it.id] }
@@ -60,20 +100,38 @@ object AlbumDjMix {
 
 /**
  * Whether the album page of [songs] has its DJ mix [mix] playing (issue #965): the queue starts with the mix, in the
- * mix's order, and the mix is that album's songs. Then its Play button keeps the record grooves. Playing the album
+ * mix's order, and the mix is that album's songs (the ones that fit a DJ mix, [djMixSongs]). Then its Play button keeps the record grooves. Playing the album
  * any other way, or anything else, ends it.
  */
 fun albumMixPlaying(queue: List<Song>, songs: List<Song>, mix: List<String>): Boolean =
     mix.isNotEmpty() && queue.size >= mix.size && queue.take(mix.size).map { it.id } == mix &&
-        songs.map { it.id }.toSet() == mix.toSet()
+        songs.map { it.id }.toSet().let { page -> page.containsAll(mix) && (djMixSongs(songs).map { it.id }.toSet().size == mix.size || mix.size == MAX_MIX_SONGS) }
 
 /**
  * Every DJ order of an album's [tracks] (issue #965): from each song in turn, through the rest, each next song the best
  * change from the one before; best blending first ([flowScore]). All songs, each once.
  */
 internal fun albumOrders(tracks: List<DjTrack>): List<List<DjTrack>> =
-    tracks.map { start -> listOf(start) + djOrder(start, tracks, tracks.size - 1) }
+    startsOf(tracks).map { start -> listOf(start) + djOrder(start, tracks, tracks.size - 1) }
         .sortedByDescending { flowScore(it) }
+
+/**
+ * The songs an order may start from: every one on an album; on a long playlist [MAX_STARTS] spread evenly through it,
+ * as each start costs a pass over all the songs for each song.
+ */
+internal fun startsOf(tracks: List<DjTrack>): List<DjTrack> =
+    if (tracks.size <= MAX_STARTS) tracks
+    else List(MAX_STARTS) { i -> tracks[i * tracks.size / MAX_STARTS] }
+
+/** The songs a DJ mix takes from [songs]: all of them, or a random [MAX_MIX_SONGS] from a longer list. */
+fun mixPortion(songs: List<Song>, random: Random): List<Song> =
+    if (songs.size <= MAX_MIX_SONGS) songs else songs.shuffled(random).take(MAX_MIX_SONGS)
+
+/** At most this many starts are tried for a long playlist's order. */
+internal const val MAX_STARTS = 24
+
+/** A DJ mix takes at most this many songs (a day of music), so ordering stays quick on a phone. */
+const val MAX_MIX_SONGS = 300
 
 /**
  * The order an album's DJ mix plays (issue #965): one of the orders that blend best, picked at random, so the mix

@@ -62,6 +62,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
@@ -289,7 +290,7 @@ fun DownloadsScreen(nav: NavController) {
             item {
                 Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
                     HorizontalDivider()
-                    // How music downloads and the covers kept on the phone are in Settings › Data (v1.0, the owner).
+                    // How music downloads and the covers kept on the phone are in Settings › Streaming & storage (v1.0, the owner).
                     PageLink(
                         "Download settings",
                         "${if (settings.downloadWifiOnly) "Wi-Fi only" else "Any connection"} · ${qualityLabel(settings.downloadKbps)} · " +
@@ -612,7 +613,7 @@ private fun StopAllButton(onStop: () -> Unit) {
 internal fun DownloadControlForTest() = DownloadControl(Icons.Rounded.Pause, "Pause") { }
 
 /**
- * Settings › Data's downloads (v1.0, the owner: everything Downloads had in Settings): the music kept on the phone
+ * Settings › Streaming & storage's downloads (v1.0, the owner: everything Downloads had in Settings): the music kept on the phone
  * (opening Downloads to see, add or remove it), on which connections and at what quality it downloads, the storage
  * limit, Remove all downloads, and the covers kept on the phone (Download all covers and the image cache).
  */
@@ -635,16 +636,8 @@ internal fun DownloadSettings(nav: NavController) {
             if (settings.downloadWifiOnly) "A VPN counts as mobile data, so nothing downloads while one is on."
             else "Downloads on any connection, including mobile data and a VPN.",
         )
-        Text("Download quality", style = MaterialTheme.typography.bodyLarge)
-        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
-            downloadQualities.forEach { kbps ->
-                FilterChip(
-                    selected = settings.downloadKbps == kbps,
-                    onClick = { graph.settings.setDownloads(kbps = kbps) },
-                    label = { Text(if (kbps == 0) "Original" else "Opus $kbps") },
-                )
-            }
-        }
+        // A drop-down, not chips (the owner, 13 Nov): the words were cut off.
+        ChoicePicker("Download quality", settings.downloadKbps, downloadQualities, "download-quality", ::qualityLabel) { graph.settings.setDownloads(kbps = it) }
         Hint(ServerWords.downloadHint(settings.sourceKind))
         Text("Storage limit", style = MaterialTheme.typography.bodyLarge)
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
@@ -686,8 +679,27 @@ internal fun DownloadSettings(nav: NavController) {
     }
 }
 
+/** The image cache's size as a slider over [cacheSizes] (100 MB to 5 GB, then No limit), the size beside it. */
+@Composable
+internal fun ImageCacheSlider(selected: Int, onPick: (Int) -> Unit) {
+    val index = cacheSizes.indexOf(selected).takeIf { it >= 0 } ?: cacheSizes.lastIndex
+    var value by remember(selected) { mutableFloatStateOf(index.toFloat()) }
+    val shown = cacheSizes[value.toInt().coerceIn(0, cacheSizes.lastIndex)]
+    Row(Modifier.fillMaxWidth().testTag("imageCacheSlider"), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
+        androidx.compose.material3.Slider(
+            value = value,
+            onValueChange = { value = kotlin.math.round(it) },
+            onValueChangeFinished = { onPick(cacheSizes[value.toInt().coerceIn(0, cacheSizes.lastIndex)]) },
+            valueRange = 0f..cacheSizes.lastIndex.toFloat(),
+            steps = cacheSizes.size - 2,
+            modifier = Modifier.weight(1f),
+        )
+        Text(if (shown <= 0) "No limit" else formatMb(shown), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.testTag("imageCacheSize"))
+    }
+}
+
 /**
- * Download all covers (issue #302), in Settings › Data's Covers on the phone: the switch, when it may run, a
+ * Download all covers (issue #302), in Settings › Streaming & storage's Covers on the phone: the switch, when it may run, a
  * network check, and its progress with Stop or Download covers now.
  */
 @Composable
@@ -697,7 +709,7 @@ private fun CoverDownloadSection() {
     val settings by graph.settings.state.collectAsStateWithLifecycle()
     var refresh by remember { mutableIntStateOf(0) }
     Heading("Download all covers")
-    Hint("Fetches every album, artist and playlist cover in the background, so browsing never waits for one. Runs after each library sync and once a day, and only fetches covers that aren't on the phone yet. Choose No limit under Image cache, below, so none are removed again.")
+    Hint("Fetches every cover in the background, after each sync and once a day, so browsing never waits. Choose No limit under Image cache, below, so none are removed again.")
     val download by CoverDownload.progress.collectAsStateWithLifecycle()
     // Check the network again once a download finishes.
     var wasRunning by remember { mutableStateOf(false) }
@@ -744,8 +756,10 @@ private fun CoverDownloadSection() {
             modifier = Modifier.fillMaxWidth(),
         )
         Text(
-            "Checked ${download.done} of ${download.total} · ${download.downloaded} downloaded" +
-                if (download.failed > 0) " · ${download.failed} failed" else "",
+            // Before the covers, the artists are looked up for their photos (Looking up artist photos: 40 of 900).
+            download.note?.takeIf { download.total == 0 }
+            ?: ("Checked ${download.done} of ${download.total} · ${download.downloaded} downloaded" +
+                if (download.failed > 0) " · ${download.failed} failed" else ""),
             style = MaterialTheme.typography.bodyMedium,
         )
         OutlinedButton(onClick = { CoverDownload.stop(context) }) { Text("Stop") }
@@ -777,7 +791,7 @@ internal fun ImageCacheSection() {
     }
     HorizontalDivider()
     Heading("Image cache")
-    Hint("Covers and artist photos are saved as they load, so they show instantly next time and without a connection. The oldest are removed when the cache is full. With no limit nothing is removed, and Android won't clear them when the phone runs low on space.")
+    Hint("Covers and artist photos are saved as they load, so they show at once next time, also offline. The oldest are removed when the cache is full; with no limit nothing is removed.")
     used.valueOrNull()?.let { bytes ->
         Text(
             if (settings.imageCacheMb <= 0) "In use: ${formatBytes(bytes)}" else "In use: ${formatBytes(bytes)} of ${formatMb(settings.imageCacheMb)}",
@@ -785,15 +799,8 @@ internal fun ImageCacheSection() {
         )
     }
     Text("Maximum size", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.testTag("imageCacheLabel"))
-    Row(Modifier.horizontalScroll(rememberScrollState()).testTag("imageCacheChips"), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
-        cacheSizes.forEach { mb ->
-            FilterChip(
-                selected = settings.imageCacheMb == mb,
-                onClick = { graph.settings.setImageCacheMb(mb) },
-                label = { Text(if (mb <= 0) "No limit" else formatMb(mb)) },
-            )
-        }
-    }
+    // A slider over the sizes (the owner, 13 Nov), No limit at its end; the size shows beside it.
+    ImageCacheSlider(settings.imageCacheMb) { graph.settings.setImageCacheMb(it) }
     // Its tag on a box around it: the box takes the button's whole touch area, as the chips above count theirs.
     Box(Modifier.testTag("imageCacheClear")) {
         OutlinedButton(onClick = {

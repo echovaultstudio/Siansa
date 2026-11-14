@@ -147,9 +147,6 @@ class CarouselStore(context: Context) {
 
     suspend fun get(id: String): Carousel? = all().firstOrNull { it.id == id }
 
-    /** The carousel for [hour] on [day], if any ([carouselFor]). */
-    suspend fun forHour(hour: Int, day: Int): Carousel? = carouselFor(all(), hour, day)
-
     suspend fun save(carousel: Carousel) {
         json.update { list -> list.map { if (it.id == carousel.id) carousel.copy(version = it.version + 1) else it } }
     }

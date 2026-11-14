@@ -1,6 +1,6 @@
 # Troubleshooting
 
-First steps for any problem: update Siansa, turn on **Debug logs** (**Settings › Help**), make the problem happen a
+First steps for any problem: update Siansa, turn on **Debug logs** (**Settings › Help & feedback**), make the problem happen a
 few times, then use **Report a problem** there. See [Reporting problems](privacy-and-logs.md#report-a-problem).
 
 ## Can't connect to my server
@@ -27,7 +27,7 @@ Song radio, similar songs or similar albums say "AudioMuse doesn't know this son
 
 1. **Has AudioMuse-AI analysed it?** New songs need its analysis first. Check in AudioMuse-AI, or run an analysis.
 2. **Several music servers in AudioMuse-AI?** Each server's name must be set in **Settings › Connections**, in the
-   card of that music server (Server name in AudioMuse), exactly as AudioMuse-AI shows it. See
+   card of that music server (Server name in AudioMuse-AI), exactly as AudioMuse-AI shows it. See
    [Several music servers](audiomuse.md#several-music-servers-in-one-audiomuse-ai).
 3. **Does AudioMuse-AI know the song on that server?** It links a second server's songs by analysis or by
    **Align** in its setup. To check, ask AudioMuse-AI directly, replacing `TOKEN`, `NAME` and `ID`:
@@ -57,6 +57,23 @@ none of its own, Siansa shows the first song's on the album page, so the page an
 a grey square means Emby or Jellyfin has no cover on that album: give the album one there (Identify, or a
 `cover.jpg` in its folder) and it shows everywhere.
 
+## A cover is missing or old
+
+Siansa shows the picture your server sends, and keeps it on the phone so it shows at once the next time.
+
+- **A blue disc or a star** (Navidrome) is Navidrome's own stand-in for a cover it doesn't have right now: the
+  library is still being scanned, an artist's photo hasn't been fetched yet, or the song has no picture. Siansa
+  shows it but never keeps it, and asks again 5 seconds later, then after 30 seconds, then every two minutes while
+  it's on screen, so the real cover appears by itself once Navidrome has it (Navidrome sometimes sends the stand-in
+  for a picture it does have, when many covers are asked for at once), in lists, the mini player, Now playing and the
+  notification alike. A song whose picture stays a disc everywhere, in Navidrome's own web page too, needs a full
+  scan there (Navidrome only re-reads a file whose modification time changed).
+- **A cover you replaced on the server** shows after the next sync. **Sync all** (the music source at the top of
+  Home) checks every cover kept on the phone: stand-ins kept by older versions are removed, and a cover that changed
+  on Navidrome, Emby or Jellyfin is fetched fresh. Nothing else in the image cache is thrown away.
+- Still wrong? **Settings › Streaming & storage › Covers on the phone › Clear image cache** starts over, and the log (lines marked `Covers`) says
+  what was removed and replaced.
+
 ## Songs show the wrong length, or the seek bar jumps
 
 Some files carry a wrong length in their header (often Dolby E-AC3 .m4a). Siansa uses your server's length when
@@ -64,7 +81,7 @@ the file's is far off. If it's still wrong, rescan the file on your server and s
 
 ## Plays don't show up on my server, Last.fm or ListenBrainz
 
-- Check **Settings › Scrobbling and history**: is the service on, and is the user switched on under **Users**?
+- Check **Settings › Scrobbling & history**: is the service on, and is the user switched on under **Users**?
 - A song counts only after the chosen share of it, or four minutes. Songs of 30 seconds or less never count.
 - Offline plays wait and are sent later.
 
@@ -78,6 +95,9 @@ closed. Siansa tries once more by itself; it's only a problem if the second try 
 - Levelling needs ReplayGain tags in your files, or the Siansa plugin as the source.
 - Smart crossfades need the plugin's measurements; until a song is measured, the fixed length is used.
 - Crossfades don't happen while casting, with Repeat one, or while the sleep timer lets a song finish.
+- Repeat and shuffle are changed in Siansa only, in the app or with Siansa's own Shuffle and Repeat buttons in
+  Android Auto and the notification: a car's or a headset's own repeat or shuffle button doesn't change them (some
+  cars switched repeat on by themselves when the song changed). The log says when one asked.
 
 ## Nothing on a TV or speaker when casting
 

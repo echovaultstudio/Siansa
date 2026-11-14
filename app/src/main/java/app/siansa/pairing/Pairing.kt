@@ -109,7 +109,7 @@ object Pairing {
         /** The services' names, as the phone lists what it would send ("AudioMuse, Last.fm"). */
         val names: List<String>
             get() = listOfNotNull(
-                "AudioMuse".takeIf { audioMuseUrl.isNotBlank() },
+                "AudioMuse-AI".takeIf { audioMuseUrl.isNotBlank() },
                 "the AI service".takeIf { aiProvider.isNotBlank() },
                 "Audiobookshelf".takeIf { audiobookshelfUrl.isNotBlank() },
                 "Last.fm".takeIf { lastFmSession.isNotBlank() },

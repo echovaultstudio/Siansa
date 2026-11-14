@@ -1,7 +1,7 @@
 # Install Siansa and report a problem
 
 Siansa is a music player for your own Navidrome, Emby or Jellyfin server, with mixes made for the moment. Found a
-problem? Please report it from the app (Settings › Help › Report a problem). Thank you!
+problem? Please report it from the app (Settings › Help & feedback › Report a problem). Thank you!
 Problems and ideas go in the [Siansa repository on GitHub](https://github.com/echovaultstudio/Siansa/issues), where the code is too.
 
 Website and sign-up: <https://siansa.app>
@@ -48,19 +48,19 @@ Open Siansa, go to **Settings**, enter these, use **Test** next to each, then **
 
 1. **Your music server**: Navidrome or Emby. Address (for example `http://192.168.1.10:4533`), user name, password.
 2. **AudioMuse-AI**: its address (for example `http://192.168.1.10:8000`) and its API token if you use one.
-   If your AudioMuse-AI serves several music servers, also fill in **Server name in AudioMuse**.
+   If your AudioMuse-AI serves several music servers, also fill in **Server name in AudioMuse-AI**.
 3. Optional: **AI**: the service, its key and model.
 
 ## Install the plugin in AudioMuse-AI
 
 1. In AudioMuse-AI, open **Plugins › Repositories** and add this address:
    ```
-   https://raw.githubusercontent.com/echovaultstudio/siansa-audiomuse-plugin/main/manifest.json
+   https://raw.githubusercontent.com/echovaultstudio/siansa-beats/main/manifest.json
    ```
 2. On the **Catalog** tab, install **Siansa Analysis** and apply the restart.
 3. Open **Plugins › Siansa Analysis › Settings** and use **Measure all songs** to measure your library.
    A big library takes hours or days, and AudioMuse-AI pauses its own jobs while a round runs.
-4. In Siansa, go to **Settings › Crossfade and levelling** and choose the plugin.
+4. In Siansa, go to **Settings › Sound** and choose the plugin.
 
 ## Report a problem
 
@@ -68,7 +68,7 @@ Open Siansa, go to **Settings**, enter these, use **Test** next to each, then **
 2. Look at the [open issues](https://github.com/echovaultstudio/Siansa/issues) first. Someone may have reported it already: add a 👍 or a comment instead.
 
 The most useful reports say what you did, what you expected and what happened. A log helps a lot:
-in Siansa, go to **Settings › Help › Show the log**, then **Share**, and attach the file, or paste the part around the problem.
+in Siansa, go to **Settings › Help & feedback › Show the log**, then **Share**, and attach the file, or paste the part around the problem.
 
 **Before you post anything**
 - Never paste passwords, tokens or API keys. Siansa's log never has them, but check anyway.

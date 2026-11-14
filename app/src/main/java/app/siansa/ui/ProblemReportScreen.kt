@@ -123,7 +123,7 @@ fun ProblemReportScreen(nav: NavController) {
                         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                     }) { Text("Open the issue") }
                 }
-                OutlinedButton(onClick = { nav.popBackStack() }, modifier = Modifier.focusRing()) { Text("Done") }
+                OutlinedButton(onClick = { nav.popBackStack() }, modifier = Modifier.tvFocusGroup().focusRing()) { Text("Done") }
             } else {
                 ReportBody(
                     happened = happened,
@@ -182,10 +182,7 @@ internal fun ReportBody(
             else "Debug logs are off, so nothing is being recorded. Turn them on and repeat the problem.",
         )
         Hint(
-            "Tell us what went wrong. Your words are posted as a short note in the public beta testers repo. " +
-                "The whole log stays private: it's kept on the Siansa server and in a private GitHub repository, and may be " +
-                "read with AI tools to find the problem. It records every request in full, including your server's address " +
-                "and what you played. Passwords, tokens and API keys are removed.",
+            "Tell us what went wrong. Your words are posted in Siansa's public GitHub repository. The log stays private: it holds your server's address and what you played, with passwords, tokens and API keys removed, and may be read with AI tools.",
         )
         if (app.siansa.BuildConfig.TV_APP) {
             // On the TV, Android's own text box, which a phone's keyboard can type and paste into (issue #860).
@@ -216,7 +213,7 @@ internal fun ReportBody(
             Text("I made the problem happen a few times with debug logs on", style = MaterialTheme.typography.bodyMedium)
         }
         error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium) }
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.tvFocusGroup(), verticalAlignment = Alignment.CenterVertically) {
             Button(onClick = onSend, enabled = ready && !busy, modifier = Modifier.focusRing().testTag("report-send")) { Text("Send report") }
             if (busy) {
                 Spacer(Modifier.width(Space.Medium))

@@ -302,7 +302,7 @@ object AnimatedCovers {
                 builder.data(file).diskCachePolicy(CachePolicy.DISABLED)
             }
             is Kind.Animated -> {
-                val key = "cover:${app.siansa.covers.CoverVersions.cacheId(coverId)}:${kind.size}"
+                val key = app.siansa.covers.CoverCache.diskKey(coverId, kind.size)
                 builder.data(graph.source.coverUrl(coverId, kind.size)).diskCacheKey(key)
                     .httpHeaders(NetworkHeaders.Builder().set(CoverStore.WANT_ANIMATION, "1").build())
             }

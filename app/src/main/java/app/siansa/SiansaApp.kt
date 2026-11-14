@@ -38,6 +38,8 @@ class SiansaApp : Application(), SingletonImageLoader.Factory {
         AppLog.init(this, graph.settings.current.logging)
         AppLog.watchLifecycle(this)
         graph.mixResume.watch()
+        // The cover colours kept on the phone, so pages seen before have theirs in their first frame (CoverToneStore).
+        Thread({ app.siansa.ui.CoverToneStore.load(this) }, "cover-tones").start()
         // A step count each time the app comes to the front, so the next mix can tell walking from sitting
         // (issue #247): one reading, only while movement is switched on for the vibes.
         registerActivityLifecycleCallbacks(object : Application.ActivityLifecycleCallbacks {
@@ -53,6 +55,11 @@ class SiansaApp : Application(), SingletonImageLoader.Factory {
             override fun onActivityDestroyed(activity: android.app.Activity) = Unit
         })
         Diagnostics.start(this)
+        // The TV keeps little (StorageBudget): say what's there and make room, away from the main thread.
+        if (BuildConfig.TV_APP) graph.scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching { app.siansa.data.TvStorage.tidy(this@SiansaApp) { graph.songCache } }
+                .onFailure { AppLog.w("Storage", "Couldn't check what's kept on the TV: ${it.message}") }
+        }
         // Each start: what the app is running on and with, then why it last closed.
         if (AppLog.enabled) AppLog.i("Session", sessionHeader())
         ExitReasons.logNew(this)
@@ -79,7 +86,7 @@ class SiansaApp : Application(), SingletonImageLoader.Factory {
     }
 
     /**
-     * Covers are kept on disk as they load, up to the size chosen in Settings › Data (or without a
+     * Covers are kept on disk as they load, up to the size chosen in Settings › Streaming & storage (or without a
      * limit), so scrolling back is instant and works offline. With no limit they're kept in the app's
      * files rather than its cache, so Android doesn't remove them when it runs short of space.
      *
@@ -88,7 +95,8 @@ class SiansaApp : Application(), SingletonImageLoader.Factory {
      * animated album as an animation is what ran the app out of memory.
      */
     override fun newImageLoader(context: PlatformContext): ImageLoader {
-        val mb = graph.settings.current.imageCacheMb
+        // The TV app has no page for the size and keeps far less: what its storage budget gives it (StorageBudget).
+        val mb = if (BuildConfig.TV_APP) app.siansa.data.StorageBudget.ofTv(this).picturesMb else graph.settings.current.imageCacheMb
         imageCacheMbInUse = mb
         val unlimited = mb <= 0
         val bytes = if (unlimited) Long.MAX_VALUE / 4 else mb.coerceAtLeast(50) * 1024L * 1024L
@@ -101,7 +109,8 @@ class SiansaApp : Application(), SingletonImageLoader.Factory {
         }
         return ImageLoader.Builder(context)
             .components {
-                add(OkHttpNetworkFetcherFactory(callFactory = { graph.imageHttp }))
+                // Every picture is kept on the phone except the server's stand-in for one it doesn't have right now.
+                add(OkHttpNetworkFetcherFactory(callFactory = { graph.imageHttp }, cacheStrategy = { app.siansa.covers.KeepRealCovers() }))
                 // Animated covers shown as stills: their first frame (Android's still decoder fails on some).
                 add(app.siansa.covers.FirstFrameDecoder.Factory())
             }
@@ -137,9 +146,9 @@ class SiansaApp : Application(), SingletonImageLoader.Factory {
             .eventListener(object : coil3.EventListener() {
                 override fun onError(request: coil3.request.ImageRequest, result: coil3.request.ErrorResult) {
                     val data = request.data.toString()
-                    val what = Regex("[?&]id=([^&]+)").find(data)?.groupValues?.get(1)?.let { id ->
-                        "cover $id (size ${Regex("[?&]size=(\\d+)").find(data)?.groupValues?.get(1) ?: "original"})"
-                    } ?: data.substringAfterLast('/').take(60)
+                    // Never the address itself: Emby's and Jellyfin's carry the sign-in.
+                    val what = app.siansa.covers.CoverAddress.of(data)?.let { "cover ${it.id} (size ${it.size ?: "original"})" }
+                        ?: data.substringBefore('?').substringAfterLast('/').take(60)
                     val e = result.throwable
                     AppLog.w("Image", "Couldn't show $what: ${e.javaClass.simpleName}: ${e.message}")
                     // A cover that can't be read may be an error message Navidrome sent once and the cache
@@ -165,14 +174,15 @@ class SiansaApp : Application(), SingletonImageLoader.Factory {
             "Android ${android.os.Build.VERSION.RELEASE} (SDK ${android.os.Build.VERSION.SDK_INT}) on ${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}",
             "memory class ${am?.memoryClass ?: "?"} MB",
             network,
-            "Navidrome ${if (s.navidromeReady) "set" else "not set"}, AudioMuse ${if (s.audioMuseReady) "set" else "not set"}, AI ${if (s.aiReady) "on" else "off"}",
+            "Navidrome ${if (s.navidromeReady) "set" else "not set"}, AudioMuse-AI ${if (s.audioMuseReady) "set" else "not set"}, AI ${if (s.aiReady) "on" else "off"}",
             "quality Wi-Fi ${if (s.transcodeWifiKbps > 0) "Opus ${s.transcodeWifiKbps}" else "original"}, mobile ${if (s.transcodeMobileKbps > 0) "Opus ${s.transcodeMobileKbps}" else "original"}",
             "ReplayGain ${s.replayGain.label}",
             // How songs blend, so a DJ session's log says what it was set to (0.52.0-dev).
-            "crossfade ${s.crossfade.name.lowercase()} ${s.crossfadeSeconds} s, beat-matched ${s.beatMatch.name.lowercase()}, ${s.blendBars} bars, bass swap ${if (s.bassSwap) "on" else "off"}",
-            "song cache ${mb(s.songCacheMb)}, image cache ${mb(s.imageCacheMb)}",
+            "crossfade ${s.crossfade.name.lowercase()} ${s.crossfadeSeconds} s, beat-matched in DJ playback, ${s.blendBars} bars",
+            if (BuildConfig.TV_APP) app.siansa.data.StorageBudget.ofTv(this).let { "song cache ${it.songsMb} MB, image cache ${it.picturesMb} MB, animated covers kept ${it.animatedMb} MB" }
+            else "song cache ${mb(s.songCacheMb)}, image cache ${mb(s.imageCacheMb)}",
             "animated covers ${if (s.animatedCovers) "on" else "off"}, download all covers ${if (s.coverDownload) (if (s.coverDownloadAnyWifi) "any Wi-Fi" else "home") else "off"}",
-            "scrobbling: " + listOfNotNull("Navidrome".takeIf { s.scrobbleNavidrome }, "Last.fm".takeIf { s.lastFmReady }, "ListenBrainz/Koito".takeIf { s.listenBrainzReady }).joinToString(", ").ifEmpty { "off" },
+            "scrobbling: " + listOfNotNull("Navidrome".takeIf { s.scrobbleNavidrome }, "Siansa Beats".takeIf { with(app.siansa.net.BeatsListens) { s.scrobbleBeats && s.beatsReady } }, "Last.fm".takeIf { s.lastFmReady }, "ListenBrainz/Koito".takeIf { s.listenBrainzReady }).joinToString(", ").ifEmpty { "off" },
         ).joinToString(" · ")
     }
 

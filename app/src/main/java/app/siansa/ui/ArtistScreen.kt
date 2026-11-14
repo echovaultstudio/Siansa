@@ -1,6 +1,16 @@
 package app.siansa.ui
 
 import app.siansa.data.versionLabels
+import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.Dp
+import app.siansa.data.AlbumCategory
+import kotlinx.coroutines.launch
 
 import androidx.compose.ui.platform.testTag
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -16,6 +26,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -38,10 +49,13 @@ import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.withFrameNanos
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -98,11 +112,42 @@ private suspend fun appearsOnOf(graph: app.siansa.AppGraph, page: ArtistPage): L
         .filterNot { album -> page.albums.any { it.id == album.id } }
         .sortedWith(compareByDescending<Album> { it.year ?: 0 }.thenBy { app.siansa.data.normalizeKey(it.name) })
 
-private val HERO = 380.dp
+// A third shorter than it was (the owner, 14 Nov: too much empty space above the songs).
+private val HERO = 260.dp
+
+/** The dark band at the foot of the artist's picture, behind the name at rest. */
+private val HERO_NAME_BAND = 120.dp
+
+/** The › at the end of the release types, in line under the Play button: the page's edge, then half of Play's width. */
+internal val ARTIST_MORE_INSET = Space.Page + (BIG_PLAY_SIZE - MORE_BUTTON) / 2
+
+/** The songs listed for an artist with no releases of their own; Play plays them all. */
+private const val THEIR_SONGS = 50
+
+/**
+ * The line under an artist's name: "22 releases · 262 songs", or for one with no releases of their own, the albums by
+ * others they're on ([appearsOn], once known) and their songs there.
+ */
+internal fun aboutArtist(releases: Int, songs: Int, appearsOn: Int?): String = listOfNotNull(
+    when {
+        releases > 0 -> "$releases ${if (releases == 1) "release" else "releases"}"
+        appearsOn != null && appearsOn > 0 -> "On $appearsOn ${if (appearsOn == 1) "album" else "albums"} by others"
+        else -> null
+    },
+    if (songs > 0) "$songs ${if (songs == 1) "song" else "songs"}" else null,
+).joinToString(" · ")
+
+/** The release-type tabs' place in the artist page's grid: after the picture's spacer and the buttons (issue #1029). */
+private const val TABS_KEY = "release-type-tabs"
+private const val TABS_INDEX = 2
+/** The item with the artist's buttons (after the picture's room). */
+private const val BUTTONS_INDEX = 1
+private const val FOOTER_KEY = "artist-page-end"
 
 /**
  * An artist with what Navidrome knows about them: photo, biography, top songs, discography grouped by
- * release type and similar artists. The photo fills the top and blends away behind the page as it scrolls.
+ * release type and similar artists. The photo fills the top and the page fades in over it as it scrolls; the
+ * release types are tabs under the buttons, pinned under the title bar once scrolled to (issue #1029).
  */
 @Composable
 fun ArtistScreen(nav: NavController, id: String) {
@@ -139,62 +184,176 @@ fun ArtistScreen(nav: NavController, id: String) {
             if (value == null) value = emptyList()
         }
     }
+    // An artist with no releases of their own (the owner, 14 Nov): the songs they're credited on, on others' albums, to
+    // list and play. Only Radio could be pressed on their page.
+    val credited by loadState("credited-$id") {
+        val loaded = snapshotFlow { page.valueOrNull() }.filterNotNull().first()
+        if (loaded.albums.isEmpty()) graph.library.songsCredited(loaded.artist) else emptyList()
+    }
+    // Albums by others they're credited on (Appears on), started with the page.
+    val others by loadState("appears-$id") { appearsOnOf(graph, snapshotFlow { page.valueOrNull() }.filterNotNull().first()) }
     val gridState = rememberLazyGridState()
     val scrolled by remember {
         derivedStateOf { if (gridState.firstVisibleItemIndex == 0) gridState.firstVisibleItemScrollOffset.toFloat() else 100_000f }
     }
     val p = page.valueOrNull()
     val artistInfo = info.valueOrNull()
+    // What Play and Shuffle play: their own songs, or with no releases of their own, the songs they're credited on.
+    val playable = p?.let { if (it.albums.isEmpty()) credited.valueOrNull().orEmpty() else it.songs }.orEmpty()
+    // The line under the name on the picture.
+    val about = p?.let { aboutArtist(it.albums.size, playable.size, others.valueOrNull()?.size) }.orEmpty()
+    var aboutHeight by remember { mutableIntStateOf(0) }
+    val aboutGap = with(LocalDensity.current) { Space.Tight.toPx() }
+    // The artist's picture, or their newest release's cover: the page's colour, and its buttons' with Dynamic colours on
+    // pages (issue #1028).
+    // Navidrome fetches an artist's photo when they're looked up, and gives it a new picture id; the library keeps the
+    // id from its last sync, which may still stand for the placeholder star (the owner, 10 Nov: Rezident). Looked up
+    // once a run, as Home's artist radios are (ArtistPhotos), and the new id kept.
+    val freshCovers by graph.artistPhotos.covers.collectAsStateWithLifecycle()
+    // Whether the photo has been looked up: until then the page's colours wait, so they're taken from the picture the
+    // page ends up with, not from the one before it (the owner, 14 Nov: colours changing while the page is open).
+    var photoLookedUp by remember(id) { mutableStateOf(graph.artistPhotos.lookedUp(id)) }
+    LaunchedEffect(p?.artist?.id) {
+        val artist = p?.artist ?: return@LaunchedEffect
+        try {
+            graph.artistPhotos.refresh(listOf(artist))
+            // Looked up from somewhere else at this moment (Home's artist radios): its answer is waited for, a few seconds at most.
+            kotlinx.coroutines.withTimeoutOrNull(3_000) { while (!graph.artistPhotos.lookedUp(artist.id)) kotlinx.coroutines.delay(50) }
+        } finally {
+            photoLookedUp = true
+        }
+    }
+    val artistCover = p?.artist?.let { freshCovers[it.id] ?: it.coverArt }
+    val pictureId = artistCover ?: p?.albums?.firstOrNull()?.coverArt
+    // The picture's colours are used at once when they're known (kept from an earlier visit: the library keeps the photo
+    // a lookup found), else once the lookup has ended.
+    val colourOf = pictureId.takeIf { photoLookedUp || CoverToneStore.has(it) }
+    val tint = rememberCoverColor(colourOf)
 
+    // Release types as tabs at the top (issue #1029): All, Albums, EPs, Singles, DJ-mixes… one at a time, only while
+    // the page is open. Once scrolled up to the title bar, they stay pinned under it.
+    var typeName by rememberReleaseTypeFilter()
+    val types = remember(p) { p?.let { releaseTypeChoices(it.albums) }.orEmpty() }
+    val type = chosenReleaseType(typeName, types)
+    val density = LocalDensity.current
+    val barPx = WindowInsets.statusBars.getTop(density) + with(density) { HERO_TITLE_BAR.toPx() }
+    val tabsPinned by remember(types.isNotEmpty(), barPx) {
+        derivedStateOf {
+            if (types.isEmpty()) return@derivedStateOf false
+            val tabs = gridState.layoutInfo.visibleItemsInfo.firstOrNull { it.key == TABS_KEY }
+            if (tabs == null) gridState.firstVisibleItemIndex > TABS_INDEX else tabs.offset.y < barPx
+        }
+    }
+    // The heart in the title bar once the page's own (with Radio, Shuffle and Play) has gone up under it, never both at
+    // once (the owner, 10 Nov).
+    val buttonsGone by remember(barPx) {
+        derivedStateOf {
+            val header = gridState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == BUTTONS_INDEX }
+            if (header == null) gridState.firstVisibleItemIndex > BUTTONS_INDEX else header.offset.y + header.size.height < barPx
+        }
+    }
+    val scope = rememberCoroutineScope()
+    // Room at the end of the page, so the tabs can always be scrolled up under the title bar, however few releases
+    // the chosen type has (the owner, 10 Nov: choosing Albums, one album, while pinned threw the page back to the top,
+    // as it had too little left to scroll). Just enough: the page's end stays where it is for a long list.
+    var footerPx by remember { mutableIntStateOf(0) }
+    LaunchedEffect(gridState, barPx) {
+        snapshotFlow {
+            val info = gridState.layoutInfo
+            val tabs = info.visibleItemsInfo.firstOrNull { it.key == TABS_KEY }
+            val end = info.visibleItemsInfo.firstOrNull { it.key == FOOTER_KEY }
+            if (tabs == null || end == null) null else (info.viewportSize.height - barPx.toInt() - (end.offset.y - tabs.offset.y)).coerceAtLeast(0)
+        }.collect { needed -> if (needed != null) footerPx = needed }
+    }
+    fun choose(t: AlbumCategory?) {
+        val pinned = tabsPinned
+        typeName = t?.name
+        // Pinned: the tabs stay where they are and the chosen releases start right under them. Room enough first
+        // (worked out exactly once the new releases are laid out), then the scroll.
+        if (pinned) {
+            footerPx = gridState.layoutInfo.viewportSize.height
+            scope.launch {
+                withFrameNanos { }
+                gridState.scrollToItem(TABS_INDEX)
+                gridState.scrollBy(-barPx)
+            }
+        }
+    }
+
+    // With Dynamic colours, only Play takes the picture's colour (the owner, 10 Nov): Radio, Shuffle and the heart stay
+    // as they are, so the row doesn't shout.
+    val playColours = rememberPageColours(
+        colourOf, pageBackdrop(MaterialTheme.colorScheme.surface, tint), where = "Artist page", tint = tint,
+        pending = colourOf == null && pictureId != null,
+    )
     HeroPage(
         title = p?.artist?.name ?: "Artist",
         heroHeight = HERO,
         scrolledPx = scrolled,
         onBack = { nav.popBackStack() },
-        color = rememberCoverColor(p?.artist?.coverArt ?: p?.albums?.firstOrNull()?.coverArt),
+        color = tint,
+        actions = {
+            // Growing in as they fade in, as on every page (BarReveal), not at once.
+            BarReveal(buttonsGone && p != null) {
+                if (p != null) {
+                    FavouriteArtistButton(p.artist, Modifier.testTag("barHeart"), androidx.compose.ui.graphics.Color.White, ICON_SIZE)
+                    // Play too, in the picture's colour, as every page's bar has it once its buttons are gone (the owner, 10 Nov).
+                    if (playable.isNotEmpty()) {
+                        val barPlayback = rememberListPlayback(playable)
+                        BarPlayButton(
+                            radio = false,
+                            colour = playColours?.controls ?: Accent,
+                            onColour = playColours?.onControls ?: MaterialTheme.colorScheme.onPrimary,
+                            playing = barPlayback.playing,
+                            onClick = { barPlayback.press { graph.player.play(playable) } },
+                        )
+                    }
+                }
+            }
+        },
+        pinned = if (tabsPinned) ({ ReleaseTypeTabs(types, type, fade = tint.copy(alpha = 1f), moreInset = ARTIST_MORE_INSET) { choose(it) } }) else null,
+        nameLiftPx = if (about.isEmpty() || aboutHeight == 0) 0f else aboutHeight + aboutGap,
         overlay = {
-            // A soft dark band behind the name, so it reads on any photo, and on a pale placeholder.
+            // A soft dark band at the foot of the picture, where the name sits at first (HeroPage draws the name, which
+            // rides up with the page into the title bar), so it reads on any photo and on a pale placeholder.
             Box(
-                Modifier.fillMaxWidth().background(
+                Modifier.fillMaxWidth().height(HERO_NAME_BAND).background(
                     androidx.compose.ui.graphics.Brush.verticalGradient(
                         listOf(androidx.compose.ui.graphics.Color.Transparent, androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.55f)),
                     ),
                 ),
-            ) {
+            )
+            // How many releases and songs, on the picture under the name (the owner, 14 Nov), not in a band of its own.
+            if (about.isNotEmpty()) {
                 Text(
-                    p?.artist?.name.orEmpty(),
-                    style = MaterialTheme.typography.displaySmall,
-                    fontWeight = FontWeight.Black,
-                    color = androidx.compose.ui.graphics.Color.White,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(start = Space.Page, end = Space.Page, top = Space.Section, bottom = Space.Medium),
+                    about,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.85f),
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    modifier = Modifier.align(Alignment.BottomStart).padding(start = Space.Page, end = Space.Page, bottom = Space.Medium)
+                        .onSizeChanged { aboutHeight = it.height }.testTag("artistAbout"),
                 )
             }
         },
-        // A heart to make the artist a favourite, in Navidrome too (issue #397).
-        actions = { p?.artist?.let { FavouriteArtistButton(it) } },
         image = { modifier ->
             // Navidrome's artist image through its cover endpoint (ND_ARTISTARTPRIORITY), cached and downloaded
             // like every cover (issue #206).
-            Cover(p?.artist?.coverArt ?: "ar-$id", LARGE_COVER, modifier, RectangleShape)
+            Cover(artistCover ?: "ar-$id", LARGE_COVER, modifier, RectangleShape)
         },
     ) { cardModifier ->
         if (p == null) {
             Box(Modifier.statusBarsPadding().padding(top = HERO)) { LoadBox(page) { } }
             return@HeroPage
         }
-        val others by loadState("appears-$id") { appearsOnOf(graph, p) }
         val groups = p.albums.groupBy { it.category }.toList().sortedBy { it.first.ordinal }
+        // All of the page, or only the chosen type's releases.
+        val everything = type == null
         // An album in more than one library shows once for each, with the library's name (issue #376).
         val folderNames by loadState("folder-names") { graph.library.folderNames() }
         val versions = versionLabels(p.albums, folderNames.valueOrNull().orEmpty())
         fun albumLine(album: Album) = listOfNotNull(album.year?.toString(), versions[album.id]).joinToString(" · ")
 
-        // Release-type chips (Albums, Singles, DJ-mixes…): one type at a time, only while the page is open.
-        var typeName by rememberReleaseTypeFilter()
-        val types = releaseTypeChoices(p.albums)
-        val type = chosenReleaseType(typeName, types)
         val shownGroups = onlyReleaseType(groups, type)
         var releasesGrid by rememberGridMode("artist")
         var topExpanded by rememberSaveable(id) { mutableStateOf(false) }
@@ -208,42 +367,54 @@ fun ArtistScreen(nav: NavController, id: String) {
         ) {
             full { HeroSpacer(HERO) }
             full {
-                Column(Modifier.padding(horizontal = Space.Page, vertical = Space.Medium)) {
-                    Text(
-                        listOfNotNull(
-                            // An artist who only appears on others' albums has no releases to count.
-                            if (p.albums.isNotEmpty()) "${p.albums.size} ${if (p.albums.size == 1) "release" else "releases"}" else null,
-                            if (p.songs.isNotEmpty()) "${p.songs.size} songs" else null,
-                        ).joinToString(" · "),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.height(Space.Medium))
-                    PlayButtonRow {
-                        OutlinedButton(onClick = {
+                // Straight under the picture (the owner, 14 Nov), the release types close below.
+                Column(Modifier.padding(start = Space.Page, end = Space.Page, top = Space.Medium)) {
+                    // The owner's layout (9 Nov): the heart on the left; radio, shuffle and Play on the right, like an
+                    // album's similar albums, shuffle and Play.
+                    val playback = rememberListPlayback(playable)
+                    ArtistButtons(
+                        heart = { m -> FavouriteArtistButton(p.artist, m, MaterialTheme.colorScheme.onSurface, ICON_SIZE) },
+                        onRadio = {
                             launch.progressivePicks("${p.artist.name} radio", { graph.radios.artistStart(p.artist) }) {
                                 graph.radios.artistMore(p.artist, it)
                             }
-                        }) {
-                            Icon(Icons.Rounded.Radio, null)
-                            Spacer(Modifier.width(Space.Tight))
-                            Text("Radio")
-                        }
-                        Spacer(Modifier.weight(1f))
-                        if (p.songs.isNotEmpty()) {
-                            IconButton(onClick = { graph.player.play(p.songs, shuffle = true) }) {
-                                Icon(Icons.Rounded.Shuffle, "Shuffle", tint = Accent, modifier = Modifier.size(30.dp))
-                            }
-                            Spacer(Modifier.width(Space.Small))
-                            val playback = rememberListPlayback(p.songs)
-                            BigPlayButton(enabled = true, playing = playback.playing) { playback.press { graph.player.play(p.songs) } }
-                        }
-                    }
+                        },
+                        onShuffle = if (playable.isNotEmpty()) ({ graph.player.play(playable, shuffle = true) }) else null,
+                        playing = playback.playing,
+                        onPlay = if (playable.isNotEmpty()) ({ playback.press { graph.player.play(playable) } }) else null,
+                        playColours = playColours,
+                        below = Space.Tight,
+                    )
                 }
             }
 
-            val topSongs = top
-            if (topSongs == null) {
+            if (types.isNotEmpty()) {
+                // Hidden behind the pinned copy under the title bar once scrolled that far.
+                item(key = TABS_KEY, span = { GridItemSpan(maxLineSpan) }) {
+                    ReleaseTypeTabs(types, type, Modifier.alpha(if (tabsPinned) 0f else 1f), moreInset = ARTIST_MORE_INSET) { choose(it) }
+                }
+            }
+
+            // No releases of their own (the owner, 14 Nov): the songs they're on, in place of Popular.
+            val theirs = if (p.albums.isEmpty()) playable else emptyList()
+            if (theirs.isNotEmpty()) {
+                full {
+                    Text(
+                        "No releases of their own in your library. These are the songs they're on.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = Space.Page).testTag("artistNoReleases"),
+                    )
+                }
+                full { SectionTitle("Their songs") }
+                itemsIndexed(theirs.take(THEIR_SONGS), key = { i, s -> "theirs-$i-${s.id}" }, span = { _, _ -> GridItemSpan(maxLineSpan) }) { index, song ->
+                    SongRow(song = song, onClick = { graph.player.play(theirs, index) })
+                }
+            }
+
+            // Popular songs, on All only: a release type shows just its releases.
+            val topSongs = top.takeIf { everything && theirs.isEmpty() } ?: emptyList()
+            if (everything && top == null && theirs.isEmpty()) {
                 // Keeps the section's place while the first answer comes in, so the page doesn't jump.
                 full { SectionTitle("Popular") }
                 items(TOP_ROWS_SHORT, key = { "top-wait-$it" }, span = { GridItemSpan(maxLineSpan) }) { SongRowPlaceholder() }
@@ -266,10 +437,6 @@ fun ArtistScreen(nav: NavController, id: String) {
                 }
             }
 
-            if (types.isNotEmpty()) {
-                full { ReleaseTypeRow(types, type) { typeName = it?.name } }
-            }
-
             // Discography by release type: Albums, EPs, Singles, Live, Compilations, DJ-mixes…
             shownGroups.forEachIndexed { i, (category, albums) ->
                 full {
@@ -277,7 +444,7 @@ fun ArtistScreen(nav: NavController, id: String) {
                         SectionTitle(
                             if (albums.size == 1) category.single else category.plural,
                             Modifier.weight(1f),
-                            top = if (i == 0 && types.isNotEmpty()) CHIPS_GAP else SECTION_GAP,
+                            top = if (i == 0 && !everything) TABS_GAP else SECTION_GAP,
                         )
                         // The grid / list switch beside the first heading (issue #289).
                         if (i == 0) GridListToggle(releasesGrid, onToggle = { releasesGrid = !releasesGrid }, modifier = Modifier.padding(end = Space.Tight))
@@ -299,7 +466,7 @@ fun ArtistScreen(nav: NavController, id: String) {
             }
 
             // Albums by others they're credited on: a row here, all of them on their own page.
-            val appearsOn = others.valueOrNull().orEmpty()
+            val appearsOn = others.valueOrNull().orEmpty().takeIf { everything }.orEmpty()
             if (appearsOn.isNotEmpty()) {
                 full { AppearsOnTitle { nav.navigate("artist/${p.artist.id}/appears-on") } }
                 full {
@@ -317,12 +484,16 @@ fun ArtistScreen(nav: NavController, id: String) {
                 }
             }
 
-            artistInfo?.biography?.let { bio -> full { Biography(bio) } }
+            if (everything) artistInfo?.biography?.let { bio -> full { Biography(bio) } }
 
-            val similar = SimilarPlugin.mergeArtists(p.artist.name, soundsAlike.valueOrNull().orEmpty(), artistInfo?.similar.orEmpty())
+            val similar = if (!everything) emptyList() else SimilarPlugin.mergeArtists(p.artist.name, soundsAlike.valueOrNull().orEmpty(), artistInfo?.similar.orEmpty())
             if (similar.isNotEmpty()) {
                 full { SectionTitle("Fans also like") }
                 full { SimilarRow(similar, nav) }
+            }
+            // The room that lets the tabs reach the title bar (footerPx).
+            item(key = FOOTER_KEY, span = { GridItemSpan(maxLineSpan) }) {
+                Spacer(Modifier.fillMaxWidth().height(with(density) { footerPx.toDp() }).testTag("artistPageEnd"))
             }
         }
     }
@@ -439,6 +610,11 @@ private fun SimilarRow(similar: List<SimilarArtist>, nav: NavController) {
     val matched by loadState(similar) {
         similar.map { a -> a to (a.id?.let { graph.library.artist(it) } ?: graph.library.artistByName(a.name)) }
     }
+    // Their photos as their own pages have them: Navidrome finds an artist's photo when they're looked up (ArtistPhotos,
+    // once a run each); Cover shows the new ones as they come.
+    LaunchedEffect(matched.valueOrNull()) {
+        matched.valueOrNull()?.mapNotNull { it.second }?.let { graph.artistPhotos.refresh(it) }
+    }
     LazyRow(contentPadding = PaddingValues(horizontal = Space.Medium), horizontalArrangement = Arrangement.spacedBy(Space.Tight)) {
         items(matched.valueOrNull() ?: similar.map { it to null }, key = { it.first.id ?: it.first.name }) { (artist, local) ->
             val target = local?.id ?: artist.id
@@ -465,6 +641,43 @@ private fun SimilarRow(similar: List<SimilarArtist>, nav: NavController) {
                 }
                 Spacer(Modifier.height(Space.Tight))
                 Text(artist.name, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+    }
+}
+
+/**
+ * The artist page's button row: the heart to make the artist a favourite (issue #397) on the left, its drawing in line
+ * with the text above; Radio, Shuffle and Play on the right, on one line. Without songs, only the heart and Radio.
+ * With Dynamic colours, only Play takes the picture's colours ([playColours]); Radio and Shuffle are the page's text
+ * colour, and the heart is red only for a favourite.
+ */
+@Composable
+internal fun ArtistButtons(
+    heart: @Composable (Modifier) -> Unit,
+    onRadio: () -> Unit,
+    onShuffle: (() -> Unit)?,
+    playing: Boolean,
+    onPlay: (() -> Unit)?,
+    playColours: DynamicColours? = null,
+    below: Dp = Space.BelowPlayButton,
+) {
+    val plain = MaterialTheme.colorScheme.onSurface
+    PlayButtonRow(below = below) {
+        heart(Modifier.offset(x = -ICON_INSET))  // spacing: exact (the heart in line with the text above)
+        Spacer(Modifier.weight(1f))
+        IconButton(onClick = onRadio, modifier = Modifier.testTag("artistRadio")) {
+            Icon(Icons.Rounded.Radio, "Radio", tint = plain, modifier = Modifier.size(ICON_SIZE))
+        }
+        if (onShuffle != null) {
+            IconButton(onClick = onShuffle, modifier = Modifier.testTag("shuffleAll")) {
+                Icon(Icons.Rounded.Shuffle, "Shuffle", tint = plain, modifier = Modifier.size(30.dp))
+            }
+        }
+        if (onPlay != null) {
+            Spacer(Modifier.width(Space.Small))
+            WithAccent(playColours?.controls, playColours?.onControls) {
+                BigPlayButton(enabled = true, playing = playing, onPlay = onPlay)
             }
         }
     }

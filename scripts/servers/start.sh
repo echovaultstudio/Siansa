@@ -8,9 +8,13 @@ set -euo pipefail
 ND_VERSION="${ND_VERSION:-0.64.2}"
 EMBY_VERSION="${EMBY_VERSION:-4.8.10.0}"
 JELLYFIN_VERSION="${JELLYFIN_VERSION:-10.10.7}"
-# "latest" asks GitHub for Navidrome's newest release.
+# "latest" asks GitHub for Navidrome's newest release: with the runner's token when there is one (shared runners
+# run into the anonymous rate limit: "KeyError: 'tag_name'"), and the pinned version when GitHub doesn't answer.
 if [ "$ND_VERSION" = latest ]; then
-  ND_VERSION="$(curl -sSL https://api.github.com/repos/navidrome/navidrome/releases/latest | python3 -c 'import json,sys; print(json.load(sys.stdin)["tag_name"].lstrip("v"))')"
+  auth=(); [ -n "${GITHUB_TOKEN:-}" ] && auth=(-H "Authorization: Bearer $GITHUB_TOKEN")
+  newest="$(curl -sSL "${auth[@]}" https://api.github.com/repos/navidrome/navidrome/releases/latest \
+    | python3 -c 'import json,sys; print(json.load(sys.stdin).get("tag_name", "").lstrip("v"))' 2>/dev/null || true)"
+  if [ -n "$newest" ]; then ND_VERSION="$newest"; else ND_VERSION=0.64.2; echo "GitHub didn't say Navidrome's newest release: using $ND_VERSION"; fi
 fi
 echo "Navidrome $ND_VERSION, Emby $EMBY_VERSION, Jellyfin $JELLYFIN_VERSION"
 HERE="$(cd "$(dirname "$0")" && pwd)"

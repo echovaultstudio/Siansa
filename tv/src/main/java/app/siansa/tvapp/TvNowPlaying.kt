@@ -26,7 +26,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.produceState
+import androidx.compose.ui.graphics.drawscope.rotate
 import app.siansa.log.AppLog
+import app.siansa.net.soundReady
 import app.siansa.ui.openSongDetails
 import app.siansa.ui.openSongPath
 import androidx.compose.material.icons.rounded.FastForward
@@ -137,7 +139,7 @@ fun TvNowPlaying() {
             horizontalArrangement = Arrangement.spacedBy(Space.Large * 2),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // Animated covers move here as on the phone (Settings › Playback there: Animated covers), and a song's own
+            // Animated covers move here as on the phone (Settings › Theme there: Animated covers), and a song's own
             // picture shows when it has one. Paused, the cover darkens under a pause sign, as on the Chromecast screen.
             if (!queue) {
                 Box(Modifier.size(COVER_SIZE), contentAlignment = Alignment.Center) {
@@ -167,6 +169,10 @@ fun TvNowPlaying() {
                     }
                 }
                 ProgressBlock(progress, details(state.codec, state.transcodeKbps), windTo, windForward)
+                // What the remote does here, on one line centred under the bar (the owner, 12 Nov; was under the
+                // cover, #1077): the keys bold, the words soft, the three an even gap apart. Not with the lyrics open,
+                // where it was in their way (the owner, 14 Nov).
+                if (showsGuide(panel)) RemoteGuide(Modifier.fillMaxWidth().testTag("tvRemoteHint"))
             }
             when (panel) {
                 Panel.QUEUE -> UpNext(state.queue, state.index, state.auto)
@@ -174,14 +180,20 @@ fun TvNowPlaying() {
                 Panel.NONE -> Unit
             }
         }
-        // What the remote does here, quietly at the foot of the page, and Siansa's logo in the corner.
-        Text(
-            if (queue) "Right  into the list  ·  Back  closes it  ·  ▼  more" else "OK  play / pause   ·   ◀ ▶  previous / next   ·   ▼  more",
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = HINT_ALPHA),
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = Space.Section).testTag("tvRemoteHint"),
-        )
-        TvBrand(Modifier.align(Alignment.BottomEnd).padding(end = TV_EDGE * 2, bottom = Space.Section))
+        // With the list of songs open there's no cover to sit under: what the remote does there stays at the foot of the
+        // page. Siansa's logo is in the corner.
+        if (panel == Panel.QUEUE) {
+            Text(
+                "Right  into the list  ·  Back  closes it  ·  ▼  more",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = HINT_ALPHA),
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = Space.Section).testTag("tvRemoteHint"),
+            )
+        }
+        // Siansa's logo, except with the lyrics open: it sat over their last lines.
+        // Its half circles turn round the bars like a record while a DJ mix plays (the owner, 14 Nov), at 33⅓.
+        val djMix = radioSeed != null && graph.songRadio.mode == app.siansa.mix.ContinuousMode.DJ
+        if (showsGuide(panel)) TvBrand(spinning = djMix && state.isPlaying, modifier = Modifier.align(Alignment.BottomEnd).padding(end = TV_EDGE * 2, bottom = Space.Section))
     }
     val snack = app.siansa.ui.LocalSnack.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
@@ -200,9 +212,9 @@ fun TvNowPlaying() {
             if (artistId != null) add("Go to the artist" to { nav.navigate(TvRoutes.artist(artistId)) })
             if (albumId != null && song.album.isNotBlank()) add("Go to the album" to { nav.navigate(TvRoutes.album(albumId)) })
             // AudioMuse's song path from this song, queued after it once ready (as on the phone's player).
-            if (graph.settings.current.audioMuseReady) add("Song path" to { nav.openSongPath(song.id, fromNowPlaying = true) })
+            if (graph.settings.current.soundReady) add("Song path" to { nav.openSongPath(song.id, fromNowPlaying = true) })
             add("Add to playlist" to { pickPlaylist = true })
-            add("Similar songs" to { nav.navigate("similar/songs/${android.net.Uri.encode(song.id)}") })
+            add("Similar songs" to { nav.navigate(TvRoutes.similarSongs(song.id)) })
             add("Song details" to { nav.openSongDetails(song.id) })
         }
         TvChoices(song.title, choices, onDismiss = { menu = false })
@@ -216,15 +228,37 @@ fun TvNowPlaying() {
     }
 }
 
+/** Whether the remote's guide and Siansa's logo show: not over the lyrics. */
+internal fun showsGuide(panel: Panel): Boolean = panel != Panel.LYRICS
+
 /** Siansa's logo, quietly in the corner (issue #974): the icon and the wordmark, its S in amber, as on the Chromecast screen. */
 @Composable
-internal fun TvBrand(modifier: Modifier = Modifier) {
+internal fun TvBrand(modifier: Modifier = Modifier, spinning: Boolean = false) {
+    // How far the half circles have turned. A record winding down when the mix stops or pauses: on to the next half turn
+    // (where the logo looks as at rest, the circles being alike both sides), then still.
+    val turn = remember { androidx.compose.animation.core.Animatable(0f) }
+    LaunchedEffect(spinning) {
+        if (spinning) {
+            while (true) {
+                turn.animateTo(turn.value + FULL_TURN, androidx.compose.animation.core.tween(RECORD_TURN_MS, easing = androidx.compose.animation.core.LinearEasing))
+            }
+        } else {
+            turn.animateTo(restingTurn(turn.value), androidx.compose.animation.core.tween(RECORD_STOP_MS, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+            turn.snapTo(0f)
+        }
+    }
     Row(modifier.alpha(BRAND_ALPHA).testTag("tvBrand"), horizontalArrangement = Arrangement.spacedBy(Space.Small), verticalAlignment = Alignment.CenterVertically) {
-        // The launcher icon's own drawing (Siansa's frost and amber, in both builds), its middle two thirds.
-        androidx.compose.foundation.Image(
-            androidx.compose.ui.res.painterResource(app.siansa.R.drawable.ic_launcher_foreground), null,
-            Modifier.size(BRAND_ICON).clipToBounds().graphicsLayer { scaleX = ICON_ZOOM; scaleY = ICON_ZOOM },
-        )
+        // The launcher icon's own drawing (Siansa's frost and amber, in both builds), its middle two thirds: the bars,
+        // and its half circles drawn here, so they can turn round the bars.
+        Box(Modifier.size(BRAND_ICON).clipToBounds().graphicsLayer { scaleX = ICON_ZOOM; scaleY = ICON_ZOOM }.testTag(if (spinning) "tvBrandSpinning" else "tvBrandIcon")) {
+            androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(app.siansa.R.drawable.tv_brand_bars), null, Modifier.matchParentSize())
+            androidx.compose.foundation.Canvas(Modifier.matchParentSize()) {
+                val unit = size.width / LOGO_VIEW
+                rotate(turn.value, pivot = androidx.compose.ui.geometry.Offset(LOGO_MIDDLE * unit, LOGO_MIDDLE * unit)) {
+                    LOGO_RINGS.forEach { ring -> drawRing(ring, unit) }
+                }
+            }
+        }
         Text(
             androidx.compose.ui.text.buildAnnotatedString {
                 withStyle(androidx.compose.ui.text.SpanStyle(brush = androidx.compose.ui.graphics.Brush.verticalGradient(listOf(BRAND_AMBER_TOP, BRAND_AMBER_BOTTOM)))) { append("S") }
@@ -276,7 +310,7 @@ private fun ProgressBlock(
     }
 }
 
-private enum class Panel { NONE, QUEUE, LYRICS }
+internal enum class Panel { NONE, QUEUE, LYRICS }
 
 /**
  * The song's lyrics from the server, as on the phone: synced ones follow the song, the line being sung lit and kept in
@@ -308,7 +342,14 @@ private fun LyricsPanel(song: app.siansa.data.Song?, positionMs: () -> Long) {
         following = true
     }
     LaunchedEffect(current, following) { if (following && current >= 0) list.animateScrollToItem((current - LINES_ABOVE).coerceAtLeast(0)) }
-    Column(Modifier.width(QUEUE_WIDTH).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
+    // A soft frosted box just around the lyrics (the owner, 14 Nov): the page behind is the cover blurred, darkened
+    // under the words so they read over any cover.
+    Column(
+        Modifier.width(QUEUE_WIDTH).fillMaxHeight()
+            .background(Color.Black.copy(alpha = LYRICS_BOX_SHADE), RoundedCornerShape(Space.Page))
+            .padding(Space.Section).testTag("tvLyricsBox"),
+        verticalArrangement = Arrangement.spacedBy(Space.Medium),
+    ) {
         Text(
             if (focused) "Lyrics · up and down scroll" else "Lyrics",
             style = MaterialTheme.typography.titleLarge,
@@ -420,9 +461,69 @@ private const val QUEUE_SHOWN = 100
 private val AUTO_MARK = 20.dp
 private val PROGRESS_HEIGHT = 4.dp
 private const val PAUSED_SHADE = 0.45f
+
+/** How dark the box behind the lyrics is. */
+private const val LYRICS_BOX_SHADE = 0.4f
 private val PAUSE_SIGN = 96.dp
 private const val HINT_ALPHA = 0.7f
+/** Between the cover and what the remote does, under it: a section's gap, clear of the cover without drifting off. */
+/** What the remote does on now playing, in two lines that fit under the cover. */
+/** The remote's keys and what they do on the now playing page, in the order shown. */
+internal val REMOTE_GUIDE = listOf("OK" to "play / pause", "◀ ▶" to "previous / next", "▼" to "more")
+
+/** [REMOTE_GUIDE] on one line, centred, the keys bold and the words softer, [GUIDE_GAP] apart. */
+@Composable
+internal fun RemoteGuide(modifier: Modifier = Modifier) {
+    Row(modifier, horizontalArrangement = Arrangement.spacedBy(GUIDE_GAP, Alignment.CenterHorizontally), verticalAlignment = Alignment.CenterVertically) {
+        REMOTE_GUIDE.forEach { (key, does) ->
+            Row(horizontalArrangement = Arrangement.spacedBy(Space.Small), verticalAlignment = Alignment.CenterVertically) {
+                Text(key, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                Text(does, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = HINT_ALPHA))
+            }
+        }
+    }
+}
+
+/** The room between the guide's three parts. */
+private val GUIDE_GAP = Space.Large
 private const val BRAND_ALPHA = 0.75f
+
+/** A turn of the logo's half circles: a record at 33⅓ turns once in 1.8 s. */
+private const val FULL_TURN = 360f
+private const val RECORD_TURN_MS = 1_800
+private const val RECORD_STOP_MS = 700
+
+/** Where the half circles come to rest: the next half turn, where they look as they do at rest. */
+internal fun restingTurn(turned: Float): Float = kotlin.math.ceil(turned / (FULL_TURN / 2)) * (FULL_TURN / 2)
+
+/** The launcher icon's drawing is 108 units across, its bars and half circles round the middle. */
+private const val LOGO_VIEW = 108f
+private const val LOGO_MIDDLE = 54f
+
+/**
+ * One pair of the logo's half circles (ic_launcher_foreground.xml): as wide as [radius] round the middle, each [sweep]
+ * degrees, [width] thick, in the frost colour faint at their ends ([end]) and stronger at their middle ([mid]).
+ */
+internal data class LogoRing(val radius: Float, val sweep: Float, val width: Float, val end: Color, val mid: Color)
+
+/** The inner and outer pair, read off the launcher icon's arcs (their ends and their middles, round 54, 54). */
+internal val LOGO_RINGS = listOf(
+    LogoRing(radius = 22.8f, sweep = 95f, width = 2.6f, end = Color(0x4DAFC2D3), mid = Color(0x8CAFC2D3)),
+    LogoRing(radius = 31.2f, sweep = 94f, width = 2.2f, end = Color(0x22AFC2D3), mid = Color(0x3DAFC2D3)),
+)
+
+/** A pair of half circles, left and right of the middle, faint at their ends, as the icon draws them. */
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawRing(ring: LogoRing, unit: Float) {
+    val r = ring.radius * unit
+    val middle = LOGO_MIDDLE * unit
+    val top = androidx.compose.ui.geometry.Offset(middle - r, middle - r)
+    val box = androidx.compose.ui.geometry.Size(2 * r, 2 * r)
+    val brush = androidx.compose.ui.graphics.Brush.verticalGradient(listOf(ring.end, ring.mid, ring.end), startY = middle - r, endY = middle + r)
+    val stroke = androidx.compose.ui.graphics.drawscope.Stroke(width = ring.width * unit, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+    // Left, round 180°, then right, round 0°.
+    drawArc(brush, 180f - ring.sweep / 2, ring.sweep, useCenter = false, topLeft = top, size = box, style = stroke)
+    drawArc(brush, -ring.sweep / 2, ring.sweep, useCenter = false, topLeft = top, size = box, style = stroke)
+}
 private val BRAND_ICON = 44.dp
 /** The launcher icon's drawing fills the middle two thirds of its square. */
 private const val ICON_ZOOM = 1.5f

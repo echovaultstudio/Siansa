@@ -18,7 +18,7 @@ internal object ServerWords {
     /** Whether Siansa can have the server convert songs (Opus, MP3): Subsonic servers yes, Emby sends the original. */
     fun converts(kind: SourceKind): Boolean = kind == SourceKind.OPENSUBSONIC
 
-    /** Settings › Playback, above the streaming quality. */
+    /** Settings › Streaming & storage, above the streaming quality. */
     fun streamingHint(kind: SourceKind): String =
         if (converts(kind)) {
             "Opus is converted by your server (on Navidrome, with its \"opus\" transcoding profile). It saves data on mobile; the original file is best on Wi-Fi. Applies from the next song."  // server-name: ok (how Navidrome does it)

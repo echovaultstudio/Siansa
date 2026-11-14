@@ -67,6 +67,7 @@ jobs:
 
       - name: Start the servers with the test library
         env:
+          GITHUB_TOKEN: ${{ github.token }}
           ND_VERSION: ${{ matrix.navidrome }}
           EMBY_VERSION: ${{ inputs.emby || matrix.emby }}
           JELLYFIN_VERSION: ${{ inputs.jellyfin || matrix.jellyfin }}

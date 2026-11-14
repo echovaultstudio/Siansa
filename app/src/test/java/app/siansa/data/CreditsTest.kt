@@ -47,6 +47,39 @@ class CreditsTest {
         assertEquals(listOf("DJ Fresh", "Fresh Prince", "Freshlyground", "Fresh"), rankByName("dj fresh", names) { it })
     }
 
+    @Test fun theSongCalledWhatWasTypedComesFirst() {
+        // The owner's searches, 12 Nov.
+        fun song(title: String, artist: String, album: String = "") = Song(id = title, title = title, artist = artist, album = album)
+        val gita = listOf(
+            song("Digital Bath (acoustic)", "Deftones"), song("bLeePs and NoiSes", "The Digital Kid"),
+            song("Insane", "A-Star vs. Digital Cowboy"), song("Gita (sped up version)", "Moderat"), song("Gita", "Moderat", "II"),
+        )
+        assertEquals(listOf("Gita", "Gita (sped up version)"), bestFirst("Gita", gita, { it.title }) { "${it.artist} ${it.album}" }.take(2).map { it.title })
+        val right = listOf(
+            song("Why the Bright Stars Glow", "Valerie June"), song("Unchained Melody", "The Righteous Brothers"),
+            song("Bright Eyes", "Lonely The Brave"), song("The Right Place (Live Mix)", "DJ Seinfeld & Teira"),
+            song("The Right", "DJ Seinfeld • Confidence Man", "If This Is It"),
+        )
+        val found = SearchResults(emptyList(), emptyList(), right)
+        assertEquals(listOf("The Right", "The Right Place (Live Mix)"), found.bestFirst("The right").songs.take(2).map { it.title })
+        // With the artist typed too, the song of just those words is still before the longer one.
+        assertEquals(listOf("The Right", "The Right Place (Live Mix)"), found.bestFirst("dj seinfeld the right").songs.take(2).map { it.title })
+    }
+
+    @Test fun howWellANameAnswersASearch() {
+        assertEquals(0, searchRank("gita", "Gita"))
+        assertEquals(1, searchRank("gita", "Gita (sped up version)"))
+        assertEquals(2, searchRank("bath", "Digital Bath"))
+        assertEquals(3, searchRank("dj seinfeld the right", "The Right", "DJ Seinfeld If This Is It"))
+        assertEquals(4, searchRank("moderat gita", "Gita (sped up version)", "Moderat II"))
+        assertEquals(5, searchRank("gita", "Digital Bath", "Deftones"))
+        assertEquals(5, searchRank("the right", "Why the Bright Stars Glow", "Valerie June"))
+        // Accents and case don't count; albums go by their name with their artist.
+        assertEquals(0, searchRank("BJORK", "Björk"))
+        val albums = listOf(Album("a1", "Digital Nowhere", "Profiler", null), Album("a2", "Gita", "Someone", null))
+        assertEquals("Gita", SearchResults(emptyList(), albums, emptyList()).bestFirst("gita").albums.first().name)
+    }
+
     @Test fun onlyTheArtistsOwnAlbumsAreReleases() {
         val artist = Artist("f", "DJ Fresh")
         val own = Album("al1", "Kryptonite", "DJ Fresh", "f")

@@ -85,7 +85,7 @@ fun PinnedCardSection(nav: NavController, card: PinnedCard, aiDown: String?) {
         else {
             SectionTitle(card.title)
             Text(
-                if (card.contents.fromBooks) "Nothing here yet." else "No songs match yet. Change the card in Settings › Notices and Cards › Cards.",
+                if (card.contents.fromBooks) "Nothing here yet." else "No songs match yet. Change the card in Settings › Home page › Cards.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = Space.Page).testTag("pinnedProblem"),
@@ -103,6 +103,16 @@ private fun PinnedCardLook(card: PinnedCard, content: CardContent, open: () -> U
         return
     }
     val songs = content.songs
+    // The Shortcuts card's look (the owner, 10 Nov): small tiles two to a row, a song's playing it, an album's opening it.
+    if (card.look == CardLook.GRID) {
+        val tiles = if (card.contents == CardContents.ALBUMS) {
+            content.albums.map { a -> GridTile(a.id, a.name, a.coverArt, onClick = { nav.navigate("album/${a.id}") }) }
+        } else {
+            songs.mapIndexed { i, song -> GridTile("$i-${song.id}", song.title, song.cover, onClick = { play(songs, i, false) }) }
+        }
+        TileGrid(card.title, tiles, card.gridSize, onOpenAll = open)
+        return
+    }
     // An album card (issue #663): its tiles and list are its albums; its banner and button play them in turn.
     if (card.contents == CardContents.ALBUMS && card.look in setOf(CardLook.TILES, CardLook.ALBUMS, CardLook.LIST)) {
         if (card.look == CardLook.LIST) {
@@ -156,6 +166,7 @@ private fun PinnedCardLook(card: PinnedCard, content: CardContent, open: () -> U
         }
         CardLook.BUTTON -> PinnedPlayButton(card, songs, open, play, rememberListPlayback(songs))
         CardLook.COVER_ROWS -> CoverRowsCard(nav, card, content, open)
+        CardLook.GRID -> Unit  // drawn above
     }
 }
 
@@ -274,7 +285,7 @@ fun PinnedCardScreen(nav: NavController, id: String) {
             LoadBox(content, Modifier.padding(top = padding.calculateTopPadding())) { found ->
                 val albums = found?.albums.orEmpty()
                 if (albums.isEmpty()) {
-                    Text("No albums match yet. Change the card in Settings › Notices and Cards › Cards.", style = MaterialTheme.typography.bodyMedium,
+                    Text("No albums match yet. Change the card in Settings › Home page › Cards.", style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(Space.Page).testTag("pinnedProblem"))
                 } else {
                     AlbumsGridOrList(albums, page = "pinned-albums", onOpen = { nav.navigate("album/${it.id}") }, modifier = Modifier.fillMaxSize(),
@@ -292,12 +303,15 @@ fun PinnedCardScreen(nav: NavController, id: String) {
         error = (card as? Load.Err)?.message ?: (content as? Load.Err)?.message,
         saveAsPlaylist = true,
         cover = { m -> GeneratedCover(title, colors, m) },
+        // Its name is on its cover, and Play takes the cover's colour, as every page with a drawn cover (the owner, 10 Nov).
+        showTitle = false,
+        coverColour = colors.first,
         header = {
-            CollectionByline(null, null, null, listOfNotNull("Your card", c?.detail, content.valueOrNull()?.songs?.let { "${it.size} songs" }).joinToString(" · "))
-        },
-        actions = {
-            // A new set only for cards from the library: a sound search gives the same answer again.
-            if (c?.source == CardSource.LIBRARY) IconButton(onClick = { round++ }) { Icon(Icons.Rounded.Refresh, "New songs") }
+            PicksRow(
+                listOfNotNull("Your card", c?.detail, content.valueOrNull()?.songs?.let { "${it.size} songs" }).joinToString(" · "),
+                // A new set only for cards from the library: a sound search gives the same answer again.
+                onNewPicks = if (c?.source == CardSource.LIBRARY) ({ round++ }) else null,
+            )
         },
     )
 }

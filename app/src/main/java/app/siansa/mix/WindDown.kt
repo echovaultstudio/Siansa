@@ -1,5 +1,6 @@
 package app.siansa.mix
 
+import app.siansa.net.soundReady
 import app.siansa.AppGraph
 import app.siansa.data.Song
 import app.siansa.log.AppLog
@@ -28,7 +29,7 @@ fun windDownSongs(timerLeftMs: Long?, alone: Boolean, setting: Int): Int? = when
  * The sleep timer's wind down (issue #153): as soon as it's switched on, everything after the current song is
  * swapped for an AudioMuse song path from that song to its "relaxed" mood, long enough to fill the timer, so the
  * music gets calmer and quieter step by step as you fall asleep. Without a path, AudioMuse's calm sound search.
- * The switch also works without a timer: then it queues the number of calm songs set in Settings › Playback, and the
+ * The switch also works without a timer: then it queues the number of calm songs set in Settings › Radios & mixes, and the
  * music ends with them. Playing something new while it's on steers again from that song; stopping playback switches
  * it off (issue #330).
  */
@@ -70,7 +71,7 @@ class WindDown(private val graph: AppGraph) {
     }
 
     private suspend fun steer(seed: Song? = null) {
-        if (!graph.settings.current.audioMuseReady) {
+        if (!graph.settings.current.soundReady) {
             AppLog.w("Sleep", "Wind down skipped: AudioMuse isn't set up")
             return
         }

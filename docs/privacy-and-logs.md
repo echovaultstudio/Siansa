@@ -24,7 +24,7 @@ The full privacy policy: <https://siansa.app/privacy.html>
 
 ## The log
 
-**Settings › Help › Debug logs**. The log helps find problems. While it's on, it writes
+**Settings › Help & feedback › Debug logs**. The log helps find problems. While it's on, it writes
 what Siansa does, including every request to your servers in full: addresses, server IPs, what was asked and how
 it answered.
 
@@ -35,7 +35,7 @@ it answered.
 
 ## Report a problem
 
-**Settings › Help › Report a problem** is the quickest way to tell us something's wrong:
+**Settings › Help & feedback › Report a problem** is the quickest way to tell us something's wrong:
 
 1. Turn on **Debug logs** (in Help, or on the report page).
 2. **Make the problem happen a few times**, so the log shows it more than once.
@@ -56,5 +56,5 @@ Before you send, try to make the problem happen once more with the log on, so th
 
 ## Backups
 
-Backups (**Settings › Backup and restore**) are files you save and keep yourself. They never hold passwords, tokens or API
+Backups (**Settings › Backup & restore**) are files you save and keep yourself. They never hold passwords, tokens or API
 keys, so after restoring on a new phone you sign in to your servers again.

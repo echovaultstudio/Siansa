@@ -47,7 +47,8 @@ library, play history and settings. A user can be on the same server or a differ
 
 ## Showing several users' music together
 
-**Sources** in the menu at the top of Home opens the source filter. There you can:
+**Sources** in the menu at the top of Home opens the Sources sheet: a row per server, with a switch at the right that
+shows or hides its music, a sync button beside it and its libraries under its name; **Sync all** is at the top. There you can:
 
 - **Show other users' music next to yours**, for users on the **same server** as you (for example two logins on
   one Navidrome). Their albums, artists, songs and playlists appear in your library, and everything about their
@@ -55,11 +56,13 @@ library, play history and settings. A user can be on the same server or a differ
   Emby next to Navidrome) can't be shown together: switch to them in **Settings › Connections** instead.
   Siansa recognises your server by its songs, so a user who reaches it at another address (a domain instead
   of an IP) still counts as the same server; while it checks, that user shows "Checking whether it's your server…".
-- **Hide your own music**, to see only another user's.
+- **Hide your own music** (its switch), to see only another user's.
 - **Pick which libraries to show** (Navidrome's music folders, Emby's libraries).
 - **Only downloaded music**: hides everything that isn't on the phone. Handy on a flight.
 - **Sync** one server, or **Sync all** to sync every music library that's shown and Audiobookshelf at once. Each
-  server shows how its sync is going on one small line under its name, with a tick once it's done.
+  server shows how its sync is going on one small line under its name, with a tick once it's done. **Sync all**
+  also checks the covers kept on the phone: one that was missing is fetched fresh, and one that changed on the
+  server is replaced (see [Troubleshooting](troubleshooting.md#a-cover-is-missing-or-old)).
 
 Every server set up in **Settings › Connections** is listed, Audiobookshelf too (with how many books and podcasts it
 has after a sync). Audiobookshelf's books aren't hidden from here: Home's **Arrange** hides their rows.
@@ -70,7 +73,7 @@ Song radios, mixes, the dice and recently played only use what the filter shows.
 playlist, a playlist on your server only takes its own user's songs (Kids' playlists take Kids' songs), and a
 playlist on this phone takes anyone's. Playlists that can't take the songs are greyed out.
 
-**Scrobbling for other users**: in **Settings › Scrobbling and history › Users** you can turn a user off, so songs from their
+**Scrobbling for other users**: in **Settings › Scrobbling & history › Users** you can turn a user off, so songs from their
 library aren't sent anywhere while you listen as you.
 
 ## Playlists on your server
@@ -102,6 +105,8 @@ Siansa shows your music as your server reads its tags, so tag your files the way
   first time.
 - **Several artists on a song:** tag each one (Navidrome: `ARTISTS`; Emby: separate them with `; `). Every
   artist gets a page, and the song shows up there.
+- **Several artists on an album:** tag each album artist (Navidrome: `ALBUMARTISTS`; Emby and Jellyfin: separate
+  them with `; `). Tapping the artist on the album's page then offers each of them.
 - **Compilations:** set the compilation tag (`COMPILATION=1`). An album by "Various Artists" (or "VA") counts as
   a compilation too, also on Emby, which has no such tag.
 - **Song details** (⋮ › **Show details**) shows what the song's tags say, as far as your server passes them on:

@@ -1,5 +1,8 @@
 # AudioMuse-AI and the Siansa plugin
 
+> New to Siansa? [Siansa Beats](siansa-beats.md) is the recommended way to the smart parts. This page is for those
+> who use AudioMuse-AI.
+
 [AudioMuse-AI](https://github.com/NeptuneHub/AudioMuse-AI) runs on your own server next to your music server. It
 listens to every song once (its "analysis") and can then answer questions like "what sounds like this song?" or
 "find songs that sound like *rainy jazz piano*". Siansa asks it those questions. Your music never leaves your
@@ -16,7 +19,7 @@ how it starts and ends, and similar albums and artists.
 | Search by sound, Flow | AudioMuse-AI (text search) |
 | Mood radios (Chill, Focus…), Wind down | AudioMuse-AI (text search) |
 | Song radio, similar songs | AudioMuse-AI, or Navidrome's sonic similarity, or (simpler) Navidrome's similar songs / Emby's Instant Mix |
-| Keep playing in DJ mode | AudioMuse-AI (tempo and key) |
+| Keep playing in DJ mode, DJ mixes | Siansa Beats (0.25 or newer; never AudioMuse-AI's tempo) |
 | Song path | AudioMuse-AI, or the AudioMuse-AI Navidrome plugin |
 | Your sound, sonic fingerprint | AudioMuse-AI |
 | Similar albums, similar artists ("Fans also like") | Siansa Analysis plugin |
@@ -30,7 +33,7 @@ how it starts and ends, and similar albums and artists.
 2. If AudioMuse-AI has a login: either an **API token**, or its **user name and password**.
 3. **Test** runs a text search ("calm piano") to check it all works, then **Save**.
 
-Only if AudioMuse-AI serves more than one music server: **Server name in AudioMuse**, in the card of your music
+Only if AudioMuse-AI serves more than one music server: **Server name in AudioMuse-AI**, in the card of your music
 server under **Servers** (see below).
 
 The AudioMuse-AI connection is the same for every user. The server name is kept per user (see below).
@@ -39,7 +42,7 @@ The AudioMuse-AI connection is the same for every user. The server name is kept 
 
 1. In AudioMuse-AI, open **Plugins › Repositories** and add:
    ```
-   https://raw.githubusercontent.com/echovaultstudio/siansa-audiomuse-plugin/main/manifest.json
+   https://raw.githubusercontent.com/echovaultstudio/siansa-beats/main/manifest.json
    ```
 2. Open the **Catalog** tab, install **Siansa Analysis**, and apply the restart.
 3. AudioMuse-AI checks for new versions by itself. Update from **Plugins** when one is offered. Your measurements
@@ -103,7 +106,7 @@ AudioMuse-AI 3 can serve several music servers (for example Navidrome and Emby).
 name** in AudioMuse-AI (Setup › Music Servers). Siansa must name the right server in every request, or AudioMuse
 answers with the other server's songs or says it doesn't know the song.
 
-In **Settings › Connections**, in the card of your music server, **Server name in AudioMuse** is its name,
+In **Settings › Connections**, in the card of your music server, **Server name in AudioMuse-AI** is its name,
 as AudioMuse-AI shows it (capitals don't matter). Leave it empty for AudioMuse-AI's default server. Each user keeps
 their own: enter the Emby server's name in your Emby user's card, and Navidrome's in your Navidrome user's.
 
@@ -119,3 +122,9 @@ match can't be used for radios and similar music. If Siansa says "AudioMuse does
 The Siansa plugin measures songs on every server: it fetches each song from whichever server has it (0.3.3).
 AudioMuse-AI runs the plugin's 15-minute task once per server; the first run does the work and the others stop
 straight away, so more servers don't make it take longer.
+
+## Siansa Beats
+
+Siansa Beats does everything on this page by itself, and more (DJ mixes, genres from the sound, your listening
+history), with no AudioMuse-AI: see [Siansa Beats](siansa-beats.md). With both set up, Siansa asks Siansa Beats first
+and AudioMuse-AI when Siansa Beats can't answer.

@@ -89,15 +89,6 @@ class BeatMatchTest {
         assertEquals(1f, BeatMatch.eased(1.016f, BeatMatch.EASE_MS + 1), 1e-5f)
     }
 
-    @Test fun theSettingSaysWhereItApplies() {
-        assertTrue(BeatMatchMode.DJ_RADIO.appliesTo(djRadio = true))
-        assertFalse(BeatMatchMode.DJ_RADIO.appliesTo(djRadio = false))
-        assertTrue(BeatMatchMode.EVERYWHERE.appliesTo(djRadio = false))
-        assertFalse(BeatMatchMode.OFF.appliesTo(djRadio = true))
-        assertEquals(BeatMatchMode.OFF, BeatMatchMode.parse(null))  // off unless chosen (issue #822)
-        assertEquals(BeatMatchMode.DJ_RADIO, BeatMatchMode.parse("DJ_RADIO"))
-    }
-
     // ---- In a crossfade plan ----
 
     private fun profile(id: String, outro: BeatEnd?, intro: BeatEnd?, quietTailMs: Long = 0L, headMs: Long = 0L) =
@@ -221,8 +212,12 @@ class BeatMatchTest {
         assertFalse(matched.beatNote!!, matched.beatNote!!.contains("not beat-matched"))
         val elsewhere = Crossfade.plan(CrossfadeMode.SMART, 16_000, song, next, 310_000, 300_000, a, b, beatMatch = false)!!
         assertTrue(elsewhere.beatNote!!, elsewhere.beatNote!!.endsWith("beat-matching is set for DJ radio only"))
-        // Fixed crossfades don't look at beats at all.
+        // Fixed crossfades don't look at beats outside DJ playback; in it, they're beat-matched over the bars set
+        // (the owner, 9 Nov).
         assertNull(Crossfade.plan(CrossfadeMode.FIXED, 16_000, song, next, 310_000, 300_000, a, b)!!.beatNote)
+        val fixedDj = Crossfade.plan(CrossfadeMode.FIXED, 16_000, song, next, 310_000, 300_000, a, b, beatMatch = true, blendBars = 4)!!
+        assertNotNull(fixedDj.beat)
+        assertTrue(fixedDj.beat!!.bars <= 5)
     }
 
     @Test fun oneReadingOffDoesntMoveTheSong() {

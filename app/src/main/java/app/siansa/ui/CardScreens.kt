@@ -1,5 +1,6 @@
 package app.siansa.ui
 
+import androidx.compose.material.icons.rounded.GridView
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -86,17 +87,17 @@ fun CardScreen(nav: NavController, id: String) {
         error = (card as? Load.Err)?.message ?: (songs as? Load.Err)?.message,
         saveAsPlaylist = true,
         cover = { m -> GeneratedCover(title, colors, m) },
+        // Its name is on its cover, and Play takes the cover's colour, as every page with a drawn cover (the owner, 10 Nov).
+        showTitle = false,
+        coverColour = colors.first,
         header = {
-            CollectionByline(null, null, null, listOfNotNull("Made for you", c?.detail, songs.valueOrNull()?.let { "${it.size} songs" }).joinToString(" · "))
-        },
-        actions = {
-            IconButton(onClick = { round++ }) { Icon(Icons.Rounded.Refresh, "New songs") }
+            PicksRow(listOfNotNull("Made for you", c?.detail, songs.valueOrNull()?.let { "${it.size} songs" }).joinToString(" · "), onNewPicks = { round++ })
         },
     )
 }
 
 /**
- * Settings › Notices and Cards › Cards: Made for you cards (issue #274) and custom cards pinned to Home (issue #622), each under its
+ * Settings › Home page › Cards: Made for you cards (issue #274) and custom cards pinned to Home (issue #622), each under its
  * own heading on one page.
  */
 @Composable
@@ -140,7 +141,7 @@ fun CardsSettingsScreen(nav: NavController) {
             Spacer(Modifier.height(Space.Medium))
             HorizontalDivider()
             Heading("Custom cards")
-            Hint("Cards of your own on Home, in its Your cards section (move it under Arrange Home). A card lists songs or whole albums: by a sound described to AudioMuse, or by rules on your library, like a record label, years or a genre, each one to include or leave out. Tap a card to change it.")
+            Hint("Cards of your own on Home, in Your cards. A card lists songs or albums by a sound you describe, or by rules like a record label, years or a genre. Tap a card to change it.")
             val pins = pinned.orEmpty()
             if (pins.isEmpty()) Hint("No custom cards yet.")
             pins.forEachIndexed { i, card ->
@@ -193,6 +194,7 @@ internal fun lookIcon(look: CardLook) = when (look) {
     CardLook.LIST -> Icons.Rounded.FormatListBulleted
     CardLook.BUTTON -> Icons.Rounded.PlayCircle
     CardLook.COVER_ROWS -> Icons.Rounded.ViewAgenda
+    CardLook.GRID -> Icons.Rounded.GridView
 }
 
 /** Picking what a new card shows: a kind, and a genre or years where it needs one. */

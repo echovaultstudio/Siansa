@@ -8,6 +8,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.border
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -144,14 +147,14 @@ fun ConnectionsScreen(nav: NavController, sourceName: String? = null, extras: Bo
             if (firstRun) {
                 Text(
                     if (fromPicker) "Enter your server's address and login. Test checks them before you save."
-                    else "Welcome! Connect your server to get started. AudioMuse and an AI service can be added now or later.",
+                    else "Welcome! Connect your server to get started. ${smartExtrasName(BEATS_OFFERED)} and an AI service can be added now or later.",
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 // A user being added: a way back to the users already set up.
                 val context = LocalContext.current
                 val others = remember { Users.all(context).filter { it.id != Users.active && it.connected } }
                 others.forEach { user ->
-                    TextButton(onClick = { Users.switchTo(context, user.id) }, modifier = Modifier.focusRing()) { Text("Switch back to ${user.label}") }
+                    TextButton(onClick = { Users.switchTo(context, user.id) }, modifier = Modifier.tvFocusGroup().focusRing()) { Text("Switch back to ${user.label}") }
                 }
             }
 
@@ -166,25 +169,30 @@ fun ConnectionsScreen(nav: NavController, sourceName: String? = null, extras: Bo
                 Field("Proxy username", draft.proxyUser, keyboard = KeyboardType.Text) { draft = draft.copy(proxyUser = it) }
                 SecretField("Proxy password", draft.proxyPassword) { draft = draft.copy(proxyPassword = it) }
             } else {
-                TextButton(onClick = { showProxy = true }, modifier = Modifier.focusRing()) { Text("Server behind a login page? Add a proxy login") }
+                TextButton(onClick = { showProxy = true }, modifier = Modifier.tvFocusGroup().focusRing()) { Text("Server behind a login page? Add a proxy login") }
             }
             TestRow(navidromeTest) {
                 runTest({ navidromeTest = it }) { s -> testServer(graph, s, kind) }
             }
             // Smart extras turned down on the first run (issue #113): only the server. They're here later in Settings.
             if (extras || !firstRun) {
+                if (BEATS_OFFERED) {
+                    HorizontalDivider()
+                    Heading("Siansa Beats")
+                    BeatsFields(graph, draft) { draft = it }
+                }
                 HorizontalDivider()
-                Heading("AudioMuse-AI")
+                Heading(if (BEATS_OFFERED) "AudioMuse-AI (optional)" else "AudioMuse-AI")
                 Field("Server address", draft.audioMuseUrl, "192.168.1.10:8000") { draft = draft.copy(audioMuseUrl = it) }
-                Hint("Leave the address empty if this user has no AudioMuse.")
-                Hint("If AudioMuse has a login, use either an API token or its username and password.")
+                Hint("Leave the address empty if this user has no AudioMuse-AI.")
+                Hint("If AudioMuse-AI has a login, use either an API token or its username and password.")
                 SecretField("API token", draft.audioMuseToken) { draft = draft.copy(audioMuseToken = it) }
                 Field("Username", draft.audioMuseUser, keyboard = KeyboardType.Text) { draft = draft.copy(audioMuseUser = it) }
                 SecretField("Password", draft.audioMusePassword) { draft = draft.copy(audioMusePassword = it) }
-                Field("Server name in AudioMuse", draft.audioMuseServer, keyboard = KeyboardType.Text) { draft = draft.copy(audioMuseServer = it) }
+                Field("Server name in AudioMuse-AI", draft.audioMuseServer, keyboard = KeyboardType.Text) { draft = draft.copy(audioMuseServer = it) }
                 Hint(
-                    if (kind.embyLike) "AudioMuse reads your ${ServerWords.name(kind)} library for everything smart. If AudioMuse has more than one music server, enter this ${ServerWords.name(kind)} server's name as it is in AudioMuse. Each user keeps their own."
-                    else "Only if AudioMuse has more than one music server: this server's name as it is in AudioMuse. Leave empty for its main one. Each user keeps their own."
+                    if (kind.embyLike) "AudioMuse-AI reads your ${ServerWords.name(kind)} library for everything smart. If AudioMuse-AI has more than one music server, enter this ${ServerWords.name(kind)} server's name as it is in AudioMuse-AI. Each user keeps their own."
+                    else "Only if AudioMuse-AI has more than one music server: this server's name as it is in AudioMuse-AI. Leave empty for its main one. Each user keeps their own."
                 )
                 TestRow(audioMuseTest) { runTest({ audioMuseTest = it }) { s -> testAudioMuse(graph, s) } }
 
@@ -244,11 +252,21 @@ internal fun FoldSection(
     content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
+    // A search result asked for this section (the owner, 13 Nov): it starts open, lit for a moment.
+    val asked = remember(tag) { SettingsFocus.take(tag) }
     var open by androidx.compose.runtime.saveable.rememberSaveable(tag) {
-        mutableStateOf(startOpen ?: !FoldMemory.isFolded(context, tag))
+        mutableStateOf(startOpen ?: (asked || !FoldMemory.isFolded(context, tag)))
     }
     val turn by androidx.compose.animation.core.animateFloatAsState(if (open) 180f else 0f, label = "fold")
-    Column(Modifier.fillMaxWidth().testTag("section-$tag")) {
+    var lit by remember { mutableStateOf(asked) }
+    val glow by androidx.compose.animation.core.animateFloatAsState(if (lit) 1f else 0f, label = "lit", animationSpec = androidx.compose.animation.core.tween(if (lit) 0 else 1500))
+    LaunchedEffect(asked) { if (asked) { kotlinx.coroutines.delay(400); lit = false } }
+    val primary = MaterialTheme.colorScheme.primary
+    Column(
+        Modifier.fillMaxWidth()
+            .then(if (glow > 0f) Modifier.border(2.dp, primary.copy(alpha = glow), MaterialTheme.shapes.medium).padding(horizontal = Space.Small) else Modifier)  // spacing: exact
+            .testTag("section-$tag"),
+    ) {
         Row(
             Modifier.fillMaxWidth()
                 .clickable(onClickLabel = if (open) "Fold" else "Open") {
@@ -276,6 +294,43 @@ internal fun FoldSection(
                 verticalArrangement = Arrangement.spacedBy(Space.Medium),
                 content = content,
             )
+        }
+    }
+}
+
+/**
+ * One choice among a few, as a drop-down (the owner, 13 Nov: chips cut the words off): the label, the choice shown
+ * in a box, and the list below it when tapped. On the TV the choices are chips, which the remote can walk.
+ */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+internal fun <T> ChoicePicker(label: String, value: T, choices: List<T>, tag: String, name: (T) -> String, onPick: (T) -> Unit) {
+    if (app.siansa.BuildConfig.TV_APP) {
+        Text(label, style = MaterialTheme.typography.bodyLarge)
+        Row(Modifier.tvFocusGroup().horizontalScroll(rememberScrollState()).testTag(tag), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+            choices.forEach { c -> FilterChip(selected = value == c, onClick = { onPick(c) }, label = { Text(name(c)) }) }
+        }
+        return
+    }
+    var open by remember { mutableStateOf(false) }
+    androidx.compose.material3.ExposedDropdownMenuBox(expanded = open, onExpandedChange = { open = it }, modifier = Modifier.fillMaxWidth().testTag(tag)) box@{
+        OutlinedTextField(
+            value = name(value),
+            onValueChange = {},
+            readOnly = true,
+            label = { Text(label) },
+            trailingIcon = { androidx.compose.material3.ExposedDropdownMenuDefaults.TrailingIcon(open) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth().menuAnchor(androidx.compose.material3.MenuAnchorType.PrimaryNotEditable),
+        )
+        this@box.ExposedDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            choices.forEach { c ->
+                androidx.compose.material3.DropdownMenuItem(
+                    text = { Text(name(c), fontWeight = if (c == value) FontWeight.SemiBold else null) },
+                    onClick = { open = false; if (c != value) onPick(c) },
+                    modifier = Modifier.testTag("$tag-${name(c).lowercase().replace(Regex("[^a-z0-9]+"), "-")}"),
+                )
+            }
         }
     }
 }

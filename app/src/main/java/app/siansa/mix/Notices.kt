@@ -17,6 +17,7 @@ enum class NoticeKind(
     val defaultMode: NoticeMode = NoticeMode.AUTO,
 ) {
     NEEDS_YOU("needs", "Needs you", "When the library sync failed", 0),
+    UPDATE("update", "Update ready", "When a newer Siansa is out", 0),
     CARRY_ON("carry_on", "Carry on", "A book or episode you're partway through", 1),
     NEW_ALBUMS("new_albums", "New in your library", "Albums added in the last 30 days", 2),
     YOUR_MONTH("month", "Your month", "Last month's listening, in the first week", 2),
@@ -28,7 +29,7 @@ enum class NoticeKind(
     }
 }
 
-/** How a kind of notice shows (Settings › Notices and Cards › Notices): always first, ordered for you, or never. */
+/** How a kind of notice shows (Settings › Home page › Notices): always first, ordered for you, or never. */
 enum class NoticeMode(val id: String, val label: String) {
     PINNED("pinned", "Pinned"),
     AUTO("auto", "Automatic"),
@@ -110,6 +111,12 @@ object Notices {
     }
 
     fun needsYou(): Notice = Notice(NoticeKind.NEEDS_YOU, "needs:sync:${LocalDate.now()}", "Library sync failed", "settings/connections")
+
+    /** A newer Siansa is out ([app.siansa.update.UpdateCheck]): opens the store the app came from. */
+    fun update(version: String): Notice = Notice(NoticeKind.UPDATE, "update:$version", "Siansa $version is out", UPDATE_ROUTE)
+
+    /** Not a page: the notice's tap opens the store ([app.siansa.update.UpdateCheck.openStore]). */
+    const val UPDATE_ROUTE = "siansa:update"
 
     fun carryOn(bookId: String, title: String): Notice =
         Notice(NoticeKind.CARRY_ON, "carry_on:$bookId", "Carry on: $title", "book/$bookId")

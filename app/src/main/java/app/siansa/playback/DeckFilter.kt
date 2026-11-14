@@ -60,7 +60,7 @@ class DeckFilter {
             cutFilter = null
             shelfFilter = null
         }
-        val cutTarget = lowCutHz.coerceIn(0.0, LOW_CUT_HZ)
+        val cutTarget = lowCutHz.coerceIn(0.0, MAX_CUT_HZ)
         val shelfTarget = shelfDb.coerceIn(SHELF_START_DB, 0.0)
         val cutBefore = cutNow
         val shelfBefore = shelfNow
@@ -97,6 +97,8 @@ class DeckFilter {
     companion object {
         /** Where the high-pass ends up at the end of the sweep: the kick and bass gone, the rest kept. */
         const val LOW_CUT_HZ = 200.0
+        /** The highest the high-pass goes: a filter fade's top (Siansa Dev), well above the bass swap's [LOW_CUT_HZ]. */
+        const val MAX_CUT_HZ = 4_000.0
         /** A sweep below this is as good as off. */
         const val MIN_CUT_HZ = 20.0
         /** The low shelf's turnover, and how far the next song's bass starts held back. */
@@ -111,6 +113,12 @@ class DeckFilter {
          * quick at first (where it takes nothing but rumble) and easing in at the top.
          */
         fun lowCutAt(t: Double): Double = LOW_CUT_HZ * sin(t.coerceIn(0.0, 1.0) * PI / 2)
+
+        /**
+         * A filter fade's high-pass [t] of the way through the blend (0..1), up to [topHz]: slow at first, so the old
+         * song stays whole while the next comes in, then thinner and thinner. 0 when [topHz] is 0.
+         */
+        fun filterAt(t: Double, topHz: Double): Double = if (topHz <= 0) 0.0 else topHz * t.coerceIn(0.0, 1.0).pow(2)
 
         /** The next song's shelf [t] of the way through the swap: from [SHELF_START_DB] back up to nothing. */
         fun shelfAt(t: Double): Double = SHELF_START_DB * (1 - t.coerceIn(0.0, 1.0))

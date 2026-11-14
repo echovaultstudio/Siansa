@@ -4,7 +4,6 @@ import android.content.Context
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import app.siansa.playback.BeatMatchMode
 import app.siansa.playback.CrossfadeMode
 import app.siansa.playback.LoudnessSource
 import app.siansa.mix.ContinuousMode
@@ -17,7 +16,7 @@ import app.siansa.net.SourceKind
 
 enum class ReplayGainMode(val label: String) { TRACK("Track"), ALBUM("Album"), OFF("Off") }
 
-/** The phone's top bar, with the clock and battery (issue #681, Settings › Style). */
+/** The phone's top bar, with the clock and battery (issue #681, Settings › Theme › Status bar). */
 enum class TopBarStyle(val label: String, val hint: String) {
     CLEAR("See-through", "The app shows behind the phone's top bar."),
     BLACK("Black", "A black top bar, so nothing shows behind the clock and icons."),
@@ -110,6 +109,13 @@ data class AppSettings(
      * it has in AudioMuse; empty for AudioMuse's default server.
      */
     val audioMuseServer: String = "",
+    /**
+     * Siansa Beats (Siansa Dev, the owner, 10 Nov): the service that measures each song's loudness, fades, key and beat
+     * grid and hears the genres, asked directly at its address with its API key (or password). Empty: those come from
+     * the Siansa Beats (dev) plugin on AudioMuse when it's there, the songs' tags otherwise.
+     */
+    val beatsUrl: String = "",
+    val beatsKey: String = "",
     /** The AI service that writes mix titles and sound searches, its key and model (issue #665: was OpenRouter only). */
     val aiProvider: AiProvider = AiProvider.OPENROUTER,
     val aiKey: String = "",
@@ -125,14 +131,22 @@ data class AppSettings(
     val bookSkipBackSec: Int = 10,
     val bookSkipForwardSec: Int = 30,
     val aiTitles: Boolean = true,
+    /**
+     * Services switched off under Settings › Services (the owner, 13 Nov): [Service] ids. One that's off is left
+     * alone and shown nowhere, as if it weren't set up, while its login stays for when it's switched back on.
+     */
+    val servicesOff: Set<String> = emptySet(),
     val replayGain: ReplayGainMode = ReplayGainMode.TRACK,
     val preampDb: Float = 0f,
     val syncFolders: Set<String> = emptySet(),
     /** Image cache limit in MB; 0 = no limit. */
     val imageCacheMb: Int = 500,
     val animatedCovers: Boolean = animatedCoversByDefault(app.siansa.BuildConfig.TV_APP),
-    /** Now playing's seek bar, Play button and device name in the cover's colours (issue #970). */
-    val dynamicPlayerColours: Boolean = false,
+    /**
+     * The cover's colours, everywhere (one switch in Style, the owner's 10 Nov): now playing's seek bar, Play and device
+     * name (issue #970), and the Play and other buttons of album, artist and playlist pages (issue #1028).
+     */
+    val dynamicColours: Boolean = false,
     /** Download every album, artist and playlist cover in the background. */
     val coverDownload: Boolean = false,
     /** ...on any Wi-Fi, rather than only on the same local network as Navidrome. */
@@ -151,6 +165,8 @@ data class AppSettings(
      * yours, sends nothing to Navidrome, Last.fm or ListenBrainz.
      */
     val scrobbleOffUsers: Set<Int> = emptySet(),
+    /** "Scrobble to Siansa Beats": listens go to its listening history (Siansa Beats 0.29, [app.siansa.net.BeatsListens]). */
+    val scrobbleBeats: Boolean = false,
     val lastFmEnabled: Boolean = false,
     val lastFmApiKey: String = "",
     val lastFmSecret: String = "",
@@ -172,7 +188,7 @@ data class AppSettings(
     /** Opus kbit/s for downloads, or 0 for the original file. */
     val downloadKbps: Int = 0,
     val homeOrder: List<HomeSection> = HomeSection.default,
-    /** Settings › Style (issue #346): the mini player's buttons, the bottom bar's tabs, and now playing's lyrics button. */
+    /** Settings › Now playing and Bottom bar (issue #346): the mini player's buttons, the bottom bar's tabs, and now playing's lyrics button. */
     val miniButtons: List<MiniButton> = MiniButton.default,
     val navTabs: List<NavTab> = NavTab.default,
     /** Home's menu, top to bottom (issue #872). */
@@ -183,18 +199,30 @@ data class AppSettings(
     val nowPlayingLyricsButton: Boolean = true,
     /** Sliding from now playing's play button, and what each way does (issue #919). */
     val playSlides: app.siansa.ui.PlaySlides = app.siansa.ui.PlaySlides(),
+    /** The DJ mix bar's places, left to right (issue #1033): Style › DJ Mix Bar puts them in order. */
+    val djBarOrder: List<app.siansa.ui.DjBarSpot> = app.siansa.ui.DjBarSpot.default,
     val topBar: TopBarStyle = TopBarStyle.CLEAR,
     val homeHidden: Set<HomeSection> = emptySet(),
     /** Home's rows in another look than their own (issue #655); a row not in it looks as it is. */
     val homeLooks: Map<HomeSection, HomeLook> = emptyMap(),
+    /** How many tiles a row shown as [HomeLook.GRID] has (2 to 8); not in it: 8. */
+    val homeGridSizes: Map<HomeSection, Int> = emptyMap(),
     /** Home's sections shown without their title (issue #961). */
     val homeUntitled: Set<HomeSection> = emptySet(),
+    /** How Home's coloured cards are painted (the owner, 13 Nov), and the cards with a look of their own. */
+    val homeCardLook: CardLook = CardLook.DEFAULT,
+    val homeCardLooks: Map<HomeSection, CardLook> = emptyMap(),
     /** The gap between Home's sections (#554), as a step of the spacing scale: 0 tight … 4 airy. 2 is the default. */
     val homeGap: Int = HOME_GAP_DEFAULT,
     /** Show only music on the phone, across the whole app (issue #141). */
     val downloadedOnly: Boolean = false,
     /** The time machine lists songs that aren't in your library, marked (issue #234). */
     val timeMachineMissing: Boolean = true,
+    /**
+     * Now playing shows "Bad blend" during a DJ blend and for a minute after it, to mark a change that sounded wrong
+     * (Settings › Help & feedback; the owner, 12 Nov). On by default in Siansa Dev only.
+     */
+    val badBlendButton: Boolean = app.siansa.playback.LastBlend.onByDefault,
     /** How each kind of notice on Home shows (issue #784): pinned, automatic (the default) or off. */
     val notices: app.siansa.mix.NoticePrefs = app.siansa.mix.NoticePrefs(),
     /** Theme (issue #148): "AUTO", "LIGHT" or "DARK"; colours by name ("MONO", "OCEAN"…); pure black when dark. */
@@ -220,14 +248,6 @@ data class AppSettings(
     val windDownSongs: Int = DEFAULT_WIND_DOWN_SONGS,
     /** The crossfade length; in smart mode, the longest a fade may be. */
     val crossfadeSeconds: Int = DEFAULT_CROSSFADE_SECONDS,
-    /** Where smart crossfades are beat-matched like a DJ's (issue #646, experimental): off, DJ radio, everywhere. */
-    val beatMatch: BeatMatchMode = BeatMatchMode.OFF,
-    /** The old song rings out in a hall over the last bar of a beat-matched blend (issue #759). */
-    val echoTail: Boolean = true,
-    /** The bass swaps from the old song to the new over the first half of a beat-matched blend (issue #807). */
-    val bassSwap: Boolean = true,
-    /** A beat-matched blend keeps the next song's key by time-stretching it (issue #816); off, the pitch follows the speed. */
-    val keepKey: Boolean = false,
     /** How many bars a beat-matched blend aims at, apart from the crossfade length (issue #759). */
     val blendBars: Int = DEFAULT_BLEND_BARS,
     /** The shape of a DJ mix (issue #649): what the energy does over the next songs. */
@@ -257,10 +277,18 @@ data class AppSettings(
     /** An API key for an OpenSubsonic server (issue #493); Emby and Jellyfin have their own login. */
     val hasApiKey: Boolean get() = sourceKind == SourceKind.OPENSUBSONIC && navidromeApiKey.isNotBlank()
     val audioMuseReady: Boolean
-        get() = audioMuseUrl.isNotBlank()
+        get() = audioMuseUrl.isNotBlank() && Service.AUDIOMUSE.id !in servicesOff
+    /** Siansa Beats is set up: the app asks it directly, and not the plugin. */
+    val beatsReady: Boolean
+        get() = beatsUrl.isNotBlank() && Service.BEATS.id !in servicesOff
     val aiReady: Boolean
-        get() = aiTitles && aiModel.isNotBlank() && (aiKey.isNotBlank() || !aiProvider.needsKey) &&
+        get() = aiTitles && Service.AI.id !in servicesOff && aiModel.isNotBlank() && (aiKey.isNotBlank() || !aiProvider.needsKey) &&
             aiCompletionsUrl(aiProvider, aiAddress) != null
+    /** AudioMuse's login is there, whether or not the service is switched on. */
+    val audioMuseSetUp: Boolean get() = audioMuseUrl.isNotBlank()
+    val beatsSetUp: Boolean get() = beatsUrl.isNotBlank()
+    val aiSetUp: Boolean get() = aiModel.isNotBlank() && (aiKey.isNotBlank() || !aiProvider.needsKey) && aiCompletionsUrl(aiProvider, aiAddress) != null
+    val booksSetUp: Boolean get() = audiobookshelfUrl.isNotBlank() && (audiobookshelfToken.isNotBlank() || (audiobookshelfUser.isNotBlank() && audiobookshelfPassword.isNotBlank()))
     /**
      * These settings with the Connections page's fields taken from [page]: the music server, its proxy login,
      * AudioMuse, the AI service and Audiobookshelf. Everything else keeps its value here.
@@ -272,6 +300,7 @@ data class AppSettings(
         proxyUser = page.proxyUser, proxyPassword = page.proxyPassword,
         audioMuseUrl = page.audioMuseUrl, audioMuseToken = page.audioMuseToken,
         audioMuseUser = page.audioMuseUser, audioMusePassword = page.audioMusePassword, audioMuseServer = page.audioMuseServer,
+        beatsUrl = page.beatsUrl, beatsKey = page.beatsKey,
         aiProvider = page.aiProvider, aiKey = page.aiKey, aiModel = page.aiModel, aiAddress = page.aiAddress, aiTitles = page.aiTitles,
         audiobookshelfUrl = page.audiobookshelfUrl, audiobookshelfToken = page.audiobookshelfToken,
         audiobookshelfUser = page.audiobookshelfUser, audiobookshelfPassword = page.audiobookshelfPassword,
@@ -293,7 +322,7 @@ data class AppSettings(
 
     /** Books show once an Audiobookshelf server with a login is set (issue #521). */
     val booksReady: Boolean
-        get() = audiobookshelfUrl.isNotBlank() && (audiobookshelfToken.isNotBlank() || (audiobookshelfUser.isNotBlank() && audiobookshelfPassword.isNotBlank()))
+        get() = booksSetUp && Service.BOOKS.id !in servicesOff
 
     companion object {
         const val HOME_GAP_DEFAULT = 2
@@ -315,11 +344,6 @@ data class AppSettings(
         val CROSSFADE_SECONDS = 1..30
         /** A beat-matched blend's length: 8 bars is about 15 s at 128 BPM (issue #759). */
         const val DEFAULT_BLEND_BARS = 8
-        /**
-         * Echo at the end and Keep the key: hidden and off for now (owner, 0.52.0-dev), the blends plain without them;
-         * the audio engine keeps both, for later.
-         */
-        const val BLEND_EXTRAS = false
         val BLEND_BAR_CHOICES = listOf(4, 8, 16)
         const val DEFAULT_WIND_DOWN_SONGS = 20
         val WIND_DOWN_CHOICES = listOf(10, 20, 30)
@@ -374,6 +398,7 @@ private fun decode(value: String): String = runCatching { URLDecoder.decode(valu
 private const val CONNECTIONS = "connections"
 private const val SEEDED = "seeded"
 private val CONNECTION_STRINGS = listOf("am_url", "am_token", "am_user", "am_pass", "am_server", "or_key", "or_model", "abs_url", "abs_token", "abs_user", "abs_pass")
+// Siansa Beats' address and key (beats_url, beats_key) are only ever in the shared store: they came after #416.
 
 /** One user's settings: by default the user in use, or another user's (to show their music too). */
 class SettingsRepository(context: Context, user: Int = Users.active) {
@@ -392,6 +417,11 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
     }
     private val _state = MutableStateFlow(load())
     val state: StateFlow<AppSettings> = _state.asStateFlow()
+
+    init {
+        // The Bad blend button's switch, where playback looks for it (it notes a blend only while the button is on).
+        app.siansa.playback.LastBlend.enabled = _state.value.badBlendButton
+    }
     val current: AppSettings get() = _state.value
 
     private fun secret(key: String) = SecretBox.decrypt(prefs.getString(key, "") ?: "")
@@ -411,6 +441,8 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         // Which of AudioMuse's servers is this user's (beta report 810dc85c): per user, as a Navidrome user and an
         // Emby user are different servers there. The shared value from before is the fallback.
         audioMuseServer = prefs.getString("am_server", null) ?: shared.getString("am_server", "") ?: "",
+        beatsUrl = shared.getString("beats_url", "") ?: "",
+        beatsKey = SecretBox.decrypt(shared.getString("beats_key", "") ?: ""),
         aiKey = SecretBox.decrypt(shared.getString("or_key", "") ?: ""),
         aiModel = shared.getString("or_model", AppSettings.DEFAULT_MODEL) ?: AppSettings.DEFAULT_MODEL,
         aiProvider = AiProvider.parse(shared.getString("ai_provider", null)),
@@ -429,7 +461,11 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         imageCacheMb = prefs.getInt("image_cache_mb", 500),
         // Off from the start on the TV app (issue #945): an animation costs a TV more than it gives.
         animatedCovers = prefs.getBoolean("animated_covers", animatedCoversByDefault(app.siansa.BuildConfig.TV_APP)),
-        dynamicPlayerColours = prefs.getBoolean("dynamic_player_colours", false),
+        // Once two switches, now playing's and the pages': on if either was.
+        dynamicColours = prefs.getBoolean(
+            "dynamic_colours",
+            prefs.getBoolean("dynamic_player_colours", false) || prefs.getBoolean("dynamic_page_colours", false),
+        ),
         coverDownload = prefs.getBoolean("cover_download", false),
         coverDownloadAnyWifi = prefs.getBoolean("cover_download_any_wifi", false),
         coverDownloadWifiOnly = prefs.getBoolean("cover_download_wifi_only", true),
@@ -446,7 +482,9 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         scrobbleNavidrome = prefs.getBoolean("scrobble_nd", true),
         scrobblePercent = prefs.getInt("scrobble_pct", 50),
         scrobbleOffUsers = prefs.getString("scrobble_off_users", null).orEmpty().split(',').mapNotNull { it.trim().toIntOrNull() }.toSet(),
+        scrobbleBeats = prefs.getBoolean("scrobble_beats", false),
         lastFmEnabled = prefs.getBoolean("lfm_on", false),
+        servicesOff = prefs.getString("services_off", "").orEmpty().split(",").filter { it.isNotBlank() }.toSet(),
         lastFmApiKey = prefs.getString("lfm_key", "") ?: "",
         lastFmSecret = secret("lfm_secret"),
         lastFmUser = prefs.getString("lfm_user", "") ?: "",
@@ -469,13 +507,18 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         homeShortcuts = prefs.getInt("home_shortcuts", 8).coerceIn(2, 8),
         nowPlayingLyricsButton = prefs.getBoolean("now_playing_lyrics_button", true),
         playSlides = app.siansa.ui.PlaySlides.parse(prefs.getString("play_slides", null)),
+        djBarOrder = app.siansa.ui.DjBarSpot.parse(prefs.getString("dj_bar_order", null)),
         topBar = TopBarStyle.parse(prefs.getString("top_bar", null)),
         homeHidden = HomeSection.parseHidden(prefs.getString("home_hidden", null)),
         homeLooks = HomeLook.parse(prefs.getString("home_looks", null)),
+        homeCardLook = CardLook.of(prefs.getString("home_card_look", null))?.takeIf { it != CardLook.AS_HOME } ?: CardLook.DEFAULT,
+        homeCardLooks = CardLook.parse(prefs.getString("home_card_looks", null)),
+        homeGridSizes = HomeLook.parseGridSizes(prefs.getString("home_grid_sizes", null)),
         homeUntitled = HomeSection.parseHidden(prefs.getString("home_untitled", null)),
         homeGap = prefs.getInt("home_gap", AppSettings.HOME_GAP_DEFAULT).coerceIn(0, AppSettings.HOME_GAP_MAX),
         downloadedOnly = prefs.getBoolean("downloaded_only", false),
         timeMachineMissing = prefs.getBoolean("time_machine_missing", true),
+        badBlendButton = prefs.getBoolean("bad_blend_button", app.siansa.playback.LastBlend.onByDefault),
         notices = app.siansa.mix.NoticePrefs.parse(prefs.getString("notices", null)),
         themeMode = prefs.getString("theme_mode", "AUTO") ?: "AUTO",
         themeColours = prefs.getString("theme_colours", null) ?: DEFAULT_THEME_COLOURS,
@@ -491,10 +534,6 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         windDownSongs = prefs.getInt("wind_down_songs", AppSettings.DEFAULT_WIND_DOWN_SONGS)
             .takeIf { it in AppSettings.WIND_DOWN_CHOICES } ?: AppSettings.DEFAULT_WIND_DOWN_SONGS,
         crossfadeSeconds = prefs.getInt("crossfade_s", AppSettings.DEFAULT_CROSSFADE_SECONDS).coerceIn(AppSettings.CROSSFADE_SECONDS),
-        beatMatch = BeatMatchMode.parse(prefs.getString("beat_match", null)),
-        echoTail = AppSettings.BLEND_EXTRAS && prefs.getBoolean("echo_tail", true),
-        bassSwap = prefs.getBoolean("bass_swap", true),
-        keepKey = AppSettings.BLEND_EXTRAS && prefs.getBoolean("keep_key", false),
         blendBars = prefs.getInt("blend_bars", AppSettings.DEFAULT_BLEND_BARS)
             .takeIf { it in AppSettings.BLEND_BAR_CHOICES } ?: AppSettings.DEFAULT_BLEND_BARS,
         mixShape = MixShape.parse(prefs.getString("mix_shape", null)),
@@ -520,6 +559,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
     fun clean(input: AppSettings): AppSettings {
         val nd = parseAddress(input.navidromeUrl)
         val am = parseAddress(input.audioMuseUrl)
+        val beats = parseAddress(input.beatsUrl)
         return input.copy(
             navidromeUrl = nd.url,
             navidromeUser = input.navidromeUser.trim(),
@@ -531,6 +571,8 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
             audioMuseUser = am.user ?: input.audioMuseUser.trim(),
             audioMusePassword = am.password ?: input.audioMusePassword,
             audioMuseServer = input.audioMuseServer.trim(),
+            beatsUrl = beats.url,
+            beatsKey = input.beatsKey.trim().ifEmpty { beats.password.orEmpty() },
             aiKey = input.aiKey.trim(),
             aiModel = input.aiModel.trim(),
             aiAddress = input.aiAddress.trim(),
@@ -566,7 +608,9 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
             .putBoolean("scrobble_nd", s.scrobbleNavidrome)
             .putInt("scrobble_pct", s.scrobblePercent)
             .putString("scrobble_off_users", s.scrobbleOffUsers.sorted().joinToString(","))
+            .putBoolean("scrobble_beats", s.scrobbleBeats)
             .putBoolean("lfm_on", s.lastFmEnabled)
+            .putString("services_off", s.servicesOff.sorted().joinToString(","))
             .putString("lfm_key", s.lastFmApiKey.trim())
             .putString("lfm_secret", SecretBox.encrypt(s.lastFmSecret.trim()))
             .putString("lfm_user", s.lastFmUser.trim())
@@ -587,6 +631,8 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
             .putString("am_token", SecretBox.encrypt(s.audioMuseToken))
             .putString("am_user", s.audioMuseUser)
             .putString("am_pass", SecretBox.encrypt(s.audioMusePassword))
+            .putString("beats_url", s.beatsUrl)
+            .putString("beats_key", SecretBox.encrypt(s.beatsKey))
             .putString("or_key", SecretBox.encrypt(s.aiKey))
             .putString("or_model", s.aiModel)
             .putString("ai_provider", s.aiProvider.name)
@@ -633,16 +679,29 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         _state.value = _state.value.copy(timeMachineMissing = on)
     }
 
+    fun setBadBlendButton(on: Boolean) {
+        prefs.edit().putBoolean("bad_blend_button", on).apply()
+        _state.value = _state.value.copy(badBlendButton = on)
+        app.siansa.playback.LastBlend.enabled = on
+    }
+
     fun setNoticeMode(kind: app.siansa.mix.NoticeKind, mode: app.siansa.mix.NoticeMode) {
         val notices = _state.value.notices.with(kind, mode)
         prefs.edit().putString("notices", notices.format()).apply()
         _state.value = _state.value.copy(notices = notices)
     }
 
-    /** Now playing in the cover's colours (issue #970). */
-    fun setDynamicPlayerColours(on: Boolean) {
-        prefs.edit().putBoolean("dynamic_player_colours", on).apply()
-        _state.value = _state.value.copy(dynamicPlayerColours = on)
+    /** Now playing and the album, artist and playlist pages in the cover's colours (issues #970, #1028). */
+    fun setDynamicColours(on: Boolean) {
+        prefs.edit().putBoolean("dynamic_colours", on).apply()
+        _state.value = _state.value.copy(dynamicColours = on)
+    }
+
+    /** Switches a service on or off under Settings › Services (the owner, 13 Nov): its login stays. */
+    fun setServiceOn(service: Service, on: Boolean) {
+        val off = if (on) _state.value.servicesOff - service.id else _state.value.servicesOff + service.id
+        prefs.edit().putString("services_off", off.sorted().joinToString(",")).apply()
+        _state.value = _state.value.copy(servicesOff = off)
     }
 
     fun setAnimatedCovers(on: Boolean) {
@@ -731,6 +790,12 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         _state.value = _state.value.copy(nowPlayingLyricsButton = on)
     }
 
+    /** The DJ mix bar's places in order (issue #1033). */
+    fun setDjBarOrder(order: List<app.siansa.ui.DjBarSpot>) {
+        prefs.edit().putString("dj_bar_order", app.siansa.ui.DjBarSpot.format(order)).apply()
+        _state.value = _state.value.copy(djBarOrder = order)
+    }
+
     fun setPlaySlides(slides: app.siansa.ui.PlaySlides) {
         prefs.edit().putString("play_slides", slides.format()).apply()
         _state.value = _state.value.copy(playSlides = slides)
@@ -759,10 +824,31 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         _state.value = _state.value.copy(homeLooks = looks)
     }
 
-    /** Every row back in its own look. */
+    /** How many tiles [section] shows as a [HomeLook.GRID], 2 to 8 (the owner, 10 Nov). */
+    fun setHomeGridSize(section: HomeSection, size: Int) {
+        val sizes = _state.value.homeGridSizes + (section to size.coerceIn(2, HomeLook.GRID_MOST))
+        prefs.edit().putString("home_grid_sizes", HomeLook.formatGridSizes(sizes)).apply()
+        _state.value = _state.value.copy(homeGridSizes = sizes)
+    }
+
+    /** Every row back in its own look, and every card in Home's colour. */
     fun resetHomeLooks() {
-        prefs.edit().remove("home_looks").apply()
-        _state.value = _state.value.copy(homeLooks = emptyMap())
+        prefs.edit().remove("home_looks").remove("home_grid_sizes").remove("home_card_look").remove("home_card_looks").apply()
+        _state.value = _state.value.copy(homeLooks = emptyMap(), homeGridSizes = emptyMap(), homeCardLook = CardLook.DEFAULT, homeCardLooks = emptyMap())
+    }
+
+    /** How every coloured card on Home is painted (the owner, 13 Nov). */
+    fun setHomeCardLook(look: CardLook) {
+        val chosen = if (look == CardLook.AS_HOME) CardLook.DEFAULT else look
+        prefs.edit().putString("home_card_look", chosen.id).apply()
+        _state.value = _state.value.copy(homeCardLook = chosen)
+    }
+
+    /** One section's cards in a look of their own; [CardLook.AS_HOME] puts it back with the rest. */
+    fun setHomeCardLook(section: HomeSection, look: CardLook) {
+        val looks = (_state.value.homeCardLooks - section) + (if (look != CardLook.AS_HOME) mapOf(section to look) else emptyMap())
+        prefs.edit().putString("home_card_looks", CardLook.format(looks)).apply()
+        _state.value = _state.value.copy(homeCardLooks = looks)
     }
 
     fun setSyncFolders(ids: Set<String>) {
@@ -816,35 +902,11 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         _state.value = _state.value.copy(crossfade = mode, crossfadeSeconds = length)
     }
 
-    fun setBeatMatch(mode: BeatMatchMode) {
-        noteBlend("Beat-matched blends", _state.value.beatMatch.name.lowercase(), mode.name.lowercase())
-        prefs.edit().putString("beat_match", mode.name).apply()
-        _state.value = _state.value.copy(beatMatch = mode)
-    }
-
     fun setBlendBars(bars: Int) {
         val length = bars.takeIf { it in AppSettings.BLEND_BAR_CHOICES } ?: AppSettings.DEFAULT_BLEND_BARS
         noteBlend("Blend length", "${_state.value.blendBars} bars", "$length bars")
         prefs.edit().putInt("blend_bars", length).apply()
         _state.value = _state.value.copy(blendBars = length)
-    }
-
-    fun setEchoTail(on: Boolean) {
-        noteBlend("Echo at the end", _state.value.echoTail, on)
-        prefs.edit().putBoolean("echo_tail", on).apply()
-        _state.value = _state.value.copy(echoTail = on)
-    }
-
-    fun setBassSwap(on: Boolean) {
-        noteBlend("Bass swap", _state.value.bassSwap, on)
-        prefs.edit().putBoolean("bass_swap", on).apply()
-        _state.value = _state.value.copy(bassSwap = on)
-    }
-
-    fun setKeepKey(on: Boolean) {
-        noteBlend("Keep the key", _state.value.keepKey, on)
-        prefs.edit().putBoolean("keep_key", on).apply()
-        _state.value = _state.value.copy(keepKey = on)
     }
 
     /** The shape and surprise of a DJ mix (issue #649). */
@@ -878,3 +940,44 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
 
 /** Whether covers move until it's set: on a phone, yes; on the TV app, no (issue #945). */
 internal fun animatedCoversByDefault(tv: Boolean): Boolean = !tv
+
+/**
+ * What Siansa talks to besides the music server (Settings › Services, the owner, 13 Nov): each can be switched off
+ * there and is then left alone and shown nowhere. Last.fm and ListenBrainz keep their own switches
+ * ([AppSettings.lastFmEnabled], [AppSettings.listenBrainzEnabled]); the rest go in [AppSettings.servicesOff].
+ */
+enum class Service(val id: String, val label: String, val gives: String) {
+    BEATS("beats", "Siansa Beats", "Beats and phrases for DJ blends, loudness and keys, genres by sound, similar albums and artists, and where your listening is kept."),
+    AUDIOMUSE("audiomuse", "AudioMuse-AI", "The sound of each song, similar music and the search by words, when there's no Siansa Beats."),
+    BOOKS("books", "Audiobookshelf", "Audiobooks and podcasts, with your place in each."),
+    LASTFM("lastfm", "Last.fm", "Your listening, scrobbled as you go."),
+    LISTENBRAINZ("listenbrainz", "ListenBrainz / Koito", "Your listening, sent to ListenBrainz or a Koito of your own."),
+    AI("ai", "AI", "Mix titles and sound searches in your own words.");
+
+    /** The name on a half-width tile, where "ListenBrainz / Koito" would be cut off. */
+    val short: String get() = if (this == LISTENBRAINZ) "ListenBrainz" else label
+
+    /** Which card on Connections sets it up. */
+    val connection: String get() = when (this) {
+        BEATS -> "beats"; AUDIOMUSE -> "audiomuse"; BOOKS -> "books"; AI -> "ai"; LASTFM, LISTENBRAINZ -> "scrobbling"
+    }
+
+    companion object {
+        /** Whether [service] is switched on in [s] (its login may still be missing: [setUp]). */
+        fun on(s: AppSettings, service: Service): Boolean = when (service) {
+            LASTFM -> s.lastFmEnabled
+            LISTENBRAINZ -> s.listenBrainzEnabled
+            else -> service.id !in s.servicesOff
+        }
+
+        /** Whether [service]'s login is there, on or off. */
+        fun setUp(s: AppSettings, service: Service): Boolean = when (service) {
+            BEATS -> s.beatsSetUp
+            AUDIOMUSE -> s.audioMuseSetUp
+            BOOKS -> s.booksSetUp
+            LASTFM -> s.lastFmApiKey.isNotBlank() && s.lastFmSecret.isNotBlank()
+            LISTENBRAINZ -> s.listenBrainzToken.isNotBlank()
+            AI -> s.aiSetUp
+        }
+    }
+}

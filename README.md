@@ -8,18 +8,24 @@ Siansa is **open source** under the GNU GPL, version 3 or later ([LICENSE](LICEN
 
 <p align="center"><img src="docs/screenshots/hero.png" alt="Siansa: Your year, Home and now playing" width="900"></p>
 
+> ⭐ **Like Siansa? Give it a star.** Navidrome lists open-source apps on its website once they have 15 stars on
+> GitHub, so every star helps more people find Siansa. It takes one click, at the top of this page. Thank you!
+
 ## Get Siansa
 
+**Help bring Siansa to Google Play, free for everyone.** Before a new developer can publish an app for everyone, Google
+asks for a closed test: 12 testers who keep it installed for 14 days in a row. Siansa isn't there yet, so every tester
+counts. Joining takes a minute: [ask for a place](https://siansa.app/#join) and the steps follow.
+
 <p align="center">
-<a href="https://siansa.app/fdroid/repo"><img src="docs/brand/get-fdroid.svg" alt="Get it on F-Droid" width="220" height="66"></a>
-&nbsp;
 <a href="https://siansa.app/#join"><img src="docs/brand/play-beta.svg" alt="Join the test on Google Play" width="220" height="66"></a>
+&nbsp;
+<a href="https://siansa.app/fdroid/repo"><img src="docs/brand/get-fdroid.svg" alt="Get it on F-Droid" width="140" height="42"></a>
 </p>
 
-- **F-Droid**, open to everyone, no sign-up: in the F-Droid app, go to **Settings › Repositories › +** and add
-  `https://siansa.app/fdroid/repo`, then search for Siansa.
-- **Google Play**: a closed test for now, as Google asks of new apps (12 testers for 14 days before it opens to
-  everyone). [Ask for a place](https://siansa.app/#join) and we'll add your Google account.
+- **Google Play**: the closed test above. Siansa updates on its own, and your feedback shapes the app.
+- **F-Droid**, open to everyone, no sign-up, if you'd rather not use Google Play: in the F-Droid app, go to
+  **Settings › Repositories › +** and add `https://siansa.app/fdroid/repo`, then search for Siansa.
 - **On your TV**: Siansa for Android TV and Google TV, in beta. See [Siansa on your TV](docs/tv.md).
 
 More in the [install guide](docs/testing.md).
@@ -65,6 +71,11 @@ More in the [install guide](docs/testing.md).
 <td align="center"><img src="docs/screenshots/arrange.png" alt="Arrange Home: show, hide and style each section" width="240"><br><sub><b>Arrange Home</b> your way</sub></td>
 <td align="center"><img src="docs/screenshots/home-more.png" alt="More of Home: recently added, your genres and random picks" width="240"><br><sub><b>More of Home</b>: genres, random picks</sub></td>
 </tr>
+<tr>
+<td align="center"><img src="docs/screenshots/dj-start.png" alt="Sliding up from the play button: Start a DJ mix" width="240"><br><sub><b>Slide up</b> for a DJ mix</sub></td>
+<td align="center"><img src="docs/screenshots/dj-bar.png" alt="The DJ mix bar: steady, a build, stop, euphoric or a wind down" width="240"><br><sub><b>Shape the mix</b> while it plays</sub></td>
+<td align="center"><img src="docs/screenshots/services.png" alt="Services: Siansa Beats and the others, each with whether it's working" width="240"><br><sub><b>Your services</b>, Siansa Beats first</sub></td>
+</tr>
 </table>
 
 <p align="center"><sub>The covers, artist pictures and names in these screenshots are made up; in the app you see your own library.</sub></p>
@@ -82,15 +93,16 @@ Both update on their own. Or build it from this source (below): a build of your 
 
 1. In Settings, enter:
    - **Your server**: address (e.g. `http://192.168.1.10:4533`), username, password.
-   - **AudioMuse-AI**: address of its web/API port (e.g. `http://192.168.1.10:8000`) and its API token if authentication is on. Text search (CLAP) must be enabled.
+   - **Siansa Beats** (under Settings › Connections): its address, for the mixes, radios, levelling and DJ blends.
+   - **AudioMuse-AI** (optional, when there's no Siansa Beats): address of its web/API port (e.g. `http://192.168.1.10:8000`) and its API token if authentication is on. Text search (CLAP) must be enabled.
    - **OpenRouter** (optional): API key and model id (default `google/gemini-2.5-flash`; any OpenRouter model id works).
    - **Audiobookshelf** (optional, under Settings › Connections): address and an API token or login.
 2. Use **Test** next to each section, then **Save**.
-3. Optional: install the **Siansa plugin** on AudioMuse-AI (see [`audiomuse-plugin/`](audiomuse-plugin/README.md)) and choose it
-   under Settings › Crossfade and levelling. It measures each song's loudness and how it starts and ends, for
+3. Optional: install the **Siansa plugin** on AudioMuse-AI (see [siansa-beats](https://github.com/echovaultstudio/siansa-beats)) and choose it
+   under Settings › Sound. It measures each song's loudness and how it starts and ends, for
    levelling and smooth crossfades, and finds similar albums and artists.
 
-Inside the app, with **Settings › Help › Debug logs** on, the log records each start (version, phone, settings that change behaviour), why the app last closed (crash, freeze, killed for memory, swiped away; Android 11+), every error in background work, playback decisions, downloads and covers. **Report a problem** on the same page sends it with your words.
+Inside the app, with **Settings › Help & feedback › Debug logs** on, the log records each start (version, phone, settings that change behaviour), why the app last closed (crash, freeze, killed for memory, swiped away; Android 11+), every error in background work, playback decisions, downloads and covers. **Report a problem** on the same page sends it with your words.
 
 ## Quality checks
 
@@ -101,17 +113,17 @@ Every push to `main` and every pull request runs `.github/workflows/ci.yml`:
 | **Build** (`assembleRelease`) | Syntax and type errors; the release APK must compile and shrink with R8. |
 | **Unit tests** (`app/src/test`) | Mistakes in the app's own logic: server addresses, cover detection, ReplayGain, release types, name matching, the home-network check. Run in seconds, no phone needed. |
 | **Screenshot tests** (`app/src/test/java/app/siansa/screenshots`) | Parts of the app drawn in light and dark, at normal and 130 % font size, and compared pixel by pixel with the approved pictures in `app/src/test/screenshots`: words cut off, text too faint in light mode, gaps that moved. Drawn on the build machine (Roborazzi on Robolectric), no phone needed. Pull requests only. When a new look is meant, label the pull request `record screenshots`: `.github/workflows/screenshots.yml` draws the pictures again, commits them to it and comments on it with each picture that differs from main, before and after. Merging the pull request approves them. |
-| **Plugin tests** (`audiomuse-plugin/tests`) | Mistakes in the AudioMuse-AI plugin: loudness against the BS.1770 reference, fade shapes, the ramp layout the app reads, similar lists and when they rebuild. |
+| **Plugin tests** (in the [siansa-beats](https://github.com/echovaultstudio/siansa-beats) repository, `plugins/SiansaAnalysis/tests`) | Mistakes in the AudioMuse-AI plugin: loudness against the BS.1770 reference, fade shapes, the ramp layout the app reads, similar lists and when they rebuild. |
 | **Android Lint** | Likely crashes, wrong Android API use for older versions, and security issues. Errors appear as annotations on the commit. |
 | **Secret scan** (gitleaks, `.gitleaks.toml`) | Passwords, tokens or API keys committed anywhere in the history. |
 | **Emulator tests** (`app/src/androidTest`) | The app on an Android emulator against a real Navidrome behind a phone-speed link: animated covers downloaded once and shown as stills in lists, songs playing while covers load, and a tour of every page that plays songs from several of them. Screenshots of every page and the app's log go to the `ci-screens` branch. They run after each merge to main and nightly, and on a pull request labelled `ui` (`.github/workflows/ui-tests.yml`, on GitHub's runner, again on each push while the label is on), and report problems without holding back releases (song start times on the throttled emulator vary too much to fail on; slow starts are listed in the run). |
 | **Dependabot** (`.github/dependabot.yml`) | Weekly pull requests for outdated libraries and alerts for known vulnerabilities in them. |
 
-Every pull request, push and nightly run builds the app and runs Lint, the unit tests, the plugin tests and the secret scan, whatever changed, and compiles the emulator tests so a pull request can't break them unseen. The emulator tests run every night, and after merges to main that can change the app. Gradle's build cache reuses unchanged work. Pull requests and the quick checks run on GitHub's runners; pushes to main, the emulator tests and releases run on the owner's own runner when the `RUNS_ON` repository variable names it (see `.github/workflows/ci.yml`).
+Every pull request, push and nightly run builds the app and runs Lint, the unit tests and the secret scan, whatever changed, and compiles the emulator tests so a pull request can't break them unseen. The emulator tests run every night, and after merges to main that can change the app. Gradle's build cache reuses unchanged work. Pull requests and the quick checks run on GitHub's runners; pushes to main, the emulator tests and releases run on the owner's own runner when the `RUNS_ON` repository variable names it (see `.github/workflows/ci.yml`).
 
 A release is published from main when the build, Lint, unit tests and secret scan pass. A failing check shows a red cross on the commit, and its details are in the run's annotations.
 
-Inside the app, with **Settings → Logs → Keep a log** on, the log records each start (version, phone, settings that change behaviour), why the app last closed (crash, freeze, killed for memory, swiped away; Android 11+), every error in background work, playback decisions, downloads and covers. **Problems** on the Logs page shows only warnings and errors.
+Inside the app, with **Settings › Help & feedback › Debug logs** on, the log records each start (version, phone, settings that change behaviour), why the app last closed (crash, freeze, killed for memory, swiped away; Android 11+), every error in background work, playback decisions, downloads and covers. **Problems** on the Logs page shows only warnings and errors.
 
 ## Building
 
@@ -123,8 +135,8 @@ To build locally: `gradle :app:assembleRelease` with Gradle 8.14+, JDK 17 and th
 
 ## Contributing and reporting
 
-Bug reports and feature requests go in this repository's [issues](issues), or **Settings › Help › Report a problem** in the app, which sends the log along. Pull requests are welcome here: one issue per pull request, with a note in `changelog.d/` and tests for what changes (see `CLAUDE.md` for the conventions CI checks).
+Bug reports and feature requests go in this repository's [issues](issues), or **Settings › Help & feedback › Report a problem** in the app, which sends the log along. Pull requests are welcome here: one issue per pull request, with a note in `changelog.d/` and tests for what changes (see `CLAUDE.md` for the conventions CI checks).
 
 ## Licence
 
-Siansa is free software under the [GNU General Public License, version 3 or later](LICENSE). The AudioMuse-AI plugin in `audiomuse-plugin/` is under the [AGPL 3](audiomuse-plugin/LICENSE), as AudioMuse-AI is. The libraries the app is built on and their licences are listed at [siansa.app/licenses](https://siansa.app/licenses).
+Siansa is free software under the [GNU General Public License, version 3 or later](LICENSE). The AudioMuse-AI plugin, in the [siansa-beats](https://github.com/echovaultstudio/siansa-beats) repository, is under the AGPL 3, as AudioMuse-AI is. The libraries the app is built on and their licences are listed at [siansa.app/licenses](https://siansa.app/licenses).

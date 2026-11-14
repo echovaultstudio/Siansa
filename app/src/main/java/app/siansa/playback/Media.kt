@@ -104,7 +104,7 @@ fun MediaItem.isAuto(): Boolean = mediaMetadata.extras?.getBoolean(AUTO_EXTRA, f
 fun MediaItem.isQueued(): Boolean = mediaMetadata.extras?.getBoolean(QUEUED_EXTRA, false) == true
 
 /**
- * Where "Add to queue" puts a song, as Spotify does: right after the song playing and after the songs you
+ * Where "Add to queue" puts a song: right after the song playing and after the songs you
  * queued before it (in the order you added them), ahead of the rest of the album or playlist.
  * [isQueued] tells for a queue position whether that song was added with "Add to queue".
  */

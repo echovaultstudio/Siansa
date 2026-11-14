@@ -78,4 +78,26 @@ class DolbyLevelTest {
         assertEquals(-24 to true, after.first())
         assertTrue(after.drop(1).all { it == -27 to true })
     }
+
+    /** Issue #1078: the log says for each song why it wasn't played louder; this is what a song is marked with. */
+    @Test
+    fun whatASongIsMarkedWithIsRead() {
+        assertEquals(24, DolbyLevel.marked(frames()))
+        val buffer = frames()
+        DolbyLevel.raise(buffer, 12)
+        assertEquals(31, DolbyLevel.marked(buffer))
+        assertNull(DolbyLevel.marked(ByteBuffer.wrap(ByteArray(64) { it.toByte() })))
+        assertNull(DolbyLevel.marked(ByteBuffer.wrap(ByteArray(4))))
+    }
+
+    @Test
+    fun whyASongWasntPlayedLouderIsSaid() {
+        // Dolby TrueHD, DTS, plain Dolby Digital.
+        assertTrue("only Dolby Digital Plus" in DolbyLevel.whyNot(eac3 = false, marked = null))
+        // Already at the receiver's full level, as some Atmos songs are.
+        assertTrue("already marked at the receiver's full level" in DolbyLevel.whyNot(eac3 = true, marked = 31))
+        assertTrue("already marked at the receiver's full level" in DolbyLevel.whyNot(eac3 = true, marked = 0))
+        assertTrue("can read" in DolbyLevel.whyNot(eac3 = true, marked = null))
+        assertTrue("−24 dB" in DolbyLevel.whyNot(eac3 = true, marked = 24))
+    }
 }

@@ -78,6 +78,8 @@ fun HomeLookRow(
     openAll: (() -> Unit)? = null,
     play: (() -> Unit)? = null,
     songs: List<Song> = emptyList(),
+    // With [HomeLook.GRID]: how many tiles (2 to 8, Arrange Home's choice for the row).
+    gridSize: Int = LocalGridSize.current,
 ) {
     if (items.isEmpty()) return
     val open = openAll ?: items.first().open
@@ -87,6 +89,7 @@ fun HomeLookRow(
         HomeLook.LIST -> HomeList(title, items, open)
         HomeLook.BUTTON -> HomeButton(id, title, items, open, play, songs)
         HomeLook.COVER_ROWS -> HomeCoverRows(title, items, open)
+        HomeLook.GRID -> TileGrid(title, items.map { GridTile(it.key, it.title, it.coverArt, it.colors, onClick = it.open) }, gridSize, openAll)
     }
 }
 
@@ -255,3 +258,44 @@ internal fun homeButtonCaption(plays: Boolean, playing: Boolean, count: Int): St
 }
 
 private val TILE = 140.dp
+
+/** One tile of a [TileGrid]: as a shortcut, its cover (or its colours and an icon) and its name. */
+data class GridTile(
+    val key: String,
+    val title: String,
+    val coverArt: String?,
+    val colors: Pair<Color, Color>? = null,
+    val icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
+    val onClick: () -> Unit,
+)
+
+/**
+ * The Shortcuts card's look for any card or row of Home (the owner, 10 Nov): its title (tapped, [onOpenAll]), then
+ * small tiles two to a row, at most [most] ([GRID_LOOK_MOST], four rows).
+ */
+@Composable
+fun TileGrid(title: String, tiles: List<GridTile>, most: Int, onOpenAll: (() -> Unit)? = null) {
+    val shown = tiles.take(most.coerceIn(2, GRID_LOOK_MOST))
+    if (shown.isEmpty()) return
+    Column(Modifier.testTag("tileGrid")) {
+        if (onOpenAll != null && LocalSectionTitleShown.current) {
+            SectionTitle(title, Modifier.clickable(onClickLabel = "Show all", onClick = onOpenAll))
+        } else SectionTitle(title)
+        Column(Modifier.padding(horizontal = Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
+            shown.chunked(2).forEach { row ->
+                Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+                    row.forEach { t ->
+                        QuickTile(t.title, t.coverArt, t.colors, t.onClick, Modifier.weight(1f).testTag("tileGridTile"), icon = t.icon)
+                    }
+                    if (row.size == 1) Spacer(Modifier.weight(1f))
+                }
+            }
+        }
+    }
+}
+
+/** The most tiles a shortcut grid shows: four rows of two, as Shortcuts. */
+const val GRID_LOOK_MOST = app.siansa.data.HomeLook.GRID_MOST
+
+/** How many tiles a Home row set to the shortcut grid shows (Arrange Home): [titledItem] sets it per row. */
+val LocalGridSize = androidx.compose.runtime.compositionLocalOf { GRID_LOOK_MOST }

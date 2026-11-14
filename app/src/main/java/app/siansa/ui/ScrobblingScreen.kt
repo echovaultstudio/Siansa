@@ -40,7 +40,10 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import app.siansa.log.AppLog
+import app.siansa.net.BeatsListens
 import app.siansa.net.ListenBrainzApi
+import app.siansa.net.beatsTakesListens
+import app.siansa.scrobble.withListenServer
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
@@ -77,7 +80,7 @@ fun ScrobblingScreen(nav: NavController) {
         }
     }
 
-    Screen(title = "Scrobbling and history", nav = nav) { padding ->
+    Screen(title = "Scrobbling & history", nav = nav) { padding ->
         Column(
             Modifier
                 .padding(top = padding.calculateTopPadding())
@@ -108,7 +111,7 @@ fun ScrobblingScreen(nav: NavController) {
                         graph.settings.save(graph.settings.current.copy(scrobbleOffUsers = off))
                     }
                 }
-                Hint("Turn a user off and songs from their library aren't sent to your server, Last.fm or ListenBrainz, while you listen as you.")
+                Hint("Turn a user off and songs from their library aren't sent to your server, Siansa Beats, Last.fm or ListenBrainz, while you listen as you.")
                 }
                 HorizontalDivider()
             }
@@ -119,6 +122,25 @@ fun ScrobblingScreen(nav: NavController) {
                 graph.settings.save(graph.settings.current.copy(scrobbleNavidrome = it))
             }
             Hint("Keeps play counts and \"recently played\" on your server. If your server itself is linked to Last.fm or ListenBrainz, leave the matching option below off, or plays are counted twice.")
+            }
+
+            // Siansa Beats' own listening history (0.29): offered once it's set up and says it takes listens.
+            if (settings.beatsReady) {
+                HorizontalDivider()
+                val takes = settings.beatsTakesListens
+                FoldSection("Siansa Beats", if (!takes) "Needs Siansa Beats 0.29" else if (settings.scrobbleBeats) "On" else "Off", tag = "beats") {
+                    if (takes) {
+                        SwitchRow("Scrobble to Siansa Beats", settings.scrobbleBeats) {
+                            AppLog.i("Scrobble", "Scrobble to Siansa Beats: " + if (it) "on" else "off")
+                            graph.settings.save(graph.settings.current.copy(scrobbleBeats = it))
+                        }
+                        val listener = BeatsListens.listener(settings)
+                        Hint("Keeps your listening history in Siansa Beats" + (if (listener.isNotBlank()) ", as $listener" else "") +
+                            ": see it on its Listening page, and here in Time Machine and your month and year. Siansa Beats can send your listens on to Last.fm; turn Last.fm off below then, or plays are counted twice.")
+                    } else {
+                        Hint("Update Siansa Beats to 0.29 or newer to keep your listening history there.")
+                    }
+                }
             }
 
             HorizontalDivider()
@@ -137,7 +159,7 @@ fun ScrobblingScreen(nav: NavController) {
             Secret("Shared secret", lfmSecret) { lfmSecret = it }
             Field("Last.fm username", lfmUser) { lfmUser = it }
             Secret("Last.fm password (used once to sign in, not stored)", lfmPassword) { lfmPassword = it }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
+            Row(Modifier.tvFocusGroup(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
                 Button(modifier = Modifier.focusRing(), onClick = {
                     result({ lfmStatus = it }) {
                         val session = graph.lastFm.mobileSession(lfmKey.trim(), lfmSecret.trim(), lfmUser.trim(), lfmPassword)
@@ -169,6 +191,7 @@ fun ScrobblingScreen(nav: NavController) {
             val lbSummary = if (settings.listenBrainzReady) "On · " + ListenBrainzApi.apiRoot(settings.listenBrainzUrl).removePrefix("https://").removeSuffix("/") else "Off"
             FoldSection("ListenBrainz / Koito", lbSummary, tag = "listenbrainz") {
             SwitchRow("Send listens", settings.listenBrainzEnabled) {
+                AppLog.i("Scrobble", "Send listens to ListenBrainz / Koito: " + if (it) "on" else "off")
                 graph.settings.save(graph.settings.current.copy(listenBrainzEnabled = it))
             }
             Hint("For Koito, enter its address (e.g. https://koito.example.com) and an API key from Koito's settings → API Keys. Leave the address empty for listenbrainz.org.")
@@ -176,25 +199,51 @@ fun ScrobblingScreen(nav: NavController) {
             Secret("Token / API key", lbToken) { lbToken = it }
             val testListenBrainz = {
                 result({ lbStatus = it }) {
+                    // An emptied token takes the server away, without asking it anything (the owner, 11 Nov: emptying
+                    // the fields answered "HTTP 400" and nothing could be removed).
+                    if (lbToken.isBlank()) {
+                        graph.settings.save(graph.settings.current.withListenServer("", ""))
+                        lbUrl = ""
+                        AppLog.i("Scrobble", "ListenBrainz / Koito removed: nothing is sent there")
+                        return@result "Removed: nothing is sent there"
+                    }
                     val message = graph.listenBrainz.validate(lbUrl, lbToken.trim())
-                    graph.settings.save(
-                        graph.settings.current.copy(listenBrainzEnabled = true, listenBrainzUrl = lbUrl.trim(), listenBrainzToken = lbToken.trim())
-                    )
-                    "$message · sending to ${ListenBrainzApi.apiRoot(lbUrl)}"
+                    val saved = graph.settings.current.withListenServer(lbUrl, lbToken)
+                    graph.settings.save(saved)
+                    // Saving doesn't switch sending back on once it was switched off.
+                    if (saved.listenBrainzEnabled) "$message · sending to ${ListenBrainzApi.apiRoot(lbUrl)}"
+                    else "$message · saved, and Send listens is off"
                 }
             }
             // On the TV the whole row is what the remote stops on, so it isn't skipped (issue #978).
             TvActionRow(onClick = { testListenBrainz() }) { button ->
                 Button(modifier = button, onClick = { testListenBrainz() }) { Text("Test and save") }
             }
+            if (settings.listenBrainzToken.isNotBlank()) {
+                val remove = {
+                    graph.settings.save(graph.settings.current.withListenServer("", ""))
+                    lbUrl = ""
+                    lbToken = ""
+                    lbStatus = "✓ Removed: nothing is sent there"
+                    AppLog.i("Scrobble", "ListenBrainz / Koito removed: nothing is sent there")
+                }
+                // On the TV the whole row is what the remote stops on, as for Test and save above (issue #978): a
+                // narrow button on the left is passed over for the wide row after it.
+                TvActionRow(onClick = remove) { button ->
+                    OutlinedButton(modifier = button, onClick = remove) { Text("Remove") }
+                }
+            }
             lbStatus?.let { Status(it) }
             }
 
-            HorizontalDivider()
             // Your listening's Time Machine (issue #780): its option was only on its own page; it stays there too.
-            FoldSection("Time Machine", if (settings.timeMachineMissing) "Shows songs not in your library" else "Only songs in your library") {
-                SwitchRow("Show songs not in your library", settings.timeMachineMissing) { graph.settings.setTimeMachineMissing(it) }
-                Hint("Songs you played back then that aren't in your library now are listed too, marked, so you can find them again.")
+            // The TV has no Time Machine (the owner, 12 Nov), so nothing to set.
+            if (!app.siansa.BuildConfig.TV_APP) {
+                HorizontalDivider()
+                FoldSection("Time Machine", if (settings.timeMachineMissing) "Shows songs not in your library" else "Only songs in your library") {
+                    SwitchRow("Show songs not in your library", settings.timeMachineMissing) { graph.settings.setTimeMachineMissing(it) }
+                    Hint("Songs you played back then that aren't in your library now are listed too, marked, so you can find them again.")
+                }
             }
         }
     }
@@ -246,7 +295,7 @@ private fun Secret(label: String, value: String, onChange: (String) -> Unit) {
 /** "25%" … "90%": how much of a song must be heard before it's sent (issue #270). */
 @Composable
 internal fun ScrobblePercentChips(selected: Int, onPick: (Int) -> Unit) {
-    Row(Modifier.horizontalScroll(rememberScrollState()).testTag("scrobblePercent"), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+    Row(Modifier.tvFocusGroup().horizontalScroll(rememberScrollState()).testTag("scrobblePercent"), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
         SCROBBLE_PERCENTS.forEach { p ->
             FilterChip(
                 selected = selected == p,

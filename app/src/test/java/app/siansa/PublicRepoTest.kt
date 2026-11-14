@@ -11,8 +11,6 @@ class PublicRepoTest {
     @Test fun theLicenceIsTheGpl3() {
         val licence = File(root, "LICENSE").readText()
         assertTrue("LICENSE isn't the GPL 3", licence.contains("GNU GENERAL PUBLIC LICENSE") && licence.contains("Version 3, 29 June 2007"))
-        val plugin = File(root, "audiomuse-plugin/LICENSE").readText()
-        assertTrue("The plugin's licence isn't the AGPL 3", plugin.contains("GNU AFFERO GENERAL PUBLIC LICENSE"))
     }
 
     @Test fun theSigningKeyIsOut() {

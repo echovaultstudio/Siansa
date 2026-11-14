@@ -30,28 +30,6 @@ import app.siansa.mix.SuggestedArtist
 import coil3.compose.AsyncImage
 import java.util.Locale
 
-/** One artist in "Artists you might like": round photo, name, and who it's like. */
-@Composable
-fun SuggestedArtistTile(artist: SuggestedArtist, onClick: () -> Unit) {
-    Column(
-        Modifier.width(130.dp).clickable(onClick = onClick).padding(vertical = Space.Tight),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        ArtistPhoto(artist, 120)
-        Spacer(Modifier.height(Space.Small))
-        Text(artist.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        artist.because.firstOrNull()?.let {
-            Text(
-                "Like $it",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-    }
-}
-
 /** What we know about a suggested artist, with a link to listen on Deezer. */
 @Composable
 fun SuggestedArtistDialog(artist: SuggestedArtist, onDismiss: () -> Unit) {

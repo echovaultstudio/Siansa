@@ -2,7 +2,7 @@ package app.siansa.data
 
 /**
  * The buttons the mini player can show (issue #346), in the order a new install shows the first three. The
- * rest are extras a user can add in Settings › Style › Mini Player.
+ * rest are extras a user can add in Settings › Now playing › Mini player.
  */
 enum class MiniButton(val id: String, val label: String) {
     PLAY("play", "Play or pause"),
@@ -97,7 +97,7 @@ fun <T> shownInOrder(order: List<T>, shown: Set<T>): List<T> = order.filter { it
 
 /**
  * The options in Home's menu (issue #872), top to bottom as a new install shows them. Their order is set in
- * Settings › Style › Home Menu; all four always show, since each is the only way to it from Home.
+ * Settings › Home page › Home menu; all four always show, since each is the only way to it from Home.
  */
 enum class HomeMenuItem(val id: String, val label: String) {
     DICE("dice", "Roll the dice"),

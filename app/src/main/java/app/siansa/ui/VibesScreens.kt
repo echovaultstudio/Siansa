@@ -1,5 +1,6 @@
 package app.siansa.ui
 
+import app.siansa.net.wordsReady
 import androidx.compose.ui.platform.testTag
 
 import androidx.compose.foundation.horizontalScroll
@@ -21,6 +22,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -43,6 +46,7 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
@@ -83,7 +87,7 @@ fun VibesScreen(nav: NavController) {
     LaunchedEffect(Unit) { graph.selectors.all() }
 
     Screen(
-        title = "Auto Generated Mixes",
+        title = "Today's mix and vibes",
         nav = nav,
         actions = {
             IconButton(onClick = { nav.navigate("selector/new") }) { Icon(Icons.Rounded.Add, "Add vibe") }
@@ -174,7 +178,7 @@ fun TodaysMixPanel() {
     // doesn't cancel it; the tile on Home shows the new one.
     fun tune(next: app.siansa.data.DailyMix) {
         set(next)
-        if (next.autoUpdate && settings.audioMuseReady) graph.scope.launch { runCatching { graph.generator.ensureCurrent(force = true) } }
+        if (next.autoUpdate && settings.wordsReady) graph.scope.launch { runCatching { graph.generator.ensureCurrent(force = true) } }
     }
     Card(Modifier.fillMaxWidth().padding(horizontal = Space.Page, vertical = Space.Small).testTag("todaysMix")) {
         Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
@@ -467,8 +471,41 @@ fun Hint(text: String) {
 
 @Composable
 fun SwitchRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+    // The whole row switches, so the remote lands on the row (the switch alone, narrow at the right edge, was skipped
+    // on the TV: down from it went past the next full-width heading, issue of 12 Nov) and a tap on the words works too.
+    Row(
+        Modifier.fillMaxWidth()
+            // The switch's own touch height (48 dp), which the row had from the switch before: nothing moves.
+            .minimumInteractiveComponentSize()
+            .toggleable(checked, role = Role.Switch, onValueChange = onChange)
+            .focusRing(MaterialTheme.shapes.small),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-        Switch(checked = checked, onCheckedChange = onChange)
+        Switch(checked = checked, onCheckedChange = null)
+    }
+}
+
+/**
+ * A switch with a line under its name saying what it does: the one way such a row is built (six pages each had
+ * their own, with different gaps and some switching only on the switch). The whole row switches, as [SwitchRow]
+ * above; [tag] names the row for tests.
+ */
+@Composable
+fun SwitchRow(label: String, hint: String, checked: Boolean, modifier: Modifier = Modifier, tag: String? = null, onChange: (Boolean) -> Unit) {
+    Row(
+        modifier.fillMaxWidth()
+            .then(if (tag != null) Modifier.testTag(tag) else Modifier)
+            .toggleable(checked, role = Role.Switch, onValueChange = onChange)
+            .focusRing(MaterialTheme.shapes.small)
+            .padding(vertical = Space.Small),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(label, style = MaterialTheme.typography.bodyLarge)
+            Text(hint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Spacer(Modifier.width(Space.Medium))
+        Switch(checked = checked, onCheckedChange = null)
     }
 }

@@ -31,10 +31,9 @@ android {
         versionCode = TV_CODES + buildNumber
         versionName = appVersion
         // The TV app plays through the new audio engine (issue #826), the engine v1.0 brings to everyone.
-        // The TV's showcase screenshots (TvShowcaseTest, .github/workflows/showcase.yml) run on a TV emulator.
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("boolean", "MIXER_ENGINE", "true")
         buildConfigField("boolean", "TV_APP", "true")
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         val castReceiverId = (System.getenv("CAST_RECEIVER_ID")?.takeIf { it.isNotBlank() }
             ?: providers.gradleProperty("siansa.castReceiverId").orNull).orEmpty().filter { it.isLetterOrDigit() }
         buildConfigField("String", "CAST_RECEIVER_ID", "\"$castReceiverId\"")
@@ -154,7 +153,8 @@ dependencies {
 
     testImplementation("junit:junit:4.13.2")
 
-    // The TV's showcase screenshots on a TV emulator (src/androidTest), at the phone app's versions.
+    // The remote sweep (.github/workflows/tv-tests.yml) and the showcase screenshots (TvShowcaseTest, showcase.yml) on a
+    // TV emulator (src/androidTest), at the phone app's versions.
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("androidx.test:rules:1.6.1")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")

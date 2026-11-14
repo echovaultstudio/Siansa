@@ -22,9 +22,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.navigation.NavController
 
 /**
- * The top of every Your listening page (Your month, Time machine, Other artists you might like), so they
- * look like one family: soft violet, rose and amber light fading into the page (issue #325), back, a big title and a line under it, then
- * the page's own controls ([extra]: range chips, the year and months), all on the page's edges.
+ * The top of Other artists you might like: soft violet, rose and amber light fading into the page (issue #325), back,
+ * a big title and a line under it, then the page's own controls ([extra]), all on the page's edges. The listening
+ * pages themselves (Your listening, the time machine, the fingerprint) have [PictureHeader], with a picture of the music.
  */
 @Composable
 fun ListeningHeader(nav: NavController, title: String, subtitle: String, extra: @Composable ColumnScope.() -> Unit = {}) {

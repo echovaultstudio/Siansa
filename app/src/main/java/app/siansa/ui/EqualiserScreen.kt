@@ -38,7 +38,7 @@ import kotlin.math.pow
 import kotlin.math.roundToInt
 
 /**
- * Settings › Playback › Equaliser: on/off, presets, ten bands and the one pre-amp. Levelling (ReplayGain) is
+ * Settings › Sound › Equaliser: on/off, presets, ten bands and the one pre-amp. Levelling (ReplayGain) is
  * under Crossfade and levelling (issue #214).
  */
 @Composable
@@ -92,7 +92,7 @@ private val presetOrder = listOf(EqPreset.FLAT, EqPreset.CUSTOM) + EqPreset.entr
 /** The preset chips, scrolling sideways. */
 @Composable
 internal fun EqPresetRow(selected: EqPreset, onPick: (EqPreset) -> Unit) {
-    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+    Row(Modifier.tvFocusGroup().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
         presetOrder.forEach { preset ->
             FilterChip(selected = selected == preset, onClick = { onPick(preset) }, label = { Text(preset.label) })
         }

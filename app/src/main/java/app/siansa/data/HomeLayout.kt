@@ -14,7 +14,7 @@ enum class HomeSection(val id: String, val label: String) {
     BOOKS("books", "Your books"),
     PODCASTS("podcasts", "Your podcasts"),
     MADE_FOR_YOU("made", "Made for you"),
-    /** Custom cards pinned to Home (issue #622); each shows in its own look, in the order set in Settings › Notices and Cards › Cards. */
+    /** Custom cards pinned to Home (issue #622); each shows in its own look, in the order set in Settings › Home page › Cards. */
     CARDS("cards", "Your cards"),
     REDISCOVER("rediscover", "Rediscover"),
     RADIOS("radios", "Radios"),
@@ -25,7 +25,7 @@ enum class HomeSection(val id: String, val label: String) {
     GENRES("genres", "Your genres"),
     RANDOM("random", "Random picks");
 
-    /** Its look can be changed under Arrange Home (issue #655); Your cards each have their own, in Settings › Notices and Cards › Cards. */
+    /** Its look can be changed under Arrange Home (issue #655); Your cards each have their own, in Settings › Home page › Cards. */
     val lookable: Boolean get() = this != CARDS && this != NOTICES
 
     companion object {
@@ -75,7 +75,9 @@ enum class HomeLook(val id: String, val label: String, val hint: String) {
     BANNER("banner", "Banner", "One wide card with the first covers and a button"),
     LIST("list", "List", "The first five listed, the rest a tap away"),
     BUTTON("button", "Play button", "A slim card: one tap plays it, or opens it"),
-    COVER_ROWS("cover_rows", "Cover rows", "Covers with their details beside them, three to a column, to swipe through");
+    COVER_ROWS("cover_rows", "Cover rows", "Covers with their details beside them, three to a column, to swipe through"),
+    // The owner, 10 Nov: any row as the Shortcuts card is, two small tiles a row, 2 to 8 of them.
+    GRID("grid", "Shortcut grid", "Small tiles two to a row, as Shortcuts: 2 to 8 of them");
 
     companion object {
         /** Reads the saved looks ("recent:list,added:banner"); unknown sections and looks are dropped. */
@@ -88,6 +90,24 @@ enum class HomeLook(val id: String, val label: String, val hint: String) {
                 if (s.lookable && l != AS_IS) s to l else null
             }.toMap()
         }
+
+        /** The most tiles of a [GRID] row, and the choices: up to four rows of two, as Shortcuts. */
+        const val GRID_MOST = 8
+        val GRID_SIZES = listOf(2, 4, 6, 8)
+
+        /** Reads the saved grid sizes ("recent:4,genres:8"); unknown sections and sizes out of 2..8 are dropped. */
+        fun parseGridSizes(saved: String?): Map<HomeSection, Int> {
+            if (saved.isNullOrBlank()) return emptyMap()
+            return saved.split(',').mapNotNull { pair ->
+                val (section, n) = pair.split(':').takeIf { it.size == 2 } ?: return@mapNotNull null
+                val s = HomeSection.entries.firstOrNull { it.id == section.trim() } ?: return@mapNotNull null
+                val size = n.trim().toIntOrNull()?.takeIf { it in 2..GRID_MOST } ?: return@mapNotNull null
+                s to size
+            }.toMap()
+        }
+
+        fun formatGridSizes(sizes: Map<HomeSection, Int>): String =
+            HomeSection.entries.mapNotNull { s -> sizes[s]?.let { "${s.id}:$it" } }.joinToString(",")
 
         fun format(looks: Map<HomeSection, HomeLook>): String =
             HomeSection.entries.mapNotNull { s -> looks[s]?.takeIf { it != AS_IS }?.let { "${s.id}:${it.id}" } }.joinToString(",")
@@ -105,4 +125,39 @@ fun movesFirstVisible(from: Int, to: Int, firstVisible: Int): Boolean = from != 
 fun <T> List<T>.moved(from: Int, to: Int): List<T> {
     if (from == to || from !in indices || to !in indices) return this
     return toMutableList().apply { add(to, removeAt(from)) }
+}
+
+/**
+ * How the coloured cards on Home are painted (the owner, 13 Nov: some were too dominant): Today's mix, the book and
+ * podcast cards, Made for you, Radios and the other generated tiles. Never the shortcut grid. One choice for the whole
+ * of Home under Arrange Home, and a card's own under its cog ([AS_HOME] follows Home's).
+ */
+enum class CardLook(val id: String, val label: String, val hint: String) {
+    AS_HOME("as_home", "As Home", "The choice made for the whole of Home"),
+    VIVID("vivid", "Vivid", "Its own full colour"),
+    SOFT("soft", "Soft", "Its colour at a third of its strength over the dark surface"),
+    PLAIN("plain", "Plain", "The same grey as the shortcut tiles; colour only in the artwork"),
+    ARTWORK("artwork", "From the artwork", "A muted colour taken from its own artwork, as the listening pages' headers");
+
+    companion object {
+        /** The choices for the whole of Home: all but [AS_HOME]. */
+        val forHome: List<CardLook> = entries.filter { it != AS_HOME }
+        val DEFAULT = VIVID
+
+        fun of(id: String?): CardLook? = entries.firstOrNull { it.id == id }
+
+        /** Reads the saved cards' looks ("today:soft,radios:plain"); unknown sections and looks are dropped. */
+        fun parse(saved: String?): Map<HomeSection, CardLook> {
+            if (saved.isNullOrBlank()) return emptyMap()
+            return saved.split(',').mapNotNull { pair ->
+                val (section, look) = pair.split(':').takeIf { it.size == 2 } ?: return@mapNotNull null
+                val s = HomeSection.entries.firstOrNull { it.id == section.trim() } ?: return@mapNotNull null
+                val l = of(look.trim()) ?: return@mapNotNull null
+                if (l != AS_HOME) s to l else null
+            }.toMap()
+        }
+
+        fun format(looks: Map<HomeSection, CardLook>): String =
+            HomeSection.entries.mapNotNull { s -> looks[s]?.let { "${s.id}:${it.id}" } }.joinToString(",")
+    }
 }

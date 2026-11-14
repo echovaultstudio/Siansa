@@ -1,5 +1,6 @@
 package app.siansa.ui
 
+import app.siansa.net.soundReady
 import androidx.compose.ui.platform.testTag
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.text.style.TextAlign
@@ -11,6 +12,8 @@ import coil3.SingletonImageLoader
 import app.siansa.data.cover
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.rounded.SwapVert
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -296,20 +299,30 @@ internal fun coverFallbackKeys(id: String, size: Int?): List<String> {
     return listOf(null, LARGE_COVER, SMALL_COVER, 150).map { coverMemoryKey(id, it) }.distinct().filter { it != own }
 }
 
+/** How long a cover shows before its colours are read ahead ([CoverToneStore.warm]). */
+private const val WARM_AFTER_MS = 600L
+
+/** How often a cover on screen looks whether it's showing a stand-in that's due to be asked for again. */
+private const val STAND_IN_POLL_MS = 2_000L
+
 /** The request [Cover] makes, so covers can be loaded ahead of time into the same cache entries. */
 fun coverRequest(context: android.content.Context, graph: app.siansa.AppGraph, id: String, size: Int?): ImageRequest {
     val px = coverServerPx(size)
+    // The server's stand-in, shown a while ago: asked for again now (StandIns).
+    app.siansa.covers.CoverCache.askAgain(SingletonImageLoader.get(context), id)
     val builder = ImageRequest.Builder(context).memoryCacheKey(coverMemoryKey(id, size))
     // A phone playlist's own picture, already on the phone.
     if (id.startsWith(LocalPlaylists.FILE_COVER)) builder.data(java.io.File(id.removePrefix(LocalPlaylists.FILE_COVER)))
-    else builder.data(graph.source.coverUrl(id, px)).diskCacheKey("cover:${app.siansa.covers.CoverVersions.cacheId(id)}:${px ?: "full"}")
+    else builder.data(graph.source.coverUrl(id, px)).diskCacheKey(app.siansa.covers.CoverCache.diskKey(id, px))
     // A fixed size lets the load start straight away instead of waiting for the layout.
     coverDecodePx(size)?.let { builder.size(it) }
     return builder.build()
 }
 
 /**
- * Album art from Navidrome. size = null would ask for the original file; screens use [LARGE_COVER] instead.
+ * Album art from the server, shown as the server sends it: a picture it has is kept on the phone; its stand-in for a
+ * picture it doesn't have right now is shown but never kept, and asked for again the next time it's needed
+ * (`StandIns`, the owner, 11 Nov). size = null would ask for the original file; screens use [LARGE_COVER] instead.
  * The cache key leaves out the per-session login token, so covers are reused from disk across app starts.
  * Always a still picture (the first frame of an animated cover); [BigCover] shows animations.
  *
@@ -324,17 +337,49 @@ fun Cover(
     shape: Shape = RoundedCornerShape(8.dp),
 ) {
     val graph = LocalGraph.current
+    // An artist's picture as looked up this run (ArtistPhotos), wherever it shows: their page, Fans also like, Home,
+    // lists. The id a list holds may be from before Navidrome found the photo, and stand for its placeholder star; the
+    // new one shows as soon as it's known, without the page being opened again (the owner, 10 Nov).
+    val freshArtists by graph.artistPhotos.covers.collectAsStateWithLifecycle()
+    @Suppress("NAME_SHADOWING")
+    val coverId = coverId?.let { app.siansa.data.freshArtistCover(it, freshArtists) }
     val context = LocalContext.current
     val loader = SingletonImageLoader.get(context)
-    val cached = remember(coverId, size) {
-        coverId?.let { loader.memoryCache?.get(MemoryCache.Key(coverMemoryKey(it, size)))?.image }
+    // A stand-in showing here is asked for again when its time comes (StandIns: soon the first times), without the
+    // cover having to leave the screen and come back (the owner, 12 Nov: a song's row kept the blue disc).
+    var again by remember(coverId) { androidx.compose.runtime.mutableIntStateOf(0) }
+    LaunchedEffect(coverId) {
+        val id = coverId ?: return@LaunchedEffect
+        val cacheId = app.siansa.covers.CoverVersions.cacheId(id)
+        while (true) {
+            val due = app.siansa.covers.StandIns.dueIn(cacheId)
+            if (due == null) { kotlinx.coroutines.delay(STAND_IN_POLL_MS); continue }
+            kotlinx.coroutines.delay(due + 50)
+            if (app.siansa.covers.StandIns.askAgain(cacheId)) {
+                app.siansa.covers.CoverCache.forgetInMemory(loader, cacheId)
+                again++
+            }
+        }
+    }
+    val cached = remember(coverId, size, again) {
+        coverId?.let {
+            // The server's stand-in, shown a while ago, is dropped here, so the cover is asked for again.
+            app.siansa.covers.CoverCache.askAgain(loader, it)
+            loader.memoryCache?.get(MemoryCache.Key(coverMemoryKey(it, size)))?.image
+        }
     }
     // Not in memory at this size: show the same cover at another size that is, until this one is ready.
     val standIn = remember(coverId, size, cached) {
         if (cached != null || coverId == null) null
         else coverFallbackKeys(coverId, size).firstNotNullOfOrNull { loader.memoryCache?.get(MemoryCache.Key(it))?.image }
     }
-    val request = remember(coverId, size) { coverId?.let { coverRequest(context, graph, it, size) } }
+    val request = remember(coverId, size, again) { coverId?.let { coverRequest(context, graph, it, size) } }
+    // Its colours, worked out in the background while it shows (CoverToneStore): the page it opens has them in its
+    // first frame. A cover only scrolled past isn't read.
+    LaunchedEffect(coverId) {
+        kotlinx.coroutines.delay(WARM_AFTER_MS)
+        CoverToneStore.warm(context, graph, coverId)
+    }
     Box(
         modifier.clip(shape).background(MaterialTheme.colorScheme.surfaceVariant),
         contentAlignment = Alignment.Center,
@@ -645,7 +690,7 @@ fun SongRow(
                         if (graph.connection.current.offline) launch.notify("You're offline: a mix needs the server")
                         else RadioChooser.ask(song)
                     })
-                    if (graph.settings.current.audioMuseReady) {
+                    if (graph.settings.current.soundReady) {
                         DropdownMenuItem(text = { Text("Song path…") }, onClick = {
                             menu = false
                             sheet.close()
@@ -657,7 +702,7 @@ fun SongRow(
                         sheet.close()
                         nav.openSimilarSongs(song.id)
                     })
-                    if (graph.settings.current.audioMuseReady && song.albumId != null) {
+                    if (graph.settings.current.soundReady && song.albumId != null) {
                         DropdownMenuItem(text = { Text("Similar albums") }, onClick = {
                             menu = false
                             sheet.close()
@@ -794,13 +839,15 @@ fun GradientTile(
     size: Dp = 160.dp,
     busy: Boolean = false,
 ) {
+    // In the look chosen for Home's cards (the owner, 13 Nov): its own colours, softened, plain, or its cover's.
+    val paint = cardPaint(colors, coverArt, "tile-$title")
     Column(modifier.width(size).clickable(onClick = onClick)) {
         Box(
             Modifier
                 .size(size)
                 .testTag("gradientTileArt")
                 .clip(RoundedCornerShape(10.dp))
-                .background(Brush.linearGradient(listOf(colors.first, colors.second))),
+                .cardFill(paint, RoundedCornerShape(10.dp)),
         ) {
             if (coverArt != null) {
                 Cover(
@@ -814,14 +861,14 @@ fun GradientTile(
             WholeWordsText(
                 title,
                 style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.ExtraBold),
-                color = Color.White,
+                color = paint.text,
                 maxLines = 3,
                 modifier = Modifier.align(Alignment.TopStart).padding(Space.Medium).testTag("gradientTileTitle"),
             )
             if (busy) {
                 CircularProgressIndicator(
                     Modifier.size(22.dp).align(Alignment.BottomStart).padding(2.dp),  // spacing: exact (the badge's inset)
-                    color = Color.White,
+                    color = paint.text,
                     strokeWidth = 2.dp,
                 )
             }
@@ -843,6 +890,10 @@ fun GradientTile(
     }
 }
 
+/** A quick access tile's height and corners: Home's menu takes them too, so it lies on the tiles (the owner, 12 Nov). */
+val QUICK_TILE_HEIGHT = 56.dp
+val QUICK_TILE_CORNER = 6.dp
+
 /** A compact "quick access" tile: small cover on the left, name on the right. */
 @Composable
 fun QuickTile(
@@ -855,8 +906,8 @@ fun QuickTile(
 ) {
     Row(
         modifier
-            .height(56.dp)
-            .clip(RoundedCornerShape(6.dp))
+            .height(QUICK_TILE_HEIGHT)
+            .clip(RoundedCornerShape(QUICK_TILE_CORNER))
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
             .clickable(onClick = onClick),
         verticalAlignment = Alignment.CenterVertically,
@@ -931,7 +982,7 @@ fun <T> Shelf(
 }
 
 /**
- * Spotify's swipe to queue: drag a song row from right to left past a third of its width and let go, and
+ * Swipe to queue: drag a song row from right to left past a third of its width and let go, and
  * the song is added to the queue (after the songs queued before it). The row slides back; an amber strip
  * with the queue icon shows behind it while dragging. [content] gets a background for the row, solid
  * only while it's dragged so the row looks as usual otherwise.
@@ -1221,3 +1272,67 @@ internal fun radioMore(startedEmpty: Boolean, restEmpty: Boolean, startedAt: Lon
     startedEmpty -> RadioMore.PLAY
     else -> RadioMore.ADD
 }
+
+/**
+ * How a list is sorted, as one control everywhere (the owner, 10 Nov: playlists had chips, Your Library the arrows):
+ * the up-and-down arrows with the order's name, opening a "Sort by" menu with the chosen one ticked.
+ */
+@Composable
+internal fun <T> SortPicker(label: String, options: List<Pair<T, String>>, selected: T, modifier: Modifier = Modifier, onPick: (T) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Box(modifier) {
+        Row(
+            Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClickLabel = "Sort by") { open = true }.padding(Space.Small).testTag("sortPicker"),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Rounded.SwapVert, null, Modifier.size(20.dp).testTag("sortArrows"))
+            Spacer(Modifier.width(Space.Small))
+            Text(label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 1)
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            Text(
+                "Sort by",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = Space.Page, vertical = Space.Small),
+            )
+            options.forEach { (option, name) ->
+                DropdownMenuItem(
+                    text = { Text(name, color = if (option == selected) Accent else MaterialTheme.colorScheme.onSurface) },
+                    trailingIcon = { if (option == selected) Icon(Icons.Rounded.Check, null, tint = Accent) },
+                    onClick = { open = false; onPick(option) },
+                    modifier = Modifier.testTag("sort-$option"),
+                )
+            }
+        }
+    }
+}
+
+/**
+ * The round Play button in the accent colour, a pause sign while [playing]: the one way it's built (Home's hero and
+ * carousel, a book's cover and the sonic fingerprint each wrote their own). [size] is the button's, [icon] the sign's.
+ */
+@Composable
+fun RoundPlayButton(
+    playing: Boolean,
+    description: String,
+    size: androidx.compose.ui.unit.Dp,
+    icon: androidx.compose.ui.unit.Dp,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+) {
+    androidx.compose.material3.FilledIconButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier.size(size),
+        colors = androidx.compose.material3.IconButtonDefaults.filledIconButtonColors(containerColor = Accent, contentColor = OnAccent),
+    ) {
+        androidx.compose.material3.Icon(
+            if (playing) androidx.compose.material.icons.Icons.Rounded.Pause else androidx.compose.material.icons.Icons.Rounded.PlayArrow,
+            description,
+            Modifier.size(icon),
+        )
+    }
+}
+
