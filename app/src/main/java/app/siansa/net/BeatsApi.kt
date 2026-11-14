@@ -25,56 +25,75 @@ import okhttp3.RequestBody.Companion.toRequestBody
  * own ids for a song. Every request then names the server this app plays from (`?server=<id>`, [serverFor]: the one
  * of its kind, by its user and address when there are several), so the ids answered are this server's. An older
  * Siansa Beats, or one that doesn't read this server, is asked as before.
+ *
+ * Users shown together are logins of their own to Siansa Beats: a question about a shown user's songs names that
+ * user's server ([whoseSongs]: the settings of the user the songs asked about belong to), not the one in use (the
+ * owner, 14 Nov: a Kids album's similar albums were the main login's).
  */
-class BeatsApi(private val http: OkHttpClient, private val settings: () -> AppSettings) {
-    suspend fun get(pathAndQuery: String): JsonElement = send(request(forServer(pathAndQuery)).get().build())
+class BeatsApi(
+    private val http: OkHttpClient,
+    private val whoseSongs: ((ids: List<String>) -> AppSettings)? = null,
+    private val settings: () -> AppSettings,
+) {
+    suspend fun get(pathAndQuery: String): JsonElement =
+        send(request(forServer(pathAndQuery, songIdsIn(pathAndQuery))).get().build())
 
-    suspend fun post(path: String, body: String): JsonElement = send(request(forServer(path)).post(body.toRequestBody(JSON)).build())
+    suspend fun post(path: String, body: String): JsonElement =
+        send(request(forServer(path, songIdsIn(path) + songIdsInBody(body))).post(body.toRequestBody(JSON)).build())
 
     /** What this Siansa Beats can do and how far it is ([Capabilities]), for the songs of the server this app plays from. */
     suspend fun capabilities(): Capabilities {
         val all = Capabilities.parse(send(request(CAPABILITIES).get().build()) as? JsonObject ?: throw ApiException("Siansa Beats sent an unexpected answer"))
-        val mine = remember(all)
+        val mine = remember(all).id
         // Its numbers are the default server's: asked again for this app's server when that's another one.
         if (mine == null || mine == all.serverId) return all
         return Capabilities.parse(send(request(withServer(CAPABILITIES, mine)).get().build()) as? JsonObject ?: return all)
     }
 
-    /** The server chosen for the current settings (null: none to name), and when it was looked for. */
-    private data class Chosen(val key: String, val id: String?, val at: Long)
+    /**
+     * The server chosen for one login (null: none to name), when it was looked for, and whether this Siansa Beats
+     * takes its own server's name for similar albums and artists too ([SIMILAR_OWN]).
+     */
+    private data class Chosen(val id: String?, val at: Long, val similar: Boolean)
 
-    @Volatile private var chosen: Chosen? = null
+    /** By login ([key]): the user in use and each user shown beside them. */
+    private val chosen = java.util.concurrent.ConcurrentHashMap<String, Chosen>()
 
-    private fun key(s: AppSettings) = listOf(s.beatsUrl, s.sourceKind.name, s.navidromeUrl, s.navidromeUser).joinToString("|")
+    /** Siansa Beats' address is the user in use's; the server is [s]'s. */
+    private fun key(s: AppSettings) = listOf(settings().beatsUrl, s.sourceKind.name, s.navidromeUrl, s.navidromeUser).joinToString("|")
 
-    private fun remember(caps: Capabilities): String? {
+    private fun remember(caps: Capabilities, s: AppSettings = settings()): Chosen {
         BeatsSound.heard(caps.sound, caps.soundPaths)
-        val s = settings()
         val id = serverFor(caps.servers, s.sourceKind, s.navidromeUrl, s.navidromeUser)
-        if (chosen?.let { it.key == key(s) && it.id == id } != true) {
-            AppLog.i("Beats", if (id != null) "Siansa Beats is asked for its server \"$id\" (${caps.servers.size} there)"
+        if (chosen[key(s)]?.id != id || !chosen.containsKey(key(s))) {
+            AppLog.i("Beats", if (id != null) "Siansa Beats is asked for its server \"$id\" for ${s.navidromeUser.ifBlank { "this login" }} (${caps.servers.size} there)"
             else if (caps.servers.isEmpty()) "Siansa Beats ${caps.version} has one server: asked without naming it"
             else "Siansa Beats doesn't read this ${s.sourceKind.label} server: asked for its default one")
         }
-        chosen = Chosen(key(s), id, System.currentTimeMillis())
-        return id
+        return Chosen(id, System.currentTimeMillis(), atLeast(caps.version, SIMILAR_OWN)).also { chosen[key(s)] = it }
     }
 
-    /** [path] with the server this app plays from; looked up once for the settings, and again [AGAIN_MS] after a failure. */
-    private suspend fun forServer(path: String): String {
-        // similar's server is AudioMuse's own name; its other paths answered here ([BeatsSound]) take this one's.
-        if (!path.startsWith("/api/v1/") || path.startsWith(SIMILAR)) return path
-        val s = settings()
-        val kept = chosen?.takeIf { it.key == key(s) && (it.id != null || System.currentTimeMillis() - it.at < AGAIN_MS) }
-        val id = if (kept != null) kept.id else try {
-            remember(Capabilities.parse(send(request(CAPABILITIES).get().build()) as? JsonObject ?: JsonObject(emptyMap())))
+    /**
+     * [path] with the server of the songs [about] (the server this app plays from, or a shown user's); looked up once
+     * for a login, and again [AGAIN_MS] after a failure.
+     */
+    private suspend fun forServer(path: String, about: List<String> = emptyList()): String {
+        if (!path.startsWith("/api/v1/")) return path
+        // A name already there is AudioMuse-AI's own for a server ("Server name in AudioMuse-AI"): left as it is.
+        val similar = path.startsWith(SIMILAR)
+        if (similar && Regex("[?&]server=").containsMatchIn(path)) return path
+        val s = whoseSongs?.invoke(about) ?: settings()
+        val kept = chosen[key(s)]?.takeIf { it.id != null || System.currentTimeMillis() - it.at < AGAIN_MS }
+        val pick = kept ?: try {
+            remember(Capabilities.parse(send(request(CAPABILITIES).get().build()) as? JsonObject ?: JsonObject(emptyMap())), s)
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: Exception) {
-            chosen = Chosen(key(s), null, System.currentTimeMillis())
-            null
+            Chosen(null, System.currentTimeMillis(), similar = false).also { chosen[key(s)] = it }
         }
-        return if (id == null) path else withServer(path, id)
+        // Before 0.43 Siansa Beats passed similar albums and artists on to AudioMuse-AI, whose server names are its own.
+        if (pick.id == null || (similar && !pick.similar)) return path
+        return withServer(path, pick.id)
     }
 
     private fun request(path: String): Request.Builder {
@@ -160,6 +179,20 @@ class BeatsApi(private val http: OkHttpClient, private val settings: () -> AppSe
         private const val SIMILAR = "/api/v1/similar/"
         /** How long after Siansa Beats couldn't be asked which servers it reads before it's asked again. */
         const val AGAIN_MS = 60_000L
+        /** From this version Siansa Beats finds similar albums and artists itself, among the named server's songs. */
+        const val SIMILAR_OWN = "0.43.0"
+
+        /** Whether [version] ("0.44.1") is [wanted] or newer; an unreadable one isn't. */
+        fun atLeast(version: String, wanted: String): Boolean {
+            fun parts(v: String) = v.trim().split('.', '-').take(3).map { it.toIntOrNull() ?: return null }
+            val have = parts(version) ?: return false
+            val need = parts(wanted) ?: return false
+            for (i in 0 until 3) {
+                val a = have.getOrElse(i) { 0 }; val b = need.getOrElse(i) { 0 }
+                if (a != b) return a > b
+            }
+            return true
+        }
 
         /** Siansa Beats' name for a kind of server. */
         fun kindName(kind: SourceKind): String = when (kind) {

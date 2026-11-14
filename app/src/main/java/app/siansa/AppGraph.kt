@@ -319,7 +319,15 @@ class AppGraph(val app: Application) {
     /** Which mini player shows: the player started last (beta #45). */
     val activePlayer: ActivePlayer by lazy { ActivePlayer(scope, player.state, bookPlayer.state) }
     /** Siansa Beats, asked directly when it's set up (Siansa Dev, the owner, 10 Nov). */
-    val beats = BeatsApi(http) { settings.current }
+    // Users shown together are logins of their own to Siansa Beats, as to AudioMuse-AI above: a shown user's songs
+    // are asked about under that user's login (the owner, 14 Nov).
+    val beats = BeatsApi(
+        http,
+        whoseSongs = { ids ->
+            val user = audioMuseUserFor(ids, { guests.ownerOf(it) }, Users.active, guests.shown.value, library.ownHidden.value)
+            if (user == Users.active) settings.current else guests.settingsOf(user).current
+        },
+    ) { settings.current }
 
     /**
      * A GET of the Siansa Beats (dev) plugin's [pluginPath], answered by Siansa Beats itself when it's set up (its v1

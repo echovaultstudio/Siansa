@@ -596,6 +596,18 @@ internal fun songIdsIn(pathAndQuery: String): List<String> =
 
 private val SONG_ID_PARAMS = setOf("ids", "track_id", "item_id", "album_id", "id")
 
+/** The song ids a JSON [body] asks about: the same names, one id or a list of them, at its top level. */
+internal fun songIdsInBody(body: String): List<String> {
+    val obj = runCatching { AppJson.parseToJsonElement(body) as? JsonObject }.getOrNull() ?: return emptyList()
+    return (SONG_ID_PARAMS + setOf("item_ids", "song_ids", "from_id", "to_id")).flatMap { name ->
+        when (val value = obj[name]) {
+            is JsonPrimitive -> listOfNotNull(value.content.takeIf { value.isString && it.isNotBlank() })
+            is JsonArray -> value.mapNotNull { (it as? JsonPrimitive)?.takeIf { p -> p.isString }?.content?.takeIf { c -> c.isNotBlank() } }
+            else -> emptyList()
+        }
+    }
+}
+
 internal fun serverInUrl(url: String, server: String): String {
     if (server.isBlank()) return url
     val parsed = url.toHttpUrlOrNull() ?: return url
