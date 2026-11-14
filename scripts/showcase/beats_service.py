@@ -58,14 +58,16 @@ def main(code, port, navidrome, data):
     libraries = call(base, "/api/libraries")
     found = libraries.get("libraries", libraries) if isinstance(libraries, dict) else libraries
     ids = [str(l["id"]) for l in found]
-    print("Libraries:", ids, call(base, "/api/libraries", {"ids": ids}), flush=True)
+    chosen = call(base, "/api/libraries", {"ids": ids})
+    print("Libraries:", ids, chosen, flush=True)
+    wanted = int(chosen.get("songs") or chosen.get("queued") or 0)
     end = time.time() + 900
     while time.time() < end:
         caps = call(base, "/api/v1/capabilities")["features"]
         grids, loud = caps["beat_grids"]["songs"], caps["loudness"]["songs"]
         print(f"Siansa Beats: {grids} grids, {loud} loudness", flush=True)
-        counts = call(base, "/api/status")["counts"]
-        if counts["songs"] > 0 and counts["done"] >= counts["songs"] and loud >= counts["songs"]:
+        # Every song with its grid and loudness (a song or two the stand-in can't read doesn't hold it up).
+        if wanted and grids >= wanted - 2 and loud >= wanted - 2:
             break
         time.sleep(5)
     print("Siansa Beats ready", flush=True)
