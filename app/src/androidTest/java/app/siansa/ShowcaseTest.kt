@@ -87,10 +87,13 @@ class ShowcaseTest {
         val server = args.getString("navidromeUrl") ?: "http://10.0.2.2:4533"
         val services = args.getString("servicesUrl") ?: "http://10.0.2.2:8000"
         val books = args.getString("booksUrl") ?: "http://10.0.2.2:13378"
+        // Siansa Beats (the real service with a stand-in for its beat model, scripts/showcase/beats_service.py): DJ
+        // mixes need it.
+        val beats = args.getString("beatsUrl") ?: "http://10.0.2.2:8090"
         graph.settings.save(
             graph.settings.current.copy(
                 navidromeUrl = server, navidromeUser = "admin", navidromePassword = "admin",
-                audioMuseUrl = services,
+                audioMuseUrl = services, beatsUrl = beats,
                 aiProvider = AiProvider.OTHER, aiAddress = "$services/v1", aiModel = "showcase", aiKey = "",
                 audiobookshelfUrl = books, audiobookshelfUser = "admin", audiobookshelfPassword = "admin",
                 themeMode = "DARK",
@@ -154,8 +157,7 @@ class ShowcaseTest {
                 compose.onAllNodesWithContentDescription("Home menu", substring = true).onFirst().performClick()
                 idle(400)
                 compose.onNodeWithTag("homeMenu-arrange").performClick()
-                idle(1200)
-                click("Arrange")
+                waitText("Arrange Home")
                 idle(1200)
                 shot("arrange", popups = true)
                 closeSheet()
@@ -251,6 +253,43 @@ class ShowcaseTest {
                     compose.mainClock.advanceTimeBy(3000)
                     frame("slides", 2200)
                     shot("dj-mix")
+                    // While the mix plays, a slide up from the record opens the DJ mix bar: the ways to shape the mix.
+                    finger(MotionEvent.ACTION_DOWN, middle.x, middle.y)
+                    frame("djbar", 900)
+                    for (i in 1..9) {
+                        val f = ((1 - kotlin.math.cos(Math.PI * i / 9)) / 2).toFloat()
+                        finger(MotionEvent.ACTION_MOVE, middle.x, middle.y - reach * f)
+                        SystemClock.sleep(60)
+                        compose.mainClock.advanceTimeBy(60)
+                        frame("djbar", 60)
+                    }
+                    SystemClock.sleep(600)
+                    compose.mainClock.advanceTimeBy(600)
+                    frame("djbar", 1800)
+                    shot("dj-bar")
+                    // Along the bar to its left end and back to the right end, then let go there.
+                    val side = reach * 1.1f
+                    for (i in 1..8) {
+                        finger(MotionEvent.ACTION_MOVE, middle.x - side * i / 8, middle.y - reach)
+                        SystemClock.sleep(50)
+                        compose.mainClock.advanceTimeBy(50)
+                        frame("djbar", 60)
+                    }
+                    frame("djbar", 1300)
+                    shot("dj-bar-left")
+                    for (i in 1..16) {
+                        finger(MotionEvent.ACTION_MOVE, middle.x - side + 2 * side * i / 16, middle.y - reach)
+                        SystemClock.sleep(50)
+                        compose.mainClock.advanceTimeBy(50)
+                        frame("djbar", 60)
+                    }
+                    frame("djbar", 1300)
+                    shot("dj-bar-right")
+                    finger(MotionEvent.ACTION_UP, middle.x + side, middle.y - reach)
+                    SystemClock.sleep(1500)
+                    compose.mainClock.advanceTimeBy(1500)
+                    frame("djbar", 1800)
+                    shot("dj-bar-chosen")
                 }
                 back()
                 idle(800)
@@ -344,7 +383,7 @@ class ShowcaseTest {
                 chip("Your listening")
                 // The entry, by its line under the title: a chip under Your listening is called Time machine too.
                 click("Your listening · Any month or year")
-                waitText("How you listened, any month or year.")
+                compose.waitUntil(20_000) { compose.onAllNodesWithTag("timeMachineTitle").fetchSemanticsNodes().isNotEmpty() }
                 compose.onAllNodesWithTag("month-0").onFirst().performSemanticsAction(SemanticsActions.OnClick)
                 idle(1500)
                 // From three years ago to this one, a picture a year: each picked from the list under the title.
@@ -584,6 +623,10 @@ class ShowcaseTest {
 
     private var fingerDown = 0L
 
+    /** Where the finger is on the screen while it's down, and where it went down: drawn on each picture. */
+    private var fingerAt: Pair<Float, Float>? = null
+    private var fingerFrom: Pair<Float, Float>? = null
+
     /** A finger on the screen at ([x], [y]), in the window's pixels: down, a move, or up. */
     private fun finger(action: Int, x: Float, y: Float) {
         val now = SystemClock.uptimeMillis()
@@ -591,6 +634,8 @@ class ShowcaseTest {
         val event = MotionEvent.obtain(fingerDown, now, action, x, y, 0).apply { source = android.view.InputDevice.SOURCE_TOUCHSCREEN }
         instrumentation.sendPointerSync(event)
         event.recycle()
+        if (action == MotionEvent.ACTION_DOWN) fingerFrom = x to y
+        fingerAt = if (action == MotionEvent.ACTION_UP) null else x to y
         if (action != MotionEvent.ACTION_UP) SystemClock.sleep(16)
     }
 
@@ -749,6 +794,27 @@ class ShowcaseTest {
         }
     }
 
+    /** The finger on a picture: a soft white dot where it is, and a faint line from where it went down. */
+    private fun drawFinger(target: Bitmap, x: Float, y: Float) {
+        val density = instrumentation.targetContext.resources.displayMetrics.density
+        val canvas = android.graphics.Canvas(target)
+        val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+        fingerFrom?.let { (fx, fy) ->
+            paint.style = android.graphics.Paint.Style.STROKE
+            paint.strokeWidth = 6f * density
+            paint.strokeCap = android.graphics.Paint.Cap.ROUND
+            paint.color = android.graphics.Color.argb(70, 255, 255, 255)
+            canvas.drawLine(fx, fy, x, y, paint)
+        }
+        paint.style = android.graphics.Paint.Style.FILL
+        paint.color = android.graphics.Color.argb(120, 255, 255, 255)
+        canvas.drawCircle(x, y, 22f * density, paint)
+        paint.style = android.graphics.Paint.Style.STROKE
+        paint.strokeWidth = 2.5f * density
+        paint.color = android.graphics.Color.argb(230, 255, 255, 255)
+        canvas.drawCircle(x, y, 22f * density, paint)
+    }
+
     /** The whole window at full size, as a JPEG, written to the log in pieces: SHOWCASE name part/parts data. */
     private fun shot(name: String, popups: Boolean = false, half: Boolean = false) {
         compose.waitForIdle()
@@ -778,6 +844,7 @@ class ShowcaseTest {
             }
             drawn.await(5, java.util.concurrent.TimeUnit.SECONDS)
         }
+        fingerAt?.let { (x, y) -> drawFinger(full, x, y) }
         val picture = if (half) Bitmap.createScaledBitmap(full, full.width / 2, full.height / 2, true) else full
         val bytes = ByteArrayOutputStream().also { picture.compress(Bitmap.CompressFormat.JPEG, if (half) 90 else 94, it) }.toByteArray()
         val parts = Base64.encodeToString(bytes, Base64.NO_WRAP).chunked(3000)
