@@ -143,8 +143,7 @@ mood radios (Chill, Energy, Focus…), "Describe what you want to hear" in Flow,
 mixes made from a description, cards made from a sound, and "Songs that sound like…" in Search.
 
 With Siansa Beats answering these, **AudioMuse-AI can be left out of Siansa's own settings**: its address can be
-empty and all of the above still work. AudioMuse-AI itself keeps running next to Siansa Beats for now, as it's what listens to new
-songs.
+empty and all of the above still work.
 
 When Siansa Beats can't answer (a song whose sound it doesn't have yet) and AudioMuse-AI is set up in Siansa,
 AudioMuse-AI is asked, as before. Without Siansa Beats nothing changes.
