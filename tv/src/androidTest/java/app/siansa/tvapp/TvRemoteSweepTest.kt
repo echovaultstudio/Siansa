@@ -227,6 +227,67 @@ class TvRemoteSweepTest {
     @Test fun sync() = check("Library sync") { app.siansa.ui.SyncScreen(LocalNav.current) }
     @Test fun report() = check("Report a problem") { app.siansa.ui.ProblemReportScreen(LocalNav.current) }
     @Test fun themes() = check("Colours") { app.siansa.ui.ThemesScreen(LocalNav.current) }
-    @Test fun logs() = check("Show the log") { app.siansa.ui.LogsScreen(LocalNav.current) }
+    @Test fun logs() = check("Show the log") { TvLog() }
+
+    /**
+     * The TV's own log page (the owner, 14 Nov: "Buttons on show the log cannot be pressed … impossible to clear
+     * logs"): the remote starts on Clear, OK clears the log, and stepping down through a long log doesn't lose it.
+     */
+    @Test fun okOnClearClearsTheLog() {
+        app.siansa.log.AppLog.setEnabled(true)
+        repeat(300) { app.siansa.log.AppLog.i("Sweep", "A line of the log, number $it, to be cleared") }
+        page { TvLog() }
+        compose.waitUntil(10_000) { compose.onAllNodesWithTag("tvLogBlock").fetchSemanticsNodes().isNotEmpty() }
+        val first = focused()
+        assertTrue("The remote starts on Clear the log, was on ${first?.let(::label)}", first != null && "Clear the log" in wordsOf(first))
+        // Along the row and back: the buttons are reached with left and right.
+        press(KeyEvent.KEYCODE_DPAD_RIGHT)
+        assertTrue("Right goes to Everything", focused()?.let { "Everything" in wordsOf(it) } == true)
+        press(KeyEvent.KEYCODE_DPAD_LEFT)
+        // Down into the log and back up: a block of lines each press, and the buttons are still there to go back to.
+        repeat(5) { press(KeyEvent.KEYCODE_DPAD_DOWN) }
+        assertTrue("Down steps through the log's blocks", focused()?.config?.getOrNull(SemanticsProperties.TestTag) == "tvLogBlock")
+        repeat(8) { press(KeyEvent.KEYCODE_DPAD_UP) }
+        assertTrue("Up comes back to the buttons", focused()?.let { "Clear the log" in wordsOf(it) } == true)
+        press(KeyEvent.KEYCODE_DPAD_CENTER)
+        compose.waitUntil(10_000) {
+            compose.onAllNodesWithTag("tvLogBlock").fetchSemanticsNodes().sumOf { wordsOf(it).count { w -> "to be cleared" in w } } == 0
+        }
+    }
+
+    /**
+     * Home's rows (the owner, 14 Nov: going right along Today's mixes, the focus jumped to the top of Home): right
+     * along a row of wide cards that scrolls stays in that row to its last card, and stops there, with a bar of pills
+     * above it and a row of covers below it that reach further right.
+     */
+    @Test fun rightAlongARowStaysInTheRow() {
+        fun genres(prefix: String, n: Int) = (1..n).map { TvItem.OfGenre(app.siansa.data.Genre("$prefix $it", it)) }
+        page {
+            androidx.compose.foundation.lazy.LazyColumn {
+                item {
+                    TvPillBar {
+                        items(6) { TvButton("Pill ${it + 1}", null, quiet = true, onClick = {}) }
+                    }
+                }
+                item { TvItemRow(TvRow("Today's mixes", genres("Mix", 8), landscape = true)) }
+                item { TvItemRow(TvRow("Genres", genres("Genre", 12))) }
+            }
+        }
+        val start = compose.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsActions.RequestFocus)).fetchSemanticsNodes()
+            .first { "Mix 1" in wordsOf(it) }
+        refocus(start.boundsInRoot)
+        assertTrue("The row's first card takes the focus", focused()?.let { "Mix 1" in wordsOf(it) } == true)
+        val seen = ArrayList<String>()
+        repeat(10) {
+            press(KeyEvent.KEYCODE_DPAD_RIGHT)
+            seen += focused()?.let(::label) ?: "(nothing)"
+        }
+        println("Row sweep: ${seen.joinToString(" → ")}")
+        assertTrue("Right left the row: ${seen.joinToString(" → ")}", seen.all { "Mix " in it })
+        assertTrue("Right never reached the row's last card: ${seen.joinToString(" → ")}", "Mix 8" in seen.last())
+        // And left all the way back stays in it too.
+        repeat(10) { press(KeyEvent.KEYCODE_DPAD_LEFT) }
+        assertTrue("Left left the row", focused()?.let { "Mix 1" in wordsOf(it) } == true)
+    }
     @Test fun about() = check("About") { app.siansa.ui.AboutScreen(LocalNav.current) }
 }

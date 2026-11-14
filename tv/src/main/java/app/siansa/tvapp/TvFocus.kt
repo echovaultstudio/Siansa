@@ -1,5 +1,8 @@
 package app.siansa.tvapp
 
+import androidx.compose.foundation.focusGroup
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -244,6 +247,21 @@ private fun TvChoicePill(text: String, onClick: () -> Unit, modifier: Modifier =
 }
 
 /**
+ * A row the remote moves along (the owner, 14 Nov: going right along Today's mixes, the focus jumped to the top of
+ * Home). Left and right stay in the row: the remote looks for the next one among the row's own first, and a row that
+ * scrolls brings in the next card that isn't on screen yet, where before the nearest thing to the right anywhere on
+ * the page was taken (a pill in the bar at the top). At the row's ends, left and right do nothing; up and down leave it.
+ */
+@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
+fun Modifier.tvRow(): Modifier = this
+    .focusProperties {
+        exit = { direction ->
+            if (direction == FocusDirection.Left || direction == FocusDirection.Right) FocusRequester.Cancel else FocusRequester.Default
+        }
+    }
+    .focusGroup()
+
+/**
  * Where the remote starts on a page: the main button (Play on an album, the first row of a list). Without it nothing has
  * the focus when a page opens, and the first press only finds a place to start.
  */
@@ -281,7 +299,7 @@ fun TvPillBar(modifier: Modifier = Modifier, content: androidx.compose.foundatio
         contentPadding = androidx.compose.foundation.layout.PaddingValues(Space.Tight),
         horizontalArrangement = Arrangement.spacedBy(Space.Tight),
         verticalAlignment = Alignment.CenterVertically,
-        modifier = modifier.padding(horizontal = TV_EDGE).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(percent = 50)),
+        modifier = modifier.padding(horizontal = TV_EDGE).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(percent = 50)).tvRow(),
         content = content,
     )
 }

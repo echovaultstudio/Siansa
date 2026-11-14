@@ -39,7 +39,7 @@ To sign out, go to **Settings › Sign out** on the TV. Your phone stays signed 
 
 ## Finding your way
 
-Everything works with the remote's arrows and the centre button; what the remote is on is lit or ringed in the accent colour, buttons on the settings pages included. The tabs along the top (Home, Library, Search,
+Everything works with the remote's arrows and the centre button; what the remote is on is lit or ringed in the accent colour, buttons on the settings pages included. The tabs along the top (Home, Library, Search, Left and right move along the row you're on, bringing in what's off the screen, and stop at its ends; up and down change rows.
 Settings) always open that tab's own page, wherever you are.
 
 - **Home**: one bar of pills at the top: Shuffle your library, Liked songs (opens the list) and **Sync**, then your notices, as on
@@ -120,7 +120,9 @@ The TV has the settings that matter on a TV, each the same page as on the phone:
 - **Audio passthrough** (below), **Playback** (crossfades, DJ blends, levelling, the equaliser, keep playing) and
   **Streaming quality** (on the Playback page).
 - **Colours**: the TV is always dark.
-- **Help**: debug logs, **Report a problem**, the log, What's new and About.
+- **Help**: debug logs, **Report a problem**, the log, What's new and About. **Show the log** is the TV's own page:
+  **Clear the log**, **Everything** or **Problems**, and **Refresh** in one row, and the log below, newest first, a
+  block of lines for each press down. There's nothing to copy or save on a TV: the log goes with a report.
 - **Open Now playing when a song starts**: on from the start; picking a song, an album or a radio goes straight to the
   player.
 - **Sign out** of the server on the TV; your phone stays signed in.

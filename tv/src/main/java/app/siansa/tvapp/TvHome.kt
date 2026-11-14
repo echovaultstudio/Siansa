@@ -327,7 +327,7 @@ fun TvItemRow(row: TvRow) {
             LazyRow(
                 contentPadding = PaddingValues(horizontal = TV_EDGE, vertical = Space.Small),
                 horizontalArrangement = Arrangement.spacedBy(Space.Page),
-                modifier = Modifier.testTag("tvLandscapeRow"),
+                modifier = Modifier.testTag("tvLandscapeRow").tvRow(),
             ) {
                 items(row.items, key = { it.key }) { item -> TvItemTile(item, Modifier.width(LANDSCAPE_CARD), wide = true) }
             }
@@ -335,17 +335,18 @@ fun TvItemRow(row: TvRow) {
             RowLook.SCROLLING -> LazyRow(
                 contentPadding = PaddingValues(horizontal = TV_EDGE, vertical = Space.Small),
                 horizontalArrangement = Arrangement.spacedBy(Space.Page),
+                modifier = Modifier.testTag("tvScrollingRow").tvRow(),
             ) {
                 items(row.items, key = { it.key }) { item -> TvItemTile(item) }
             }
             RowLook.FILLED -> Row(
-                Modifier.fillMaxWidth().padding(horizontal = TV_EDGE, vertical = Space.Small),
+                Modifier.fillMaxWidth().padding(horizontal = TV_EDGE, vertical = Space.Small).tvRow(),
                 horizontalArrangement = Arrangement.spacedBy(Space.Page),
             ) {
                 row.items.forEach { item -> TvItemTile(item, Modifier.weight(1f), width = Dp.Unspecified) }
             }
             RowLook.WIDE_CARDS -> Row(
-                Modifier.fillMaxWidth().padding(horizontal = TV_EDGE, vertical = Space.Small).testTag("tvWideRow"),
+                Modifier.fillMaxWidth().padding(horizontal = TV_EDGE, vertical = Space.Small).testTag("tvWideRow").tvRow(),
                 horizontalArrangement = Arrangement.spacedBy(Space.Page),
             ) {
                 row.items.forEach { item -> TvItemTile(item, Modifier.weight(1f), wide = true) }
