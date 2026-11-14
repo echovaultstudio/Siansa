@@ -120,18 +120,10 @@ private fun FingerprintPage(nav: NavController) {
                         }
                         Spacer(Modifier.weight(1f))
                         val playback = rememberListPlayback(list)
-                        FilledIconButton(
-                            onClick = { playback.press { scope.launch { graph.player.play(list.shuffled()) } } },
+                        RoundPlayButton(
+                            playback.playing, if (playback.playing) "Pause your fingerprint" else "Play your fingerprint", 52.dp, 30.dp,
                             enabled = list.isNotEmpty(),
-                            modifier = Modifier.size(52.dp),
-                            colors = IconButtonDefaults.filledIconButtonColors(containerColor = Accent, contentColor = OnAccent),
-                        ) {
-                            Icon(
-                                if (playback.playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                                if (playback.playing) "Pause your fingerprint" else "Play your fingerprint",
-                                Modifier.size(30.dp),
-                            )
-                        }
+                        ) { playback.press { scope.launch { graph.player.play(list.shuffled()) } } }
                     }
                 }
             }

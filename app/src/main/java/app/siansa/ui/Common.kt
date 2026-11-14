@@ -1298,3 +1298,32 @@ internal fun <T> SortPicker(label: String, options: List<Pair<T, String>>, selec
         }
     }
 }
+
+/**
+ * The round Play button in the accent colour, a pause sign while [playing]: the one way it's built (Home's hero and
+ * carousel, a book's cover and the sonic fingerprint each wrote their own). [size] is the button's, [icon] the sign's.
+ */
+@Composable
+fun RoundPlayButton(
+    playing: Boolean,
+    description: String,
+    size: androidx.compose.ui.unit.Dp,
+    icon: androidx.compose.ui.unit.Dp,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+) {
+    androidx.compose.material3.FilledIconButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier.size(size),
+        colors = androidx.compose.material3.IconButtonDefaults.filledIconButtonColors(containerColor = Accent, contentColor = OnAccent),
+    ) {
+        androidx.compose.material3.Icon(
+            if (playing) androidx.compose.material.icons.Icons.Rounded.Pause else androidx.compose.material.icons.Icons.Rounded.PlayArrow,
+            description,
+            Modifier.size(icon),
+        )
+    }
+}
+
