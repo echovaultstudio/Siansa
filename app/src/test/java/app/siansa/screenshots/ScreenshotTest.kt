@@ -625,11 +625,20 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     listOf(
                         "Joy Orbison" to 0f, "Joy Orbison" to heroPx * 0.25f, "Joy Orbison" to heroPx * 0.62f,
                         "Joy Orbison" to heroPx * 2f, "Tayo Meets Acid Rockers Uptown" to heroPx * 0.62f,
+                        // A name too long for the bar, settled there with the heart and Play: it fades out before them
+                        // (the owner, 14 Nov).
+                        "Stevie Ray Vaughan and Double Trouble" to heroPx * 2f,
                     ).forEach { (name, scrolled) ->
                         Box(Modifier.fillMaxWidth().height(170.dp)) {
                             app.siansa.ui.HeroPage(
                                 title = name, heroHeight = hero, scrolledPx = scrolled, onBack = {}, color = Color(0xFF4A2A26),
                                 image = { m -> Box(m.background(androidx.compose.ui.graphics.Brush.radialGradient(listOf(Color(0xFF7A5A4C), Color(0xFF26171A))))) },
+                                actions = {
+                                    if (name.startsWith("Stevie")) {
+                                        app.siansa.ui.FavouriteHeart(on = true, iconSize = 28.dp) { }
+                                        app.siansa.ui.BarPlayButton(radio = false, colour = Color(0xFFD9A0A0), onColour = Color.Black, playing = false, onClick = {})
+                                    }
+                                },
                             ) { page -> Box(page.fillMaxSize()) }
                         }
                     }

@@ -33,6 +33,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
@@ -164,6 +167,11 @@ fun HeroPage(
         val restBottomPx = with(density) { Space.Medium.toPx() }
         val startGapPx = with(density) { DOCK_START_GAP.toPx() }
         var nameHeight by remember { mutableIntStateOf(0) }
+        // How wide the title bar's buttons are (the artist's heart and Play), 0 while there are none.
+        var actionsPx by remember { mutableIntStateOf(0) }
+        // A name too long for the bar fades out before its buttons (the owner, 14 Nov: a long name ran under the heart).
+        val fadeEndPx = screenWidthPx - with(density) { (Space.Tight + Space.Small).toPx() } - actionsPx
+        val fadePx = with(density) { NAME_FADE.toPx() }
         val restTop = heroPx - nameHeight - restBottomPx
         val dockTop = statusPx + barPx / 2f - lineHeightPx * dockScale / 2f
         val frame = heroNameFrame(scrolledPx, restTop, startTop = statusPx + barPx + startGapPx, dockTop = dockTop)
@@ -190,7 +198,8 @@ fun HeroPage(
             Spacer(Modifier.width(Space.Small))
             // The bar's title is the name itself, glided into this place (below): one name, never two.
             Spacer(Modifier.weight(1f))
-            actions()
+            // Measured, so a long name fades out before them (below).
+            Row(Modifier.onSizeChanged { actionsPx = it.width }, verticalAlignment = Alignment.CenterVertically) { actions() }
         }
         if (pinned != null) {
             // In the title bar's colour, as one with it, its words white as the title's.
@@ -212,18 +221,44 @@ fun HeroPage(
                 .graphicsLayer {
                     // Laid out at the page's left edge; moved and shrunk from its top left corner.
                     transformOrigin = TransformOrigin(0f, 0f)
-                    val e = smooth((dockT * SIDEWAYS_LEAD).coerceAtMost(1f))
-                    translationX = (dockLeftPx - restLeftPx) * e
+                    translationX = nameShift(dockLeftPx - restLeftPx, dockT)
                     translationY = frame.top
-                    val sc = 1f + (dockScale - 1f) * smooth(dockT)
+                    val sc = nameScale(dockScale, dockT)
                     scaleX = sc
                     scaleY = sc
                     alpha = if (nameHeight == 0) 0f else 1f
+                    compositingStrategy = CompositingStrategy.Offscreen
+                }
+                .drawWithContent {
+                    drawContent()
+                    if (actionsPx > 0) {
+                        // Where the bar's buttons start, in the name's own (unmoved, unscaled) place.
+                        val end = nameFadeEnd(fadeEndPx, restLeftPx, nameShift(dockLeftPx - restLeftPx, dockT), nameScale(dockScale, dockT))
+                        val start = end - fadePx / nameScale(dockScale, dockT)
+                        if (start < size.width) {
+                            drawRect(
+                                Brush.horizontalGradient(0f to Color.Black, 1f to Color.Transparent, startX = start, endX = end),
+                                blendMode = BlendMode.DstIn,
+                            )
+                        }
+                    }
                 }
                 .testTag("heroName"),
         )
     }
 }
+
+/** How far sideways the name has moved on its way into the bar, of [distance], at [dockT] of the way. */
+internal fun nameShift(distance: Float, dockT: Float): Float = distance * smooth((dockT * SIDEWAYS_LEAD).coerceAtMost(1f))
+
+/** How large the name is on its way into the bar: 1 at rest, [dockScale] in the bar. */
+internal fun nameScale(dockScale: Float, dockT: Float): Float = 1f + (dockScale - 1f) * smooth(dockT)
+
+/**
+ * Where a long name has faded out, in its own place before it's moved ([shift]) and scaled ([scale]): the screen's
+ * [screenEnd] (just before the title bar's buttons), for a name laid out from [left].
+ */
+internal fun nameFadeEnd(screenEnd: Float, left: Float, shift: Float, scale: Float): Float = (screenEnd - left - shift) / scale
 
 /** Where the hero's name is, [top] in px from the top of the screen, and how far into the title bar it is ([t], 0–1). */
 data class HeroNameFrame(val top: Float, val t: Float)
@@ -288,6 +323,9 @@ internal val BACK_BUTTON = 48.dp
 
 /** The name is sideways in its place a little before it's up: it clears the back arrow on the way. */
 internal const val SIDEWAYS_LEAD = 1.3f
+
+/** How far a long name fades out before the title bar's buttons. */
+private val NAME_FADE = Space.Large
 
 /** How much smaller a long artist name may be set to fit one line before it's cut off with "…". */
 private const val MIN_NAME_FIT = 0.6f
