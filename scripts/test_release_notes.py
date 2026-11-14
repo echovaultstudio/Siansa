@@ -45,6 +45,16 @@ class Size(unittest.TestCase):
     def test_major_only_when_asked(self):
         self.assertEqual(rn.level_of(notes("### Added\n- a\n", "<!-- release: major -->\n### Changed\n- 1.0\n")), "major")
 
+    def test_a_note_can_name_the_version(self):
+        files = notes("<!-- release: 1.5.0 -->\n### Added\n- a\n", "### Fixed\n- b\n")
+        self.assertEqual(rn.named(files, "1.1.0"), "1.5.0")
+        self.assertEqual(rn.level_of(files), "minor")
+        self.assertNotIn("release:", rn.combine(files))
+
+    def test_a_named_version_below_the_current_one_is_left(self):
+        self.assertIsNone(rn.named(notes("<!-- release: 1.0.0 -->\n### Fixed\n- a\n"), "1.1.0"))
+        self.assertIsNone(rn.named(notes("### Fixed\n- a\n"), "1.1.0"))
+
     def test_mark_not_in_notes(self):
         text = rn.combine(notes("<!-- release: minor -->\n### Changed\n- big rework\n"))
         self.assertNotIn("release:", text)
