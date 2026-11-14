@@ -82,10 +82,10 @@ Both update on their own. Or build it from this source (below): a build of your 
 
 1. In Settings, enter:
    - **Your server**: address (e.g. `http://192.168.1.10:4533`), username, password.
-   - **AudioMuse-AI**: address of its web/API port (e.g. `http://192.168.1.10:8000`) and its API token if authentication is on. Text search (CLAP) must be enabled.
+   - **Siansa Beats** (under Settings › Connections): its address, for the mixes, radios, levelling and DJ blends.
+   - **AudioMuse-AI** (optional, when there's no Siansa Beats): address of its web/API port (e.g. `http://192.168.1.10:8000`) and its API token if authentication is on. Text search (CLAP) must be enabled.
    - **OpenRouter** (optional): API key and model id (default `google/gemini-2.5-flash`; any OpenRouter model id works).
    - **Audiobookshelf** (optional, under Settings › Connections): address and an API token or login.
-   - **Siansa Beats** (Siansa Dev for now, under Settings › Connections): its address. It does what AudioMuse-AI and the plugin do, by itself.
 2. Use **Test** next to each section, then **Save**.
 3. Optional: install the **Siansa plugin** on AudioMuse-AI (see [`audiomuse-plugin/`](audiomuse-plugin/README.md)) and choose it
    under Settings › Sound. It measures each song's loudness and how it starts and ends, for

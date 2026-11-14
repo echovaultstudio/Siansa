@@ -62,7 +62,7 @@ Settings) always open that tab's own page, wherever you are.
 - **Search**: type with the on-screen keyboard or press the microphone button and say it. "Play … on Siansa" from
   Google TV's own search opens it too. With nothing typed, it shows your recent searches (the phone's, kept when you
   search or go into the results; **Clear** forgets them), then radios (with AudioMuse) and your genres, as on the phone:
-  in Siansa Dev with Siansa Beats, the genres it heard in your music (Home's Your genres and Library's genres too),
+  with Siansa Beats, the genres it heard in your music (Home's Your genres and Library's genres too),
   otherwise your genre tags.
 - **Now playing**: as simple as Siansa's Chromecast screen: the cover, the song, its artist and album, a thin line
   for the time, over the cover blurred as on the phone, and Siansa's logo in the corner. Under the time line, a short

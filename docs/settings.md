@@ -27,7 +27,7 @@ nowhere: no card on Settings, no notice, no option that needs it; its login stay
 - **For the best Siansa**, at the top: a line per service, ✓ when it's on and answers, ✕ when it doesn't (with what
   the check said), – when it's not needed (with Siansa Beats on, AudioMuse-AI covers nothing Beats doesn't, and the
   line offers **Turn AudioMuse-AI off**), ○ when it's off or optional.
-- **Siansa Beats** (Siansa Dev): beats and phrases for DJ blends, loudness and keys, genres by sound, similar albums
+- **Siansa Beats**: beats and phrases for DJ blends, loudness and keys, genres by sound, similar albums
   and artists, and where your listening is kept.
 - **AudioMuse-AI**: the sound of each song, similar music and the search by words, when there's no Siansa Beats.
 - **Audiobookshelf**: audiobooks and podcasts.
@@ -58,11 +58,11 @@ to fold it open; they start folded. **Save** (at the top, or in any open card) k
 **Services**
 
 - **AudioMuse-AI**: address, and an API token or user name and password. See [AudioMuse-AI](audiomuse.md).
-- **Siansa Beats** (Siansa Dev): its address (port 8090) and, if it asks for one, its API key or password. With it
+- **Siansa Beats**: its address (port 8090) and, if it asks for one, its API key or password. With it
   set, each song's beats, loudness, fades and key, and the genres, come straight from Siansa Beats instead of the
   Siansa plugin on AudioMuse-AI; leave the address empty to keep using the plugin, or the songs' tags. **Test** says
   how many songs it has analysed. It reads Navidrome, so it's for a Navidrome server. See
-  [AudioMuse-AI](audiomuse.md#siansa-beats-siansa-dev).
+  [AudioMuse-AI](audiomuse.md#siansa-beats).
 - **AI** (optional): which service writes mix titles and sound searches (OpenRouter, OpenAI, Anthropic, Google
   Gemini, Mistral, Groq, Ollama or another), its key, its model, and **AI titles and sound searches**. See
   [AI features](ai.md).
