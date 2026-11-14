@@ -346,7 +346,8 @@ class SpacingLibraryTest : SpacingCheck() {
         val first = compose.onAllNodesWithTag("releaseTypeTabChosen")[0].getBoundsInRoot()
         assertEven("The › centred under Play", (more.left + more.right) / 2, (play.left + play.right) / 2, 1.dp)
         assertEven("The first pill at the page's edge", first.left, Space.Page, 1.dp)
-        assertTrue("The pills close under the buttons (${(first.top - play.bottom).value} dp)", first.top - play.bottom <= Space.Medium + 1.dp)
+        // 4 under the buttons, 4 of the bar's, and 6 of the pill's 48 dp touch area round its 36: 14 (the mockup had 12).
+        assertEven("The pills close under the buttons", first.top - play.bottom, Space.Medium + 2.dp, 1.dp)
     }
 
     /** Album page (issue #367): the last-played line is drawn behind its row, so the title keeps its even room. */

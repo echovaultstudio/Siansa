@@ -106,7 +106,8 @@ fun ReleaseTypeTabs(
             Modifier
                 .fillMaxWidth()
                 .horizontalScroll(scroll)
-                .padding(horizontal = Space.Page, vertical = Space.Small)
+                // Little above and below: each pill is tapped in a 48 dp area round its 36, which adds the rest.
+                .padding(horizontal = Space.Page, vertical = Space.Tight)
                 .selectableGroup()
                 .testTag("releaseTypeTabs"),
             horizontalArrangement = Arrangement.spacedBy(Space.Small),
