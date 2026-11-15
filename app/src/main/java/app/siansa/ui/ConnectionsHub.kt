@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -38,6 +39,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -47,6 +49,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -94,6 +98,7 @@ fun ConnectionsHub(nav: NavController, open: String? = null) {
     var draft by remember { mutableStateOf(graph.settings.current) }
     var problem by remember { mutableStateOf<String?>(null) }
     var opened by rememberSaveable { mutableStateOf(setOfNotNull(open)) }
+    val scroll = rememberScrollState()
     var changes by remember { mutableIntStateOf(0) }
     val users = remember(changes) { Users.all(context) }
     val inUse = users.firstOrNull { it.id == Users.active }
@@ -220,7 +225,7 @@ fun ConnectionsHub(nav: NavController, open: String? = null) {
                 .padding(top = padding.calculateTopPadding())
                 .fillMaxSize()
                 .aboveKeyboard()
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scroll)
                 .padding(Space.Page)
                 .testTag("connections"),
             verticalArrangement = Arrangement.spacedBy(Space.Small),
@@ -266,6 +271,7 @@ fun ConnectionsHub(nav: NavController, open: String? = null) {
                 expanded = "books" in opened,
                 onToggle = { toggle("books") },
                 tag = "fold-books",
+                jumpTo = scroll.takeIf { open == "books" },
             ) {
                 AudiobookshelfFields(graph, draft) { draft = it; problem = null }
                 Button(onClick = ::save, modifier = Modifier.focusRing().fillMaxWidth()) { Text("Save") }
@@ -305,6 +311,7 @@ fun ConnectionsHub(nav: NavController, open: String? = null) {
                 expanded = "audiomuse" in opened,
                 onToggle = { toggle("audiomuse") },
                 tag = "fold-audiomuse",
+                jumpTo = scroll.takeIf { open == "audiomuse" },
             ) {
                 AudioMuseFields(graph, draft) { draft = it; problem = null }
                 Button(onClick = ::save, modifier = Modifier.focusRing().fillMaxWidth()) { Text("Save") }
@@ -317,6 +324,7 @@ fun ConnectionsHub(nav: NavController, open: String? = null) {
                     expanded = "beats" in opened,
                     onToggle = { toggle("beats") },
                     tag = "fold-beats",
+                    jumpTo = scroll.takeIf { open == "beats" },
                 ) {
                     BeatsFields(graph, draft) { draft = it; problem = null }
                     Button(onClick = ::save, modifier = Modifier.focusRing().fillMaxWidth()) { Text("Save") }
@@ -329,6 +337,7 @@ fun ConnectionsHub(nav: NavController, open: String? = null) {
                 expanded = "ai" in opened,
                 onToggle = { toggle("ai") },
                 tag = "fold-ai",
+                jumpTo = scroll.takeIf { open == "ai" },
             ) {
                 AiFields(graph, draft) { draft = it; problem = null }
                 Button(onClick = ::save, modifier = Modifier.focusRing().fillMaxWidth()) { Text("Save") }
@@ -380,10 +389,20 @@ internal fun FoldCard(
     onToggle: () -> Unit,
     tag: String,
     accent: Boolean = false,
+    jumpTo: ScrollState? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val turn by animateFloatAsState(if (expanded) 180f else 0f, label = "fold")
-    Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().testTag(tag)) {
+    // The card a service's tile asked for (the owner, 15 Nov: "I still need to scroll to each field"): the page
+    // opens with this card at its top, at once and only once, so coming back or turning the phone leaves the page
+    // where it was. [jumpTo] is the scroll of the column this card sits in.
+    var jumped by rememberSaveable { mutableStateOf(false) }
+    var top by remember { mutableIntStateOf(-1) }
+    if (jumpTo != null) LaunchedEffect(top) {
+        if (!jumped && top >= 0) { jumpTo.scrollTo(top); jumped = true }
+    }
+    val place = if (jumpTo != null && !jumped) Modifier.onGloballyPositioned { top = it.positionInParent().y.toInt() } else Modifier
+    Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().testTag(tag).then(place)) {
         Column {
             Row(
                 Modifier.fillMaxWidth().clickable(onClickLabel = if (expanded) "Fold" else "Open", onClick = onToggle)
