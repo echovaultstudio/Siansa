@@ -66,6 +66,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -195,8 +196,10 @@ fun DscvrScreen(nav: NavController) {
     var renaming by remember { mutableStateOf<SavedVibe?>(null) }
 
     // Flow's bar is where the mini player is (FlowDock): the pill while no Flow mix plays, in the mood's colour.
+    // Play puts the keyboard away too.
+    val focus = LocalFocusManager.current
     SideEffect {
-        FlowDock.onPlay = { flow.play(launch::notify) }
+        FlowDock.onPlay = { focus.clearFocus(); flow.play(launch::notify) }
         FlowDock.colour = look.colour
         FlowDock.ink = look.ink
         FlowDock.summary = flowSummary(text, tuning)
@@ -248,7 +251,7 @@ fun DscvrScreen(nav: NavController) {
                     val making by flow.making.collectAsStateWithLifecycle()
                     AskPill(
                         text, onText = { flow.text.value = it }, look = look, busy = making, ready = text.trim().length >= 3,
-                        onGo = { flow.play(launch::notify) }, modifier = Modifier.padding(start = Space.Page, end = Space.Page, top = Space.Small),
+                        onGo = { focus.clearFocus(); flow.play(launch::notify) }, modifier = Modifier.padding(start = Space.Page, end = Space.Page, top = Space.Small),
                     )
                 }
                 item(key = "shape") {

@@ -70,6 +70,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.CustomAccessibilityAction
@@ -145,14 +146,18 @@ internal fun MoodShaper(
     picker: @Composable (onDone: () -> Unit) -> Unit = { done -> MoodPickerSheet(tuning, look, inMix, { onChange(it); onSettled() }, done) },
 ) {
     var picking by rememberSaveable { mutableStateOf(false) }
+    // Touching the pad, a pick or Artists puts the keyboard away (the owner, 15 Nov: after words were typed it stayed
+    // open over the page, and came back when the list of sounds was closed): the words box lets go of the typing.
+    val focus = LocalFocusManager.current
     fun set(next: VibeTuning) {
+        focus.clearFocus()
         onChange(next)
         onSettled()
     }
-    if (picking) picker { picking = false }
+    if (picking) picker { focus.clearFocus(); picking = false }
     Column(modifier, verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
         MoodPad(tuning.energy, tempo = tuning.tempo, look = look, hold = hold, dots = dots,
-            onMove = { e, t -> onChange(tuning.copy(energy = e, tempo = t)) }, onSettled = onSettled)
+            onMove = { e, t -> focus.clearFocus(); onChange(tuning.copy(energy = e, tempo = t)) }, onSettled = { focus.clearFocus(); onSettled() })
         Column(Modifier.testTag("moodWords")) {
             Text(look.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black, modifier = Modifier.testTag("moodName"))
             Text(look.about, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -164,7 +169,7 @@ internal fun MoodShaper(
             verticalArrangement = Arrangement.spacedBy(Space.Small),
         ) {
             FlowMood.picks(tuning).forEach { dial -> MoodChip(dial, look) { set(FlowMood.tap(tuning, dial.term)) } }
-            AddChip { picking = true }
+            AddChip { focus.clearFocus(); picking = true }
         }
         MoodLabel("Artists")
         MoodSegment(ARTISTS, FlowMood.artists(tuning.familiar), "moodArtists") { set(tuning.copy(familiar = FlowMood.familiar(it))) }

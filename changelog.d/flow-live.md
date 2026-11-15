@@ -13,3 +13,5 @@
   "less" leaves them out.
 - **Genres were listed under Sounds too.** Sounds now has only sounds.
 - **Lines showed in the colour at the top of Flow.** The glow is smooth now.
+- **The keyboard stayed open on Flow.** After typing, touching the pad, a pick, Artists or Play puts it away, and it
+  no longer comes back when the list of sounds is closed.
