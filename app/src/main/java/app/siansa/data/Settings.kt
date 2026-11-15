@@ -962,6 +962,9 @@ enum class Service(val id: String, val label: String, val gives: String) {
         BEATS -> "beats"; AUDIOMUSE -> "audiomuse"; BOOKS -> "books"; AI -> "ai"; LASTFM, LISTENBRAINZ -> "scrobbling"
     }
 
+    /** The page with this service's own settings: its card on Connections, opened, or Scrobbling & history. */
+    val settingsRoute: String get() = if (connection == "scrobbling") "settings/scrobbling" else "settings/connections/$connection"
+
     companion object {
         /** Whether [service] is switched on in [s] (its login may still be missing: [setUp]). */
         fun on(s: AppSettings, service: Service): Boolean = when (service) {

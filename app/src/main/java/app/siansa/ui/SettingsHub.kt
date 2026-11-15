@@ -133,7 +133,9 @@ fun SettingsHub(nav: NavController) {
         ) {
             SearchBox(nav)
             YouCard(settings, users, library, progress, health[ServiceHealth.SERVER]) { nav.navigate("settings/connections") }
-            ServicesCard(settings, health) { nav.navigate("settings/services") }
+            // A service's tile opens that service's own settings (the owner, 15 Nov: it opened the list of all of them,
+            // at its top); Manage opens the list.
+            ServicesCard(settings, health, onService = { nav.navigate(it.settingsRoute) }) { nav.navigate("settings/services") }
             HubGroupLabel("Playing", Modifier.padding(top = Space.Small))
             HubTiles(listOf(
                 HubTile(Icons.Rounded.Equalizer, "Sound", "settings/sound"),
@@ -216,7 +218,7 @@ internal fun YouCard(
 
 /** The services that are on, two a row with a dot each (a lone last one spans the row), and Manage for the page. */
 @Composable
-internal fun ServicesCard(s: AppSettings, health: Map<String, ServiceCheck>, onOpen: () -> Unit) {
+internal fun ServicesCard(s: AppSettings, health: Map<String, ServiceCheck>, onService: (Service) -> Unit = {}, onOpen: () -> Unit) {
     val on = Service.entries.filter { Service.on(s, it) && Service.setUp(s, it) && !(it == Service.BOOKS && app.siansa.BuildConfig.TV_APP) }
     SettingsCard(tag = "hubServices") {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -231,7 +233,7 @@ internal fun ServicesCard(s: AppSettings, health: Map<String, ServiceCheck>, onO
             Column(verticalArrangement = Arrangement.spacedBy(Space.Small)) {
                 on.chunked(2).forEach { pair ->
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
-                        pair.forEach { service -> ServiceTile(service, health[service.id], Modifier.weight(1f), onOpen) }
+                        pair.forEach { service -> ServiceTile(service, health[service.id], Modifier.weight(1f)) { onService(service) } }
                     }
                 }
             }
