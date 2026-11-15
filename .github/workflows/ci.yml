@@ -350,7 +350,7 @@ jobs:
       # The TV app on a dedicated Android TV track of its own (issue #988): only when PLAY_TV_TRACK names one. Siansa's
       # Android TV shares the phone's tracks, so the TV bundle goes in the phone's release above instead.
       - name: Upload the TV app to Google Play
-        if: steps.version.outputs.exists != 'true' && vars.PLAY_TV == 'true' && vars.PLAY_TV_TRACK != ''
+        if: steps.version.outputs.exists != 'true' && vars.PLAY_TV == 'true' && vars.PLAY_TV_TRACK != '' && hashFiles('.play-hold') == ''
         continue-on-error: true
         env:
           PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
