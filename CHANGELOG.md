@@ -3,6 +3,13 @@
 Every version of Siansa, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 1.5.4 — 2026-11-15
+
+### Fixed
+- **Download all covers left big animated covers out.** Only a still of an animated album cover over 8 MB was kept,
+  and its animation came once you opened the album, so it wasn't there offline. Albums' animations are now
+  downloaded whole too, while Animated covers is on.
+
 ## 1.5.3 — 2026-11-15
 
 ### Fixed
