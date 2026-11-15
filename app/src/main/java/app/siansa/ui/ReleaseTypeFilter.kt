@@ -45,6 +45,8 @@ import app.siansa.data.AlbumCategory
 import kotlinx.coroutines.launch
 import app.siansa.data.category
 import app.siansa.log.AppLog
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.graphicsLayer
 
 /**
  * The release types an artist has (Albums, EPs, Singles, DJ-mixes…), in display order, for the chips on
@@ -83,7 +85,9 @@ fun ReleaseTypeTabs(
     choices: List<AlbumCategory>,
     selected: AlbumCategory?,
     modifier: Modifier = Modifier,
-    fade: Color = MaterialTheme.colorScheme.surface,
+    // What the row's end fades into before the arrow: the page behind it, or null when that isn't one colour (pinned
+    // under the title bar, on its wash): the pills themselves fade out there.
+    fade: Color? = MaterialTheme.colorScheme.surface,
     moreInset: Dp = Space.Small,
     onSelect: (AlbumCategory?) -> Unit,
 ) {
@@ -105,6 +109,19 @@ fun ReleaseTypeTabs(
         Row(
             Modifier
                 .fillMaxWidth()
+                .then(
+                    if (fade == null && scroll.canScrollForward) Modifier
+                        .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
+                        .drawWithContent {
+                            drawContent()
+                            val width = (moreInset + MORE_BUTTON + MORE_BLEND).toPx()
+                            drawRect(
+                                Brush.horizontalGradient(0f to Color.Black, 0.55f to Color.Transparent, 1f to Color.Transparent, startX = size.width - width, endX = size.width),
+                                blendMode = androidx.compose.ui.graphics.BlendMode.DstIn,
+                            )
+                        }
+                    else Modifier,
+                )
                 .horizontalScroll(scroll)
                 // Little above and below: each pill is tapped in a 48 dp area round its 36, which adds the rest.
                 .padding(horizontal = Space.Page, vertical = Space.Tight)
@@ -125,7 +142,7 @@ fun ReleaseTypeTabs(
             val rowScope = rememberCoroutineScope()
             Box(Modifier.matchParentSize(), contentAlignment = Alignment.CenterEnd) {
                 // Clear to [fade] from the middle of the blend: the ›'s space, nothing shows through it.
-                Box(
+                if (fade != null) Box(
                     Modifier.fillMaxHeight().width(moreInset + MORE_BUTTON + MORE_BLEND).testTag("releaseTypesFade")
                         .background(Brush.horizontalGradient(0f to fade.copy(alpha = 0f), 0.45f to fade, 1f to fade)),
                 )

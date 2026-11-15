@@ -67,6 +67,13 @@ import app.siansa.data.BookProgress
 import app.siansa.data.Chapter
 import app.siansa.data.bookLength
 import app.siansa.log.AppLog
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.statusBars
 
 /**
  * Home's "Your books" or "Your podcasts" carousel (issue #521): Audiobookshelf's own shelves, as big cards like
@@ -140,6 +147,8 @@ internal fun BookPageHeader(
     surface: Color,
     details: String,
     position: BookPosition?,
+    // For the title: the page fades it out as it goes under the title bar, and reads where it is.
+    titleModifier: Modifier = Modifier,
     actions: @Composable () -> Unit,
 ) {
     val width = LocalConfiguration.current.screenWidthDp
@@ -157,7 +166,7 @@ internal fun BookPageHeader(
         }
         Spacer(Modifier.height(Space.Page))
         Column(Modifier.fillMaxWidth().testTag("bookWords")) {
-            Text(b.title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold, maxLines = 3, overflow = TextOverflow.Ellipsis)
+            Text(b.title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold, maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = titleModifier)
             b.subtitle?.takeIf { it.isNotBlank() }?.let {
                 Text(it, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
@@ -305,10 +314,22 @@ fun BookScreen(nav: NavController, id: String) {
     val scrolled by remember {
         derivedStateOf { if (listState.firstVisibleItemIndex == 0) listState.firstVisibleItemScrollOffset.toFloat() else 100_000f }
     }
-    val barAlpha = titleBarAlpha(scrolled, headerPx)
-    // What the page's Play does now (it knows where you were, a podcast's episode too), for the bar's Play.
-    var barPlay by remember { mutableStateOf<() -> Unit>({}) }
-    Box(Modifier.fillMaxSize().background(surface)) {
+    // The glass bar (GlassBar), as on an album's page: it comes in as the book's title goes under it.
+    val density = LocalDensity.current
+    val statusPx = WindowInsets.statusBars.getTop(density).toFloat()
+    val barPx = with(density) { GlassBar.HEIGHT.toPx() }
+    var pageTop by remember { mutableFloatStateOf(0f) }
+    var titleTop by remember { mutableStateOf<Float?>(null) }
+    var titleHeight by remember { mutableIntStateOf(0) }
+    val barStep = when {
+        listState.firstVisibleItemIndex > 0 -> 1f
+        else -> titleTop?.let { GlassBar.step(it, titleHeight.toFloat(), statusPx + barPx, with(density) { GlassBar.LEAD.toPx() }) }
+            ?: titleBarAlpha(scrolled, headerPx)
+    }
+    val washPx = statusPx + barPx + with(density) { GlassBar.TAIL.toPx() }
+    val solidPx = statusPx + barPx - with(density) { GlassBar.SOFT.toPx() }
+    Box(Modifier.fillMaxSize().background(surface).onGloballyPositioned { pageTop = it.positionInRoot().y }) {
+        GlassWash(color, with(density) { washPx.toDp() }, amount = { barStep })
         LoadBox(page, Modifier) { b ->
             // Loaded here: a list's content block isn't composable (issue #521).
             val episodes by loadState("episodes-${b.id}") { if (b.podcast) graph.audiobookshelf.episodes(b.id) else emptyList() }
@@ -318,12 +339,18 @@ fun BookScreen(nav: NavController, id: String) {
             val current = position?.currentSec ?: 0.0
             val chapterNow = if (b.podcast) null else b.chapterAt(current)
             val finished = !b.podcast && progress?.finished == true
-            androidx.compose.runtime.SideEffect {
-                barPlay = { graph.bookPlayer.playOrToggle(b, if (position != null && !position.finished) position.currentSec else 0.0) }
-            }
-            LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomBarPadding(Space.Section))) {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxSize().dissolveUnderBar({ washPx }, { solidPx }, { barStep }),
+                contentPadding = PaddingValues(bottom = bottomBarPadding(Space.Section)),
+            ) {
                 item {
-                    BookPageHeader(b, color, surface, bookDetails(b, episodeList.size.takeIf { b.podcast && it > 0 }, finished), position) {
+                    BookPageHeader(
+                        b, color, surface, bookDetails(b, episodeList.size.takeIf { b.podcast && it > 0 }, finished), position,
+                        titleModifier = Modifier
+                            .graphicsLayer { alpha = GlassBar.pageTitle(barStep) }
+                            .onGloballyPositioned { titleTop = it.positionInRoot().y - pageTop; titleHeight = it.size.height },
+                    ) {
                         // Dynamic colours: Play in the cover's colour, as an album's (the owner, 10 Nov: books and podcasts too).
                         androidx.compose.runtime.CompositionLocalProvider(
                             LocalPlayColours provides rememberPageColours(b.cover, pageBackdrop(surface, color), where = "Book page", tint = color),
@@ -375,26 +402,8 @@ fun BookScreen(nav: NavController, id: String) {
                 }
             }
         }
-        // Play in the bar once the page's own has scrolled under it, as on every page (the owner, 10 Nov).
-        val b = book
-        val barColours = rememberPageColours(b?.cover, pageBackdrop(surface, color), where = "Book page bar", tint = color)
-        FadingTitleBar(nav, book?.title ?: "Book", color, barAlpha, actions = {
-            BarReveal(b != null && listState.firstVisibleItemIndex > 0) {
-                if (b != null) {
-                    val now = playing.book?.id == b.id && playing.playing
-                    BarPlayButton(
-                        radio = false,
-                        colour = barColours?.controls ?: Accent,
-                        onColour = barColours?.onControls ?: MaterialTheme.colorScheme.onPrimary,
-                        playing = now,
-                        onClick = {
-                            barPlay()  // what the page's own Play does: carries on where you were, or pauses
-                            AppLog.i("Books", "${if (now) "Pause" else "Play"} \"${b.title}\" from its title bar")
-                        },
-                    )
-                }
-            }
-        })
+        // No Play up here (the owner, 15 Nov): the bar is the back arrow and the title.
+        GlassTitleBar(book?.title ?: "Book", onBack = { nav.popBackStack() }, titleAmount = { GlassBar.barTitle(barStep) }, tag = "fadingTitleBar")
     }
 }
 

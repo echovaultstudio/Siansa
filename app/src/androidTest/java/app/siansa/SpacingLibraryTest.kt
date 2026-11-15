@@ -570,12 +570,17 @@ class SpacingLibraryTest : SpacingCheck() {
         compose.onNode(androidx.compose.ui.test.hasScrollToIndexAction()).performScrollToIndex(2)
         compose.waitForIdle()
         val bar = compose.onNodeWithTag("fadingTitleBar").getBoundsInRoot()
-        // The page's title has glided up into the title bar (one title, as on an artist's page, the owner, 10 Nov),
-        // and what was under it comes up under the bar, with no empty band where the cover was.
-        val title = compose.onAllNodesWithText("A single").fetchSemanticsNodes().maxBy { it.boundsInRoot.top }
-        val middle = with(compose.density) { title.boundsInRoot.center.y.toDp() }
-        assertTrue("The title is in the title bar: its middle at ${middle.value} dp, bar ${bar.top.value}–${bar.bottom.value} dp",
-            middle >= bar.top && middle <= bar.bottom)
+        // The page's own title has gone up under the title bar, whose title is in its middle (the glass bar, the
+        // owner, 15 Nov), and what was under it comes up under the bar, with no empty band where the cover was.
+        val inBar = compose.onNodeWithTag("barTitle", useUnmergedTree = true).getBoundsInRoot()
+        assertTrue("The bar's title is inside the bar: $inBar in $bar", inBar.top >= bar.top && inBar.bottom <= bar.bottom)
+        val screen = compose.onRoot().getBoundsInRoot()
+        assertEven("The bar's title in the middle", (inBar.left + inBar.right) / 2, (screen.left + screen.right) / 2, 1.dp)
+        // (Scrolled right off the page it isn't there at all.)
+        compose.onAllNodesWithTag("collectionTitle", useUnmergedTree = true).fetchSemanticsNodes().forEach { own ->
+            val bottom = with(compose.density) { own.boundsInRoot.bottom.toDp() }
+            assertTrue("The page's own title is under the bar: its bottom at ${bottom.value} dp, bar to ${bar.bottom.value} dp", bottom <= bar.bottom + 1.dp)
+        }
         val byline = with(compose.density) { compose.onNodeWithText("Sunborn").fetchSemanticsNode().boundsInRoot.top.toDp() }
         assertTrue("What was under the title comes up under the bar: ${byline.value} dp vs bar ${bar.bottom.value} dp",
             byline - bar.bottom <= Space.Section * 2)
@@ -585,9 +590,10 @@ class SpacingLibraryTest : SpacingCheck() {
     /**
      * A genre's page (the owner, 10 Nov): nothing on its cover; under it one row with the song count at the page
      * margin and the heart beside the radio at the right margin, the heart level with the radio; and once that row has
-     * scrolled under the title bar, the bar has both.
+     * scrolled under the title bar, the bar has neither (the owner, 15 Nov: no Play and no heart up there), only the
+     * genre's name in its middle.
      */
-    @Test fun aGenresRadioSitsBesideItsHeartAndBothGoToTheBar() {
+    @Test fun aGenresRadioSitsBesideItsHeartAndNeitherGoesToTheBar() {
         val graph = (androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as SiansaApp).graph
         val songs = (1..40).map { app.siansa.data.Song(id = "g-$it", title = "Song $it", artist = "Artist", album = "Album") }
         compose.setContent {
@@ -608,7 +614,6 @@ class SpacingLibraryTest : SpacingCheck() {
                         showTitle = false,
                         playAs = { },
                         radioColour = androidx.compose.ui.graphics.Color(0xFFE53935),
-                        barExtras = { Box(Modifier.size(Space.Section).testTag("barHeartStandIn")) },
                         radioRow = {
                             Box(Modifier.weight(1f)) { app.siansa.ui.CollectionByline(null, null, null, "2,000 songs") }
                             Box(Modifier.size(Space.Section).testTag("pageHeartStandIn"))
@@ -630,14 +635,12 @@ class SpacingLibraryTest : SpacingCheck() {
         val count = compose.onNodeWithText("2,000 songs").getBoundsInRoot()
         assertEven("The count at the page margin", count.left - screen.left, Space.Page, 1.dp)
         assertEven("The count level with the radio", (count.top + count.bottom) / 2, (radio.top + radio.bottom) / 2, 1.dp)
-        compose.onAllNodesWithTag("barPlayButton").assertCountEquals(0)
-        compose.onAllNodesWithTag("barHeartStandIn").assertCountEquals(0)
         compose.onNode(androidx.compose.ui.test.hasScrollToIndexAction()).performScrollToIndex(20)
         compose.waitForIdle()
-        compose.onNodeWithTag("barPlayButton").assertIsDisplayed()
-        compose.onNodeWithTag("barHeartStandIn").assertIsDisplayed()
+        compose.onAllNodesWithTag("barPlayButton").assertCountEquals(0)
         val bar = compose.onNodeWithTag("fadingTitleBar").getBoundsInRoot()
-        val inBar = compose.onNodeWithTag("barPlayButton").getBoundsInRoot()
-        assertTrue("The bar's radio inside the bar: $inBar in $bar", inBar.top >= bar.top && inBar.bottom <= bar.bottom)
+        val inBar = compose.onNodeWithTag("barTitle", useUnmergedTree = true).getBoundsInRoot()
+        assertTrue("The genre's name inside the bar: $inBar in $bar", inBar.top >= bar.top && inBar.bottom <= bar.bottom)
+        assertEven("The genre's name in the middle", (inBar.left + inBar.right) / 2, (screen.left + screen.right) / 2, 1.dp)
     }
 }
