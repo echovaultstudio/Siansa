@@ -130,8 +130,11 @@ class ProfileStore(
         synchronized(lock) { backOffUntil = 0L }
         return try {
             val health = get(HEALTH_PATH) as? JsonObject
-            if (health == null || health.str("plugin") !in PLUGIN_NAMES) {
-                CheckResult(false, "AudioMuse-AI answered, but not as Siansa Beats (dev): install it from the dev catalog")
+            // Either plugin does: Siansa Analysis (the catalog's) is asked when Siansa Beats (dev) isn't installed, and
+            // songs are levelled by it, so the test says it works too (the owner, 15 Nov: it said to install the dev one).
+            val name = PLUGIN_TITLES[health?.str("plugin")]
+            if (health == null || name == null) {
+                CheckResult(false, "AudioMuse-AI answered, but not as a Siansa plugin: install Siansa Analysis under Plugins in AudioMuse-AI")
             } else if (health.str("status") != "ok") {
                 CheckResult(false, "The Siansa plugin is there but not ready (${health.str("status") ?: "no status"})")
             } else {
@@ -145,8 +148,8 @@ class ProfileStore(
                     reachable -> " · Siansa Beats ${beats.str("version") ?: ""} answers".trimEnd()
                     else -> " · Siansa Beats doesn't answer: ${beats.str("problem") ?: "check its address on the plugin's page"}"
                 }
-                AppLog.i("Loudness", "Siansa Beats (dev)$version is working$beatsNote")
-                CheckResult(beats == null || reachable, "Siansa Beats (dev)$version is working$beatsNote")
+                AppLog.i("Loudness", "$name$version is working$beatsNote")
+                CheckResult(beats == null || reachable, "$name$version is working$beatsNote")
             }
         } catch (e: CancellationException) {
             throw e
@@ -176,8 +179,8 @@ class ProfileStore(
     companion object {
         // Siansa Dev's experiment: profiles from Siansa Beats (dev), next to the Siansa plugin (see PluginProfiles.PATH).
         const val PLUGIN_NAME = "siansa_beats"
-        /** The plugin by its name now, or as it was called before the rename (issue #360) until that's replaced. */
-        val PLUGIN_NAMES = setOf(PLUGIN_NAME)
+        /** The plugins that answer the same API, by what their health check calls them, with their names in AudioMuse-AI. */
+        val PLUGIN_TITLES = mapOf(PLUGIN_NAME to "Siansa Beats (dev)", "siansa_analysis" to "Siansa Analysis")
         const val HEALTH_PATH = "/plugins/siansa_beats/api/health"
         const val MAX_CACHED = 3_000
 
