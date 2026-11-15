@@ -91,4 +91,19 @@ class ServicesTest {
         assertEquals(null, app.siansa.net.audioMuseToAsk(on.copy(servicesOff = setOf(app.siansa.data.Service.AUDIOMUSE.id))))
         assertEquals(null, app.siansa.net.audioMuseToAsk(app.siansa.data.AppSettings()))
     }
+
+    /** The owner, 15 Nov: a service's tile on Settings opened the list of all services, not that service. */
+    @Test fun aServiceOpensItsOwnSettings() {
+        val routes = app.siansa.data.Service.entries.associate { it to it.settingsRoute }
+        assertEquals("settings/connections/beats", routes[app.siansa.data.Service.BEATS])
+        assertEquals("settings/connections/audiomuse", routes[app.siansa.data.Service.AUDIOMUSE])
+        assertEquals("settings/connections/books", routes[app.siansa.data.Service.BOOKS])
+        assertEquals("settings/connections/ai", routes[app.siansa.data.Service.AI])
+        // Last.fm and ListenBrainz are set on Scrobbling & history.
+        assertEquals("settings/scrobbling", routes[app.siansa.data.Service.LASTFM])
+        assertEquals("settings/scrobbling", routes[app.siansa.data.Service.LISTENBRAINZ])
+        // The start page's tiles go there, not to the list of services.
+        val hub = java.io.File("src/main/java/app/siansa/ui/SettingsHub.kt").readText()
+        assertTrue(hub.contains("onService = { nav.navigate(it.settingsRoute) }"))
+    }
 }

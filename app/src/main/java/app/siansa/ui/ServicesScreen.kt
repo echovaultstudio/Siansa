@@ -249,9 +249,7 @@ private fun ServiceCard(graph: AppGraph, s: AppSettings, service: Service, check
         }
         Hint(service.gives)
         Row(horizontalArrangement = Arrangement.spacedBy(Space.Page)) {
-            TextButton(onClick = {
-                if (service.connection == "scrobbling") nav.navigate("settings/scrobbling") else nav.navigate("settings/connections/${service.connection}")
-            }) { Text(if (setUp) "Set up" else "Set it up") }
+            TextButton(onClick = { nav.navigate(service.settingsRoute) }) { Text(if (setUp) "Set up" else "Set it up") }
         }
     }
 }
