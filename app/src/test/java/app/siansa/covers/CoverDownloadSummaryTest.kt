@@ -37,4 +37,58 @@ class CoverDownloadSummaryTest {
             assertFalse(id, CoverDownload.bringsAnimation(id, animations = true, onlyStill = true))
         }
     }
+
+    /** The owner, 15 Nov: "it should fetch ALL". Big Mountain is on one compilation and has no album of their own. */
+    @Test fun artistsOnlyCreditedOnSongsAreFetchedToo() {
+        fun song(id: String, artist: String, artistId: String?, vararg credits: Pair<String, String>) = app.siansa.data.Song(
+            id = id, title = "T$id", artist = artist, artistId = artistId, artists = credits.map { app.siansa.data.ArtistRef(it.first, it.second) },
+        )
+        val songs = listOf(
+            song("1", "Big Mountain", "big"),
+            song("2", "Fred V & Grafix feat. Amy J Pryce", "fred", "fred" to "Fred V & Grafix", "amy" to "Amy J Pryce"),
+            song("3", "Known", "known"),
+            song("4", "Big Mountain", "big"),
+            song("5", "A feat. B", "ab"),
+            song("6", "Nobody", null),
+        )
+        val all = app.siansa.data.Credits.everyone(songs, known = setOf("known", "fred"))
+        assertEquals(listOf("big", "amy", "ab"), all.map { it.id })
+        assertEquals("Big Mountain", all[0].name)
+        assertEquals("Amy J Pryce", all[1].name)
+        // "A feat. B" under one id isn't one artist's name; the id is still looked up.
+        assertEquals("", all[2].name)
+        assertTrue(app.siansa.data.Credits.everyone(songs, known = setOf("known", "fred", "big", "amy", "ab")).isEmpty())
+    }
+
+    @Test fun artistsStillBeingFetchedAreAskedForAgainTwice() {
+        assertEquals(2, CoverDownload.ARTISTS_AGAIN_MS.size)
+        assertTrue(CoverDownload.ARTISTS_AGAIN_MS[0] < CoverDownload.ARTISTS_AGAIN_MS[1])
+    }
+
+    /**
+     * On every server (the owner, 15 Nov): only Navidrome sends a stand-in while it fetches an artist's photo, so only
+     * there is a photo waited for; Emby and Jellyfin answer a missing picture with 404, which is final. Artists only
+     * credited on songs are found by their ids in each server's own style, and their pictures have an address on each.
+     */
+    @Test fun everyArtistIsFetchedOnEveryServer() {
+        for (server in app.siansa.servers.EveryServer.all) {
+            val artist = if (server.name == "Navidrome") "4pEiOs5wj3RTq6LVJaxSj0" else server.songId
+            // The picture's id as the run asks for it, and its address on this server.
+            val address = CoverAddress.of(server.source().coverUrl("ar-$artist", 300))
+            assertEquals("$server", 300, address?.size)
+            val path = okhttp3.HttpUrl.Companion.run { server.source().coverUrl("ar-$artist", 300).toHttpUrl() }.encodedPath
+            // "Don't keep" with no version: Navidrome's stand-in. The same headers from Emby or Jellyfin aren't one.
+            val standIn = StandIns.isStandIn(path, "no-store", null)
+            assertEquals("$server sends a stand-in", server.name == "Navidrome", standIn)
+            assertEquals("$server: the photo is waited for", server.name == "Navidrome", CoverDownload.waitsForPhoto("ar-$artist", standIn))
+            // Never for an album's or a song's cover, on any server.
+            assertFalse("$server", CoverDownload.waitsForPhoto("al-$artist", standIn))
+            assertFalse("$server", CoverDownload.waitsForPhoto(server.songId, standIn && server.name != "Navidrome"))
+            // An artist only credited on a song is found whatever the ids look like.
+            val song = app.siansa.data.Song(id = server.songId, title = "T", artist = "Big Mountain", artistId = artist)
+            assertEquals("$server", listOf(artist), app.siansa.data.Credits.everyone(listOf(song), emptySet()).map { it.id })
+            // Animated originals are Navidrome's matter: only its album ids ("al-…") ask for one.
+            assertEquals("$server", server.name == "Navidrome", CoverDownload.bringsAnimation(if (server.name == "Navidrome") "al-$artist" else artist, animations = true, onlyStill = true))
+        }
+    }
 }

@@ -304,7 +304,13 @@ object CoverDownload {
         // Artist photos first (the owner, 10 Nov): Navidrome only fetches an artist's photo when they're looked up, and
         // gives it a new picture id then; the library's id from its sync may still stand for the placeholder star. Each
         // artist is looked up once a run (ArtistPhotos), so the photos themselves are what's downloaded below.
-        val artists = graph.library.artists()
+        // Every artist, also those with no album of their own (the owner, 15 Nov: "it should fetch ALL"): an artist only
+        // on a compilation or featured on a song has a page, and shows under Fans also like, but isn't in the library's
+        // list of artists, so their photo was never fetched here.
+        val own = graph.library.artists()
+        val credited = app.siansa.data.Credits.everyone(graph.library.allSongs(), own.mapTo(HashSet()) { it.id })
+            .map { app.siansa.data.Artist(it.id, it.name) }
+        val artists = own + credited
         update { Progress(running = true, note = "Looking up artist photos…") }
         graph.artistPhotos.refresh(artists) { done, of ->
             if (done == of || done % 10 == 0) update { it.copy(running = true, note = "Looking up artist photos: $done of $of") }
@@ -313,7 +319,7 @@ object CoverDownload {
         val albums = graph.library.albums("name").mapNotNull { it.coverArt }
         // The ids just looked up, else the library's (it keeps the new ones too, for the next sync's sake).
         val fresh = graph.artistPhotos.covers.value
-        val photos = graph.library.artists().map { fresh[it.id] ?: it.coverArt ?: "ar-${it.id}" }
+        val photos = artists.map { fresh[it.id] ?: it.coverArt ?: "ar-${it.id}" }
         val playlists = graph.library.playlists().mapNotNull { it.coverArt }
         val main = (albums + photos + playlists).distinctBy { CoverStore.canonical(it) }
         val songCovers = songCoversToFetch(graph.library.songCoverIds(), main)
@@ -323,7 +329,7 @@ object CoverDownload {
         val animations = settings.animatedCovers && CoverStore.maxOriginalBytes == Long.MAX_VALUE
         AppLog.i(
             "Covers",
-            "Downloading covers: ${albums.size} albums, ${photos.size} artists and ${playlists.size} playlists (${main.size} pictures) and " +
+            "Downloading covers: ${albums.size} albums, ${photos.size} artists (${credited.size} of them only credited on songs) and ${playlists.size} playlists (${main.size} pictures) and " +
                 "${songCovers.size} song and disc covers to check" + if (animations) ", with albums' animations" else "",
         )
         update { Progress(running = true, total = ids.size) }
@@ -332,6 +338,8 @@ object CoverDownload {
         val failed = AtomicInteger()
         // The server has no picture for these (its stand-in, or nothing): asked again next time, not "already here".
         val none = AtomicInteger()
+        // Artists answered with the stand-in: Navidrome may still be fetching their photo (it starts when they're looked up).
+        val waiting = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
         val animated = AtomicInteger()
         val done = AtomicInteger()
         val permits = Semaphore(4)
@@ -354,7 +362,10 @@ object CoverDownload {
                         when (one(graph, disk, id, animations, animated)) {
                             Outcome.DOWNLOADED -> downloaded.incrementAndGet()
                             Outcome.FAILED -> failed.incrementAndGet()
-                            Outcome.NONE -> none.incrementAndGet()
+                            Outcome.NONE -> {
+                                none.incrementAndGet()
+                                if (waitsForPhoto(id, standIns.remove(id))) waiting += id
+                            }
                             Outcome.HAD -> Unit
                         }
                     } finally {
@@ -377,6 +388,32 @@ object CoverDownload {
                 }
             }
         }
+        // Artists' photos the server was still fetching are asked for again, after a short and a longer wait, so a
+        // run ends with every photo the server has (the owner, 15 Nov), not with its star kept as "no picture".
+        for (waitMs in ARTISTS_AGAIN_MS) {
+            if (stoppedBecause != null || waiting.isEmpty()) break
+            update { it.copy(note = "Waiting for ${waiting.size} artist photos the server is still fetching…") }
+            kotlinx.coroutines.delay(waitMs)
+            val before = waiting.size
+            coroutineScope {
+                for (id in waiting.toList()) {
+                    permits.acquire()
+                    launch {
+                        try {
+                            if (one(graph, disk, id, animations, animated) == Outcome.DOWNLOADED) {
+                                waiting -= id
+                                downloaded.incrementAndGet()
+                                none.decrementAndGet()
+                            }
+                        } finally {
+                            permits.release()
+                        }
+                    }
+                }
+            }
+            AppLog.i("Covers", "Artist photos asked for again after ${waitMs / 1000}s: ${before - waiting.size} of $before came")
+            update { it.copy(downloaded = downloaded.get(), note = null) }
+        }
         // The colours of every album, artist and playlist cover, so their pages have them in their first frame and
         // nothing on them changes colour while they're open (CoverToneStore; kept on the phone, read once).
         if (stoppedBecause == null) {
@@ -397,6 +434,20 @@ object CoverDownload {
     }
 
     private enum class Outcome { HAD, DOWNLOADED, NONE, FAILED }
+
+    /** The ids just answered with the server's stand-in, until the run has read them. */
+    private val standIns = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+
+    /**
+     * Whether a cover with no picture is asked for again at the end of the run: an artist's photo that Navidrome
+     * answered with its stand-in ([standIn]), which it sends while it's still fetching the photo. Emby and Jellyfin
+     * say plainly when an artist has no picture (404, never a stand-in), so nothing is waited for there; nor for an
+     * album's or a song's cover, which no lookup brings.
+     */
+    internal fun waitsForPhoto(id: String, standIn: Boolean): Boolean = standIn && id.startsWith("ar-")
+
+    /** How long a run waits before asking again for artists' photos the server answered with its stand-in. */
+    internal val ARTISTS_AGAIN_MS = longArrayOf(8_000L, 30_000L)
 
     /** What a run did, in a line for the log and Settings. [none]: covers the server has no picture for. */
     internal fun summary(downloaded: Int, had: Int, none: Int, failed: Int, seconds: Long, animations: Int = 0): String =
@@ -493,7 +544,10 @@ object CoverDownload {
                 return@executeCancellable if (response.code == 404) false else null
             }
             // The server's stand-in for a cover it doesn't have right now: nothing to keep (StandIns).
-            if (StandIns.isStandIn(response)) return@executeCancellable false
+            if (StandIns.isStandIn(response)) {
+                standIns += id
+                return@executeCancellable false
+            }
             val body = response.body ?: return@executeCancellable null
             val head = response.peekBody(32).bytes()
             val image = CoverStore.sniff(head)
