@@ -391,6 +391,21 @@ class SpacingHomeTest : SpacingCheck() {
         assertEven("Between the picks, and before Add", chips[1].getBoundsInRoot().left - chips[0].getBoundsInRoot().right, add.left - chips[1].getBoundsInRoot().right, 1.dp)
     }
 
+    /** Flow's line under the pad (the owner, 15 Nov): right under it, in the middle, and the mood's name as far below it as below the pad without it. */
+    @Test fun thePadsNoteIsCentredRightUnderIt() {
+        compose.setContent {
+            SiansaTheme {
+                app.siansa.ui.MoodShaper(VibeTuning(), app.siansa.ui.MoodLook(0f, 0f), app.siansa.ui.MoodHold(), onChange = { }, padNote = app.siansa.ui.FLOW_PAD_NOTE, picker = { })
+            }
+        }
+        val pad = compose.onNodeWithTag("soundPad").getBoundsInRoot()
+        val note = compose.onNodeWithTag("padNote").getBoundsInRoot()
+        val words = compose.onNodeWithTag("moodWords").getBoundsInRoot()
+        assertEven("The note right under the pad", note.top - pad.bottom, app.siansa.ui.Space.Tight, 1.dp)
+        assertEven("The note as wide as the pad, its words in the middle", note.left + note.right, pad.left + pad.right, 1.dp)
+        assertEven("The mood's name under the note", words.top - note.bottom, app.siansa.ui.Space.Medium, 1.dp)
+    }
+
     /** Vibes panel (issue #247): the "Use the moment" switch rows are the same distance apart. */
     @Test fun situationSwitchesAreEvenlySpaced() {
         compose.setContent {

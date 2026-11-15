@@ -147,12 +147,13 @@ from the sound of one to the other. Choose how many songs. Play it, or save it a
 
 ## Flow
 
-The **Flow** tab is for vibes on the spot. Shape one, say one, or both, then press the bar at the bottom, **Play
-this vibe**: the mix starts playing and you stay on Flow.
+The **Flow** tab is for vibes on the spot. Shape one, say one, or both, then press the round arrow beside the words
+box: the mix starts playing and you stay on Flow.
 
 - **The mood pad**: drag its dot. Up is more energy, down is calmer; right is faster, left is slower. The pad, your
-  picks and the bar take the colour of the mood you're in, and its name is under the pad ("Easy groove",
+  picks and the arrow take the colour of the mood you're in, and its name is under the pad ("Easy groove",
   "Late-night drift", "Get moving"…). Let go and the dot settles on the nearest of its 25 places.
+  The line under the pad says it: dragging it while a vibe plays changes the vibe.
 - **Sounds and genres**: tap **+ Add a sound or genre** and pick from the list. Nothing is suggested: you choose,
   up to six. **Sounds** are the words your sound search understands (piano, vocals, dreamy…), its own list from
   AudioMuse-AI or Siansa Beats, without its genre words. **Genres** are the ones Siansa Beats hears in your music,
@@ -163,11 +164,10 @@ this vibe**: the mix starts playing and you stay on Flow.
 - **Artists**: **Favourites** (the artists you play most), **A mix**, or **New to me** (artists you rarely play).
 - **Or say it**: type what you want to hear ("tired but hopeful", "rainy Sunday", "need to focus"). With AI set
   up it reads your words; what you set on the pad and your picks are used with them. Words count when you press
-  Play.
+  the arrow.
 
-**One bar.** On Flow, the bar where the mini player is waits as a pill in the mood's colour, also when other music
-is playing (that music carries on until you press it; on every other tab the mini player is there as usual). Press
-it and its round ends fold into the mini player as the mix starts.
+**One player.** Flow has no bar of its own: the mini player is the same as everywhere, and shows what's playing
+on Flow too. The arrow beside the words starts a vibe, with words or with only what you set on the page.
 
 **Steer it while it plays.** The Flow page stays in charge of its mix: move the dot, change a pick or Artists, and
 the songs that come next change, while the one playing carries on. The mix keeps the name it started with. It ends

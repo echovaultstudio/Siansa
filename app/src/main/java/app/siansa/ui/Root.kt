@@ -249,15 +249,10 @@ fun SiansaRoot() {
                                 transformOrigin = TransformOrigin(0.5f, 1f)
                             },
                         ) {
-                            // On Flow, a pill in the mood's colour stands here until its mix plays, then folds into the player.
-                            val shown = app.siansa.playback.miniShown(active, player.hasMedia, bookState.book != null)
-                            val makingVibe by graph.flow.making.collectAsStateWithLifecycle()
-                            FlowDockSlot(hasMini = shown != app.siansa.playback.MiniFor.NONE, making = makingVibe) {
-                                when (shown) {
-                                    app.siansa.playback.MiniFor.MUSIC -> Box(Modifier.sheetDragUp(sheet)) { MiniPlayer(player) { sheet.open() } }
-                                    app.siansa.playback.MiniFor.BOOK -> Box(Modifier.sheetDragUp(bookSheet)) { BookMiniPlayer(bookState) { bookSheet.open() } }
-                                    app.siansa.playback.MiniFor.NONE -> Unit
-                                }
+                            when (app.siansa.playback.miniShown(active, player.hasMedia, bookState.book != null)) {
+                                app.siansa.playback.MiniFor.MUSIC -> Box(Modifier.sheetDragUp(sheet)) { MiniPlayer(player) { sheet.open() } }
+                                app.siansa.playback.MiniFor.BOOK -> Box(Modifier.sheetDragUp(bookSheet)) { BookMiniPlayer(bookState) { bookSheet.open() } }
+                                app.siansa.playback.MiniFor.NONE -> Unit
                             }
                         }
                         BottomTabs(appSettings.navTabs, currentTab) { tab ->
