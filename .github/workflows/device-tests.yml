@@ -62,11 +62,26 @@ jobs:
         run: |
           set -o pipefail
           device="$DEVICE"
-          echo "::notice::Emulator: $device"
-          gradle ":app:${device}DebugAndroidTest" \
-            -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect \
-            -Pandroid.experimental.testOptions.managedDevices.setupTimeoutMinutes=20 \
-            -Pandroid.testInstrumentationRunnerArguments.navidromeUrl=http://10.0.2.2:5533 2>&1 | tee gradle.txt
+          # The machine's processor is said, as it matters: on 15 Nov 2026 the emulator went offline part-way through
+          # in every failed run of the day (4 of 4, all on AMD machines; the 3 runs on Intel passed, as did 3 on AMD),
+          # each time in a test that scrolls a page under the glass title bar. Nothing was in the device's log: it
+          # just stopped. The emulator draws with SwiftShader on the machine's processor.
+          cpu="$(lscpu | sed -n 's/^Model name: *//p' | head -1)"
+          echo "::notice::Emulator: $device on ${cpu:-an unknown processor}"
+          tests() {
+            gradle ":app:${device}DebugAndroidTest" \
+              -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect \
+              -Pandroid.experimental.testOptions.managedDevices.setupTimeoutMinutes=20 \
+              -Pandroid.testInstrumentationRunnerArguments.navidromeUrl=http://10.0.2.2:5533 2>&1 | tee gradle.txt
+          }
+          if tests; then exit 0; fi
+          # A test that fails is a failure. An emulator that went offline is not a test's fault: the test running then
+          # is marked failed with no message and the rest never run. Once more on a new emulator, and said so.
+          if ! grep -q "device offline" gradle.txt; then exit 1; fi
+          echo "::warning::The emulator went offline part-way through ($cpu). Running the tests once more on a new one."
+          cp gradle.txt gradle-first.txt
+          rm -rf app/build/outputs/androidTest-results
+          tests
           
       # Results as annotations, so they can be read without downloading logs. GitHub shows only the first 10 errors and
       # 10 notices of a step, so the ones that explain a failure come first: failed tests, then a crash, then the build.
@@ -99,6 +114,10 @@ jobs:
               gradle = open("gradle.txt", errors="ignore").read()
           except OSError:
               gradle = ""
+          if "device offline" in gradle:
+              # The test running as it went is marked failed with no message: that one isn't the test's doing.
+              errors = [e for e in errors if not e.endswith(": ")]
+              errors.insert(0, "The emulator went offline part-way through: the tests after it didn't run. Not a failed test.")
           if "Process crashed" in gradle:
               errors.append("The app's process crashed during the run: the tests after it didn't run.")
           errors += [f"e: {m}" for m in sorted(set(re.findall(r"^e: file://\S*/app/(src/\S+ .*)$", gradle, re.M)))][:5]
