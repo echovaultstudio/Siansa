@@ -25,7 +25,7 @@ data class PadDot(val x: Float, val y: Float)
 data class MixOffer(val sounds: List<MixSound> = emptyList(), val dots: List<PadDot> = emptyList())
 
 object MixSounds {
-    /** The most sounds a mix offers: the dials first, the rest to add. */
+    /** The most sounds a mix offers to pick from. */
     const val MOST = 8
     /** Genres are only told apart in a mix where this many songs have any. */
     const val MIN_KNOWN = 6
@@ -64,39 +64,6 @@ fun mixSounds(genres: Map<String, List<SongGenre>>, most: Int = MixSounds.MOST):
 }
 
 /**
- * The dials a vibe's page shows for [tuning]: the AI's own concepts ([steered], kept also when set to the middle) and
- * every dial that's set, then the mix's own sounds ([offered]) up to [VibeTuning.MAX_SOUNDS] dials, and always at
- * least one of them. Nothing is added from a fixed list: without Siansa Beats the dials are the AI's alone.
- */
-fun vibeDials(tuning: VibeTuning, steered: List<Steer>, offered: List<MixSound>): VibeTuning {
-    val ai = steered.map { it.term.lowercase() }.toSet()
-    val kept = if (tuning.sounds.isEmpty()) VibeTuning.start(steered, emptyList()).sounds
-    else tuning.sounds.filter { it.value != 0 || (!it.genre && it.term.lowercase() in ai) }
-    val taken = kept.map { it.term.lowercase() }.toSet()
-    val room = (VibeTuning.MAX_SOUNDS - kept.size).coerceAtLeast(1).coerceAtMost(VibeTuning.MOST_DIALS - kept.size).coerceAtLeast(0)
-    val own = offered.filter { it.name.lowercase() !in taken }.take(room).map { SoundDial(it.name, 0, genre = true) }
-    return tuning.copy(sounds = kept + own)
-}
-
-/** The mix's sounds that aren't a dial yet, to add ([addSound]). */
-fun soundsToAdd(tuning: VibeTuning, offered: List<MixSound>): List<MixSound> {
-    val taken = tuning.sounds.map { it.term.lowercase() }.toSet()
-    return offered.filter { it.name.lowercase() !in taken }
-}
-
-/**
- * [tuning] with the mix's sound [name] as a dial in the middle: one more dial while there's room for it
- * ([VibeTuning.MOST_DIALS]), otherwise in place of a dial that isn't set (the last one when all are).
- */
-fun addSound(tuning: VibeTuning, name: String): VibeTuning {
-    if (tuning.sounds.any { it.term.equals(name, ignoreCase = true) }) return tuning
-    val dial = SoundDial(name, 0, genre = true)
-    if (tuning.sounds.size < VibeTuning.MOST_DIALS) return tuning.copy(sounds = tuning.sounds + dial)
-    val at = tuning.sounds.indexOfLast { it.value == 0 }.let { if (it < 0) tuning.sounds.lastIndex else it }
-    return tuning.copy(sounds = tuning.sounds.toMutableList().also { it[at] = dial })
-}
-
-/**
  * Where a song of [tempo] (beats a minute) sits on the sound pad, and how high: by its [arousal] (Siansa Beats 0.35:
  * how energetic it is, from [MixSounds.SETTLED] to [MixSounds.DRIVING]) where there is one, else by [energy]
  * (AudioMuse's). Null without a tempo and one of the two.
@@ -110,27 +77,6 @@ fun padPlace(tempo: Double?, energy: Double?, arousal: Double? = null): PadDot? 
     }
     val x = ((tempo - MixSounds.SLOW) / (MixSounds.FAST - MixSounds.SLOW)).coerceIn(0.0, 1.0)
     return PadDot(x.toFloat(), y.coerceIn(0.0, 1.0).toFloat())
-}
-
-/** Under the sound pad: where its dot is, in words. */
-fun padCaption(tuning: VibeTuning): String {
-    val energy = when (tuning.energy.coerceIn(-2, 2)) {
-        -2 -> "much calmer"
-        -1 -> "a bit calmer"
-        1 -> "a bit more energy"
-        2 -> "much more energy"
-        else -> null
-    }
-    val tempo = when (tuning.tempo.coerceIn(-2, 2)) {
-        -2 -> "much slower"
-        -1 -> "a bit slower"
-        1 -> "a bit faster"
-        2 -> "much faster"
-        else -> null
-    }
-    val said = listOfNotNull(energy, tempo)
-    if (said.isEmpty()) return "Energy and speed as planned. Drag the dot to change them."
-    return said.joinToString(" and ").replaceFirstChar { it.uppercase() } + "."
 }
 
 /** Siansa Beats' answer to `songs/genres`: each song's genres by its id, its best first. */

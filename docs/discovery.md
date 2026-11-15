@@ -147,22 +147,26 @@ from the sound of one to the other. Choose how many songs. Play it, or save it a
 
 ## Flow
 
-The **Flow** tab is for vibes on the spot. **Describe what you want to hear** ("tired but hopeful", "rainy
-Sunday", "need to focus") and Siansa makes a mix for it. Then **shape your sound**, on Flow before you make a
-vibe or on the vibe's own page (the sliders button next to Pin to Home):
+The **Flow** tab is for vibes on the spot. Shape one, say one, or both, then tap **Play this vibe**: Siansa makes
+the mix, opens its page and starts playing it.
 
-- **The sound pad**: one dot sets two things at once. Drag it up for more energy or down for calmer, right for
-  faster or left for slower. On a vibe's page each small dot is one of its songs, so you see where the mix is now;
-  the dot can go anywhere, also where the mix has no songs yet (an ambient mix drifting into something faster).
-- **Niche ↔ Familiar**: from artists you rarely play to artists you play most.
-- **Sounds**: a dial for each sound, turned towards or away from it. On a vibe's page they're the sounds the AI
-  picked for it and **the mix's own sounds**: genres some of its songs are in and others aren't, as Siansa Beats
-  hears them (an ambient mix isn't offered "more rock"). **Also in this mix** lists its other sounds: tap one to
-  add a dial for it. Without Siansa Beats the dials are the AI's alone. On Flow, before there's a mix, they're a
-  few of AudioMuse-AI's sound concepts (piano, acoustic, electronic…).
+- **The mood pad**: drag its dot. Up is more energy, down is calmer; right is faster, left is slower. The pad, your
+  picks and the Play button take the colour of the mood you're in, and its name is under the pad ("Easy groove",
+  "Late-night drift", "Get moving"…). Let go and the dot settles on the nearest of its 25 places.
+- **Sounds and genres**: tap **+ Add a sound or genre** and pick from the list. Nothing is suggested: you choose,
+  up to six. **Sounds** are the words your sound search understands (piano, vocals, dreamy…), its own list from
+  AudioMuse-AI or Siansa Beats. **Genres** are the ones Siansa Beats hears in your music, or your songs' genre tags
+  without it: the main ones (those with most songs) first, and the search box finds the rest. Each pick starts as
+  **more** of it (filled). Tap it for **less** (dashed, struck through); tap again to take it off. A sound steers
+  the search; a genre moves songs of that genre up or down the mix.
+- **Artists**: **Favourites** (the artists you play most), **A mix**, or **New to me** (artists you rarely play).
+- **Or say it**: type what you want to hear ("tired but hopeful", "rainy Sunday", "need to focus"). With AI set
+  up it reads your words; what you set on the pad and your picks are used with them.
 
-Letting go re-runs the search and re-ranks the songs without asking the AI again; **Reset** puts everything back
-in the middle. Vibes you make are kept, and can be renamed or deleted.
+**Reset** puts everything back. On a vibe's own page, the sliders button next to Pin to Home opens the same
+shaping for that mix: each small dot on the pad is one of its songs, the list of genres starts with the ones in
+this mix, and the mix is made again as soon as you change something. Vibes you make are kept, and can be renamed
+or deleted.
 
 ## Search
 

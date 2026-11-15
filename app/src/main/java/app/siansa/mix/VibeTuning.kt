@@ -13,11 +13,10 @@ import kotlin.math.abs
  * - [energy] and [tempo] run from -2 (calmer, slower) to +2 (more energy, faster). They re-rank by AudioMuse's
  *   own energy and tempo for each song (`/api/sync`).
  * - [familiar] runs from -2 (niche: artists you rarely play) to +2 (familiar: artists you play most).
- * - [sounds]: up to [MAX_SOUNDS] of AudioMuse's sound concepts, each a dial from -5 to +5 that steers the
- *   search away from or towards the concept. AudioMuse takes a steering weight of 1, 2, 3, 5 or 10, so the
- *   five steps either side of the middle are those weights ([STEER_WEIGHTS]). On a vibe's page the dials are also
- *   the mix's own sounds ([SoundDial.genre], [vibeDials]): genres some of its songs are in and others aren't, which
- *   re-rank the search's songs by how much each is of that genre.
+ * - [sounds]: the sounds and genres picked ([FlowMood]), each a dial from -5 to +5: a sound (one of the search's
+ *   own concepts) steers the search away from or towards it. AudioMuse takes a steering weight of 1, 2, 3, 5 or 10,
+ *   so the five steps either side of the middle are those weights ([STEER_WEIGHTS]). A genre ([SoundDial.genre])
+ *   re-ranks the search's songs by how much each is of that genre.
  */
 @Serializable
 data class VibeTuning(
@@ -52,9 +51,6 @@ data class VibeTuning(
         const val SLIDER_MAX = 2
         const val DIAL_MAX = 5
         const val MAX_SOUNDS = 3
-
-        /** The most dials a vibe's page shows once sounds of the mix are added to them ([addSound]). */
-        const val MOST_DIALS = 5
 
         /** AudioMuse's steering weights, one per step of a sound dial away from the middle. */
         val STEER_WEIGHTS = listOf(1, 2, 3, 5, 10)
