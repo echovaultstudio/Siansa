@@ -3,6 +3,17 @@
 Every release of Siansa and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [1.5.4](https://github.com/echovaultstudio/Siansa/releases/tag/v1.5.4) — 2026-11-15
+
+- [#1192](https://github.com/echovaultstudio/Siansa/pull/1192) Download all covers brings albums' animated covers whole (@Th3K1ngP1n)
+
+## [1.5.3](https://github.com/echovaultstudio/Siansa/releases/tag/v1.5.3) — 2026-11-15
+
+- [#1181](https://github.com/echovaultstudio/Siansa/pull/1181) Artist page fix on main, with releases on hold (@Th3K1ngP1n)
+- [#1184](https://github.com/echovaultstudio/Siansa/pull/1184) Sound: Test says the Siansa Analysis plugin works when it does (@Th3K1ngP1n)
+- [#1186](https://github.com/echovaultstudio/Siansa/pull/1186) main is merged into dev by itself after each release (@Th3K1ngP1n)
+- [#1191](https://github.com/echovaultstudio/Siansa/pull/1191) Release 1.5.3; Google Play waits (@Th3K1ngP1n)
+
 ## [1.5.2](https://github.com/echovaultstudio/Siansa/releases/tag/v1.5.2) — 2026-11-14
 
 - [#1174](https://github.com/echovaultstudio/Siansa/pull/1174) Artist page: the picture a little taller, so less of it is cut off (to main, 1.5.2) (@Th3K1ngP1n)
