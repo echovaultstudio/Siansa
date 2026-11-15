@@ -709,7 +709,7 @@ private fun CoverDownloadSection() {
     val settings by graph.settings.state.collectAsStateWithLifecycle()
     var refresh by remember { mutableIntStateOf(0) }
     Heading("Download all covers")
-    Hint("Fetches every cover in the background, after each sync and once a day, so browsing never waits. Choose No limit under Image cache, below, so none are removed again.")
+    Hint("Fetches every cover in the background, after each sync and once a day, so browsing never waits. Albums' animated covers come whole while Animated covers is on; they can be 100 MB each. Choose No limit under Image cache, below, so none are removed again.")
     val download by CoverDownload.progress.collectAsStateWithLifecycle()
     // Check the network again once a download finishes.
     var wasRunning by remember { mutableStateOf(false) }
