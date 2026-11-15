@@ -139,4 +139,26 @@ class StandInsTest {
         CoverEtags.remove("cover:ar-5:300")
         assertNull(CoverEtags.get("cover:ar-5:300"))
     }
+
+    /**
+     * The owner, 15 Nov: Big Mountain's page asked for the artist's picture seven times in a second and a half, each
+     * answered with Navidrome's star, and then not again for two minutes, though the photo was there by then.
+     */
+    @Test fun aPictureAskedForSeveralTimesAtOnceIsOneShowing() {
+        StandIns.forget()
+        for (i in 0 until 7) StandIns.shown("ar-4pEi", now = 1_000L + i * 200)
+        // Still the first showing: asked again after the first short wait, counted from the first answer.
+        assertEquals(StandIns.SOON_MS[0], StandIns.waitMs("ar-4pEi"))
+        assertFalse(StandIns.askAgain("ar-4pEi", now = 1_000 + StandIns.SOON_MS[0] - 1))
+        assertTrue(StandIns.askAgain("ar-4pEi", now = 1_000 + StandIns.SOON_MS[0]))
+        // The star again, several at once again: the second showing, the second short wait.
+        for (i in 0 until 4) StandIns.shown("ar-4pEi", now = 7_000L + i)
+        assertEquals(StandIns.SOON_MS[1], StandIns.waitMs("ar-4pEi"))
+        assertTrue(StandIns.askAgain("ar-4pEi", now = 7_000 + StandIns.SOON_MS[1]))
+        // A showing nobody asked about again (the page was left) doesn't hold the next one up.
+        StandIns.shown("ar-left", now = 1_000)
+        StandIns.shown("ar-left", now = 1_000 + 10 * StandIns.AGAIN_MS)
+        assertEquals(0L, StandIns.dueIn("ar-left", now = 1_000 + 10 * StandIns.AGAIN_MS))
+        StandIns.forget()
+    }
 }

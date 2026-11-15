@@ -9,8 +9,9 @@ each (green when it answers, red when it doesn't), then twelve pages in three gr
 | Home & look | [Home page](#home-page) · [Theme](#theme) · [Now playing](#now-playing) · [Bottom bar](#bottom-bar) |
 | Listening & app | [Scrobbling & history](#scrobbling--history) · [Backup & restore](#backup--restore) · [Help & feedback](#help--feedback) · [About](#about) |
 
-Above the groups: tap your name to open [Connections](#connections) (your servers and logins), and **Manage** beside
-the services to open [Services](#services). The services shown are the ones that are on; one switched off isn't.
+Above the groups: tap your name to open [Connections](#connections) (your servers and logins), tap a service to go
+straight to that service's own settings, and **Manage** beside the services to open [Services](#services), the list
+of them all. The services shown are the ones that are on; one switched off isn't.
 
 **Find a setting**: the box at the top. It matches a setting's name, its page and the words people use for it, so
 "battery" finds Pure black and "loud" finds Levelling. Tap a result and its page opens with that section open and lit
