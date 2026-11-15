@@ -147,26 +147,41 @@ from the sound of one to the other. Choose how many songs. Play it, or save it a
 
 ## Flow
 
-The **Flow** tab is for vibes on the spot. Shape one, say one, or both, then tap **Play this vibe**: Siansa makes
-the mix, opens its page and starts playing it.
+The **Flow** tab is for vibes on the spot. Shape one, say one, or both, then press the bar at the bottom, **Play
+this vibe**: the mix starts playing and you stay on Flow.
 
 - **The mood pad**: drag its dot. Up is more energy, down is calmer; right is faster, left is slower. The pad, your
-  picks and the Play button take the colour of the mood you're in, and its name is under the pad ("Easy groove",
+  picks and the bar take the colour of the mood you're in, and its name is under the pad ("Easy groove",
   "Late-night drift", "Get moving"…). Let go and the dot settles on the nearest of its 25 places.
 - **Sounds and genres**: tap **+ Add a sound or genre** and pick from the list. Nothing is suggested: you choose,
   up to six. **Sounds** are the words your sound search understands (piano, vocals, dreamy…), its own list from
-  AudioMuse-AI or Siansa Beats. **Genres** are the ones Siansa Beats hears in your music, or your songs' genre tags
-  without it: the main ones (those with most songs) first, and the search box finds the rest. Each pick starts as
-  **more** of it (filled). Tap it for **less** (dashed, struck through); tap again to take it off. A sound steers
-  the search; a genre moves songs of that genre up or down the mix.
+  AudioMuse-AI or Siansa Beats, without its genre words. **Genres** are the ones Siansa Beats hears in your music,
+  or your songs' genre tags without it: the main ones (those with most songs) first, and the search box finds the
+  rest. Each pick starts as **more** of it (filled). Tap it for **less** (dashed, struck through); tap again to
+  take it off. A sound steers the search. A genre comes first: with **more** of a genre the mix is made of that
+  genre's songs, the ones that fit the rest best first; **less** leaves that genre's songs out.
 - **Artists**: **Favourites** (the artists you play most), **A mix**, or **New to me** (artists you rarely play).
 - **Or say it**: type what you want to hear ("tired but hopeful", "rainy Sunday", "need to focus"). With AI set
-  up it reads your words; what you set on the pad and your picks are used with them.
+  up it reads your words; what you set on the pad and your picks are used with them. Words count when you press
+  Play.
 
-**Reset** puts everything back. On a vibe's own page, the sliders button next to Pin to Home opens the same
-shaping for that mix: each small dot on the pad is one of its songs, the list of genres starts with the ones in
-this mix, and the mix is made again as soon as you change something. Vibes you make are kept, and can be renamed
-or deleted.
+**One bar.** On Flow, the bar where the mini player is waits as a pill in the mood's colour, also when other music
+is playing (that music carries on until you press it; on every other tab the mini player is there as usual). Press
+it and its round ends fold into the mini player as the mix starts.
+
+**Steer it while it plays.** The Flow page stays in charge of its mix: move the dot, change a pick or Artists, and
+the songs that come next change, while the one playing carries on. The mix keeps the name it started with. It ends
+when you stop playback or play something else; pausing keeps it. While it plays:
+
+- now playing says **Now playing from** and the mix's name at its top (tap it for the mix's own page), and the
+  queue says it under **Up next**;
+- **+** in the mini player and in now playing saves the whole mix as a playlist, under its name;
+- the queue's **Shape your mix** is hidden, as the Flow page shapes this mix, unless a DJ mix is running.
+
+**Reset** puts everything back. Every mix is kept under **Your vibes**, where it can be opened, renamed or
+deleted. On a vibe's own page, the sliders button next to Pin to Home opens the same shaping for that mix: each
+small dot on the pad is one of its songs, the list of genres starts with the ones in this mix, and the mix is made
+again as soon as you change something.
 
 ## Search
 

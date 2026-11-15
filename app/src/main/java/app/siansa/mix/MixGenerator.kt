@@ -512,9 +512,9 @@ class MixGenerator(private val graph: AppGraph) {
         if (!graph.settings.current.wordsReady) throw MixException("Set up AudioMuse-AI in Settings first")
         val words = text.trim()
         if (words.isEmpty()) {
-            val query = sliderQuery(tuning) ?: throw MixException("Describe your aura, or move a slider")
-            val summary = tuning.summary().ifEmpty { "Your vibe" }
-            return VibePlan(summary.replaceFirstChar { it.uppercase() }, "Made from your sliders", query, emptyList(), ai = false)
+            // With nothing set either, Flow plays the middle: a mix of everything (the owner, 15 Nov: Play always plays).
+            val query = sliderQuery(tuning) ?: "music"
+            return VibePlan(FlowMood.title(tuning), "Made on Flow: " + FlowMood.summary(tuning), query, emptyList(), ai = false)
         }
         if (words.length < 3) throw MixException("Describe your aura in a few words")
         var plan = Plan(words.replaceFirstChar { it.uppercase() }, words, "From your description", ai = false)
@@ -525,6 +525,20 @@ class MixGenerator(private val graph: AppGraph) {
         }
         AppLog.i("Vibe", "\"$words\" → \"${plan.title}\" · search \"${plan.query}\" · ai=${plan.ai}")
         return VibePlan(plan.title, plan.description, plan.query, plan.steering, plan.ai)
+    }
+
+    /**
+     * The sounds to pick from on Flow: the words the sound search understands, without its genre words (the owner, 15
+     * Nov: genres were listed under Sounds too; they have their own list, from the music itself). Empty when it can't say.
+     */
+    suspend fun soundsToPick(): List<String> = runCatching { soundsOf(graph.audioMuse.conceptCatalogue()) }
+        .onFailure { AppLog.w("Vibe", "Couldn't load the sounds to pick from: ${it.message}") }
+        .getOrDefault(emptyList())
+
+    /** The ids of the songs of genre [name]: as Siansa Beats hears them, or by the songs' genre tags without it. */
+    private suspend fun genreSongIds(name: String): Set<String> {
+        val heard = runCatching { graph.beatsGenres.songIds(name, GENRE_SONGS) }.getOrNull().orEmpty()
+        return heard.ifEmpty { graph.library.songsOfGenre(name, GENRE_SONGS).map { it.id } }.toSet()
     }
 
     /** Sound concepts AudioMuse's search understands, for the sound dials; empty when it can't say. */
@@ -556,7 +570,30 @@ class MixGenerator(private val graph: AppGraph) {
         val dials = tuning.steering()
         // The dials start at the AI's concepts, so once any is shown they say everything; before that, the AI's.
         val steering = if (tuning.sounds.isNotEmpty()) dials else aiSteering
-        val found = searchHere(query, size, steering)
+        // A genre picked comes first (the owner, 15 Nov: "more progressive metal" on a calm search got a downtempo song,
+        // as the genre only re-ordered what the search had found): the mix is drawn from that genre's songs, the ones
+        // the search likes best first, and a genre picked as "less" is left out altogether.
+        val more = tuning.sounds.filter { it.genre && it.value > 0 }.map { it.term }
+        val less = tuning.sounds.filter { it.genre && it.value < 0 }.map { it.term }
+        val wanted = if (more.isEmpty()) null else more.flatMap { genreSongIds(it) }.toSet()
+        val unwanted = less.flatMap { genreSongIds(it) }.toSet()
+        var found = if (wanted == null) searchHere(query, size, steering) else inLibrary(graph.audioMuse.textSearch(query, WIDE_SEARCH, steering))
+        if (wanted != null || unwanted.isNotEmpty()) {
+            val idHere = { hit: ClapHit -> found.here[hit.id]?.id ?: hit.id }
+            val searched = hitsToPick(found)
+            val missing = if (wanted == null) emptyList() else {
+                val have = searched.mapTo(HashSet()) { idHere(it) }
+                graph.library.songs(wanted.filter { it !in have && it !in unwanted }.shuffled().take(size * 3))
+            }
+            val kept = genreFirst(searched, idHere, wanted, unwanted, missing.map { ClapHit(it.id, it.title, it.artist, it.album, 0.0) }, size * 3)
+            AppLog.i(
+                "Vibe",
+                "Genres: " + (more.map { "+$it" } + less.map { "−$it" }).joinToString(" ") + " · ${wanted?.size ?: 0} songs wanted, ${unwanted.size} left out · " +
+                    "${searched.size} searched, ${kept.size} kept (${kept.count { it.similarity == 0.0 }} added from the genre)",
+            )
+            if (wanted != null && kept.isEmpty()) throw MixException("No songs of ${more.joinToString(" or ")} found")
+            found = HereSearch(kept, found.here + missing.associateBy { it.id }, foreign = found.foreign)
+        }
         if (found.hits.isEmpty()) throw MixException("AudioMuse-AI found nothing for that vibe")
         val hits = hitsToPick(found)
         val features = if (tuning.energy != 0 || tuning.tempo != 0) {
@@ -765,6 +802,8 @@ class MixGenerator(private val graph: AppGraph) {
         const val SERVER_SEARCH_MAX = 60
         /** AudioMuse's songs asked for when its songs are another server's and few are here (beta testers #41). */
         const val WIDE_SEARCH = 800
+        /** The most songs of a genre a vibe is drawn from. */
+        const val GENRE_SONGS = 2_000
         /** Albums played lately whose songs On repeat looks at (issue #495). */
         const val RECENT_ALBUMS = 40
         /** Songs of the music shown looked at for a mix from the library. */
@@ -838,6 +877,24 @@ internal data class HereSearch(val hits: List<ClapHit>, val here: Map<String, So
  */
 internal fun hitsToPick(found: HereSearch): List<ClapHit> =
     if (found.foreign && found.here.isNotEmpty()) found.hits.filter { it.id in found.here } else found.hits
+
+/**
+ * The songs a vibe with genres picked is drawn from: of [hits] (the search's, best first; [idOf] is each one's id in
+ * the library) only those in [wanted] (the genres picked as "more"; null when none is) and none in [unwanted] (the
+ * genres picked as "less"), then, while there are fewer than [most], songs of the wanted genres the search didn't
+ * find ([fill]).
+ */
+internal fun genreFirst(hits: List<ClapHit>, idOf: (ClapHit) -> String, wanted: Set<String>?, unwanted: Set<String>, fill: List<ClapHit>, most: Int): List<ClapHit> {
+    val kept = hits.filter { hit -> idOf(hit).let { it !in unwanted && (wanted == null || it in wanted) } }
+    if (wanted == null) return kept
+    if (kept.size >= most) return kept.take(most)
+    val have = kept.mapTo(HashSet()) { idOf(it) }
+    return kept + fill.filter { it.id in wanted && it.id !in unwanted && have.add(it.id) }.take(most - kept.size)
+}
+
+/** The sounds in AudioMuse's [catalogue] without its genre words, each group's best-understood first. */
+internal fun soundsOf(catalogue: app.siansa.net.ConceptCatalogue): List<String> =
+    catalogue.categories.filterNot { it.id.contains("genre", ignoreCase = true) }.flatMap { it.terms }.distinctBy { it.lowercase() }
 
 /** The song in a server search's [results] with [hit]'s title and artist (beta testers #40), or null. */
 internal fun serverMatch(hit: ClapHit, results: List<Song>): Song? {

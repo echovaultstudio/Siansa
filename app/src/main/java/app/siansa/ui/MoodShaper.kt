@@ -411,12 +411,20 @@ private fun MoodPad(
 @Composable
 internal fun MoodPickerSheet(tuning: VibeTuning, look: MoodLook, inMix: List<MixSound>, onChange: (VibeTuning) -> Unit, onDone: () -> Unit) {
     val graph = LocalGraph.current
-    val sounds by produceState<List<String>?>(null) { value = graph.generator.soundConcepts() }
     val genres by rememberBrowseGenres(ALL_GENRES)
+    // The search's own words, without any that's one of the library's genres: those are under Genres.
+    val words by produceState<List<String>?>(null) { value = graph.generator.soundsToPick() }
+    val sounds = words?.let { all -> soundsNotGenres(all, genres.orEmpty().map { it.name }) }
     val heard by produceState(false) { value = withContext(Dispatchers.IO) { graph.beatsGenres.saved(graph.shownLibraries()) != null } }
     ModalBottomSheet(onDismissRequest = onDone, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         MoodPicker(tuning, look, sounds, genres, heard, inMix, onChange, onDone, Modifier.fillMaxHeight(0.92f).padding(horizontal = Space.Page))
     }
+}
+
+/** [sounds] without those that are the name of one of [genres], whatever the capitals. */
+internal fun soundsNotGenres(sounds: List<String>, genres: List<String>): List<String> {
+    val names = genres.mapTo(HashSet()) { it.trim().lowercase() }
+    return sounds.filter { it.trim().lowercase() !in names }
 }
 
 /** What the picker sheet shows (also drawn on its own by the screenshot and spacing tests). */
@@ -552,35 +560,6 @@ private fun PickerRow(name: String, count: Int?, picked: Boolean, full: Boolean,
     }
 }
 
-/**
- * Flow's Play button: a pill in the mood's colour across the bottom of the page, with what's set under its words and
- * a play mark at its end. [busy]: a vibe is being made.
- */
-@Composable
-internal fun MoodPlayPill(look: MoodLook, summary: String, enabled: Boolean, busy: Boolean, modifier: Modifier = Modifier, onPlay: () -> Unit) {
-    Row(
-        modifier
-            .fillMaxWidth()
-            .defaultMinSize(minHeight = MOOD_PLAY)
-            .clip(CircleShape)
-            .background(look.colour.copy(alpha = if (enabled || busy) 1f else 0.55f))
-            .clickable(enabled = enabled && !busy, onClickLabel = "Play this vibe", onClick = onPlay)
-            .padding(start = Space.Page, end = Space.Small, top = Space.Small, bottom = Space.Small)
-            .testTag("vibeGenerate"),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Space.Medium),
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(if (busy) "Making your vibe…" else "Play this vibe", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = look.ink, maxLines = 1)
-            Text(summary, style = MaterialTheme.typography.bodySmall, color = look.ink.copy(alpha = 0.82f), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.testTag("vibeSummary"))
-        }
-        Box(Modifier.size(MOOD_PLAY_MARK).clip(CircleShape).background(Color.Black.copy(alpha = 0.22f)), contentAlignment = Alignment.Center) {
-            if (busy) androidx.compose.material3.CircularProgressIndicator(Modifier.size(20.dp), color = look.ink, strokeWidth = 2.dp) // spacing: exact
-            else Icon(Icons.Rounded.PlayArrow, null, Modifier.size(24.dp), tint = look.ink)
-        }
-    }
-}
-
 /** True on a dark page. */
 @Composable
 internal fun darkPage(): Boolean = MaterialTheme.colorScheme.background.luminance() < 0.5f
@@ -600,5 +579,3 @@ private val MOOD_GENRE_CORNER = 12.dp
 private val MOOD_ROW = 52.dp
 private val MOOD_MARK = 30.dp
 private val MOOD_MARK_EDGE = 1.5.dp
-internal val MOOD_PLAY = 64.dp
-private val MOOD_PLAY_MARK = 44.dp

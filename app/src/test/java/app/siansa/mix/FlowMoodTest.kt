@@ -118,6 +118,55 @@ class FlowMoodTest {
         assertEquals(ai, FlowMood.over(ai, VibeTuning()))
     }
 
+    @Test fun aMixWithoutWordsIsNamedAfterItsMood() {
+        assertEquals("Balanced", FlowMood.title(VibeTuning()))
+        assertEquals("Easy groove with jazz and piano", FlowMood.title(VibeTuning(energy = -1, tempo = 1, sounds = listOf(SoundDial("Jazz", 3, genre = true), SoundDial("vocals", -3), SoundDial("piano", 3), SoundDial("guitar", 3)))))
+    }
+
+    /** The owner, 15 Nov: "more progressive metal" on a calm search got a downtempo song. A picked genre comes first. */
+    @Test fun aPickedGenreComesFirstAndALessOneIsLeftOut() {
+        val hits = listOf("a", "b", "c", "d").map { ClapHit(it, "T$it", "A$it", null, 0.5) }
+        val fill = listOf("x", "b", "y", "z").map { ClapHit(it, "T$it", "A$it", null, 0.0) }
+        val id = { hit: ClapHit -> hit.id }
+        // Only the genre's songs of what the search found, best first, then more of the genre the search didn't find.
+        assertEquals(listOf("b", "d", "x", "y"), genreFirst(hits, id, wanted = setOf("b", "d", "x", "y", "z"), unwanted = emptySet(), fill = fill, most = 4).map { it.id })
+        // None of the search's songs is of the genre: the mix is still the genre's.
+        assertEquals(listOf("x", "y", "z"), genreFirst(hits, id, wanted = setOf("x", "y", "z"), unwanted = emptySet(), fill = fill, most = 10).map { it.id })
+        // "Less" leaves the genre's songs out, of the search's and of what's added.
+        assertEquals(listOf("a", "c"), genreFirst(hits, id, wanted = null, unwanted = setOf("b", "d"), fill = fill, most = 2).map { it.id })
+        assertEquals(listOf("d", "x"), genreFirst(hits, id, wanted = setOf("b", "d", "x"), unwanted = setOf("b"), fill = fill, most = 5).map { it.id })
+        // Enough of the genre among the search's: nothing is added.
+        assertEquals(listOf("a", "b"), genreFirst(hits, id, wanted = setOf("a", "b", "c", "x"), unwanted = emptySet(), fill = fill, most = 2).map { it.id })
+    }
+
+    @Test fun theSoundsToPickLeaveTheSearchsGenreWordsOut() {
+        val catalogue = app.siansa.net.ConceptCatalogue(
+            listOf(
+                app.siansa.net.ConceptCategory("genre", "Genre", listOf("progressive rock", "jazz")),
+                app.siansa.net.ConceptCategory("instrument", "Instrument", listOf("piano", "guitar")),
+                app.siansa.net.ConceptCategory("mood", "Mood", listOf("dreamy", "Piano")),
+            ),
+            10,
+        )
+        assertEquals(listOf("piano", "guitar", "dreamy"), soundsOf(catalogue))
+    }
+
+    @Test fun aFlowMixLivesUntilPlaybackStopsOrSomethingElsePlays() {
+        assertTrue(FlowMix.isLive(started = 7, now = 7, hasMedia = true))
+        // Another list was started, or playback was stopped (both count the player's list on).
+        assertFalse(FlowMix.isLive(started = 7, now = 8, hasMedia = true))
+        // Nothing in the player.
+        assertFalse(FlowMix.isLive(started = 7, now = 7, hasMedia = false))
+    }
+
+    @Test fun steeringChangesOnlyWhatComesNext() {
+        fun song(id: String) = app.siansa.data.Song(id = id, title = "T$id", artist = "A", album = "B")
+        val heard = listOf(song("1"), song("2"))
+        // What has played and what's playing aren't queued again, and a song comes once.
+        assertEquals(listOf("5", "3", "4"), FlowMix.upcoming(listOf(song("2"), song("5"), song("3"), song("5"), song("1"), song("4")), heard).map { it.id })
+        assertTrue(FlowMix.upcoming(heard, heard).isEmpty())
+    }
+
     @Test fun artistsAreThreeChoices() {
         assertEquals(listOf(0, 1, 2), listOf(2, 0, -1).map { FlowMood.artists(it) })
         assertEquals(listOf(2, 0, -2), listOf(0, 1, 2).map { FlowMood.familiar(it) })

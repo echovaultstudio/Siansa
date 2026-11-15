@@ -249,10 +249,15 @@ fun SiansaRoot() {
                                 transformOrigin = TransformOrigin(0.5f, 1f)
                             },
                         ) {
-                            when (app.siansa.playback.miniShown(active, player.hasMedia, bookState.book != null)) {
-                                app.siansa.playback.MiniFor.MUSIC -> Box(Modifier.sheetDragUp(sheet)) { MiniPlayer(player) { sheet.open() } }
-                                app.siansa.playback.MiniFor.BOOK -> Box(Modifier.sheetDragUp(bookSheet)) { BookMiniPlayer(bookState) { bookSheet.open() } }
-                                app.siansa.playback.MiniFor.NONE -> Unit
+                            // On Flow, a pill in the mood's colour stands here until its mix plays, then folds into the player.
+                            val shown = app.siansa.playback.miniShown(active, player.hasMedia, bookState.book != null)
+                            val makingVibe by graph.flow.making.collectAsStateWithLifecycle()
+                            FlowDockSlot(hasMini = shown != app.siansa.playback.MiniFor.NONE, making = makingVibe) {
+                                when (shown) {
+                                    app.siansa.playback.MiniFor.MUSIC -> Box(Modifier.sheetDragUp(sheet)) { MiniPlayer(player) { sheet.open() } }
+                                    app.siansa.playback.MiniFor.BOOK -> Box(Modifier.sheetDragUp(bookSheet)) { BookMiniPlayer(bookState) { bookSheet.open() } }
+                                    app.siansa.playback.MiniFor.NONE -> Unit
+                                }
                             }
                         }
                         BottomTabs(appSettings.navTabs, currentTab) { tab ->
@@ -503,8 +508,12 @@ private fun MiniPlayerButton(button: MiniButton, state: PlayerState, song: app.s
         MiniButton.ADD -> {
             val launch = rememberPlayLauncher()
             var picking by remember { mutableStateOf(false) }
-            IconButton(onClick = { picking = true }) { Icon(Icons.Rounded.AddCircleOutline, "Add to playlist") }
-            if (picking) {
+            // A Flow mix is saved whole, under its own name (the owner, 15 Nov); any other music adds the song.
+            val mix = graph.flow.live(state)
+            IconButton(onClick = { picking = true }) { Icon(Icons.Rounded.AddCircleOutline, if (mix != null) "Save this mix as a playlist" else "Add to playlist") }
+            if (picking && mix != null) {
+                SaveAsPlaylistDialog(mix.name, state.queue) { picking = false }
+            } else if (picking) {
                 AddToPlaylistDialog(listOf(song)) { message ->
                     picking = false
                     message?.let { launch.notify(it) }

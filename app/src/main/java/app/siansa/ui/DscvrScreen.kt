@@ -47,6 +47,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -179,18 +181,28 @@ fun DscvrScreen(nav: NavController) {
     val graph = LocalGraph.current
     val launch = rememberPlayLauncher()
     val aiProblem = rememberAiProblem()
-    val busy by VibeMaking.busy.collectAsStateWithLifecycle()
-    var text by rememberSaveable { mutableStateOf("") }
-    // Nothing is picked to begin with: sounds and genres are added with +, never suggested (the owner, 15 Nov).
-    var tuning by remember { mutableStateOf(VibeTuning()) }
+    val flow = graph.flow
+    // What's set lives with the mix (FlowMix), so it's still here after a look at another tab, and steers a mix playing.
+    val text by flow.text.collectAsStateWithLifecycle()
+    val tuning by flow.tuning.collectAsStateWithLifecycle()
+    val steering by flow.steering.collectAsStateWithLifecycle()
+    val player by graph.player.state.collectAsStateWithLifecycle()
+    val mix = flow.live(player)
     val hold = remember { MoodHold() }
     val look = rememberMoodLook(tuning, hold)
     val vibes by graph.savedVibes.state.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { graph.savedVibes.all() }
     var renaming by remember { mutableStateOf<SavedVibe?>(null) }
-    val ready = flowReady(text, tuning)
 
-    fun make() = makeVibe(graph, nav, launch::notify, text, tuning) { vibe -> launch(vibe.shownTitle) { vibe.songs } }
+    // Flow's bar is where the mini player is (FlowDock): the pill while no Flow mix plays, in the mood's colour.
+    SideEffect {
+        FlowDock.onPlay = { flow.play(launch::notify) }
+        FlowDock.colour = look.colour
+        FlowDock.ink = look.ink
+        FlowDock.summary = flowSummary(text, tuning)
+        FlowDock.shown = aiProblem == null && mix == null
+    }
+    DisposableEffect(Unit) { onDispose { FlowDock.shown = false } }
 
     renaming?.let { vibe ->
         RenameVibeDialog(vibe, onDismiss = { renaming = null }) { name ->
@@ -199,21 +211,32 @@ fun DscvrScreen(nav: NavController) {
         }
     }
 
-    val bar = LocalBottomBarPadding.current
     Box(Modifier.fillMaxSize().testTag("flowPage")) {
         MoodGlow(look)
         LazyColumn(
             Modifier.fillMaxSize().statusBarsPadding().aboveKeyboard(),
-            // Room at the end for the Play button, which floats over the list.
-            contentPadding = PaddingValues(top = Space.Page, bottom = bar + MOOD_PLAY + Space.Section + Space.Medium),
+            contentPadding = PaddingValues(top = Space.Page, bottom = bottomBarPadding(Space.Section)),
         ) {
             item(key = "top") {
-                Row(Modifier.fillMaxWidth().padding(start = Space.Page, end = Space.Small), verticalAlignment = Alignment.CenterVertically) {
-                    Text("Flow", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black, modifier = Modifier.weight(1f).testTag("flowTitle"))
-                    if (aiProblem == null) {
-                        TextButton(onClick = { tuning = VibeTuning(); text = "" }, enabled = !tuning.isNeutral || text.isNotEmpty(), modifier = Modifier.testTag("flowReset")) {
-                            Text("Reset")
+                Column(Modifier.fillMaxWidth().padding(start = Space.Page, end = Space.Small)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Flow", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black, modifier = Modifier.weight(1f).testTag("flowTitle"))
+                        if (aiProblem == null) {
+                            TextButton(onClick = { flow.reset() }, enabled = !tuning.isNeutral || text.isNotEmpty(), modifier = Modifier.testTag("flowReset")) {
+                                Text("Reset")
+                            }
                         }
+                    }
+                    // While its mix plays, the page says so: what's moved here changes what comes next.
+                    if (mix != null) {
+                        Text(
+                            flowLiveLine(mix.name, steering),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(end = Space.Small).testTag("flowLive"),
+                        )
                     }
                 }
             }
@@ -222,10 +245,20 @@ fun DscvrScreen(nav: NavController) {
                 item(key = "problem") { AiUnavailable(aiProblem, Modifier.padding(horizontal = Space.Page, vertical = Space.Medium)) }
             } else {
                 item(key = "ask") {
-                    AskPill(text, onText = { text = it }, look = look, busy = busy, ready = ready, onGo = ::make, modifier = Modifier.padding(start = Space.Page, end = Space.Page, top = Space.Small))
+                    val making by flow.making.collectAsStateWithLifecycle()
+                    AskPill(
+                        text, onText = { flow.text.value = it }, look = look, busy = making, ready = text.trim().length >= 3,
+                        onGo = { flow.play(launch::notify) }, modifier = Modifier.padding(start = Space.Page, end = Space.Page, top = Space.Small),
+                    )
                 }
                 item(key = "shape") {
-                    MoodShaper(tuning, look, hold, onChange = { tuning = it }, modifier = Modifier.padding(start = Space.Page, end = Space.Page, top = Space.Medium))
+                    // The dot moving only sets what's shown; a finger lifted, a pick or Artists changed also steers a mix playing.
+                    MoodShaper(
+                        tuning, look, hold,
+                        onChange = { flow.set(it, settled = false) },
+                        onSettled = { flow.set(flow.tuning.value, settled = true) },
+                        modifier = Modifier.padding(start = Space.Page, end = Space.Page, top = Space.Medium),
+                    )
                 }
             }
             val recent = vibes.orEmpty()
@@ -245,36 +278,34 @@ fun DscvrScreen(nav: NavController) {
                 }
             }
         }
-        if (aiProblem == null && !keyboardOpen()) {
-            MoodPlayPill(
-                look, flowSummary(text, tuning), enabled = ready, busy = busy,
-                modifier = Modifier.align(Alignment.BottomCenter).padding(start = Space.Page, end = Space.Page, bottom = bar + Space.Medium),
-                onPlay = ::make,
-            )
-        }
     }
 }
 
-/** True when there's something to make a vibe from: a few words, or a mood, a pick or a choice of artists. */
-internal fun flowReady(text: String, tuning: VibeTuning): Boolean = text.trim().length >= 3 || !tuning.isNeutral
+/** Under Flow's title while its mix plays: which mix the page is steering. */
+internal fun flowLiveLine(name: String, steering: Boolean): String =
+    "Playing “$name”. " + if (steering) "Changing what comes next…" else "Move anything here to change what comes next."
 
-/** Under "Play this vibe": the words typed and what's set, or what to do while nothing is. */
+/** Under "Play this vibe": the words typed and what's set; with nothing set, the mix in the middle. */
 internal fun flowSummary(text: String, tuning: VibeTuning): String {
     val words = text.trim().takeIf { it.length >= 3 }?.let { "“$it”" }
-    if (words == null && tuning.isNeutral) return "Drag the dot, add a sound, or say it"
+    if (words == null && tuning.isNeutral) return "Balanced, a mix of artists"
     return listOfNotNull(words, FlowMood.summary(tuning).takeIf { !tuning.isNeutral }).joinToString(" · ")
 }
 
-/** The mood's colour glowing down from the top of the page, behind everything. */
+/**
+ * The mood's colour glowing down from the top of the page, behind everything: all of it at the top, none at its end,
+ * on [GlassBar.colour]'s curve in many dithered steps under the same grain as the title bar's wash, so it shows no
+ * lines (the owner, 15 Nov: a plain radial fade did).
+ */
 @Composable
 private fun MoodGlow(look: MoodLook) {
-    val colour = if (darkPage()) look.deep.copy(alpha = 0.8f) else look.colour.copy(alpha = 0.22f)
-    Box(
-        Modifier.fillMaxWidth().height(320.dp).drawBehind {
-            drawRect(Brush.radialGradient(0f to colour, 0.7f to colour.copy(alpha = 0f), center = Offset(size.width / 2, 0f), radius = size.width * 1.1f))
-        }.testTag("moodGlow"),
-    )
+    val dark = darkPage()
+    Box(Modifier.fillMaxWidth().height(MOOD_GLOW).testTag("moodGlow")) {
+        GlassWash(if (dark) look.deep else look.colour, MOOD_GLOW, amount = { if (dark) 0.85f else 0.22f })
+    }
 }
+
+private val MOOD_GLOW = 320.dp
 
 /** "Or say it" (issue #369): the words for a vibe in one pill, made with its round button or the keyboard's Go. */
 @Composable

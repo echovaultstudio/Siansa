@@ -384,7 +384,15 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                         // The top row sits exactly halfway between the status bar and the cover (the owner, 9 Nov).
                         PlayerTop(
                             topGap = playerTopGapDp(LocalConfiguration.current.screenHeightDp).dp,
-                            row = { TopRow(song, onClose = onClose, onAlbum = ::openAlbum, onMenu = { menuOpen = true }, onSleep = { sleepOpen = true }) },
+                            row = {
+                                // A Flow mix is named at the top, and opens its own page from there (the owner, 15 Nov).
+                                val mix = graph.flow.live(state)
+                                TopRow(
+                                    song, mix?.name, onClose = onClose,
+                                    onAlbum = { if (mix != null) { onClose(); nav.navigate("vibe/${mix.vibeId}") } else openAlbum() },
+                                    onMenu = { menuOpen = true }, onSleep = { sleepOpen = true },
+                                )
+                            },
                             cover = { SwipeCover(song, onTap = ::openAlbum, slideLabel = slideLabel) },
                             // Siansa Dev: marks the last DJ blend as bad (the owner, 9 Nov).
                             belowCover = { BadBlendButton() },
@@ -707,15 +715,15 @@ internal fun PlayerTop(
 }
 
 @Composable
-private fun TopRow(song: Song?, onClose: () -> Unit, onAlbum: () -> Unit, onMenu: () -> Unit, onSleep: () -> Unit) {
+private fun TopRow(song: Song?, mix: String?, onClose: () -> Unit, onAlbum: () -> Unit, onMenu: () -> Unit, onSleep: () -> Unit) {
     val timerRunning = LocalGraph.current.sleepTimer.state.collectAsStateWithLifecycle().value != null
     Row(Modifier.fillMaxWidth().testTag("playerTopRow"), verticalAlignment = Alignment.CenterVertically) {
         IconButton(onClick = onClose) { Icon(Icons.Rounded.KeyboardArrowDown, "Close", Modifier.size(32.dp)) }
         if (timerRunning) Spacer(Modifier.size(48.dp))  // spacing: exact (the width of the button it balances)
-        Column(Modifier.weight(1f).clickable(enabled = song?.albumId != null, onClick = onAlbum), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("PLAYING FROM ALBUM", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f))
+        Column(Modifier.weight(1f).clickable(enabled = mix != null || song?.albumId != null, onClick = onAlbum), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(playingFromLabel(mix), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f), modifier = Modifier.testTag("playingFrom"))
             Text(
-                song?.album.orEmpty(),
+                mix ?: song?.album.orEmpty(),
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
@@ -953,11 +961,15 @@ internal fun Controls(
             Icon(Icons.Rounded.SkipNext, "Next", Modifier.size(40.dp))
         }
         var picking by remember { mutableStateOf(false) }
-        Box(Modifier.alpha(others)) { StateButton(icon = Icons.Rounded.AddCircleOutline, label = "Add to playlist", on = false, tag = "addToPlaylistButton") {
+        // A Flow mix is saved whole, under its own name (the owner, 15 Nov); any other music adds the song.
+        val mix = graph.flow.live(state)
+        Box(Modifier.alpha(others)) { StateButton(icon = Icons.Rounded.AddCircleOutline, label = if (mix != null) "Save this mix as a playlist" else "Add to playlist", on = false, tag = "addToPlaylistButton") {
             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
             if (state.current != null) picking = true
         } }
-        if (picking) {
+        if (picking && mix != null) {
+            SaveAsPlaylistDialog(mix.name, state.queue) { picking = false }
+        } else if (picking) {
             val launch = rememberPlayLauncher()
             state.current?.let { song ->
                 AddToPlaylistDialog(listOf(song)) { message ->
@@ -1023,15 +1035,21 @@ private fun QueueView(state: PlayerState, onDjBar: (DjBarSpot, Boolean) -> Unit)
         return
     }
     var saving by remember { mutableStateOf(false) }
-    if (saving) SaveAsPlaylistDialog("Queue · ${java.time.LocalDate.now()}", state.queue) { saving = false }
+    // A Flow mix is named here too, and saved under its name (the owner, 15 Nov).
+    val flowMix = graph.flow.live(state)
+    if (saving) SaveAsPlaylistDialog(flowMix?.name ?: "Queue · ${java.time.LocalDate.now()}", state.queue) { saving = false }
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(start = Space.Page), verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                "Up next · ${state.queue.size - state.index - 1} of ${state.queue.size}",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.weight(1f).padding(vertical = Space.Page),
-            )
+            Column(Modifier.weight(1f).padding(vertical = Space.Page)) {
+                Text(
+                    "Up next · ${state.queue.size - state.index - 1} of ${state.queue.size}",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                )
+                if (flowMix != null) {
+                    Text("From ${flowMix.name}", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.75f), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.testTag("queueFrom"))
+                }
+            }
             // The whole queue as a playlist (beta #19); a filled circle, unlike a song's "Add to playlist".
             IconButton(onClick = { saving = true }, modifier = Modifier.testTag("saveQueueAsPlaylist")) {
                 Icon(Icons.Rounded.AddCircle, "Save queue as playlist", tint = Color.White)
@@ -1050,7 +1068,8 @@ private fun QueueView(state: PlayerState, onDjBar: (DjBarSpot, Boolean) -> Unit)
         val connection by graph.connection.state.collectAsStateWithLifecycle()
         val canStart = song != null && !OutsideMedia.isOutside(song.id) &&
             app.siansa.mix.DjReady.problem(settings, connection, djBeats) == null
-        djBarPlaces(settings.djBarOrder, djRadio, listMix, canStart)?.let { places ->
+        // Not for a Flow mix, which is shaped on the Flow page, unless a DJ mix runs in it (the owner, 15 Nov).
+        djBarPlaces(settings.djBarOrder, djRadio, listMix, canStart)?.takeIf { shapeYourMixShown(flowMix != null, djRadio, listMix) }?.let { places ->
             var open by rememberSaveable { mutableStateOf(false) }
             MixShapePanel(
                 places = places,
@@ -1277,3 +1296,13 @@ private const val QUEUE_PULL_PX = 40f
 
 /** The lyrics and queue buttons' width under the controls; the device name gets the rest (issue #311). */
 private val SIDE_BUTTON_WIDTH = 72.dp
+
+
+/** Over the name at the top of now playing: a Flow mix is named ([mix]), anything else is its album. */
+internal fun playingFromLabel(mix: String?): String = if (mix != null) "NOW PLAYING FROM" else "PLAYING FROM ALBUM"
+
+/**
+ * Whether the queue shows Shape your mix: not while a Flow mix plays ([flow]), which is shaped on the Flow page, unless
+ * a DJ mix runs in it (a DJ radio, or a list's own mix).
+ */
+internal fun shapeYourMixShown(flow: Boolean, djRadio: Boolean, listMix: Boolean): Boolean = !flow || djRadio || listMix
