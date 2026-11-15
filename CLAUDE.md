@@ -72,6 +72,9 @@ implements them and opens a pull request. Labels show where each one is: `claude
   private logs repository. GitHub closes a fixed issue on merge, and the release comments on it with the version that
   has the fix (`scripts/notify_fixed.py`, issue #433).
 - Describe before and after, and how it was tested.
+- Add every change to the running list, issue 69 in `echovaultstudio/siansa-dev` ("What changed"): one line under
+  today's date (App, TV, Siansa Beats, or Website and server) with the pull request and where it is (`in checks`,
+  `dev`, `main, waiting`, `released` with the version), and correct that as it moves on (the owner, 15 Nov 2026).
 - Don't merge: the owner reviews, and CI (`.github/workflows/ci.yml`) must pass. Pull requests run the build,
   Lint, unit tests and secret scan, and compile the emulator tests; emulator tests run after merging to main.
 
