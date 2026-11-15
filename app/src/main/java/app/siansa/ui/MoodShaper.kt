@@ -264,8 +264,9 @@ internal fun MoodSegment(options: List<String>, chosen: Int, tag: String, modifi
             .clip(CircleShape)
             .background(scheme.surfaceContainer)
             .border(MOOD_EDGE, scheme.outlineVariant.copy(alpha = 0.5f), CircleShape)
-            .padding(Space.Tight)
-            .testTag(tag),
+            // The tag is the whole pill, not what's inside its padding: the spacing tests measure to its edge.
+            .testTag(tag)
+            .padding(Space.Tight),
     ) {
         options.forEachIndexed { i, option ->
             val on = i == chosen
