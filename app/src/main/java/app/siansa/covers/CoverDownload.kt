@@ -364,7 +364,7 @@ object CoverDownload {
                             Outcome.FAILED -> failed.incrementAndGet()
                             Outcome.NONE -> {
                                 none.incrementAndGet()
-                                if (id.startsWith("ar-")) waiting += id
+                                if (waitsForPhoto(id, standIns.remove(id))) waiting += id
                             }
                             Outcome.HAD -> Unit
                         }
@@ -434,6 +434,17 @@ object CoverDownload {
     }
 
     private enum class Outcome { HAD, DOWNLOADED, NONE, FAILED }
+
+    /** The ids just answered with the server's stand-in, until the run has read them. */
+    private val standIns = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+
+    /**
+     * Whether a cover with no picture is asked for again at the end of the run: an artist's photo that Navidrome
+     * answered with its stand-in ([standIn]), which it sends while it's still fetching the photo. Emby and Jellyfin
+     * say plainly when an artist has no picture (404, never a stand-in), so nothing is waited for there; nor for an
+     * album's or a song's cover, which no lookup brings.
+     */
+    internal fun waitsForPhoto(id: String, standIn: Boolean): Boolean = standIn && id.startsWith("ar-")
 
     /** How long a run waits before asking again for artists' photos the server answered with its stand-in. */
     internal val ARTISTS_AGAIN_MS = longArrayOf(8_000L, 30_000L)
@@ -533,7 +544,10 @@ object CoverDownload {
                 return@executeCancellable if (response.code == 404) false else null
             }
             // The server's stand-in for a cover it doesn't have right now: nothing to keep (StandIns).
-            if (StandIns.isStandIn(response)) return@executeCancellable false
+            if (StandIns.isStandIn(response)) {
+                standIns += id
+                return@executeCancellable false
+            }
             val body = response.body ?: return@executeCancellable null
             val head = response.peekBody(32).bytes()
             val image = CoverStore.sniff(head)
