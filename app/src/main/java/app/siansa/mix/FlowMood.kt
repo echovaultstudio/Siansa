@@ -99,6 +99,15 @@ object FlowMood {
         if (tuning.familiar != 0) add(if (tuning.familiar > 0) "your favourites" else "new to you")
     }.joinToString(" · ")
 
+    /**
+     * The name of a mix made from what's set alone (no words typed): its mood, and the sounds and genres it has more
+     * of: "Easy groove with jazz and piano". It keeps this name however it's steered afterwards.
+     */
+    fun title(tuning: VibeTuning): String {
+        val more = tuning.sounds.filter { it.value > 0 }.take(2).map { it.term.lowercase() }
+        return name(at(tuning.energy), at(tuning.tempo)) + if (more.isEmpty()) "" else " with " + more.joinToString(" and ")
+    }
+
     /** The mood's colour (red, green, blue, 0–255) for [energy] and [tempo], each −1…1. */
     fun colour(energy: Float, tempo: Float): IntArray {
         val e = energy.coerceIn(-1f, 1f)

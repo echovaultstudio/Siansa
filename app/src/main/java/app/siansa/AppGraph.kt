@@ -64,6 +64,7 @@ import app.siansa.mix.Similar
 import app.siansa.mix.Sonic
 import app.siansa.situation.SituationReader
 import app.siansa.mix.SonicFingerprint
+import app.siansa.mix.FlowMix
 import app.siansa.mix.MixGenerator
 import app.siansa.mix.Radios
 import app.siansa.mix.Insights
@@ -451,6 +452,8 @@ class AppGraph(val app: Application) {
     val beatsHistory = BeatsHistory({ path -> beats.get(path) }, { settings.current })
     val taste = Taste(this)
     val generator = MixGenerator(this)
+    /** The mix Flow is playing, and what's set on the Flow page (the owner, 15 Nov). */
+    val flow: FlowMix by lazy { FlowMix(this) }
     val insights = Insights(this)
     val radios = Radios(this)
     val suggestions = ArtistSuggestions(this)

@@ -290,17 +290,20 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     app.siansa.ui.MoodShaper(app.siansa.mix.VibeTuning(), app.siansa.ui.MoodLook(0f, 0f), app.siansa.ui.MoodHold(), onChange = {}, picker = {})
                 }
             },
+            // Flow's bar where the mini player is: the pill in each mood's colour (its ends round, as it waits), a long
+            // summary, while a mix is made, and folded half way and all the way to the mini player's corners.
             Scene("mood_colours") {
                 Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
-                    listOf(2 to 2, 2 to -2, -2 to 2, -2 to -2, 2 to 0, 0 to -1).forEach { (e, t) ->
+                    listOf(2 to 2, 2 to -2, -2 to 2, -2 to -2, 0 to 0).forEach { (e, t) ->
                         val tuning = app.siansa.mix.VibeTuning(energy = e, tempo = t, sounds = listOf(app.siansa.mix.SoundDial("guitar", 3)))
-                        app.siansa.ui.MoodPlayPill(
-                            app.siansa.ui.MoodLook(e / 2f, t / 2f), app.siansa.mix.FlowMood.name(e / 2f, t / 2f) + " · " + app.siansa.mix.FlowMood.summary(tuning),
-                            enabled = true, busy = false,
-                        ) {}
+                        val look = app.siansa.ui.MoodLook(e / 2f, t / 2f)
+                        app.siansa.ui.FlowPill(look.ink, look.name + " · " + app.siansa.mix.FlowMood.summary(tuning), making = false, Modifier.clip(RoundedCornerShape(app.siansa.ui.FlowDock.ROUND)).background(look.colour))
                     }
-                    app.siansa.ui.MoodPlayPill(app.siansa.ui.MoodLook(0f, 0f), "Drag the dot, add a sound, or say it", enabled = false, busy = false) {}
-                    app.siansa.ui.MoodPlayPill(app.siansa.ui.MoodLook(0.5f, 1f), "Livelier and fast · more a very long sound name that runs off the end of the pill", enabled = true, busy = true) {}
+                    val look = app.siansa.ui.MoodLook(0.5f, 1f)
+                    app.siansa.ui.FlowPill(look.ink, "Livelier and fast · more a very long sound name that runs off the end of the pill", making = true, Modifier.clip(RoundedCornerShape(app.siansa.ui.FlowDock.ROUND)).background(look.colour))
+                    listOf(0.5f, 1f).forEach { fold ->
+                        app.siansa.ui.FlowPill(look.ink, "Folding into the player", making = false, Modifier.clip(RoundedCornerShape(app.siansa.ui.FlowDock.corner(fold).dp)).background(look.colour))
+                    }
                 }
             },
             // The list to pick from: sounds (one picked, one found by typing has no count), and genres with a vibe's own
