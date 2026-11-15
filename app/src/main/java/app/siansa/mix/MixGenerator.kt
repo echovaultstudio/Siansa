@@ -567,10 +567,13 @@ class MixGenerator(private val graph: AppGraph) {
         val familiarity = if (tuning.familiar != 0) {
             graph.history.all().groupingBy { it.artist.lowercase() }.eachCount()
         } else emptyMap()
-        // The mix's own sound dials go by each song's genres, as Siansa Beats hears them.
+        // The genres picked go by each song's genres.
         val genres = if (tuning.sounds.any { it.genre && it.value != 0 }) {
-            graph.beatsGenres.ofSongs(hits.map { it.id }).orEmpty()
-                .also { if (it.isEmpty()) AppLog.w("Vibe", "Siansa Beats didn't say the songs' genres, leaving the mix's sound dials out") }
+            // As Siansa Beats hears them; without it (or for songs it hasn't heard) by the songs' own genre tags.
+            graph.beatsGenres.ofSongs(hits.map { it.id }).orEmpty().ifEmpty {
+                hits.mapNotNull { hit -> found.here[hit.id]?.let { hit.id to tagGenres(it.genre) } }.toMap().filterValues { it.isNotEmpty() }
+                    .also { AppLog.i("Vibe", "Siansa Beats didn't say the songs' genres: going by the genre tags of ${it.size} songs") }
+            }
         } else emptyMap()
         val ranked = rankVibe(hits, features, familiarity, tuning, genres) { Random.nextDouble() * 0.05 }
         val perArtist = HashMap<String, Int>()

@@ -267,28 +267,58 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     }
                 }
             },
-            // Shape your sound (the owner, 11 Nov): the pad with a mix's songs on it, the Niche ↔ Familiar pill, the dials
-            // (the AI's and the mix's own, with a long name) and the mix's sounds to add; on the page, and on a dark one.
-            Scene("shape_your_sound") {
+            // Flow's mood pad (the owner's pick, 15 Nov): the pad in its mood's colour with a mix's songs on it, the mood's
+            // name, the picks (more and less of a sound, a genre with a long name), + to add, and whose music.
+            Scene("mood_shaper") {
                 val tuning = app.siansa.mix.VibeTuning(
                     energy = -1, tempo = 1, familiar = -2,
                     sounds = listOf(
-                        app.siansa.mix.SoundDial("dance", -5),
-                        app.siansa.mix.SoundDial("Experimental Field Recordings", 2, genre = true),
+                        app.siansa.mix.SoundDial("piano", 3),
+                        app.siansa.mix.SoundDial("vocals", -3),
+                        app.siansa.mix.SoundDial("Experimental Field Recordings", 3, genre = true),
+                        app.siansa.mix.SoundDial("Drone", -3, genre = true),
                     ),
                 )
                 val dots = (0 until 24).map { app.siansa.mix.PadDot(0.12f + (it * 7 % 11) / 22f, 0.1f + (it * 5 % 9) / 18f) }
-                val more = listOf("Drone", "Neo-Classical Downtempo").map { app.siansa.mix.MixSound(it, 4) }
                 Column(Modifier.padding(Space.Page)) {
-                    app.siansa.ui.VibeSliders(tuning, onChange = {}, dots = dots, soundsTitle = "Sounds in this mix", more = more)
+                    app.siansa.ui.MoodShaper(tuning, app.siansa.ui.MoodLook(-0.5f, 0.5f), app.siansa.ui.MoodHold(), onChange = {}, dots = dots, picker = {})
                 }
             },
-            // The same before there's a mix (Flow): nothing set, no songs on the pad, one sound; on a dark page.
-            Scene("shape_your_sound_unset") {
-                OnPlayer {
-                    Column(Modifier.padding(Space.Page)) {
-                        app.siansa.ui.VibeSliders(app.siansa.mix.VibeTuning(sounds = listOf(app.siansa.mix.SoundDial("piano", 0))), onChange = {})
+            // The same before anything is set (Flow), and at the pad's four corners: every mood's colour and name.
+            Scene("mood_shaper_unset") {
+                Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Section)) {
+                    app.siansa.ui.MoodShaper(app.siansa.mix.VibeTuning(), app.siansa.ui.MoodLook(0f, 0f), app.siansa.ui.MoodHold(), onChange = {}, picker = {})
+                }
+            },
+            Scene("mood_colours") {
+                Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
+                    listOf(2 to 2, 2 to -2, -2 to 2, -2 to -2, 2 to 0, 0 to -1).forEach { (e, t) ->
+                        val tuning = app.siansa.mix.VibeTuning(energy = e, tempo = t, sounds = listOf(app.siansa.mix.SoundDial("guitar", 3)))
+                        app.siansa.ui.MoodPlayPill(
+                            app.siansa.ui.MoodLook(e / 2f, t / 2f), app.siansa.mix.FlowMood.name(e / 2f, t / 2f) + " · " + app.siansa.mix.FlowMood.summary(tuning),
+                            enabled = true, busy = false,
+                        ) {}
                     }
+                    app.siansa.ui.MoodPlayPill(app.siansa.ui.MoodLook(0f, 0f), "Drag the dot, add a sound, or say it", enabled = false, busy = false) {}
+                    app.siansa.ui.MoodPlayPill(app.siansa.ui.MoodLook(0.5f, 1f), "Livelier and fast · more a very long sound name that runs off the end of the pill", enabled = true, busy = true) {}
+                }
+            },
+            // The list to pick from: sounds (one picked, one found by typing has no count), and genres with a vibe's own
+            // first, their song counts, a long name, and the note once six are picked.
+            Scene("mood_picker") {
+                val look = app.siansa.ui.MoodLook(-0.5f, 0.5f)
+                val genres = listOf("Rock" to 1204, "Electronic" to 986, "Neo-Classical Downtempo With Field Recordings" to 31, "Jazz" to 12).map { app.siansa.data.Genre(it.first, it.second) }
+                Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Section)) {
+                    app.siansa.ui.MoodPicker(
+                        app.siansa.mix.VibeTuning(sounds = listOf(app.siansa.mix.SoundDial("piano", 3))), look,
+                        sounds = listOf("acoustic", "piano", "vocals", "dreamy"), genres = genres, heard = true, inMix = emptyList(),
+                        onChange = {}, onDone = {}, modifier = Modifier.height(380.dp),
+                    )
+                    app.siansa.ui.MoodPicker(
+                        app.siansa.mix.VibeTuning(sounds = listOf("a", "b", "c", "d", "e", "Drone").map { app.siansa.mix.SoundDial(it, 3, genre = true) }), look,
+                        sounds = emptyList(), genres = genres, heard = false, inMix = listOf(app.siansa.mix.MixSound("Drone", 9), app.siansa.mix.MixSound("Ambient", 4)),
+                        onChange = {}, onDone = {}, modifier = Modifier.height(460.dp), startTab = 1,
+                    )
                 }
             },
             // Settings › Style (issue #681).

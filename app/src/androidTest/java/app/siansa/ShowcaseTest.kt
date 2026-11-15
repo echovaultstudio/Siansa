@@ -348,15 +348,13 @@ class ShowcaseTest {
                 tab("Flow")
                 compose.onAllNodes(hasSetTextAction()).onFirst()
                     .performSemanticsAction(SemanticsActions.SetText) { it(AnnotatedString("rainy jazz piano")) }
-                compose.onAllNodesWithTag("shapeToggle").onFirst().performClick()
-                idle(1000)
-                // The sound pad's dot: much calmer (near the bottom) and a bit slower (left of the middle).
+                // The mood pad's dot: much calmer (near the bottom) and a bit slower (left of the middle).
                 compose.onAllNodesWithTag("soundPad").onFirst().performScrollTo()
                     .performTouchInput { click(percentOffset(padAt(-1), padAt(2))) }
                 idle(300)
                 idle(1500)
                 shot("flow-shape")
-                compose.onAllNodesWithTag("vibeGenerate").onFirst().performScrollTo().performClick()
+                compose.onAllNodesWithTag("vibeGenerate").onFirst().performClick()
                 waitText("Wet Streets, Warm Keys", 45_000)
                 idle(3000)
                 shot("vibe")

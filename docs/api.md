@@ -42,7 +42,7 @@ a server name is set. See [AudioMuse-AI](audiomuse.md#several-music-servers-in-o
 | Call | Used for |
 |---|---|
 | `POST /api/clap/search` | Search by sound, vibes, mood radios, Flow |
-| `GET /api/clap/concepts` | The sound concepts for steering and Flow's dials |
+| `GET /api/clap/concepts` | The sound concepts for steering and Flow's list of sounds |
 | `GET /api/similar_tracks?item_id=…` | Song radio, similar songs, Keep playing |
 | `GET /api/similar_tracks?mood=…&centroid_index=…` | Mood radios around AudioMuse-AI's mood centres |
 | `GET /api/mood_centroids` | The mood centres |

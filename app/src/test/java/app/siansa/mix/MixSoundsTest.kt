@@ -13,7 +13,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** A vibe's sound dials come from what its own songs have to offer (the owner, 11 Nov), and the sound pad. */
+/** What a vibe's own songs have to offer for shaping it (the owner, 11 Nov), and the pad. */
 class MixSoundsTest {
     private fun g(vararg names: String) = names.map { SongGenre(it, 0.5) }
 
@@ -30,42 +30,6 @@ class MixSoundsTest {
     @Test fun aMixWithTooFewKnownSongsOffersNothing() {
         assertTrue(mixSounds(tired.entries.take(4).associate { it.key to it.value }).isEmpty())
         assertTrue(mixSounds(emptyMap()).isEmpty())
-    }
-
-    @Test fun theDialsAreTheAisAndTheMixsOwnNeverAFixedList() {
-        val steered = listOf(Steer("ambient music", true), Steer("dance", false))
-        val offered = listOf(MixSound("Drone", 5), MixSound("Piano", 4))
-        // A vibe made with the old padding: the AI's two, and "acoustic" from the fixed list, never moved.
-        val old = VibeTuning(sounds = listOf(SoundDial("ambient music", 3), SoundDial("dance", -3), SoundDial("acoustic", 0)))
-        assertEquals(
-            listOf(SoundDial("ambient music", 3), SoundDial("dance", -3), SoundDial("Drone", 0, genre = true)),
-            vibeDials(old, steered, offered).sounds,
-        )
-        // Without Siansa Beats: the AI's alone, also one of them set back to the middle.
-        assertEquals(
-            listOf(SoundDial("ambient music", 0), SoundDial("dance", -3)),
-            vibeDials(old.copy(sounds = listOf(SoundDial("ambient music", 0), SoundDial("dance", -3), SoundDial("acoustic", 0))), steered, emptyList()).sounds,
-        )
-        // No AI: the mix's own three. Three from the AI: still one of the mix's.
-        assertEquals(listOf("Drone", "Piano"), vibeDials(VibeTuning(), emptyList(), offered).sounds.map { it.term })
-        val three = steered + Steer("piano", true)
-        assertEquals(listOf("ambient music", "dance", "piano", "Drone"), vibeDials(VibeTuning(), three, offered).sounds.map { it.term })
-        // A sound that's already a dial isn't offered twice ("piano" and "Piano").
-        assertEquals(listOf(MixSound("Drone", 5)), soundsToAdd(vibeDials(VibeTuning(), listOf(Steer("piano", true)), emptyList()), offered))
-    }
-
-    @Test fun aSoundIsAddedWhileThereIsRoomThenTakesAnUnusedDialsPlace() {
-        var t = VibeTuning(sounds = listOf(SoundDial("a", 1), SoundDial("b", 0)))
-        t = addSound(t, "Piano")
-        assertEquals(listOf("a", "b", "Piano"), t.sounds.map { it.term })
-        assertTrue(t.sounds.last().genre)
-        assertEquals(t, addSound(t, "piano"))  // already there
-        t = addSound(addSound(t, "Drone"), "Strings")
-        assertEquals(VibeTuning.MOST_DIALS, t.sounds.size)
-        // Full: the last dial that isn't set makes way; the ones set stay.
-        assertEquals(listOf("a", "b", "Piano", "Drone", "Jazz"), addSound(t, "Jazz").sounds.map { it.term })
-        val allSet = t.copy(sounds = t.sounds.map { it.copy(value = 2) })
-        assertEquals("Jazz", addSound(allSet, "Jazz").sounds.last().term)
     }
 
     @Test fun theMixsOwnDialsReRankAndNeverSteerTheSearch() {
@@ -92,12 +56,6 @@ class MixSoundsTest {
         assertEquals(PadDot(0.5f, 0.5f), padPlace(120.0, 0.84, arousal = 5.25))
         assertEquals(PadDot(0.5f, 1f), padPlace(120.0, null, arousal = 8.0))
         assertEquals(PadDot(0.5f, 0f), padPlace(120.0, 0.84, arousal = 2.0))
-    }
-
-    @Test fun thePadSaysWhereItsDotIs() {
-        assertEquals("Energy and speed as planned. Drag the dot to change them.", padCaption(VibeTuning()))
-        assertEquals("A bit calmer and much faster.", padCaption(VibeTuning(energy = -1, tempo = 2)))
-        assertEquals("Much more energy.", padCaption(VibeTuning(energy = 2)))
     }
 
     private fun answer(id: String) = AppJson.parseToJsonElement(
