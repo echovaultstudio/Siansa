@@ -266,6 +266,8 @@ internal class MixedCrossfader(
                 (length?.let { " · starts at ${clock(at)} of ${clock(it)}, handed over at ${clock(handover)}" }.orEmpty()) +
                 (planned.beatNote?.let { " · $it" } ?: ""),
         )
+        // Which points of the two songs meet, and why: a blend on the wrong phrase is seen here.
+        planned.beat?.let { AppLog.i("Crossfade", "Lined up ${item.mediaId} with the next song: ${it.aligned}") }
     }
 
     /**

@@ -296,6 +296,52 @@ class BeatMatchTest {
         assertEquals("beat-matched 126.0 → 128.0 BPM (+1.6 %), 8 bars (15.0 s), phrase on phrase (8-bar phrases), let go at the end of its last phrase (5.0 s left out)", plan.why)
     }
 
+    // ---- Which phrases were lined up, in the log (the DJ plan after 12 Nov: "wrong phrase" must be seen) ----
+
+    @Test fun theLogSaysWhichPhrasesMeetAndWhy() {
+        // 5 s into the last phrase: left out; one whole phrase fits 16 s.
+        assertEquals(
+            "the old song's phrase at 4:45.0 meets the new song's first phrase at 0:01.9 " +
+                "(1 of up to 4 8-bar phrases fit 16.0 s; its last 5.0 s, under half a phrase, are left out)",
+            BeatMatch.plan(phrasedOutro, phrasedIntro, endMs = 305_000, maxMs = 16_000)!!.aligned,
+        )
+        // 10 s into the last phrase: it plays out; with 30 s, one whole phrase before it too.
+        assertEquals(
+            "the old song's phrase at 4:45.0 meets the new song's first phrase at 0:01.9 " +
+                "(1 of up to 4 8-bar phrases fit 30.0 s; its last 10.0 s after its last phrase start play out)",
+            BeatMatch.plan(phrasedOutro, phrasedIntro, endMs = 310_000, maxMs = 30_000)!!.aligned,
+        )
+        assertEquals(
+            "the old song's phrase at 5:00.0 meets the new song's first phrase at 0:01.9 " +
+                "(the old song's last 8-bar phrase, to its end; its last 10.0 s after its last phrase start play out)",
+            BeatMatch.plan(phrasedOutro, phrasedIntro, endMs = 310_000, maxMs = 16_000)!!.aligned,
+        )
+        // A short setting: half a phrase.
+        assertEquals(
+            "the old song's phrase at 4:52.5 meets the new song's first phrase at 0:01.9 " +
+                "(half of one 8-bar phrase: a whole one doesn't fit 8.0 s; its last 5.0 s, under half a phrase, are left out)",
+            BeatMatch.plan(phrasedOutro, phrasedIntro, 305_000, 8_000)!!.aligned,
+        )
+    }
+
+    @Test fun theLogSaysWhyABlendIsntPhraseOnPhrase() {
+        val bars = BeatMatch.plan(phrasedOutro, intro, endMs = 305_000, maxMs = 16_000)!!
+        assertNull(bars.phraseBars)
+        assertTrue(bars.aligned, bars.aligned.startsWith("the old song's bar at "))
+        assertTrue(bars.aligned, bars.aligned.endsWith("(no phrases found at the new song's start)"))
+        assertTrue(BeatMatch.plan(outro, phrasedIntro, 305_000, 16_000)!!.aligned.endsWith("(no phrases found at the old song's end)"))
+        assertTrue(BeatMatch.plan(outro, intro, 305_000, 16_000)!!.aligned.endsWith("(no phrases found in either song)"))
+        val beats = BeatMatch.plan(outro.copy(barMs = null), intro, 305_000, 16_000)!!
+        assertEquals(false, beats.onBars)
+        assertTrue(beats.aligned, beats.aligned.startsWith("the old song's beat at "))
+        assertTrue(beats.aligned, beats.aligned.endsWith("(no phrases found in either song: and no bars at the old song's end)"))
+        // Phrases assumed from a grid are said to be.
+        val assumed = BeatMatch.plan(phrasedOutro.copy(assumed = true), phrasedIntro, 305_000, 16_000)!!
+        assertTrue(assumed.aligned, assumed.aligned.endsWith("; the old song's phrases are assumed from its grid)"))
+        assertEquals("4:45.0", BeatMatch.clock(285_000))
+        assertEquals("0:01.9", BeatMatch.clock(1_875))
+    }
+
     @Test fun aLongerLastPartPhraseIsPlayedToTheEnd() {
         // 10 s into the last phrase (more than half of it): the blend starts on that phrase and runs to the end.
         val plan = BeatMatch.plan(phrasedOutro, phrasedIntro, endMs = 310_000, maxMs = 16_000)!!
