@@ -123,7 +123,8 @@ have (**Albums**, **EPs**, **Singles**, **Live**, **DJ-mixes**…). Pick one to 
 tapping the chosen one again) shows the whole page: popular songs, every release, **Appears on**, **About** and **Fans
 also like**. With more types than fit, the bar scrolls sideways: it fades out at the right, and the › under the Play
 button scrolls it on. As you scroll down, the page slides softly over the artist's picture and the bar stays pinned
-under the title bar. The artist's name, large at the foot of the picture, moves up with the page; as it goes under the
+under the title bar. The artist's name, large at the foot of the picture with their releases and songs under it, moves
+up with the page (both of them, never behind it); as the name goes under the
 title bar it fades out and the bar comes in, in one step: a wash of the picture's colour that the page dissolves
 into, with the name small in its middle. Scroll back and it all goes the other way. The heart and Play stay on the
 page, not in the bar.
