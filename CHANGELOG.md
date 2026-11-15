@@ -3,6 +3,16 @@
 Every version of Siansa, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 1.5.3 — 2026-11-15
+
+### Fixed
+- **Siansa could close on an artist's page.** After switching the releases between list and grid, scrolling back up the page could close the app. It now scrolls as it should.
+- Settings › Sound: **Test** says the Siansa Analysis plugin works when it does. It said to install Siansa Beats (dev) from the dev catalog, though songs were levelled by the plugin.
+
+### Highlights
+- **We focus on Siansa Beats going forward.** Siansa Beats is Siansa's own companion for your server ([siansa.app/beats](https://siansa.app/beats)). It measures every song's loudness, beats, bars and phrases, and with that Siansa levels songs, blends them like a DJ, sorts genres by how songs sound, and finds similar songs, albums and artists. It also keeps your listening history, with your top songs and artists, and can send it on to Last.fm.
+- **New in 1.5, in short:** Siansa Beats; DJ mixes on measured beats for any album, playlist or list; genres by how your songs sound; Settings regrouped, with a search box; Like, Shuffle and Repeat in Android Auto; and a new Home and DJ mixes on the TV.
+
 ## 1.5.2 — 2026-11-14
 
 ### Changed
