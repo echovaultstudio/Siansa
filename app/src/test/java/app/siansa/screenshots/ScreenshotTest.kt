@@ -23,6 +23,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.clipToBounds
+import app.siansa.ui.dissolveUnderBar
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -638,31 +641,58 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     }
                 }
             },
-            // An artist's name on their page (the owner, 10 Nov): at rest on the picture, riding up with the page, halfway into
-            // the title bar (shrinking, sideways past the back arrow), and settled there as the bar's title. A long name too.
-            Scene("artist_name_glide") {
+            // The glass title bar on an artist's page (the owner, 15 Nov): the name at rest on the picture, riding up with
+            // the page, going under the bar (it fades as the bar's wash comes in), and gone, with the name small in the
+            // middle of the bar. A long name too: cut off in the bar, never under the back arrow.
+            Scene("artist_glass_bar") {
                 val density = androidx.compose.ui.platform.LocalDensity.current
-                val hero = 150.dp
+                val hero = 300.dp  // about the page's own, so the page's soft edge is as it is there
                 val heroPx = with(density) { hero.toPx() }
                 Column(verticalArrangement = Arrangement.spacedBy(Space.Small)) {
                     listOf(
-                        "Joy Orbison" to 0f, "Joy Orbison" to heroPx * 0.62f,
-                        "Joy Orbison" to heroPx * 2f, "Tayo Meets Acid Rockers Uptown" to heroPx * 0.62f,
-                        // A name too long for the bar, settled there with the heart and Play: it fades out before them
-                        // (the owner, 14 Nov). Five rows, so this last one still fits in the picture.
-                        "Stevie Ray Vaughan and Double Trouble" to heroPx * 2f,
-                    ).forEach { (name, scrolled) ->
-                        Box(Modifier.fillMaxWidth().height(170.dp)) {
+                        Triple("Joy Orbison", 0.dp, 320.dp), Triple("Joy Orbison", 150.dp, 190.dp), Triple("Joy Orbison", 205.dp, 170.dp),
+                        Triple("Joy Orbison", 240.dp, 170.dp), Triple("Joy Orbison", 600.dp, 170.dp),
+                        Triple("Stevie Ray Vaughan and Double Trouble with Friends", 600.dp, 170.dp),
+                    ).forEach { (name, by, tall) ->
+                        val scrolled = with(density) { by.toPx() }
+                        Box(Modifier.fillMaxWidth().height(tall).clipToBounds()) {
                             app.siansa.ui.HeroPage(
                                 title = name, heroHeight = hero, scrolledPx = scrolled, onBack = {}, color = Color(0xFF4A2A26),
                                 image = { m -> Box(m.background(androidx.compose.ui.graphics.Brush.radialGradient(listOf(Color(0xFF7A5A4C), Color(0xFF26171A))))) },
-                                actions = {
-                                    if (name.startsWith("Stevie")) {
-                                        app.siansa.ui.FavouriteHeart(on = true, iconSize = 28.dp) { }
-                                        app.siansa.ui.BarPlayButton(radio = false, colour = Color(0xFFD9A0A0), onColour = Color.Black, playing = false, onClick = {})
+                            ) { page ->
+                                // The page's rows, scrolled as far: the first starts where the picture ends.
+                                Box(page.fillMaxSize()) {
+                                    Column(Modifier.graphicsLayer { translationY = heroPx - scrolled }) {
+                                        repeat(40) { Text("Release ${it + 1} · 2019", Modifier.padding(horizontal = Space.Page, vertical = Space.Small)) }
                                     }
-                                },
-                            ) { page -> Box(page.fillMaxSize()) }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            // The glass title bar over a list (an album, a playlist, liked songs…): the page's colour strongest at the top
+            // and running out below the bar with no edge, the rows dissolving into it, the title in the middle. Half way
+            // in and all the way, on a dark, a bright and a grey cover, with a long title and a button at the right.
+            Scene("glass_bar") {
+                val density = androidx.compose.ui.platform.LocalDensity.current
+                val wash = app.siansa.ui.GlassBar.HEIGHT + app.siansa.ui.GlassBar.TAIL
+                val washPx = with(density) { wash.toPx() }
+                val solidPx = with(density) { (app.siansa.ui.GlassBar.HEIGHT - app.siansa.ui.GlassBar.SOFT).toPx() }
+                Column(verticalArrangement = Arrangement.spacedBy(Space.Small)) {
+                    listOf(
+                        Triple(Color(0xFF1D444B), "Low Tide Signals", 0.5f), Triple(Color(0xFF1D444B), "Low Tide Signals", 1f),
+                        Triple(Color(0xFFD9703A), "Supercalifragilistic expialidocious, the Tenth Anniversary Deluxe Edition", 1f),
+                        Triple(Color(0xFF8A8A92), "Liked songs", 1f),
+                    ).forEachIndexed { n, (colour, title, step) ->
+                        Box(Modifier.fillMaxWidth().height(150.dp).background(MaterialTheme.colorScheme.surface)) {
+                            app.siansa.ui.GlassWash(colour, wash, amount = { step })
+                            Column(Modifier.fillMaxSize().dissolveUnderBar({ washPx }, { solidPx }, { step })) {
+                                repeat(7) { Text("${it + 1}   Song number ${it + 1} of the list", Modifier.padding(horizontal = Space.Page, vertical = Space.Tight)) }
+                            }
+                            app.siansa.ui.GlassTitleBar(title, onBack = {}, titleAmount = { app.siansa.ui.GlassBar.barTitle(step) }) {
+                                if (n == 2) androidx.compose.material3.IconButton(onClick = {}) { androidx.compose.material3.Icon(Icons.Rounded.DownloadForOffline, "Download", tint = Color.White) }
+                            }
                         }
                     }
                 }
@@ -858,14 +888,6 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                         4,
                     )
                     app.siansa.ui.GridSizeChips(6, Modifier.padding(Space.Page)) {}
-                }
-            },
-            // A page's Play in the title bar once its own has scrolled away, and a radio's (the owner, 10 Nov).
-            Scene("bar_play") {
-                Row(Modifier.background(Color(0xFF7A1F2B)).padding(Space.Page), horizontalArrangement = Arrangement.spacedBy(Space.Page)) {
-                    app.siansa.ui.BarPlayButton(radio = false, colour = Color(0xFFFFB547), onColour = Color(0xFF1A1200), playing = false) {}
-                    app.siansa.ui.BarPlayButton(radio = false, colour = Color(0xFF9DB4C8), onColour = Color(0xFF120D00), playing = true) {}
-                    app.siansa.ui.BarPlayButton(radio = true, colour = Color(0xFFE53935), onColour = Color.White, playing = false) {}
                 }
             },
             // A list's sort (liked songs, playlists): Your Library's arrows and menu, not chips; and the line under a

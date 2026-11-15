@@ -137,7 +137,7 @@ not here.
   the cover.
 - **Dynamic colours** (off at first), one switch for the whole app: now playing's seek bar, Play button, the heart of
   a liked song and where it plays, and the Play button on every page of songs (albums, playlists, artists, radios, mixes,
-  cards, books and podcasts) and in its title bar, and the book player's seek bar and buttons, take a soft colour from
+  cards, books and podcasts), and the book player's seek bar and buttons, take a soft colour from
   the cover (an artist's picture; a radio's or mix's own drawn cover; a book's or podcast's) instead of your theme's
   (the same colour the page's top is painted in; each cover's colours are kept on the phone, so a page seen before, or
   shown in a list, opens in its colours and they don't change while it's open),

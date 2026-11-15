@@ -376,7 +376,6 @@ fun AlbumScreen(nav: NavController, id: String) {
         // A heart for favourite albums, starred in Navidrome (issue #275): beside Download, and in the title bar before
         // Play once the buttons have scrolled away, as on an artist's page (the owner, 14 Nov; it was at the top right).
         rowExtras = { d?.album?.let { FavouriteAlbumButton(it) } },
-        barExtras = { d?.album?.let { FavouriteAlbumButton(it, tag = "barHeart", offTint = Color.White) } },
         // "Find similar albums" beside Shuffle (issue #228), through any of its songs; needs AudioMuse.
         onSimilar = d?.songs?.firstOrNull()?.id?.takeIf { graph.settings.current.soundReady }?.let { id -> { nav.openSimilarAlbums(id) } },
         // Genres, labels, the version and the length at the foot of the page (#558).

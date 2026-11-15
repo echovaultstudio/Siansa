@@ -142,7 +142,6 @@ internal fun aboutArtist(releases: Int, songs: Int, appearsOn: Int?): String = l
 private const val TABS_KEY = "release-type-tabs"
 private const val TABS_INDEX = 2
 /** The item with the artist's buttons (after the picture's room). */
-private const val BUTTONS_INDEX = 1
 private const val FOOTER_KEY = "artist-page-end"
 
 /**
@@ -245,14 +244,6 @@ fun ArtistScreen(nav: NavController, id: String) {
             if (tabs == null) gridState.firstVisibleItemIndex > TABS_INDEX else tabs.offset.y < barPx
         }
     }
-    // The heart in the title bar once the page's own (with Radio, Shuffle and Play) has gone up under it, never both at
-    // once (the owner, 10 Nov).
-    val buttonsGone by remember(barPx) {
-        derivedStateOf {
-            val header = gridState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == BUTTONS_INDEX }
-            if (header == null) gridState.firstVisibleItemIndex > BUTTONS_INDEX else header.offset.y + header.size.height < barPx
-        }
-    }
     val scope = rememberCoroutineScope()
     // Room at the end of the page, so the tabs can always be scrolled up under the title bar, however few releases
     // the chosen type has (the owner, 10 Nov: choosing Albums, one album, while pinned threw the page back to the top,
@@ -293,26 +284,7 @@ fun ArtistScreen(nav: NavController, id: String) {
         scrolledPx = scrolled,
         onBack = { nav.popBackStack() },
         color = tint,
-        actions = {
-            // Growing in as they fade in, as on every page (BarReveal), not at once.
-            BarReveal(buttonsGone && p != null) {
-                if (p != null) {
-                    FavouriteArtistButton(p.artist, Modifier.testTag("barHeart"), androidx.compose.ui.graphics.Color.White, ICON_SIZE)
-                    // Play too, in the picture's colour, as every page's bar has it once its buttons are gone (the owner, 10 Nov).
-                    if (playable.isNotEmpty()) {
-                        val barPlayback = rememberListPlayback(playable)
-                        BarPlayButton(
-                            radio = false,
-                            colour = playColours?.controls ?: Accent,
-                            onColour = playColours?.onControls ?: MaterialTheme.colorScheme.onPrimary,
-                            playing = barPlayback.playing,
-                            onClick = { barPlayback.press { graph.player.play(playable) } },
-                        )
-                    }
-                }
-            }
-        },
-        pinned = if (tabsPinned) ({ ReleaseTypeTabs(types, type, fade = tint.copy(alpha = 1f), moreInset = ARTIST_MORE_INSET) { choose(it) } }) else null,
+        pinned = if (tabsPinned) ({ ReleaseTypeTabs(types, type, fade = null, moreInset = ARTIST_MORE_INSET) { choose(it) } }) else null,
         nameLiftPx = if (about.isEmpty() || aboutHeight == 0) 0f else aboutHeight + aboutGap,
         overlay = {
             // A soft dark band at the foot of the picture, where the name sits at first (HeroPage draws the name, which

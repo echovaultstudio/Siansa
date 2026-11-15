@@ -54,11 +54,10 @@ import kotlin.math.min
  * A page whose picture fills the top of the screen, up behind the status bar (an artist's page). Scrolling
  * slides the page up over the picture, which stays almost still, zooms gently and fades out into [color];
  * the page comes up with a soft edge, so the picture fades into it rather than being cut off (issue #1029).
- * [title] sits large at the foot of the picture and rides up with the page; near the top it glides into the
- * title bar, shrinking as it goes, and is the bar's title from then on: one name all the way, on one line (the
- * owner, 10 Nov: [heroNameFrame]). The bar
- * fills with [color] as it arrives, and [pinned] (the release-type tabs) sits under it once the page has
- * scrolled past them.
+ * [title] sits large at the foot of the picture and rides up with the page. As it goes under the title bar it fades
+ * out and the bar comes in, in one step (the owner, 15 Nov: [GlassBar]): a wash of [color] that the page dissolves
+ * into, with the name small in the middle. [pinned] (the release-type tabs) sits under the bar, on the same wash, once
+ * the page has scrolled past them.
  *
  * [scrolledPx] is how far the first item has scrolled; the list or grid must start with [HeroSpacer]
  * and use the given modifier, which paints the page behind its items.
@@ -72,8 +71,6 @@ fun HeroPage(
     color: Color,
     image: @Composable BoxScope.(Modifier) -> Unit,
     overlay: @Composable BoxScope.() -> Unit = {},
-    // Buttons at the right of the title bar (the artist page's heart, issue #397).
-    actions: @Composable RowScope.() -> Unit = {},
     // Kept under the title bar while it's given (the artist's release-type tabs once scrolled to, issue #1029).
     pinned: (@Composable () -> Unit)? = null,
     // How much higher the name rests on the picture, for a line under it there (the artist's releases and songs).
@@ -121,7 +118,20 @@ fun HeroPage(
         // (issue #1029): the picture fades into the page as it slides up, instead of the page's hard top edge cutting
         // across it. At rest the picture's own fade is there, and the name on it stays clear, so the edge grows in as
         // the page starts to move.
-        val pageModifier = Modifier.drawBehind {
+        // The name's way: it rides up with the page, and the bar comes in as it goes under it.
+        val statusPx = WindowInsets.statusBars.getTop(density).toFloat()
+        val barPx = with(density) { GlassBar.HEIGHT.toPx() }
+        var nameHeight by remember { mutableIntStateOf(0) }
+        var pinnedPx by remember { mutableIntStateOf(0) }
+        val restBottomPx = with(density) { Space.Medium.toPx() } + nameLiftPx
+        val nameTop = heroPx - nameHeight - restBottomPx - scrolledPx
+        val barStep = if (nameHeight == 0) 0f else GlassBar.step(nameTop, nameHeight.toFloat(), statusPx + barPx, with(density) { GlassBar.LEAD.toPx() })
+        // The wash runs out below the tabs when they're pinned under the bar.
+        val washPx = statusPx + barPx + (if (pinned != null) pinnedPx else 0) + with(density) { GlassBar.TAIL.toPx() }
+        val solidPx = washPx - with(density) { (GlassBar.TAIL + GlassBar.SOFT).toPx() }
+        GlassWash(color, with(density) { washPx.toDp() }, amount = { barStep })
+
+        val pageModifier = Modifier.dissolveUnderBar({ washPx }, { solidPx }, { barStep }).drawBehind {
             val top = (heroPx - scrolledPx).coerceAtLeast(0f)
             val soft = (scrolledPx / softPx).coerceIn(0f, 1f)
             if (soft > 0f && top > 0f) {
@@ -141,76 +151,26 @@ fun HeroPage(
         }
         content(pageModifier)
 
-        // The name's way from the picture into the title bar, all of it worked out while drawing, so it follows the
-        // finger frame by frame.
-        val statusPx = WindowInsets.statusBars.getTop(density).toFloat()
-        val barPx = with(density) { HERO_TITLE_BAR.toPx() }
         val bigStyle = MaterialTheme.typography.displaySmall.copy(
             fontWeight = FontWeight.Black,
             // Reads on any photo, and on the page as the photo fades.
             shadow = Shadow(Color.Black.copy(alpha = 0.45f), Offset(0f, 2f), 14f),
         )
-        val smallStyle = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black)
-        // One name, one line, all the way (the owner, 10 Nov: no second title fading in over it). A long name is set a
-        // little smaller to fit the line, down to [MIN_NAME_FIT], and cut off with "…" beyond that.
+        // On one line: a long name is set a little smaller to fit it, down to [MIN_NAME_FIT], and cut off with "…"
+        // beyond that.
         val measurer = rememberTextMeasurer()
         val screenWidthPx = with(density) { LocalConfiguration.current.screenWidthDp.dp.toPx() }
         val nameWidthPx = screenWidthPx - 2 * with(density) { Space.Page.toPx() }
-        val nameStyle = remember(title, bigStyle, nameWidthPx) {
-            val full = measurer.measure(title, bigStyle, maxLines = 1, softWrap = false).size.width
-            val fit = if (full <= 0) 1f else (nameWidthPx / full).coerceIn(MIN_NAME_FIT, 1f)
-            bigStyle.copy(fontSize = bigStyle.fontSize * fit, lineHeight = bigStyle.lineHeight * fit)
-        }
-        val dockScale = smallStyle.fontSize.value / nameStyle.fontSize.value
-        val lineHeightPx = with(density) { nameStyle.lineHeight.toPx() }
-        val restLeftPx = with(density) { Space.Page.toPx() }
-        // Where the bar's title starts: the bar's padding, the back arrow's button and the gap after it.
-        val dockLeftPx = with(density) { (Space.Tight + BACK_BUTTON + Space.Small).toPx() }
-        val restBottomPx = with(density) { Space.Medium.toPx() } + nameLiftPx
-        val startGapPx = with(density) { DOCK_START_GAP.toPx() }
-        var nameHeight by remember { mutableIntStateOf(0) }
-        // How wide the title bar's buttons are (the artist's heart and Play), 0 while there are none.
-        var actionsPx by remember { mutableIntStateOf(0) }
-        // A name too long for the bar fades out before its buttons (the owner, 14 Nov: a long name ran under the heart).
-        val fadeEndPx = screenWidthPx - with(density) { (Space.Tight + Space.Small).toPx() } - actionsPx
-        val fadePx = with(density) { NAME_FADE.toPx() }
-        val restTop = heroPx - nameHeight - restBottomPx
-        val dockTop = statusPx + barPx / 2f - lineHeightPx * dockScale / 2f
-        val frame = heroNameFrame(scrolledPx, restTop, startTop = statusPx + barPx + startGapPx, dockTop = dockTop)
-        val dockT = frame.t
-        // The bar is solid by the time the name comes into it, so nothing on the page shows through behind the name:
-        // it fills in over the last stretch before the name reaches the bar's lower edge.
-        val barBottomPx = statusPx + barPx
-        val nameBar = smooth(((barBottomPx + 2 * startGapPx - frame.top) / (2 * startGapPx)).coerceIn(0f, 1f))
-        val barAlpha = maxOf(((scrolledPx - heroPx * 0.65f) / (heroPx * 0.25f)).coerceIn(0f, 1f), if (nameHeight == 0) 0f else nameBar)
+        val nameStyle = remember(title, bigStyle, nameWidthPx) { fitOneLine(measurer, title, bigStyle, nameWidthPx) }
         Column(Modifier.fillMaxWidth()) {
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .background(color.copy(alpha = barAlpha))
-                .statusBarsPadding()
-                .padding(horizontal = Space.Tight, vertical = Space.Tight)
-                .testTag("heroTitleBar"),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            // No shading behind the arrow (issue #228).
-            IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back", tint = Color.White)
+            GlassTitleBar(title, onBack, titleAmount = { GlassBar.barTitle(barStep) }, tag = "heroTitleBar")
+            if (pinned != null) {
+                // On the bar's wash, as one with it, its words white as the title's.
+                Box(Modifier.fillMaxWidth().onSizeChanged { pinnedPx = it.height }.testTag("heroPinned")) { pinned() }
             }
-            Spacer(Modifier.width(Space.Small))
-            // The bar's title is the name itself, glided into this place (below): one name, never two.
-            Spacer(Modifier.weight(1f))
-            // Measured, so a long name fades out before them (below).
-            Row(Modifier.onSizeChanged { actionsPx = it.width }, verticalAlignment = Alignment.CenterVertically) { actions() }
-        }
-        if (pinned != null) {
-            // In the title bar's colour, as one with it, its words white as the title's.
-            Box(Modifier.fillMaxWidth().background(color.copy(alpha = 1f)).testTag("heroPinned")) { pinned() }
-        }
         }
 
-        // The name, over everything: it rides up with the page, then glides into the bar (above it, so the bar
-        // filling in never covers it on the way).
+        // The name, over the page: it rides up with it and fades out as it goes under the bar.
         Text(
             title,
             style = nameStyle,
@@ -221,88 +181,12 @@ fun HeroPage(
                 .padding(start = Space.Page, end = Space.Page)
                 .onSizeChanged { nameHeight = it.height }
                 .graphicsLayer {
-                    // Laid out at the page's left edge; moved and shrunk from its top left corner.
-                    transformOrigin = TransformOrigin(0f, 0f)
-                    translationX = nameShift(dockLeftPx - restLeftPx, dockT)
-                    translationY = frame.top
-                    val sc = nameScale(dockScale, dockT)
-                    scaleX = sc
-                    scaleY = sc
-                    alpha = if (nameHeight == 0) 0f else 1f
-                    compositingStrategy = CompositingStrategy.Offscreen
-                }
-                .drawWithContent {
-                    drawContent()
-                    if (actionsPx > 0) {
-                        // Where the bar's buttons start, in the name's own (unmoved, unscaled) place.
-                        val end = nameFadeEnd(fadeEndPx, restLeftPx, nameShift(dockLeftPx - restLeftPx, dockT), nameScale(dockScale, dockT))
-                        val start = end - fadePx / nameScale(dockScale, dockT)
-                        if (start < size.width) {
-                            drawRect(
-                                Brush.horizontalGradient(0f to Color.Black, 1f to Color.Transparent, startX = start, endX = end),
-                                blendMode = BlendMode.DstIn,
-                            )
-                        }
-                    }
+                    translationY = nameTop
+                    alpha = if (nameHeight == 0) 0f else GlassBar.pageTitle(barStep)
                 }
                 .testTag("heroName"),
         )
     }
-}
-
-/** How far sideways the name has moved on its way into the bar, of [distance], at [dockT] of the way. */
-internal fun nameShift(distance: Float, dockT: Float): Float = distance * smooth((dockT * SIDEWAYS_LEAD).coerceAtMost(1f))
-
-/** How large the name is on its way into the bar: 1 at rest, [dockScale] in the bar. */
-internal fun nameScale(dockScale: Float, dockT: Float): Float = 1f + (dockScale - 1f) * smooth(dockT)
-
-/**
- * Where a long name has faded out, in its own place before it's moved ([shift]) and scaled ([scale]): the screen's
- * [screenEnd] (just before the title bar's buttons), for a name laid out from [left].
- */
-internal fun nameFadeEnd(screenEnd: Float, left: Float, shift: Float, scale: Float): Float = (screenEnd - left - shift) / scale
-
-/** Where the hero's name is, [top] in px from the top of the screen, and how far into the title bar it is ([t], 0–1). */
-data class HeroNameFrame(val top: Float, val t: Float)
-
-/**
- * The hero's name as the page scrolls [scrolled] px: at rest its top is at [restTop], and it moves up with the page
- * until it reaches [startTop] (just under the title bar). From there it glides into the bar's title place, [dockTop],
- * over [DOCK_SPAN] times that last distance of scrolling: its speed at the start is the page's, so there's no jolt,
- * and it slows to a stop as it settles (a Hermite curve, which never overshoots at this span). Scrolling back runs it
- * the other way, frame for frame.
- */
-fun heroNameFrame(scrolled: Float, restTop: Float, startTop: Float, dockTop: Float): HeroNameFrame {
-    // A tall font on a short screen can start the name above the start line: then it starts gliding at once.
-    val start = minOf(startTop, restTop).coerceAtLeast(dockTop)
-    val free = restTop - scrolled
-    if (free >= start) return HeroNameFrame(free, 0f)
-    val distance = start - dockTop
-    if (distance <= 0f) return HeroNameFrame(dockTop, 1f)
-    val span = DOCK_SPAN * distance
-    val t = ((scrolled - (restTop - start)) / span).coerceIn(0f, 1f)
-    // Hermite from (start, moving up at the page's speed) to (dockTop, at rest).
-    val t2 = t * t
-    val t3 = t2 * t
-    val top = (2 * t3 - 3 * t2 + 1) * start + (t3 - 2 * t2 + t) * (-span) + (-2 * t3 + 3 * t2) * dockTop
-    return HeroNameFrame(top, t)
-}
-
-/**
- * [heroNameFrame] for a title whose place on the screen is known as it scrolls ([free], its top as the page has it):
- * an album's, a playlist's (the owner, 10 Nov: as the artist's page).
- */
-fun glideFrame(free: Float, startTop: Float, dockTop: Float): HeroNameFrame {
-    val start = startTop.coerceAtLeast(dockTop)
-    if (free >= start) return HeroNameFrame(free, 0f)
-    val distance = start - dockTop
-    if (distance <= 0f) return HeroNameFrame(dockTop, 1f)
-    val span = DOCK_SPAN * distance
-    val t = ((start - free) / span).coerceIn(0f, 1f)
-    val t2 = t * t
-    val t3 = t2 * t
-    val top = (2 * t3 - 3 * t2 + 1) * start + (t3 - 2 * t2 + t) * (-span) + (-2 * t3 + 3 * t2) * dockTop
-    return HeroNameFrame(top, t)
 }
 
 /** A long title set smaller to fit one line [widthPx] wide, down to [MIN_NAME_FIT] of [style], then cut off with "…". */
@@ -314,20 +198,9 @@ fun fitOneLine(measurer: androidx.compose.ui.text.TextMeasurer, title: String, s
 
 internal fun smooth(t: Float): Float = t * t * (3f - 2f * t)
 
-/** How many times the last distance into the bar the name takes to glide there (at most 3, or it would overshoot). */
-const val DOCK_SPAN = 2.5f
-
-/** How far under the title bar the name starts gliding into it. */
-internal val DOCK_START_GAP = Space.Section
-
 /** The back arrow's button, before the bar's title. */
 internal val BACK_BUTTON = 48.dp
 
-/** The name is sideways in its place a little before it's up: it clears the back arrow on the way. */
-internal const val SIDEWAYS_LEAD = 1.3f
-
-/** How far a long name fades out before the title bar's buttons. */
-private val NAME_FADE = Space.Large
 
 /** How much smaller a long artist name may be set to fit one line before it's cut off with "…". */
 private const val MIN_NAME_FIT = 0.6f
