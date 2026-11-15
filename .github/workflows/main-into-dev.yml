@@ -1,0 +1,102 @@
+name: Main into dev
+
+# Every fix released on main reaches dev by itself (the owner, 15 Nov 2026: "in future main fixes also go into dev",
+# "build it guaranteed"). One way only: dev's own work never goes to main from here.
+#
+# After each CI run on main (the release's own commits are on main by then), nightly as a safety net, and by hand:
+# main is merged into dev with a merge commit and pushed with the release's deploy key, which dev's ruleset lets
+# through (as main's does), so Siansa Dev and Siansa TV Dev are built from it. When the two don't merge cleanly
+# nothing is pushed: an issue labelled "claude" asks for it to be sorted out by hand.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  schedule:
+    - cron: "41 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: main-into-dev
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Merge main into dev
+    if: github.repository == 'echovaultstudio/Siansa'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: dev
+          fetch-depth: 0
+          ssh-key: ${{ secrets.RELEASE_DEPLOY_KEY }}
+
+      - name: Merge
+        id: merge
+        run: |
+          git fetch -q origin main
+          if git merge-base --is-ancestor origin/main HEAD; then
+            echo "::notice::dev already has everything on main."
+            echo "state=same" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          base=$(git merge-base HEAD origin/main)
+          what=$(git log --format=%s --no-merges "$base..origin/main" | grep -v "\[skip ci\]" | head -1)
+          if ! git merge -q --no-ff -m "main into dev: ${what:-what main has}" origin/main; then
+            {
+              echo "files<<EOF"
+              git diff --name-only --diff-filter=U
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+            git merge --abort
+            echo "state=conflict" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # A note written on dev and on main for the same change, already released on main: Git keeps dev's copy
+          # (it was added on both sides), and dev's next release would announce it again. It goes when it's the
+          # very note main released (the same path and content).
+          gone=0
+          for commit in $(git log --format=%H --diff-filter=D "$base..origin/main" -- changelog.d); do
+            for path in $(git diff-tree --no-commit-id --name-only -r --diff-filter=D "$commit" -- changelog.d); do
+              [ -f "$path" ] || continue
+              if [ "$(git rev-parse "$commit^:$path")" = "$(git rev-parse "HEAD:$path")" ]; then
+                git rm -q "$path"
+                gone=$((gone + 1))
+              fi
+            done
+          done
+          if [ "$gone" -gt 0 ]; then git commit -q --amend --no-edit; echo "::notice::$gone note(s) main already released left out of dev."; fi
+          for i in 1 2 3; do git push -q origin HEAD:dev && pushed=1 && break; sleep 5; done
+          [ -n "$pushed" ] || { echo "::error::dev couldn't be pushed (does dev's ruleset let deploy keys through?)"; exit 1; }
+          echo "::notice::main merged into dev: $(git log --format=%s -1)"
+          echo "state=merged" >> "$GITHUB_OUTPUT"
+
+      # Nothing is forced: the two are merged by hand. One issue at a time.
+      - name: Ask for the conflict to be sorted out
+        if: steps.merge.outputs.state == 'conflict'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FILES: ${{ steps.merge.outputs.files }}
+        run: |
+          title="main into dev: conflicts to sort out by hand"
+          if [ -z "$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "\"$title\" in:title" --json number --jq '.[0].number')" ]; then
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --label claude --body "main couldn't be merged into dev by itself: these files were changed on both.
+
+          \`\`\`
+          $FILES
+          \`\`\`
+
+          Branch from dev, merge main, sort the files out, and open a pull request against dev (\"main into dev\", merged with a merge commit). The Main into dev workflow then finds nothing left to do.
+
+          Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          fi
+          echo "::error::main and dev don't merge cleanly; an issue asks for it to be sorted out"
+          exit 1

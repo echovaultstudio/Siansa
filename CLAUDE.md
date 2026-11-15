@@ -12,7 +12,10 @@ Source: `app/src/main/java/app/siansa/`. Unit tests: `app/src/test/`. Emulator t
   open with a comment that it's in Siansa Dev; it closes when `dev` reaches `main`.
 - **Bug fixes and security fixes go straight to `main`**, as they're urgent: branch from `main` and open the pull
   request against `main`. Each merge with a note in `changelog.d/` is released.
-- After a fix lands on `main`, merge `main` into `dev` (a pull request "main into dev"), so `dev` never falls behind.
+- After a fix lands on `main`, `main` is merged into `dev` by itself (`.github/workflows/main-into-dev.yml`: after each
+  CI run on `main`, nightly and by hand; pushed with the release's deploy key), so `dev` never falls behind. One way
+  only: `dev` never goes to `main` from there. When the two don't merge cleanly it opens an issue labelled `claude`:
+  then merge `main` into `dev` by hand (a pull request "main into dev", merged with a merge commit).
 - When `dev` is ready for everyone, it goes to `main` in one pull request.
 - Siansa Dev's purple icon and name live only in `app/src/dev/` and never reach the normal app; anything shared by
   both builds (such as the Cast TV screen, `cast-receiver/`) uses main's black, frost and amber colours and icon.
