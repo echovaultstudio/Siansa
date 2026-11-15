@@ -388,12 +388,18 @@ object CoverDownload {
                 }
             }
         }
-        // Artists' photos the server was still fetching are asked for again, after a short and a longer wait, so a
-        // run ends with every photo the server has (the owner, 15 Nov), not with its star kept as "no picture".
-        for (waitMs in ARTISTS_AGAIN_MS) {
-            if (stoppedBecause != null || waiting.isEmpty()) break
-            update { it.copy(note = "Waiting for ${waiting.size} artist photos the server is still fetching…") }
+        // Artists' photos the server was still fetching are asked for again, so a run ends with every photo the server
+        // has by then (the owner, 15 Nov), not with its star kept as "no picture". Navidrome gets them from Apple Music or
+        // Deezer, a few at a time: the owner's first run with every artist had 11,549 waiting, and 251 then 104 came in
+        // two askings. So it goes on asking, every half minute while photos keep coming, for ten minutes at most.
+        var pass = 0
+        var came = 0
+        while (stoppedBecause == null && waiting.isNotEmpty() && asksAgain(pass, came)) {
+            val waitMs = againAfterMs(pass)
+            update { it.copy(note = "Waiting for ${waiting.size} artist photos your server is still fetching…") }
             kotlinx.coroutines.delay(waitMs)
+            stoppedBecause = whyNot(context, graph.settings.current)
+            if (stoppedBecause != null) break
             val before = waiting.size
             coroutineScope {
                 for (id in waiting.toList()) {
@@ -411,7 +417,9 @@ object CoverDownload {
                     }
                 }
             }
-            AppLog.i("Covers", "Artist photos asked for again after ${waitMs / 1000}s: ${before - waiting.size} of $before came")
+            came = before - waiting.size
+            pass++
+            AppLog.i("Covers", "Artist photos asked for again after ${waitMs / 1000}s (asking $pass): $came of $before came")
             update { it.copy(downloaded = downloaded.get(), note = null) }
         }
         // The colours of every album, artist and playlist cover, so their pages have them in their first frame and
@@ -428,7 +436,7 @@ object CoverDownload {
             }
         }
         val seconds = (System.currentTimeMillis() - started) / 1000
-        val summary = summary(downloaded.get(), done.get() - downloaded.get() - failed.get() - none.get(), none.get(), failed.get(), seconds, animated.get())
+        val summary = summary(downloaded.get(), done.get() - downloaded.get() - failed.get() - none.get(), none.get() - waiting.size, failed.get(), seconds, animated.get(), notYet = waiting.size)
         AppLog.i("Covers", "Covers: $summary" + (stoppedBecause?.let { ". Stopped: $it" } ?: ""))
         update { it.copy(running = false, note = stoppedBecause?.let { "Stopped: $it" } ?: "Done: $summary") }
     }
@@ -446,12 +454,25 @@ object CoverDownload {
      */
     internal fun waitsForPhoto(id: String, standIn: Boolean): Boolean = standIn && id.startsWith("ar-")
 
-    /** How long a run waits before asking again for artists' photos the server answered with its stand-in. */
-    internal val ARTISTS_AGAIN_MS = longArrayOf(8_000L, 30_000L)
+    /** How long a run waits before asking again for artists' photos the server answered with its stand-in: soon the first time, then every half minute. */
+    internal fun againAfterMs(pass: Int): Long = if (pass == 0) 8_000L else 30_000L
 
-    /** What a run did, in a line for the log and Settings. [none]: covers the server has no picture for. */
-    internal fun summary(downloaded: Int, had: Int, none: Int, failed: Int, seconds: Long, animations: Int = 0): String =
+    /** The most askings in a run: ten minutes of them. */
+    internal const val MOST_ASKINGS = 20
+
+    /**
+     * Whether artists' photos are asked for once more: the first two times always (the server may only just have
+     * started), after that while the last asking brought any ([came]), and never more than [MOST_ASKINGS] times.
+     */
+    internal fun asksAgain(pass: Int, came: Int): Boolean = pass < MOST_ASKINGS && (pass < 2 || came > 0)
+
+    /**
+     * What a run did, in a line for the log and Settings. [none]: covers the server has no picture for. [notYet]:
+     * artists the server answered with its stand-in to the end, whose photo it may still fetch; the next run asks again.
+     */
+    internal fun summary(downloaded: Int, had: Int, none: Int, failed: Int, seconds: Long, animations: Int = 0, notYet: Int = 0): String =
         "$downloaded downloaded" + (if (animations > 0) " ($animations of them animations)" else "") + ", $had already here" +
+            (if (notYet > 0) ", $notYet artists your server has no photo for yet" else "") +
             (if (none > 0) ", $none with no picture on the server" else "") +
             (if (failed > 0) ", $failed failed" else "") + " in ${seconds}s"
 
