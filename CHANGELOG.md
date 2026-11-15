@@ -3,6 +3,13 @@
 Every version of Siansa, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 1.5.6 — 2026-11-15
+
+### Fixed
+- **Download all covers gave up on artist photos too soon.** A server that fetches photos a few at a time (Navidrome,
+  from Apple Music or Deezer) is now asked again every half minute while photos keep coming, for up to ten minutes.
+  The result says how many artists your server has no photo for yet, apart from covers it has no picture for.
+
 ## 1.5.5 — 2026-11-15
 
 ### Fixed

@@ -60,9 +60,27 @@ class CoverDownloadSummaryTest {
         assertTrue(app.siansa.data.Credits.everyone(songs, known = setOf("known", "fred", "big", "amy", "ab")).isEmpty())
     }
 
-    @Test fun artistsStillBeingFetchedAreAskedForAgainTwice() {
-        assertEquals(2, CoverDownload.ARTISTS_AGAIN_MS.size)
-        assertTrue(CoverDownload.ARTISTS_AGAIN_MS[0] < CoverDownload.ARTISTS_AGAIN_MS[1])
+    /** The owner's server gets photos from Apple Music or Deezer, a few at a time: 251 came, then 104, of 11,549. */
+    @Test fun artistsStillBeingFetchedAreAskedForWhilePhotosKeepComing() {
+        assertEquals(8_000L, CoverDownload.againAfterMs(0))
+        assertEquals(30_000L, CoverDownload.againAfterMs(1))
+        assertEquals(30_000L, CoverDownload.againAfterMs(7))
+        // Twice whatever came, then for as long as the last asking brought any.
+        assertTrue(CoverDownload.asksAgain(pass = 0, came = 0))
+        assertTrue(CoverDownload.asksAgain(pass = 1, came = 0))
+        assertFalse(CoverDownload.asksAgain(pass = 2, came = 0))
+        assertTrue(CoverDownload.asksAgain(pass = 2, came = 104))
+        assertTrue(CoverDownload.asksAgain(pass = 19, came = 3))
+        // Ten minutes at most.
+        assertFalse(CoverDownload.asksAgain(pass = CoverDownload.MOST_ASKINGS, came = 500))
+    }
+
+    @Test fun artistsTheServerHasntFetchedYetAreSaidApart() {
+        assertEquals(
+            "1427 downloaded, 12168 already here, 11194 artists your server has no photo for yet, 281 with no picture on the server in 368s",
+            CoverDownload.summary(downloaded = 1427, had = 12168, none = 281, failed = 0, seconds = 368, notYet = 11194),
+        )
+        assertEquals("3 downloaded, 9 already here in 2s", CoverDownload.summary(3, 9, 0, 0, 2))
     }
 
     /**

@@ -3,6 +3,10 @@
 Every release of Siansa and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [1.5.6](https://github.com/echovaultstudio/Siansa/releases/tag/v1.5.6) — 2026-11-15
+
+- [#1197](https://github.com/echovaultstudio/Siansa/pull/1197) Cover download keeps asking for artist photos while they keep coming (@Th3K1ngP1n)
+
 ## [1.5.5](https://github.com/echovaultstudio/Siansa/releases/tag/v1.5.5) — 2026-11-15
 
 - [#1194](https://github.com/echovaultstudio/Siansa/pull/1194) Settings: a service's tile opens that service's own settings (@Th3K1ngP1n)
