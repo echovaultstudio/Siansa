@@ -132,6 +132,12 @@ object CoverStore {
 
     fun has(id: String) = local(id) != null
 
+    /**
+     * True when only a still of this animated cover is kept, made from the start of its file ([stillFromStart]): its
+     * animation isn't on the phone yet. Download all covers brings it then.
+     */
+    fun hasOnlyStill(id: String): Boolean = local(id) == null && stillFile(resolve(id)).exists()
+
     fun sizeBytes(): Long = dir.listFiles()?.sumOf { it.length() } ?: 0L
 
     /**

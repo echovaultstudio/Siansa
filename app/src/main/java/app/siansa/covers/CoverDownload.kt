@@ -310,22 +310,29 @@ object CoverDownload {
             if (done == of || done % 10 == 0) update { it.copy(running = true, note = "Looking up artist photos: $done of $of") }
         }
         update { it.copy(note = null) }
-        val main = buildList {
-            graph.library.albums("name").forEach { it.coverArt?.let(::add) }
-            // The ids just looked up, else the library's (it keeps the new ones too, for the next sync's sake).
-            val fresh = graph.artistPhotos.covers.value
-            graph.library.artists().forEach { add(fresh[it.id] ?: it.coverArt ?: "ar-${it.id}") }
-            graph.library.playlists().forEach { it.coverArt?.let(::add) }
-        }.distinctBy { CoverStore.canonical(it) }
+        val albums = graph.library.albums("name").mapNotNull { it.coverArt }
+        // The ids just looked up, else the library's (it keeps the new ones too, for the next sync's sake).
+        val fresh = graph.artistPhotos.covers.value
+        val photos = graph.library.artists().map { fresh[it.id] ?: it.coverArt ?: "ar-${it.id}" }
+        val playlists = graph.library.playlists().mapNotNull { it.coverArt }
+        val main = (albums + photos + playlists).distinctBy { CoverStore.canonical(it) }
         val songCovers = songCoversToFetch(graph.library.songCoverIds(), main)
         val ids = main + songCovers
-        AppLog.i("Covers", "Downloading covers: ${main.size} albums, artists and playlists and ${songCovers.size} song and disc covers to check")
+        // Albums' animations come too, where they're shown (the owner, 15 Nov: only stills of the big ones were kept).
+        // Not where only so many are kept (the TV app): the oldest would go as the newest came, run after run.
+        val animations = settings.animatedCovers && CoverStore.maxOriginalBytes == Long.MAX_VALUE
+        AppLog.i(
+            "Covers",
+            "Downloading covers: ${albums.size} albums, ${photos.size} artists and ${playlists.size} playlists (${main.size} pictures) and " +
+                "${songCovers.size} song and disc covers to check" + if (animations) ", with albums' animations" else "",
+        )
         update { Progress(running = true, total = ids.size) }
         val started = System.currentTimeMillis()
         val downloaded = AtomicInteger()
         val failed = AtomicInteger()
         // The server has no picture for these (its stand-in, or nothing): asked again next time, not "already here".
         val none = AtomicInteger()
+        val animated = AtomicInteger()
         val done = AtomicInteger()
         val permits = Semaphore(4)
         val lastShown = java.util.concurrent.atomic.AtomicLong(0)
@@ -344,7 +351,7 @@ object CoverDownload {
                 permits.acquire()
                 launch {
                     try {
-                        when (one(graph, disk, id)) {
+                        when (one(graph, disk, id, animations, animated)) {
                             Outcome.DOWNLOADED -> downloaded.incrementAndGet()
                             Outcome.FAILED -> failed.incrementAndGet()
                             Outcome.NONE -> none.incrementAndGet()
@@ -384,7 +391,7 @@ object CoverDownload {
             }
         }
         val seconds = (System.currentTimeMillis() - started) / 1000
-        val summary = summary(downloaded.get(), done.get() - downloaded.get() - failed.get() - none.get(), none.get(), failed.get(), seconds)
+        val summary = summary(downloaded.get(), done.get() - downloaded.get() - failed.get() - none.get(), none.get(), failed.get(), seconds, animated.get())
         AppLog.i("Covers", "Covers: $summary" + (stoppedBecause?.let { ". Stopped: $it" } ?: ""))
         update { it.copy(running = false, note = stoppedBecause?.let { "Stopped: $it" } ?: "Done: $summary") }
     }
@@ -392,8 +399,8 @@ object CoverDownload {
     private enum class Outcome { HAD, DOWNLOADED, NONE, FAILED }
 
     /** What a run did, in a line for the log and Settings. [none]: covers the server has no picture for. */
-    internal fun summary(downloaded: Int, had: Int, none: Int, failed: Int, seconds: Long): String =
-        "$downloaded downloaded, $had already here" +
+    internal fun summary(downloaded: Int, had: Int, none: Int, failed: Int, seconds: Long, animations: Int = 0): String =
+        "$downloaded downloaded" + (if (animations > 0) " ($animations of them animations)" else "") + ", $had already here" +
             (if (none > 0) ", $none with no picture on the server" else "") +
             (if (failed > 0) ", $failed failed" else "") + " in ${seconds}s"
 
@@ -415,12 +422,45 @@ object CoverDownload {
         return songCovers.filter { it.isNotEmpty() && have.add(CoverStore.canonical(it)) }
     }
 
-    private suspend fun one(graph: AppGraph, disk: DiskCache, id: String): Outcome {
+    /**
+     * Whether Download all covers brings this cover's animation: an album's ([id] `al-…`), while animated covers are
+     * shown ([animations]) and only a still of it is on the phone ([onlyStill]). A big animated cover is answered with a
+     * still made from the start of its file, so lists don't download 100 MB to show one frame ([CoverStore]); until
+     * the owner's report of 15 Nov the rest of it came only once its album was opened, so it wasn't there offline.
+     * Songs' and discs' covers stay stills: what moves is the album's.
+     */
+    internal fun bringsAnimation(id: String, animations: Boolean, onlyStill: Boolean): Boolean =
+        animations && onlyStill && CoverStore.canonical(id).startsWith("al-")
+
+    /**
+     * Downloads an album's animated original and keeps it ([CoverStore] does the keeping, asked for the animation).
+     * true = kept, false = the server sent nothing to keep (too big, or no longer animated), null = failed.
+     */
+    private suspend fun animation(graph: AppGraph, id: String): Boolean? = runCatching {
+        val request = Request.Builder().url(graph.source.coverUrl(id, null)).header(CoverStore.WANT_ANIMATION, "1").build()
+        graph.imageHttp.newCall(request).executeCancellable { response -> response.isSuccessful && CoverStore.has(id) }
+    }.onFailure {
+        currentCoroutineContext().ensureActive()
+        AppLog.w("Covers", "Animated cover $id failed: ${it.javaClass.simpleName}: ${it.message}")
+    }.getOrNull()
+
+    private suspend fun one(graph: AppGraph, disk: DiskCache, id: String, animations: Boolean, animated: AtomicInteger): Outcome {
         // An animated original kept on the phone answers every size already.
         if (CoverStore.has(id)) return Outcome.HAD
         var outcome = Outcome.HAD
         for (size in SIZES) {
             if (size == LARGE_COVER) {
+                // Only a still of a big animated cover came with the small size: its animation now.
+                if (bringsAnimation(id, animations, CoverStore.hasOnlyStill(id))) {
+                    when (animation(graph, id)) {
+                        true -> {
+                            animated.incrementAndGet()
+                            return Outcome.DOWNLOADED
+                        }
+                        null -> return Outcome.FAILED
+                        false -> Unit
+                    }
+                }
                 // Big sizes of an animated GIF fail on Navidrome; the screens never ask for them.
                 val kind = AnimatedCovers.knownKind(id)
                 if (kind != null && kind != AnimatedCovers.Kind.Still) break
