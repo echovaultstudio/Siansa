@@ -3,6 +3,18 @@
 Every version of Siansa, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 1.5.5 — 2026-11-15
+
+### Fixed
+- **Artists kept the star though the server had their photo.** Under Fans also like and on an artist's own page, a
+  photo Navidrome was still fetching was asked for again only two minutes later. It's now asked for again after a
+  few seconds, so it shows while you're still on the page.
+- **Download all covers missed many artist photos.** Artists with no album of their own (on a compilation, or
+  featured on a song) were left out, and a photo your server was still fetching was counted as "no picture". Every
+  artist credited on a song is now included, and photos still being fetched are asked for again before the run ends.
+- **A service on Settings opened the whole list.** Tapping Siansa Beats, Audiobookshelf, AI or another service now
+  goes straight to that service's own settings. Manage still opens the list.
+
 ## 1.5.4 — 2026-11-15
 
 ### Fixed
