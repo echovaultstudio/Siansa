@@ -24,6 +24,22 @@ object Credits {
     fun names(value: String): String = decode(value).joinToString(" ") { it.name }
 
     /**
+     * Every artist credited on [songs] who isn't among [known] (ids), each once: the artists the library's own list
+     * leaves out, as they have no album of their own (a song on a compilation, a featured singer). Their pages and
+     * Fans also like show them, so Download all covers fetches their photos too.
+     */
+    fun everyone(songs: List<Song>, known: Set<String>): List<ArtistRef> {
+        val found = LinkedHashMap<String, ArtistRef>()
+        for (song in songs) {
+            for (ref in song.artists) if (ref.id.isNotBlank() && ref.id !in known) found.putIfAbsent(ref.id, ref)
+            // The main artist too; by the song's artist text only when that names one artist, not "A feat. B".
+            val main = song.artistId?.takeIf { it.isNotBlank() && it !in known && it !in found } ?: continue
+            found[main] = ArtistRef(main, if (song.artists.isEmpty() && creditedNames(song.artist).size == 1) song.artist else "")
+        }
+        return found.values.toList()
+    }
+
+    /**
      * Artists credited on [songs] whose name has every one of [terms] (normalised), not among [known] (ids):
      * the artists search shows besides the album artists. Each once, with how many songs credit them.
      */

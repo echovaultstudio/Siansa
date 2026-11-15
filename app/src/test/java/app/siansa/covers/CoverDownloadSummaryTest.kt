@@ -37,4 +37,31 @@ class CoverDownloadSummaryTest {
             assertFalse(id, CoverDownload.bringsAnimation(id, animations = true, onlyStill = true))
         }
     }
+
+    /** The owner, 15 Nov: "it should fetch ALL". Big Mountain is on one compilation and has no album of their own. */
+    @Test fun artistsOnlyCreditedOnSongsAreFetchedToo() {
+        fun song(id: String, artist: String, artistId: String?, vararg credits: Pair<String, String>) = app.siansa.data.Song(
+            id = id, title = "T$id", artist = artist, artistId = artistId, artists = credits.map { app.siansa.data.ArtistRef(it.first, it.second) },
+        )
+        val songs = listOf(
+            song("1", "Big Mountain", "big"),
+            song("2", "Fred V & Grafix feat. Amy J Pryce", "fred", "fred" to "Fred V & Grafix", "amy" to "Amy J Pryce"),
+            song("3", "Known", "known"),
+            song("4", "Big Mountain", "big"),
+            song("5", "A feat. B", "ab"),
+            song("6", "Nobody", null),
+        )
+        val all = app.siansa.data.Credits.everyone(songs, known = setOf("known", "fred"))
+        assertEquals(listOf("big", "amy", "ab"), all.map { it.id })
+        assertEquals("Big Mountain", all[0].name)
+        assertEquals("Amy J Pryce", all[1].name)
+        // "A feat. B" under one id isn't one artist's name; the id is still looked up.
+        assertEquals("", all[2].name)
+        assertTrue(app.siansa.data.Credits.everyone(songs, known = setOf("known", "fred", "big", "amy", "ab")).isEmpty())
+    }
+
+    @Test fun artistsStillBeingFetchedAreAskedForAgainTwice() {
+        assertEquals(2, CoverDownload.ARTISTS_AGAIN_MS.size)
+        assertTrue(CoverDownload.ARTISTS_AGAIN_MS[0] < CoverDownload.ARTISTS_AGAIN_MS[1])
+    }
 }
