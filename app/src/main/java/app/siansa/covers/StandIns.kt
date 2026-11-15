@@ -118,10 +118,15 @@ object StandIns {
     private val shown = ConcurrentHashMap<String, Long>()
     private val times = ConcurrentHashMap<String, Int>()
 
-    /** The cover kept under [cacheId] just showed the server's stand-in (the [times]th time running). */
+    /**
+     * The cover kept under [cacheId] just showed the server's stand-in (the [times]th time running). The same stand-in
+     * arriving again while it's showing is the same showing: a page asks for one picture several times at once (its
+     * header, its colours, the list it came from, at two sizes). Counting each used up the early askings in the first
+     * second, and the picture then waited [AGAIN_MS] (the owner, 15 Nov: artists under Fans also like, and an artist's
+     * own page, kept the star though Navidrome had the photo a moment after it was looked up).
+     */
     fun shown(cacheId: String, now: Long = System.currentTimeMillis()) {
-        shown[cacheId] = now
-        times.merge(cacheId, 1, Int::plus)
+        if (shown.putIfAbsent(cacheId, now) == null) times.merge(cacheId, 1, Int::plus)
     }
 
     /** The server sent the real picture for [cacheId]: its stand-in showings start over. */
