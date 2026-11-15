@@ -308,6 +308,16 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     )
                 }
             },
+            // All genres (the owner, 15 Nov): the box to find a genre, empty and with long words typed, and A to Z beside a list.
+            Scene("genres_find") {
+                Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
+                    app.siansa.ui.FindField("", "Find a genre…", "genreFind") {}
+                    app.siansa.ui.FindField("neo-classical downtempo with field recordings", "Find a genre…", "genreFind") {}
+                    Box(Modifier.fillMaxWidth().height(360.dp)) {
+                        app.siansa.ui.AlphabetBar(setOf('#', 'A', 'B', 'H', 'J', 'R', 'U'), 'J', {}, Modifier.align(Alignment.TopEnd))
+                    }
+                }
+            },
             // Settings › Style (issue #681).
             Scene("style_top_bar") { TopBarChoice(TopBarStyle.BLACK) {} },
             // Themes › Pages and cards (issue #761): grey, warm, blue grey and the theme's own, with long labels.

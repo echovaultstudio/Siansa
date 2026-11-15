@@ -194,7 +194,9 @@ Names are listed best first: the one called exactly what you typed, then names t
 a word that starts with it, and last the ones that only have the letters inside a word. Typing the artist too
 ("moderat gita") narrows it down.
 
-Before you type, Search shows your genres to browse, the 30 with the most songs, then **All genres** for every one. In
+Before you type, Search shows your genres to browse, the 30 with the most songs, then **All genres** for every one,
+A to Z: type in **Find a genre…** at its top to narrow the list, or tap or drag the letters down its right edge to jump
+to one (a long list has them). In
 Siansa with Siansa Beats, they're the genres Siansa Beats hears in your music, most songs first: a song is in every genre
 it sounds like (its tags play no part there), and a genre's page lists all its songs. The list is saved on your phone, so it shows at once, and it's brought up to date in the background every
 half hour. When Siansa Beats is slow or away, the saved list stays. A genre whose songs are all in libraries you hide
