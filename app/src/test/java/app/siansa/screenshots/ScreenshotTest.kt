@@ -659,6 +659,8 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                             app.siansa.ui.HeroPage(
                                 title = name, heroHeight = hero, scrolledPx = scrolled, onBack = {}, color = Color(0xFF4A2A26),
                                 image = { m -> Box(m.background(androidx.compose.ui.graphics.Brush.radialGradient(listOf(Color(0xFF7A5A4C), Color(0xFF26171A))))) },
+                                // The line under the name rides up with it, never behind the page (the owner, 15 Nov).
+                                about = "7 releases · 112 songs",
                             ) { page ->
                                 // The page's rows, scrolled as far: the first starts where the picture ends.
                                 Box(page.fillMaxSize()) {

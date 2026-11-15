@@ -73,8 +73,9 @@ fun HeroPage(
     overlay: @Composable BoxScope.() -> Unit = {},
     // Kept under the title bar while it's given (the artist's release-type tabs once scrolled to, issue #1029).
     pinned: (@Composable () -> Unit)? = null,
-    // How much higher the name rests on the picture, for a line under it there (the artist's releases and songs).
-    nameLiftPx: Float = 0f,
+    // A line under the name (the artist's releases and songs). It rides up with the name and fades out with it (the
+    // owner, 15 Nov: it stayed on the picture and went behind the page as that slid up).
+    about: String = "",
     content: @Composable (pageModifier: Modifier) -> Unit,
 ) {
     val density = LocalDensity.current
@@ -123,8 +124,9 @@ fun HeroPage(
         val barPx = with(density) { GlassBar.HEIGHT.toPx() }
         var nameHeight by remember { mutableIntStateOf(0) }
         var pinnedPx by remember { mutableIntStateOf(0) }
-        val restBottomPx = with(density) { Space.Medium.toPx() } + nameLiftPx
-        val nameTop = heroPx - nameHeight - restBottomPx - scrolledPx
+        // The name and the line under it, as one block, rest this far above the picture's foot.
+        var wordsHeight by remember { mutableIntStateOf(0) }
+        val nameTop = heroPx - wordsHeight - with(density) { Space.Medium.toPx() } - scrolledPx
         val barStep = if (nameHeight == 0) 0f else GlassBar.step(nameTop, nameHeight.toFloat(), statusPx + barPx, with(density) { GlassBar.LEAD.toPx() })
         // The wash runs out below the tabs when they're pinned under the bar.
         val washPx = statusPx + barPx + (if (pinned != null) pinnedPx else 0) + with(density) { GlassBar.TAIL.toPx() }
@@ -170,22 +172,36 @@ fun HeroPage(
             }
         }
 
-        // The name, over the page: it rides up with it and fades out as it goes under the bar.
-        Text(
-            title,
-            style = nameStyle,
-            color = Color.White,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier
+        // The name and its line, over the page: they ride up with it and fade out as the name goes under the bar.
+        Column(
+            Modifier
                 .padding(start = Space.Page, end = Space.Page)
-                .onSizeChanged { nameHeight = it.height }
+                .onSizeChanged { wordsHeight = it.height }
                 .graphicsLayer {
                     translationY = nameTop
                     alpha = if (nameHeight == 0) 0f else GlassBar.pageTitle(barStep)
-                }
-                .testTag("heroName"),
-        )
+                },
+        ) {
+            Text(
+                title,
+                style = nameStyle,
+                color = Color.White,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.onSizeChanged { nameHeight = it.height }.testTag("heroName"),
+            )
+            if (about.isNotEmpty()) {
+                Spacer(Modifier.height(Space.Tight))
+                Text(
+                    about,
+                    style = MaterialTheme.typography.bodyMedium.copy(shadow = Shadow(Color.Black.copy(alpha = 0.45f), Offset(0f, 1f), 8f)),
+                    color = Color.White.copy(alpha = 0.85f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.testTag("artistAbout"),
+                )
+            }
+        }
     }
 }
 
