@@ -17,31 +17,6 @@ class FlowScreenTest {
         assertEquals("dscvr", NavTab.DSCVR.route)
     }
 
-    @Test fun underPlayIsWhatsSet() {
-        // Nothing set still plays: the middle.
-        assertEquals("Balanced, a mix of artists", flowSummary("", VibeTuning()))
-        assertEquals("Calmer and a bit faster · more piano", flowSummary("", VibeTuning(energy = -1, tempo = 1, sounds = listOf(SoundDial("piano", 3)))))
-        assertEquals("“rainy Sunday”", flowSummary(" rainy Sunday ", VibeTuning()))
-        assertEquals("“rainy Sunday” · Balanced · new to you", flowSummary("rainy Sunday", VibeTuning(familiar = -2)))
-        // A pick taken off again is nothing set.
-        assertEquals("Balanced, a mix of artists", flowSummary("", VibeTuning(sounds = listOf(SoundDial("piano", 0)))))
-    }
-
-    /** The owner, 15 Nov: one bar. The pill's round ends fold into the mini player's corners, and it's gone before they settle. */
-    @Test fun thePillFoldsIntoTheMiniPlayer() {
-        assertEquals(FlowDock.ROUND.value, FlowDock.corner(0f), 0.001f)
-        assertEquals(FlowDock.FOLDED.value, FlowDock.corner(1f), 0.001f)
-        assertTrue(FlowDock.corner(0.5f) in FlowDock.FOLDED.value..FlowDock.ROUND.value)
-        // Half the pill's height: its ends are round.
-        assertEquals(FlowDock.HEIGHT.value / 2, FlowDock.ROUND.value, 0.001f)
-        assertEquals(1f, FlowDock.pill(0f), 0.001f)
-        assertEquals(0f, FlowDock.pill(0.8f), 0.001f)
-        assertEquals(0f, FlowDock.pill(1f), 0.001f)
-        // Past either end stays the end.
-        assertEquals(FlowDock.corner(1f), FlowDock.corner(3f), 0.001f)
-        assertEquals(1f, FlowDock.pill(-1f), 0.001f)
-    }
-
     @Test fun thePageSaysWhichMixItSteers() {
         assertEquals("Playing “Easy groove with jazz”. Move anything here to change what comes next.", flowLiveLine("Easy groove with jazz", steering = false))
         assertEquals("Playing “Evening Chill”. Changing what comes next…", flowLiveLine("Evening Chill", steering = true))

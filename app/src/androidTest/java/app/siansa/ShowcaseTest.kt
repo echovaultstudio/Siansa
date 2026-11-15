@@ -354,7 +354,7 @@ class ShowcaseTest {
                 idle(300)
                 idle(1500)
                 shot("flow-shape")
-                compose.onAllNodesWithTag("vibeGenerate").onFirst().performClick()
+                compose.onAllNodesWithTag("auraGo").onFirst().performClick()
                 // The mix plays and the Flow page stays (the owner, 15 Nov); its own page is under Your vibes.
                 waitText("Wet Streets, Warm Keys", 45_000)
                 idle(2000)

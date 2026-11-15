@@ -83,6 +83,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -130,7 +131,8 @@ internal fun rememberMoodLook(tuning: VibeTuning, hold: MoodHold): MoodLook {
  * Shaping a vibe (the owner's pick, 15 Nov: the mood pad): the pad with the mood's name under it, the sounds and
  * genres picked (each one "more" or "less", tapped through more, less, gone) with + to pick from a list, and whose
  * music it is. [dots] are a mix's songs on the pad, [inMix] the sounds a mix has of its own (a vibe's page).
- * [onSettled] runs when a finger is lifted or a pick changes, after [onChange] has given the new tuning.
+ * [onSettled] runs when a finger is lifted or a pick changes, after [onChange] has given the new tuning. [padNote]:
+ * a short line centred right under the pad.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -143,6 +145,7 @@ internal fun MoodShaper(
     onSettled: () -> Unit = {},
     dots: List<PadDot> = emptyList(),
     inMix: List<MixSound> = emptyList(),
+    padNote: String? = null,
     picker: @Composable (onDone: () -> Unit) -> Unit = { done -> MoodPickerSheet(tuning, look, inMix, { onChange(it); onSettled() }, done) },
 ) {
     var picking by rememberSaveable { mutableStateOf(false) }
@@ -156,8 +159,20 @@ internal fun MoodShaper(
     }
     if (picking) picker { focus.clearFocus(); picking = false }
     Column(modifier, verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
-        MoodPad(tuning.energy, tempo = tuning.tempo, look = look, hold = hold, dots = dots,
-            onMove = { e, t -> focus.clearFocus(); onChange(tuning.copy(energy = e, tempo = t)) }, onSettled = { focus.clearFocus(); onSettled() })
+        // The pad, with a line of its own right under it where the page has something to say about it ([padNote]).
+        Column(verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
+            MoodPad(tuning.energy, tempo = tuning.tempo, look = look, hold = hold, dots = dots,
+                onMove = { e, t -> focus.clearFocus(); onChange(tuning.copy(energy = e, tempo = t)) }, onSettled = { focus.clearFocus(); onSettled() })
+            if (padNote != null) {
+                Text(
+                    padNote,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth().testTag("padNote"),
+                )
+            }
+        }
         Column(Modifier.testTag("moodWords")) {
             Text(look.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black, modifier = Modifier.testTag("moodName"))
             Text(look.about, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)

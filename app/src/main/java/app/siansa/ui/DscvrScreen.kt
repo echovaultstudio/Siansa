@@ -47,8 +47,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -174,7 +172,7 @@ internal fun vibeMakingBusy(): Boolean = VibeMaking.busy.collectAsStateWithLifec
 /**
  * Flow (issue #339, renamed in #369; the mood pad, the owner's pick of 15 Nov): say what you want to hear, or shape
  * it: drag the pad's dot for the mood, pick sounds and genres with +, choose whose music. The page takes the mood's
- * colour, and "Play this vibe" across the bottom makes the vibe and plays it. Recent vibes below (the last five, plus
+ * colour, and the arrow beside the words makes the vibe and plays it. Recent vibes below (the last five, plus
  * pinned ones), each one tap from playing again, and each can be renamed or deleted.
  */
 @Composable
@@ -195,17 +193,9 @@ fun DscvrScreen(nav: NavController) {
     LaunchedEffect(Unit) { graph.savedVibes.all() }
     var renaming by remember { mutableStateOf<SavedVibe?>(null) }
 
-    // Flow's bar is where the mini player is (FlowDock): the pill while no Flow mix plays, in the mood's colour.
-    // Play puts the keyboard away too.
+    // One player (the owner, 15 Nov): nothing of Flow's own stands in the mini player's place. The arrow beside the
+    // words starts the mix, with or without words, and puts the keyboard away.
     val focus = LocalFocusManager.current
-    SideEffect {
-        FlowDock.onPlay = { focus.clearFocus(); flow.play(launch::notify) }
-        FlowDock.colour = look.colour
-        FlowDock.ink = look.ink
-        FlowDock.summary = flowSummary(text, tuning)
-        FlowDock.shown = aiProblem == null && mix == null
-    }
-    DisposableEffect(Unit) { onDispose { FlowDock.shown = false } }
 
     renaming?.let { vibe ->
         RenameVibeDialog(vibe, onDismiss = { renaming = null }) { name ->
@@ -250,7 +240,7 @@ fun DscvrScreen(nav: NavController) {
                 item(key = "ask") {
                     val making by flow.making.collectAsStateWithLifecycle()
                     AskPill(
-                        text, onText = { flow.text.value = it }, look = look, busy = making, ready = text.trim().length >= 3,
+                        text, onText = { flow.text.value = it }, look = look, busy = making,
                         onGo = { focus.clearFocus(); flow.play(launch::notify) }, modifier = Modifier.padding(start = Space.Page, end = Space.Page, top = Space.Small),
                     )
                 }
@@ -260,6 +250,8 @@ fun DscvrScreen(nav: NavController) {
                         tuning, look, hold,
                         onChange = { flow.set(it, settled = false) },
                         onSettled = { flow.set(flow.tuning.value, settled = true) },
+                        // The owner, 15 Nov: say right under the pad that it also steers a vibe that's playing.
+                        padNote = FLOW_PAD_NOTE,
                         modifier = Modifier.padding(start = Space.Page, end = Space.Page, top = Space.Medium),
                     )
                 }
@@ -284,16 +276,12 @@ fun DscvrScreen(nav: NavController) {
     }
 }
 
+/** Right under Flow's pad. */
+internal const val FLOW_PAD_NOTE = "Drag while it plays to change the vibe."
+
 /** Under Flow's title while its mix plays: which mix the page is steering. */
 internal fun flowLiveLine(name: String, steering: Boolean): String =
     "Playing “$name”. " + if (steering) "Changing what comes next…" else "Move anything here to change what comes next."
-
-/** Under "Play this vibe": the words typed and what's set; with nothing set, the mix in the middle. */
-internal fun flowSummary(text: String, tuning: VibeTuning): String {
-    val words = text.trim().takeIf { it.length >= 3 }?.let { "“$it”" }
-    if (words == null && tuning.isNeutral) return "Balanced, a mix of artists"
-    return listOfNotNull(words, FlowMood.summary(tuning).takeIf { !tuning.isNeutral }).joinToString(" · ")
-}
 
 /**
  * The mood's colour glowing down from the top of the page, behind everything: all of it at the top, none at its end,
@@ -310,9 +298,12 @@ private fun MoodGlow(look: MoodLook) {
 
 private val MOOD_GLOW = 320.dp
 
-/** "Or say it" (issue #369): the words for a vibe in one pill, made with its round button or the keyboard's Go. */
+/**
+ * "Or say it" (issue #369): the words for a vibe in one pill, and the round arrow at its end that plays the vibe, as
+ * does the keyboard's Go. The arrow is how a vibe starts, with words or with only the mood and picks (the owner, 15 Nov).
+ */
 @Composable
-private fun AskPill(text: String, onText: (String) -> Unit, look: MoodLook, busy: Boolean, ready: Boolean, onGo: () -> Unit, modifier: Modifier = Modifier) {
+private fun AskPill(text: String, onText: (String) -> Unit, look: MoodLook, busy: Boolean, onGo: () -> Unit, modifier: Modifier = Modifier) {
     val scheme = MaterialTheme.colorScheme
     Row(
         modifier
@@ -337,7 +328,7 @@ private fun AskPill(text: String, onText: (String) -> Unit, look: MoodLook, busy
                 textStyle = MaterialTheme.typography.bodyLarge.copy(color = scheme.onSurface),
                 cursorBrush = SolidColor(scheme.onSurface),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
-                keyboardActions = KeyboardActions(onGo = { if (ready && !busy) onGo() }),
+                keyboardActions = KeyboardActions(onGo = { if (!busy) onGo() }),
                 modifier = Modifier.fillMaxWidth().testTag("auraField"),
             )
         }
@@ -345,13 +336,13 @@ private fun AskPill(text: String, onText: (String) -> Unit, look: MoodLook, busy
             Modifier
                 .size(40.dp)
                 .clip(CircleShape)
-                .background(look.colour.copy(alpha = if (ready) 1f else 0.55f))
-                .clickable(enabled = ready && !busy, onClickLabel = "Make my vibe", onClick = onGo)
+                .background(look.colour)
+                .clickable(enabled = !busy, onClickLabel = "Play this vibe", role = androidx.compose.ui.semantics.Role.Button, onClick = onGo)
                 .testTag("auraGo"),
             contentAlignment = Alignment.Center,
         ) {
             if (busy) CircularProgressIndicator(Modifier.size(20.dp), color = look.ink, strokeWidth = 2.dp) // spacing: exact
-            else Icon(Icons.AutoMirrored.Rounded.ArrowForward, "Make my vibe", tint = look.ink, modifier = Modifier.size(20.dp))
+            else Icon(Icons.AutoMirrored.Rounded.ArrowForward, "Play this vibe", tint = look.ink, modifier = Modifier.size(20.dp))
         }
     }
 }
