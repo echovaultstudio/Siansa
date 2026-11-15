@@ -608,9 +608,17 @@ class ProfileStoreTest {
         assertFalse(down.ok)
         assertTrue(down.message, "Nothing answers at beats:8090" in down.message)
 
-        // The Siansa plugin itself isn't what this build asks.
-        reply = { JsonObject(mapOf("plugin" to JsonPrimitive("siansa_analysis"), "status" to JsonPrimitive("ok"))) }
-        assertTrue(store.check().message.contains("not as Siansa Beats (dev)"))
+        // Siansa Analysis, the catalog's plugin, answers the same and is said to work (the owner, 15 Nov: with only
+        // it installed songs were levelled by it, yet the test said to install Siansa Beats (dev)).
+        reply = { JsonObject(mapOf("plugin" to JsonPrimitive("siansa_analysis"), "plugin_version" to JsonPrimitive("0.5.7"), "status" to JsonPrimitive("ok"))) }
+        val analysis = store.check()
+        assertTrue(analysis.ok)
+        assertEquals("Siansa Analysis 0.5.7 is working", analysis.message)
+        // Something else at that address isn't.
+        reply = { JsonObject(mapOf("plugin" to JsonPrimitive("another"), "status" to JsonPrimitive("ok"))) }
+        val other = store.check()
+        assertFalse(other.ok)
+        assertTrue(other.message, "not as a Siansa plugin" in other.message)
 
         reply = { throw ApiException("AudioMuse-AI sent something that isn't JSON. Is the address its API port?") }
         val login = store.check()
