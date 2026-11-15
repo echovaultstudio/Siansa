@@ -451,7 +451,7 @@ fun ArtistScreen(nav: NavController, id: String) {
                         if (i == 0) GridListToggle(releasesGrid, onToggle = { releasesGrid = !releasesGrid }, modifier = Modifier.padding(end = Space.Tight))
                     }
                 }
-                items(albums, key = { "album-${it.id}" }, span = { if (releasesGrid) GridItemSpan(1) else GridItemSpan(maxLineSpan) }) { album ->
+                releaseItems(albums, releasesGrid) { album ->
                     if (releasesGrid) {
                         AlbumTile(
                             name = album.name,
@@ -549,6 +549,18 @@ fun AppearsOnScreen(nav: NavController, id: String) {
 
 private fun LazyGridScope.full(content: @Composable () -> Unit) {
     item(span = { GridItemSpan(maxLineSpan) }) { content() }
+}
+
+/**
+ * One release type's releases in the artist page's grid: a tile each ([grid]), or one to a row in the list (issue #289).
+ *
+ * [grid] is a plain value, read while the page's rows are listed, never the switch's state read inside `span`: the
+ * grid remembers which releases start its rows, and only works that out again when the rows are listed again.
+ * Switched while it still held the list's rows (the owner, 15 Nov), it put one release in two rows at once on the
+ * way back up the page and Siansa closed ("Place was called on a node which was placed already").
+ */
+internal fun LazyGridScope.releaseItems(albums: List<Album>, grid: Boolean, content: @Composable (Album) -> Unit) {
+    items(albums, key = { "album-${it.id}" }, span = { if (grid) GridItemSpan(1) else GridItemSpan(maxLineSpan) }) { content(it) }
 }
 
 /** The popular songs to show: the ones already showing stay (issue #440); [fresh] only fills an empty list. */
