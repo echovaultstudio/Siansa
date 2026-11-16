@@ -213,15 +213,15 @@ internal class MixedCrossfader(
                 var quickAt = quick?.let { duration - it.cutMs - it.overlapMs }
                 var quickHandover = quickAt?.let { EngineFade.handoverAt(it, position) }
                 var chosen = quick
-                if (quick != null && quickHandover != null && quickHandover - position < MIN_PREPARE_MS && quick.beat == null && !quick.coldEnd) {
+                if (quickHandover == null || quickHandover - position < MIN_PREPARE_MS) {
                     // Not even that fits (the owner's log, 12 Nov: moved to the last half minute, the songs changed with
-                    // no blend at all): a plain blend of what's left, however short, never none.
-                    val left = duration - quick.cutMs - position - MIN_PREPARE_MS - EngineFade.LEAD_MS
-                    if (left >= SHORTEST_LEFT_MS) {
-                        chosen = quick.copy(overlapMs = left, fadeInMs = minOf(quick.fadeInMs, left).coerceAtLeast(Crossfade.MIN_FADE_IN_MS),
-                            why = "smart: a blend of what's left (%.1f s) after moving near the end · ${quick.why}".format(java.util.Locale.ROOT, left / 1000.0))
-                        quickAt = duration - chosen.cutMs - chosen.overlapMs
-                        quickHandover = EngineFade.handoverAt(quickAt, position)
+                    // no blend at all): a plain blend of what's left, however short, never none. Also when the quick
+                    // one is beat-matched (it can't be laid on the bar any more) or couldn't be planned (siansa-dev
+                    // #63, "no silence, ever"); only a cold end, which is meant to have none, stays as it is.
+                    EngineFade.whatsLeft(quick ?: fade, duration, position, MIN_PREPARE_MS, SHORTEST_LEFT_MS)?.let { left ->
+                        chosen = left
+                        quickAt = duration - left.cutMs - left.overlapMs
+                        quickHandover = EngineFade.handoverAt(quickAt!!, position)
                     }
                 }
                 if (chosen == null || quickAt == null || quickHandover == null || quickHandover - position < MIN_PREPARE_MS) {
@@ -909,6 +909,22 @@ internal object EngineFade {
     const val LEAD_MS = 2_500L
     /** And never sooner than this from now. */
     const val MIN_LEAD_MS = 1_500L
+
+    /**
+     * A plain blend of what's left of the song before its end (ms), for [base] that no longer fits: never laid on the
+     * beat (it can't be put on the bar any more), its whole length what's left once the next song is ready. Null when
+     * that's under [shortestMs], or for a cold end, which is meant to play the two back to back.
+     */
+    fun whatsLeft(base: FadePlan, durationMs: Long, positionMs: Long, prepareMs: Long, shortestMs: Long): FadePlan? {
+        if (base.coldEnd) return null
+        val left = durationMs - base.cutMs - positionMs - prepareMs - LEAD_MS
+        if (left < shortestMs) return null
+        return base.copy(
+            overlapMs = left, fadeInMs = minOf(base.fadeInMs, left).coerceAtLeast(Crossfade.MIN_FADE_IN_MS),
+            beat = null, technique = null, filterHz = 0.0, echoBeatMs = null, buildUp = false,
+            why = "smart: a blend of what's left (%.1f s) after moving near the end · ${base.why}".format(java.util.Locale.ROOT, left / 1000.0),
+        )
+    }
 
     /** Where (ms of the old song) the tail takes the old song over, for a fade starting at [startAtMs] heard at [positionMs]. */
     fun handoverAt(startAtMs: Long, positionMs: Long): Long =
