@@ -82,6 +82,26 @@ class SpacingHomeTest : SpacingCheck() {
         }
     }
 
+    /** What's new after an update (the owner, 16 Nov): the title and the headlines start a page margin in, the two buttons end the same room from the edges. */
+    @Test fun whatsNewSheetIsEvenlySpaced() {
+        compose.setContent {
+            SiansaTheme {
+                Box(Modifier.width(360.dp)) {
+                    app.siansa.ui.WhatsNewPanel(app.siansa.ui.UpdateSummary("1.6.0", listOf("Siansa Beats", "Star ratings for songs"), more = 3), onOpenAll = {}, onDone = {})
+                }
+            }
+        }
+        val panel = compose.onNodeWithTag("whatsNewPanel").getBoundsInRoot()
+        val title = compose.onNodeWithTag("whatsNewTitle").getBoundsInRoot()
+        val line = compose.onNodeWithTag("whatsNewLine-0").getBoundsInRoot()
+        val all = compose.onNodeWithTag("whatsNewAll").getBoundsInRoot()
+        val done = compose.onNodeWithTag("whatsNewDone").getBoundsInRoot()
+        assertEven("The title and the first headline, one left edge", title.left, line.left, tolerance = 1.dp)
+        assertEven("The headlines, full width", line.left - panel.left, panel.right - line.right, tolerance = 1.dp)
+        assertEven("The buttons, the same room at both edges", all.left - panel.left, panel.right - done.right, tolerance = 1.dp)
+        assertEven("The buttons, in line", all.top + (all.bottom - all.top) / 2, done.top + (done.bottom - done.top) / 2, tolerance = 1.dp)
+    }
+
     /** Home's notice chips are Your Library's pills (issue #794): the same height, so Home and the library match. */
     @Test fun noticeChipsMatchTheLibrarysPills() {
         compose.setContent {

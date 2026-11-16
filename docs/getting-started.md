@@ -41,7 +41,9 @@ That's it: Home fills with your mixes and recent music.
 ## Updating
 
 Google Play and F-Droid update Siansa by themselves. When a newer version is out, a notice at the top of Home says so
-("Siansa 1.6.0 is out"); a tap opens the store you installed it from. **Settings › About › What's new** shows what
+("Siansa 1.6.0 is out"); a tap opens the store you installed it from. The first time you open Siansa after an update,
+**What's new** comes up over Home: the biggest changes and fixes in a few lines, with a link to every version's
+changes. It shows once per update, never after a fresh install. **Settings › About › What's new** shows what
 changed in the version you have; tap it to see every version's changes. Update Siansa Beats with `docker compose pull`
 and `docker compose up -d` in its folder.
 
