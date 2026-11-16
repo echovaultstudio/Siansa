@@ -280,10 +280,10 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                 OnPlayer {
                     Column(Modifier.fillMaxWidth().padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Page)) {
                         listOf(
-                            ("FLAC" to "2,116 kbit/s") to app.siansa.playback.PlayingAs.of(null, null, 256, cached = false, wifi = false),
-                            ("FLAC" to "2,116 kbit/s") to app.siansa.playback.PlayingAs.of(null, null, 0, cached = false, wifi = true),
-                            ("ALAC" to "1,411 kbit/s") to app.siansa.playback.PlayingAs.of(null, 192, 0, cached = false, wifi = true),
-                            ("MP3" to "320 kbit/s") to app.siansa.playback.PlayingAs.of("Uncharacteristically long living room television", null, 0, cached = false, wifi = true),
+                            app.siansa.playback.PlayingAs.file("FLAC", null, 2116) to app.siansa.playback.PlayingAs.of(null, null, 256, cached = false, wifi = false),
+                            app.siansa.playback.PlayingAs.file("FLAC", null, 2116) to app.siansa.playback.PlayingAs.of(null, null, 0, cached = false, wifi = true),
+                            app.siansa.playback.PlayingAs.file("ALAC", null, 1411) to app.siansa.playback.PlayingAs.of(null, 192, 0, cached = false, wifi = true),
+                            app.siansa.playback.PlayingAs.file("MP3", null, 320) to app.siansa.playback.PlayingAs.of("Uncharacteristically long living room television", null, 0, cached = false, wifi = true),
                             ("M4A" to null) to app.siansa.playback.PlayingAs.of(null, 0, 0, cached = true, wifi = false),
                         ).forEach { (file, playing) ->
                             Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(nowPlayingCardColor(Color(0xFF7A2E3A))).padding(Space.Page)) {

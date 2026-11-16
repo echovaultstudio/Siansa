@@ -83,6 +83,8 @@ class SpacingPlayerTest : SpacingCheck() {
         val now = compose.onNodeWithTag("streamPlaying").getBoundsInRoot()
         assertEven("File and Playing, one height", file.bottom - file.top, now.bottom - now.top, tolerance = 1.dp)
         assertEven("File and Playing, one top", file.top, now.top, tolerance = 1.dp)
+        // Their labels on one line, as their first lines.
+        assertEven("FILE and PLAYING, one line", compose.onNodeWithText("FILE").getBoundsInRoot().top, compose.onNodeWithText("PLAYING").getBoundsInRoot().top, tolerance = 1.dp)
     }
 
     /** A menu row whose label wraps (issue #778) grows to fit it, with the same gap above and below; a short one stays 48 dp. */

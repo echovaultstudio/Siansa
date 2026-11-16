@@ -479,22 +479,25 @@ internal fun StreamPath(file: Pair<String, String?>, playing: PlayingAs) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Space.Small),
     ) {
-        StreamEnd("FILE", file.first, file.second, lit = false, Modifier.weight(1f).fillMaxHeight().testTag("streamFile"))
+        // The file's side is as wide as its words ("FLAC", "2,116 kbit/s" never broken), Playing gets the rest.
+        StreamEnd("FILE", file.first, file.second, lit = false, Modifier.width(IntrinsicSize.Max).fillMaxHeight().testTag("streamFile"))
         Icon(Icons.AutoMirrored.Rounded.ArrowForward, null, tint = Color.White.copy(alpha = 0.45f), modifier = Modifier.size(STREAM_ARROW))
-        StreamEnd("PLAYING", playing.title, playing.detail, lit = playing.differs, Modifier.weight(STREAM_PLAYING_SHARE).fillMaxHeight().testTag("streamPlaying"))
+        StreamEnd("PLAYING", playing.title, playing.detail, lit = playing.differs, Modifier.weight(1f).fillMaxHeight().testTag("streamPlaying"))
     }
 }
 
 @Composable
 private fun StreamEnd(label: String, title: String, detail: String?, lit: Boolean, modifier: Modifier) {
-    val shape = RoundedCornerShape(12.dp)
+    // The Flow pad's curve (the owner, 16 Nov: "a bit more pill shaped"), with room inside it so no word meets the
+    // curve. Both boxes start at the top, so their labels and their first lines sit on one line each.
+    val shape = RoundedCornerShape(STREAM_CORNER)
     Column(
         modifier
             .clip(shape)
             .background(if (lit) Accent.copy(alpha = 0.13f) else Color.White.copy(alpha = 0.06f))
             .then(if (lit) Modifier.border(1.dp, Accent.copy(alpha = 0.4f), shape) else Modifier)
-            .padding(horizontal = Space.Medium, vertical = Space.Small),
-        verticalArrangement = Arrangement.Center,
+            .padding(horizontal = Space.Page, vertical = Space.Medium),
+        verticalArrangement = Arrangement.Top,
     ) {
         Text(label, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.45f), letterSpacing = 0.4.sp, maxLines = 1)
         Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -503,9 +506,9 @@ private fun StreamEnd(label: String, title: String, detail: String?, lit: Boolea
 }
 
 private val STREAM_ARROW = 18.dp
+/** As the Flow pad's corners (MoodShaper's board). */
+internal val STREAM_CORNER = 28.dp
 internal val STREAM_ARROW_FOR_TESTS get() = STREAM_ARROW
-/** The Playing side is a little wider than the File side: it says more. */
-private const val STREAM_PLAYING_SHARE = 1.35f
 
 /**
  * How [song] is playing now, for About this song (issue #1038): on a TV or speaker, from its download, converted by the
@@ -529,7 +532,9 @@ internal fun rememberPlayingAs(song: Song, state: app.siansa.playback.PlayerStat
         }
     }
     val wifi = remember(song.id, state.transcodeKbps, state.isPlaying) { app.siansa.playback.Streaming.isUnmetered(context) }
-    return PlayingAs.of(device = dlna?.name ?: cast.device, downloadKbps = download, transcodeKbps = state.transcodeKbps, cached = cached, wifi = wifi)
+    val settings by graph.settings.state.collectAsStateWithLifecycle()
+    return PlayingAs.of(device = dlna?.name ?: cast.device, downloadKbps = download, transcodeKbps = state.transcodeKbps, cached = cached, wifi = wifi,
+        cacheOn = app.siansa.playback.songCacheOn(settings))
 }
 
 /**
