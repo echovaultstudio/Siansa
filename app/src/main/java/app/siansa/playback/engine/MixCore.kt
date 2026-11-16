@@ -26,6 +26,8 @@ class MixCore(val outRate: Int) {
         /** The echo at the end of a blend (the deck going out), once the engine made one for it ([MixCore.echoOf]). */
         @Volatile var echo: Echo? = null
             internal set
+        /** Listens for the kicks in this deck's sound while a DJ blend plays (the grid check); null otherwise. */
+        @Volatile var kicks: KickListener? = null
         internal val streams = CopyOnWriteArrayList<DeckStream>()
 
         private class Mark(val inputFrame: Long, val mediaUs: Long)
@@ -234,6 +236,8 @@ class MixCore(val outRate: Int) {
                     stream.becameAudible = false
                     (started ?: mutableListOf<DeckStream>().also { started = it }).add(stream)
                 }
+                // The kicks are heard before the volume and the filter: a fading song, its bass swapped out, still has its beat.
+                if (stream === deck.current) deck.kicks?.feed(scratch, frames, mixStart)
                 // The echo takes the song before its volume (a send before the fader): it rings on as the song goes.
                 if (echo != null) for (i in 0 until frames * 2) echoIn[i] += scratch[i]
                 val g0 = stream.gainNow

@@ -48,6 +48,9 @@ object LastBlend {
         val speed: Float? = null,
         val fromLockMs: Double? = null,
         val toLockMs: Double? = null,
+        /** The grid check (siansa-dev #63): how far each song's kicks landed off its grid (ms), when enough were heard. */
+        val fromGridOffMs: Long? = null,
+        val toGridOffMs: Long? = null,
     ) {
         /** What goes to Siansa Beats: the plugin's `POST /api/bad-blends` body. */
         fun toJson(): JsonObject = buildJsonObject {
@@ -66,6 +69,8 @@ object LastBlend {
                 speed?.let { put("speed", it) }
                 fromLockMs?.let { put("from_lock_ms", it) }
                 toLockMs?.let { put("to_lock_ms", it) }
+                fromGridOffMs?.let { put("from_grid_off_ms", it) }
+                toGridOffMs?.let { put("to_grid_off_ms", it) }
             })
         }
     }
@@ -77,6 +82,12 @@ object LastBlend {
     fun record(fromId: String, toId: String, atMs: Long, plan: FadePlan, dj: Boolean, now: Long = SystemClock.elapsedRealtime()) {
         if (!enabled) return
         last.value = of(fromId, toId, atMs, plan, dj, now)
+    }
+
+    /** The grid check of the blend just over ([GridCheck]): kept with it, so a bad blend marked says it. */
+    fun gridChecked(from: GridCheck.Side, to: GridCheck.Side) {
+        val now = last.value ?: return
+        last.value = now.copy(fromGridOffMs = from.offMs.takeIf { from.sure }, toGridOffMs = to.offMs.takeIf { to.sure })
     }
 
     /** The report of a blend ([record] without keeping it): for tests. */
@@ -120,7 +131,8 @@ object LastBlend {
             "Crossfade",
             "Bad blend marked: ${report.fromId} into ${report.toId} (${report.technique}) · ${report.why} · " +
                 "started at ${report.atMs / 1000} s of the old song" +
-                (report.fromRhythm?.let { " · confidence out %.2f, in %.2f".format(java.util.Locale.ROOT, it, report.toRhythm ?: 0f) }.orEmpty()),
+                (report.fromRhythm?.let { " · confidence out %.2f, in %.2f".format(java.util.Locale.ROOT, it, report.toRhythm ?: 0f) }.orEmpty()) +
+                (if (report.fromGridOffMs != null || report.toGridOffMs != null) " · kicks off the grid: out ${report.fromGridOffMs?.let { "$it ms" } ?: "?"}, in ${report.toGridOffMs?.let { "$it ms" } ?: "?"}" else ""),
             event = "crossfade.bad_blend", fields = mapOf("technique" to report.technique, "bars" to report.bars),
         )
         return try {
