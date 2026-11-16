@@ -106,6 +106,13 @@ row, or set each kind to **Pinned**, **Automatic** or **Off**. Pinned kinds alwa
 pin them, and are never pushed out by other notices; the automatic ones fill the places left. The notices are
 always at the top of Home, so they're not in Arrange Home.
 
+## What's new after an update
+
+The first time you open Siansa after an update, a small sheet comes up over Home with the biggest changes and fixes of
+that update, at most five lines, and **Every version's changes**, which opens the full list. Close it with **Done** or
+by swiping it down; it doesn't come back until the next update. It reads the list that comes with the app, so nothing
+is fetched. After a fresh install it doesn't show.
+
 ## Vibes and today's mix
 
 A **vibe** covers part of the day. Siansa starts with Morning, Daytime, Evening and Night. When you open the app,

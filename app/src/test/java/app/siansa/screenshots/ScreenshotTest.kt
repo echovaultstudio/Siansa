@@ -530,6 +530,27 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                 }
             },
             // The notices row at the top of Home (issue #784), with a long book title cut off.
+            // What's new after an update (the owner, 16 Nov): the sheet's rows with long headlines and more changes left,
+            // and a small update with nothing left over.
+            Scene("home_whats_new") {
+                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Space.Section)) {
+                    app.siansa.ui.WhatsNewPanel(
+                        app.siansa.ui.UpdateSummary(
+                            "1.6.0",
+                            listOf(
+                                "Siansa Beats",
+                                "DJ mixes on measured beats, for any album, playlist or list, uncharacteristically long",
+                                "Star ratings for songs",
+                                "Download all covers missed many artist photos",
+                                "Siansa could close on an artist's page",
+                            ),
+                            more = 12,
+                        ),
+                        onOpenAll = {}, onDone = {},
+                    )
+                    app.siansa.ui.WhatsNewPanel(app.siansa.ui.UpdateSummary("1.5.7", listOf("Artists kept the star though the server had their photo"), more = 0), onOpenAll = {}, onDone = {})
+                }
+            },
             Scene("home_notices") {
                 app.siansa.ui.HomeTopBar(
                     listOf(
