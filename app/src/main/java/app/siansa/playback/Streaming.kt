@@ -66,29 +66,29 @@ object Streaming {
      * from the library instead, and seeking is done by Navidrome ([ServerSeekPlayer]).
      */
     fun rewrite(uri: Uri, kbps: Int): Uri =
-        if (isEmbyStream(uri)) convertOnEmby(uri, kbps) else convert(uri, "opus", kbps, estimateLength = false)
+        if (isEmbyStream(uri)) convertOnEmby(uri, "opus", "ogg", kbps) else convert(uri, "opus", kbps, estimateLength = false)
 
     /**
-     * The Opus conversion of a song on Emby or Jellyfin (issue #1204): Opus in Ogg, from their ffmpeg, starting at
-     * [TICKS_PARAM] when it's there. Each stream carries its own play session: without one, both servers hand out
+     * A conversion of a song on Emby or Jellyfin (issue #1204): [codec] in [container], from their ffmpeg, starting
+     * at [TICKS_PARAM] when it's there. Each stream carries its own play session: without one, both servers hand out
      * the conversion they made first for that song, and so ignore where it's asked to start. The session is named
-     * by the song, the bitrate and the start, so the very same stream asked for again is the same conversion.
+     * by the song, the format and the start, so the very same stream asked for again is the same conversion.
+     * [kbps] is left out for FLAC, which has none.
+     *
+     * Emby 4.8 can't "convert" a file to the format it's already in (it answers "Error starting ffmpeg", HTTP 500):
+     * callers send that file as it is ([keepsOriginal]).
      */
-    fun convertOnEmby(uri: Uri, kbps: Int): Uri {
-        if (kbps <= 0 || !isEmbyStream(uri)) return uri
+    fun convertOnEmby(uri: Uri, codec: String, container: String, kbps: Int?): Uri {
+        if ((kbps != null && kbps <= 0) || !isEmbyStream(uri)) return uri
         val builder = uri.buildUpon().clearQuery()
         val replaced = setOf("Static", "Container", EMBY_CODEC, EMBY_BITRATE, EMBY_SESSION)
         uri.queryParameterNames.filter { name -> replaced.none { it.equals(name, ignoreCase = true) } }.forEach { name ->
             uri.getQueryParameters(name).forEach { builder.appendQueryParameter(name, it) }
         }
         val id = uri.pathSegments.let { it.getOrNull(it.indexOfLast { s -> s.equals("Audio", ignoreCase = true) } + 1) }.orEmpty()
-        return builder
-            .appendQueryParameter("Static", "false")
-            .appendQueryParameter("Container", "ogg")
-            .appendQueryParameter(EMBY_CODEC, "opus")
-            .appendQueryParameter(EMBY_BITRATE, (kbps * 1000).toString())
-            .appendQueryParameter(EMBY_SESSION, "siansa-$id-opus$kbps-${offsetMs(uri) / 1000}")
-            .build()
+        builder.appendQueryParameter("Static", "false").appendQueryParameter("Container", container).appendQueryParameter(EMBY_CODEC, codec)
+        if (kbps != null) builder.appendQueryParameter(EMBY_BITRATE, (kbps * 1000).toString())
+        return builder.appendQueryParameter(EMBY_SESSION, "siansa-$id-$codec${kbps ?: ""}-${offsetMs(uri) / 1000}").build()
     }
 
     /** Navidrome's start offset for a converted stream, in seconds (issue #162). */
@@ -130,7 +130,13 @@ object Streaming {
             if (isEmbyStream(uri)) builder.appendQueryParameter(TICKS_PARAM, (seconds * 1000 * TICKS_PER_MS).toString())
             else builder.appendQueryParameter(OFFSET_PARAM, seconds.toString())
         }
-        return builder.build()
+        val out = builder.build()
+        // An Emby or Jellyfin conversion is named by its start: a new start is a new play session, or the server
+        // hands out the conversion it's already making, from the old start.
+        val codec = out.getQueryParameter(EMBY_CODEC)
+        val container = out.getQueryParameter("Container")
+        if (isEmbyStream(out) && formatOf(out) != null && codec != null && container != null) return convertOnEmby(out, codec, container, kbpsOf(out))
+        return out
     }
 
     /** The format a stream is converted to ("opus", "mp3"), or null for the original file. */
@@ -156,10 +162,7 @@ object Streaming {
      * beginning, wherever it was asked to start (a seek started the song again), and Emby 4.8 answers "Error starting
      * ffmpeg" (HTTP 500). Emby and Jellyfin call the file's type "ogg", Opus or Vorbis.
      */
-    fun keepsOriginal(kind: app.siansa.net.SourceKind, suffix: String?): Boolean {
-        val type = suffix?.trim()?.lowercase()?.removePrefix(".") ?: return false
-        return type == "opus" || (kind.embyLike && (type == "ogg" || type == "oga"))
-    }
+    fun keepsOriginal(kind: app.siansa.net.SourceKind, suffix: String?): Boolean = sameFormat(kind.embyLike, suffix, "opus")
 
     private const val EMBY_CODEC = "AudioCodec"
     private const val EMBY_BITRATE = "AudioBitRate"
@@ -169,7 +172,13 @@ object Streaming {
      * The stream a Chromecast plays: MP3 320 converted by Navidrome, which every Cast device can play
      * (the original file may be hi-res FLAC or ALAC, which they can't).
      */
-    fun forCast(uri: Uri): Uri = convert(uri, "mp3", CAST_KBPS, estimateLength = true)
+    fun forCast(uri: Uri, suffix: String? = null): Uri = when {
+        // An MP3 file goes as it is, and the device seeks inside it: asked for MP3 from one, Navidrome sends the file
+        // from its beginning wherever it's asked to start, and Emby can't convert it (issue #1204).
+        sameFormat(uri, suffix, "mp3") -> uri
+        isEmbyStream(uri) -> convertOnEmby(uri, "mp3", "mp3", CAST_KBPS)
+        else -> convert(uri, "mp3", CAST_KBPS, estimateLength = true)
+    }
 
     const val CAST_KBPS = 320
     const val CAST_MIME = "audio/mpeg"
@@ -180,7 +189,23 @@ object Streaming {
      * Without an estimated length: Opus is variable, so an estimate would leave the device waiting at the end for data
      * that never comes.
      */
-    fun forCastOpus(uri: Uri): Uri = convert(uri, "opus", CAST_KBPS, estimateLength = false)
+    fun forCastOpus(uri: Uri, suffix: String? = null): Uri = when {
+        // A file that is Opus already isn't converted to Opus, for the same reason: the device gets the MP3 of it.
+        sameFormat(uri, suffix, "opus") -> uri
+        isEmbyStream(uri) -> convertOnEmby(uri, "opus", "ogg", CAST_KBPS)
+        else -> convert(uri, "opus", CAST_KBPS, estimateLength = false)
+    }
+
+    /** The FLAC conversion of a song on Emby or Jellyfin, for a TV in lossless quality (issue #1204). */
+    fun flacOnEmby(uri: Uri): Uri = convertOnEmby(uri, "flac", "flac", kbps = null)
+
+    /** Whether a file of type [suffix] is in [format] already. Emby and Jellyfin ([emby]) call an Opus file "ogg". */
+    private fun sameFormat(emby: Boolean, suffix: String?, format: String): Boolean {
+        val type = suffix?.trim()?.lowercase()?.removePrefix(".") ?: return false
+        return type == format || (emby && format == "opus" && (type == "ogg" || type == "oga"))
+    }
+
+    private fun sameFormat(uri: Uri, suffix: String?, format: String): Boolean = sameFormat(isEmbyStream(uri), suffix, format)
 
     const val CAST_OPUS_MIME = "audio/ogg"
 

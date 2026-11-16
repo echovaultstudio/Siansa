@@ -334,7 +334,8 @@ Chromecast:
 It applies to music you start playing after you change it. Siansa asks your server for each song's file type just
 before the songs go to the TV (the library doesn't keep it), which can take a moment for a long queue. Converting to
 FLAC needs Navidrome (or another Subsonic server) with a **flac** transcoding, and Opus its **opus** transcoding (both
-come with Navidrome); with Jellyfin and Emby, those files go as MP3 320.
+come with Navidrome). Jellyfin and Emby convert to FLAC, Opus and MP3 with their own ffmpeg, nothing to set up. A file
+that is in the format already (an MP3 as MP3, say) is sent as it is.
 
 **Adding the FLAC conversion to Navidrome.** Recent Navidrome versions come with it (**Settings › Transcodings**
 lists **flac audio**). If yours doesn't, ALAC songs fall back to MP3 320 on the TV. To add it, sign in to Navidrome as

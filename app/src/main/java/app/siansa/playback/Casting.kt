@@ -454,8 +454,8 @@ object CastOriginals {
     /**
      * What Siansa's TV screen plays instead of the MP3 for a song of type [suffix] whose original is at [streamUrl]
      * (issue #114), or null when it plays the MP3: always with [CastQuality.Mp3]; in lossless, the original where every
-     * Cast device plays its type, else the server's FLAC conversion of it (Navidrome and other Subsonic servers only;
-     * Jellyfin and Emby addresses get the MP3, as before).
+     * Cast device plays its type, else the server's FLAC conversion of it (Navidrome and other Subsonic servers
+     * with a "flac" transcoding; Emby and Jellyfin with their own ffmpeg, issue #1204).
      */
     fun source(suffix: String?, quality: CastQuality, streamUrl: String): CastSource? {
         if (quality != CastQuality.Lossless) return null
@@ -465,12 +465,14 @@ object CastOriginals {
     }
 
     /**
-     * A Subsonic stream address asking for the song as FLAC (format=flac, replacing format=raw), or null for any other
-     * address. No maxBitRate (FLAC has none) and no estimated length: an estimate would be wrong for FLAC, and the TV
+     * A stream address asking for the song as FLAC: Subsonic's format=flac (replacing format=raw), Emby's and Jellyfin's
+     * AudioCodec=flac, or null for any other address. No maxBitRate (FLAC has none) and no estimated length: an estimate would be wrong for FLAC, and the TV
      * would wait at the song's end for data that never comes.
      */
     fun flacUrl(streamUrl: String): String? {
         val path = streamUrl.substringBefore('?').substringBefore('#')
+        // Emby and Jellyfin convert with their own ffmpeg (issue #1204).
+        if (Regex("""/Audio/[^/]+/stream[^/]*$""", RegexOption.IGNORE_CASE).containsMatchIn(path)) return Streaming.flacOnEmby(Uri.parse(streamUrl)).toString()
         if (!path.endsWith("/rest/stream") && !path.endsWith("/rest/stream.view")) return null
         val format = Regex("""([?&])format=[^&#]*""")
         if (format.containsMatchIn(streamUrl)) return format.replace(streamUrl) { it.groupValues[1] + "format=flac" }
@@ -522,8 +524,8 @@ class CastItems(private val api: MusicSource) : MediaItemConverter {
         // The lossy stream the TV falls back to: Opus 320 (MP3 320 in that quality, or where the server can't convert),
         // with MP3 320 after it for TVs that can't play Opus (Siansa's TV screen goes original → Opus → MP3).
         val raw = Uri.parse(api.streamUrl(mediaItem.mediaId))
-        val mp3 = from(Streaming.forCast(raw).toString())
-        val opus = Streaming.forCastOpus(raw).toString().takeIf { CastSettings.quality.value != CastQuality.Mp3 && it != raw.toString() }?.let(from)
+        val mp3 = from(Streaming.forCast(raw, CastFormats.suffixOf(song)).toString())
+        val opus = Streaming.forCastOpus(raw, CastFormats.suffixOf(song)).toString().takeIf { CastSettings.quality.value != CastQuality.Mp3 && it != raw.toString() }?.let(from)
         if (opus != null) custom.put(OPUS_URL, opus).put(MP3_URL, mp3)
         val info = MediaInfo.Builder(mediaItem.mediaId)
             .setContentUrl(opus ?: mp3)

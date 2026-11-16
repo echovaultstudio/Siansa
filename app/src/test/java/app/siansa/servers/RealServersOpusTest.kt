@@ -92,4 +92,50 @@ class RealServersOpusTest(private val server: String) {
         }
         assertTrue("$server: songs converted", converted >= songs.size - 1)
     }
+
+    private fun bytes(url: Uri, what: String): ByteArray = http.newCall(Request.Builder().url(url.toString()).build()).execute().use { r ->
+        assertEquals("$what: answer", 200, r.code)
+        // Navidrome's MP3 comes with an estimated length, which can be more than it sends: read what there is.
+        val out = java.io.ByteArrayOutputStream()
+        val buffer = ByteArray(64 * 1024)
+        val input = r.body!!.byteStream()
+        try { while (true) { val n = input.read(buffer); if (n < 0) break; out.write(buffer, 0, n) } } catch (_: java.io.IOException) { }
+        out.toByteArray()
+    }
+
+    private fun ByteArray.startsWith(mark: String) = size > mark.length && mark.indices.all { this[it] == mark[it].code.toByte() }
+
+    /**
+     * What a TV or speaker is sent (Chromecast, DLNA): MP3 320, Opus 320 and, on Emby and Jellyfin, FLAC, each whole
+     * and from 10 seconds in, as a seek on the TV asks for it.
+     */
+    @Test fun everySongConvertsForATvOrSpeaker() = runBlocking {
+        val source = source()
+        source.songsPage(0, 500).forEach { s ->
+            val what = "$server ${s.title} (.${s.suffix})"
+            val plain = Uri.parse(source.streamUrl(s.id))
+            val mp3 = Streaming.forCast(plain, s.suffix)
+            val whole = bytes(mp3, "$what as MP3")
+            // An MP3 starts with its ID3 tag or a frame.
+            assertTrue("$what: an MP3", whole.startsWith("ID3") || (whole[0] == 0xFF.toByte() && (whole[1].toInt() and 0xE0) == 0xE0))
+            if (Streaming.formatOf(mp3) != null) {
+                val part = bytes(Streaming.startingAt(mp3, 10_000), "$what as MP3 from 10s")
+                assertTrue("$what: MP3 from 10s is shorter (${part.size} of ${whole.size})", part.size < whole.size * 0.85)
+            }
+            val opus = Streaming.forCastOpus(plain, s.suffix)
+            if (opus != plain) {
+                val all = opusSeconds(bytes(opus, "$what as Opus 320"))
+                val from = opusSeconds(bytes(Streaming.startingAt(opus, 10_000), "$what as Opus 320 from 10s"))
+                assertEquals("$what: Opus 320 from 10s", all - 10, from, 1.5)
+            }
+            // FLAC of files a TV can't play: Emby and Jellyfin always can; Navidrome needs a "flac" transcoding set up.
+            if (kind.embyLike && app.siansa.playback.CastOriginals.convertsToFlac(s.suffix)) {
+                val flac = Uri.parse(app.siansa.playback.CastOriginals.flacUrl(plain.toString())!!)
+                val all = bytes(flac, "$what as FLAC")
+                assertTrue("$what: FLAC", all.startsWith("fLaC"))
+                val part = bytes(Streaming.startingAt(flac, 10_000), "$what as FLAC from 10s")
+                assertTrue("$what: FLAC from 10s is shorter", part.startsWith("fLaC") && part.size < all.size * 0.85)
+            }
+        }
+    }
 }
