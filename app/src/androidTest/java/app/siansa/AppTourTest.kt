@@ -18,6 +18,7 @@ import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.onRoot
@@ -227,8 +228,11 @@ class AppTourTest {
                 click("Lyrics")
                 idle(1500)
                 shot("10c-lyrics")
-                back()
-                idle(600)
+                // A hard pull down on the lyrics closes the lyrics only: now playing stays (the owner, 16 Nov).
+                compose.onAllNodesWithTag("lyricsScreen").onFirst().performTouchInput { swipeDown(startY = top + height * 0.3f, endY = bottom, durationMillis = 120) }
+                idle(1200)
+                check(compose.onAllNodesWithTag("lyricsScreen").fetchSemanticsNodes().isEmpty()) { "a pull down left the lyrics open" }
+                check(compose.onAllNodesWithContentDescription("Song options").fetchSemanticsNodes().isNotEmpty()) { "a pull down on the lyrics closed now playing too" }
                 // Scrolled down to the cards under the player.
                 compose.onRoot().performTouchInput { swipeUp(startY = bottom * 0.8f, endY = top + bottom * 0.1f) }
                 idle(1500)
