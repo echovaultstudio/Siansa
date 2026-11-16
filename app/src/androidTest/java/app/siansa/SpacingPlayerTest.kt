@@ -70,7 +70,7 @@ class SpacingPlayerTest : SpacingCheck() {
         assertEven("Rate, as tall as a menu row", rate.bottom - rate.top, app.siansa.ui.MENU_ROW_HEIGHT, tolerance = 1.dp)
     }
 
-    /** File → Playing (issue #1038): the two boxes are one height, and the arrow has the same gap on both sides. */
+    /** File → Playing (issue #1038): one box, its two sides one height, with the same room inside it all round. */
     @Test fun fileAndPlayingAreEvenlySpaced() {
         compose.setContent {
             androidx.compose.material3.MaterialTheme(colorScheme = app.siansa.ui.playerColors()) {
@@ -83,6 +83,9 @@ class SpacingPlayerTest : SpacingCheck() {
         val now = compose.onNodeWithTag("streamPlaying").getBoundsInRoot()
         assertEven("File and Playing, one height", file.bottom - file.top, now.bottom - now.top, tolerance = 1.dp)
         assertEven("File and Playing, one top", file.top, now.top, tolerance = 1.dp)
+        val box = compose.onNodeWithTag("streamPath").getBoundsInRoot()
+        assertEven("The box, left and right inside", file.left - box.left, box.right - now.right, tolerance = 1.dp)
+        assertEven("The box, above and below inside", file.top - box.top, box.bottom - file.bottom, tolerance = 1.dp)
         // Their labels on one line, as their first lines.
         assertEven("FILE and PLAYING, one line", compose.onNodeWithText("FILE").getBoundsInRoot().top, compose.onNodeWithText("PLAYING").getBoundsInRoot().top, tolerance = 1.dp)
     }
