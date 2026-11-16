@@ -224,7 +224,6 @@ internal class MixedCrossfader(
                         quickHandover = EngineFade.handoverAt(quickAt, position)
                     }
                 }
-                }
                 if (chosen == null || quickAt == null || quickHandover == null || quickHandover - position < MIN_PREPARE_MS) {
                     AppLog.i("Crossfade", "Too close to the end of ${current.id} to get a fade ready (${fade.why}): the songs change without one")
                     skipped = item.mediaId
