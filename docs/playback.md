@@ -5,9 +5,13 @@
 **Settings › Streaming & storage › Streaming quality**, set separately **On Wi-Fi** and **On mobile data**:
 
 - **Original**: the file as it is on your server. Best on Wi-Fi.
-- **Opus 96–320 kbit/s**: converted by your server (Navidrome's "opus" transcoding profile), to save data.
-- **On Emby** the original file is always played and downloaded: Siansa can only have Navidrome and other
-  Subsonic servers convert songs, so the quality choices don't change anything there.
+- **Opus 96–320 kbit/s**: converted by your server, to save data. Navidrome uses its "opus" transcoding profile;
+  Emby and Jellyfin convert with their own ffmpeg (your user there must be allowed audio transcoding, which is the
+  default).
+- A file that is Opus already is played as it is, whatever you choose: it's small, and the servers don't convert it
+  again.
+
+Moving to another spot in a converted song has the server start a new conversion from there, so it takes a moment.
 
 Siansa always plays the quality you chose; it never switches by itself. Changes apply from the next song.
 

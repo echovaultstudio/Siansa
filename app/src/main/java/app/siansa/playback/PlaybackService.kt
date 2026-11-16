@@ -152,7 +152,7 @@ class PlaybackService : MediaLibraryService() {
         exo = built.player
         val player = ServerSeekPlayer(
             exo,
-            converted = { id -> !OutsideMedia.isOutside(id) && graph.downloads.fileFor(id) == null && (chosenKbps[id] ?: Streaming.bitrate(this, graph.settings.current)) > 0 },
+            converted = { id -> !OutsideMedia.isOutside(id) && graph.downloads.fileFor(id) == null && !keepsOriginal(id) && (chosenKbps[id] ?: Streaming.bitrate(this, graph.settings.current)) > 0 },
             durationMsOf = { id -> SongRegistry.get(id)?.durationSec?.takeIf { it > 0 }?.let { it * 1000L } },
         )
         phone = player
@@ -337,6 +337,8 @@ class PlaybackService : MediaLibraryService() {
         return listOfNotNull(exo.currentMediaItem?.mediaId, next).any { id -> Passthrough.involves(mode, id, SongRegistry.get(id)?.suffix) }
     }
 
+    private fun keepsOriginal(songId: String): Boolean = Streaming.keepsOriginal(graph.source.kind, SongRegistry.get(songId)?.suffix)
+
     private fun kbpsFor(songId: String): Int = if (OutsideMedia.isOutside(songId)) 0 else chosenKbps.getOrPut(songId) {
         // A file type the phone can't open is converted from the start (issue #354).
         SongRegistry.get(songId)?.suffix?.takeIf { Formats.mustConvert(it) }?.let { suffix ->
@@ -347,6 +349,11 @@ class PlaybackService : MediaLibraryService() {
         // A Dolby or DTS file always streams untouched while passthrough is on (issue #860): Opus can't go to the receiver.
         SongRegistry.get(songId)?.suffix?.takeIf { Passthrough.keepsOriginal(graph.settings.current.audioPassthrough, it) }?.let { suffix ->
             AppLog.i("Stream", "Song $songId: original .$suffix, for audio passthrough")
+            return@getOrPut 0
+        }
+        // A file that is Opus already plays as it is (issue #1204): it's small, and the servers don't convert it again.
+        if (keepsOriginal(songId)) {
+            if (Streaming.bitrate(this, graph.settings.current) > 0) AppLog.i("Stream", "Song $songId: original, it's an Opus file already")
             return@getOrPut 0
         }
         // Otherwise only what's chosen in Settings → Playback: Siansa never switches quality on its own.
@@ -1092,7 +1099,7 @@ class PlaybackService : MediaLibraryService() {
             if (OutsideMedia.isOutside(item.mediaId)) return
             if (chosenKbps[item.mediaId] == FALLBACK_KBPS) return
             if (graph.connection.current.offline) return
-            AppLog.w("Audio", "The phone can't play ${item.mediaId} (${error.errorCodeName}); playing it as Opus $FALLBACK_KBPS kbit/s from Navidrome",
+            AppLog.w("Audio", "The phone can't play ${item.mediaId} (${error.errorCodeName}); playing it as Opus $FALLBACK_KBPS kbit/s from the server",
                 event = "playback.recovery", fields = mapOf("song_id" to item.mediaId, "action" to "transcode_opus", "reason" to error.errorCodeName))
             chosenKbps[item.mediaId] = FALLBACK_KBPS
             val uri = item.localConfiguration?.uri ?: return
@@ -1131,7 +1138,7 @@ class PlaybackService : MediaLibraryService() {
                 AppLog.e("Audio", "Can't play ${item.mediaId} even as Opus: $desc", event = "playback.unsupported_format", fields = mapOf("song_id" to item.mediaId, "format" to desc))
                 return
             }
-            AppLog.w("Audio", "This phone can't decode ${item.mediaId} ($desc); playing it as Opus $FALLBACK_KBPS kbit/s from Navidrome",
+            AppLog.w("Audio", "This phone can't decode ${item.mediaId} ($desc); playing it as Opus $FALLBACK_KBPS kbit/s from the server",
                 event = "playback.recovery", fields = mapOf("song_id" to item.mediaId, "action" to "transcode_opus", "reason" to "unsupported_format", "format" to desc))
             chosenKbps[item.mediaId] = FALLBACK_KBPS
             val uri = item.localConfiguration?.uri ?: return
@@ -1313,7 +1320,7 @@ class PlaybackService : MediaLibraryService() {
                 val alreadyOpus = (chosenKbps[id] ?: 0) > 0
                 when {
                     !alreadyOpus -> {
-                        AppLog.w("Player", "Song $id stuck for 5 s with its data loaded ($where); playing the rest as Opus $FALLBACK_KBPS kbit/s from Navidrome",
+                        AppLog.w("Player", "Song $id stuck for 5 s with its data loaded ($where); playing the rest as Opus $FALLBACK_KBPS kbit/s from the server",
                             event = "playback.recovery", fields = mapOf("song_id" to id, "action" to "transcode_opus", "reason" to "stuck", "position_ms" to position))
                         chosenKbps[id] = FALLBACK_KBPS
                         val uri = item.localConfiguration?.uri ?: return

@@ -29,7 +29,7 @@ lists the `apiKeyAuthentication` extension, every request sends `apiKey` instead
 |---|---|
 | Connect | `POST /Users/AuthenticateByName`, `GET /System/Info/Public` |
 | Library | `/Users/{user}/Views`, `/Users/{user}/Items`, `/Artists/AlbumArtists`, `/Items/{id}/Similar`, `/Songs/{id}/InstantMix` |
-| Playback | `/Audio/{id}/stream?Static=true`, `/Items/{id}/Images/Primary`, lyrics from the item's subtitle stream |
+| Playback | `/Audio/{id}/stream` (original with `Static=true`, or Opus with `Static=false&Container=ogg&AudioCodec=opus&AudioBitRate=…&PlaySessionId=…`, and `StartTimeTicks` after a seek), `/Items/{id}/Images/Primary`, lyrics from the item's subtitle stream |
 | Favourites | `/Users/{user}/FavoriteItems/{id}` |
 | Plays | `POST /Users/{user}/PlayedItems/{id}?DatePlayed=yyyyMMddHHmmss`, and `/Sessions/Playing`, `/Sessions/Playing/Progress`, `/Sessions/Playing/Stopped` for "now playing" |
 | Playlists | `/Playlists`, `/Playlists/{id}/Items` |

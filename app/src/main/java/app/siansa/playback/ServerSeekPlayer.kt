@@ -12,13 +12,13 @@ import androidx.media3.exoplayer.source.ShuffleOrder
 import app.siansa.log.AppLog
 
 /**
- * The phone's player, with seeking in converted (Opus) streams done by Navidrome (issue #162).
+ * The phone's player, with seeking in converted (Opus) streams done by the server (issue #162; Emby and Jellyfin, #1204).
  *
- * Navidrome converts a song while it sends it, so the player can't jump inside that stream: it has to read
+ * The server converts a song while it sends it, so the player can't jump inside that stream: it has to read
  * everything up to the new spot first (on a slow connection that's minutes, and the song looks stuck). Instead,
- * a seek in a converted song asks Navidrome for a new conversion starting there (`timeOffset`, in whole
- * seconds), and this player adds where that stream starts to every position it reports, so the seek bar, the
- * lock screen and scrobbling see the song's real position. Originals, downloads and cached songs seek as usual.
+ * a seek in a converted song asks the server for a new conversion starting there (Navidrome's `timeOffset`, Emby's
+ * and Jellyfin's `StartTimeTicks`, in whole seconds), and this player adds where that stream starts to every
+ * position it reports, so the seek bar, the lock screen and scrobbling see the song's real position. Originals, downloads and cached songs seek as usual.
  *
  * [converted] says whether a song streams converted now (and isn't played from a download).
  */
@@ -41,7 +41,7 @@ class ServerSeekPlayer(
         })
     }
 
-    /** Where the current stream starts in its song (0 unless Navidrome was asked to start later). */
+    /** Where the current stream starts in its song (0 unless the server was asked to start later). */
     private fun offset(): Long = Streaming.offsetMs(exo.currentMediaItem?.localConfiguration?.uri)
 
     override fun getCurrentPosition(): Long = exo.currentPosition + offset()
@@ -67,7 +67,7 @@ class ServerSeekPlayer(
         live(exo.isCurrentMediaItemLive, exo.currentMediaItem?.mediaId?.let(converted) == true)
 
     // A converted stream has no length, so the player itself says it can't seek in it, and the app's controller
-    // would then drop a seek before it got here. Seeking is done by Navidrome, so it's offered.
+    // would then drop a seek before it got here. Seeking is done by the server, so it's offered.
     private fun withSeek(commands: Player.Commands): Player.Commands {
         val id = exo.currentMediaItem?.mediaId ?: return commands
         if (!converted(id)) return commands
@@ -129,7 +129,7 @@ class ServerSeekPlayer(
         // Already streaming from that very second: nothing to load again.
         if (mediaItemIndex == exo.currentMediaItemIndex && start > 0 && target / 1000 * 1000 == start && exo.currentPosition < 1_000) return
         val next = Streaming.startingAt(uri, target)
-        AppLog.i("Stream", "Song ${item.mediaId}: converted, so Navidrome starts it at ${target / 1000}s instead of the player reading up to there")
+        AppLog.i("Stream", "Song ${item.mediaId}: converted, so the server starts it at ${target / 1000}s instead of the player reading up to there")
         swap(mediaItemIndex, item.withUri(next))
         // The new stream starts at that whole second and has no known length, so the player can't jump inside
         // it: it plays from its start (at most a second before where was asked).
