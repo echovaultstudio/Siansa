@@ -279,7 +279,7 @@ format and bit rate) and, beside it, what is really playing and where it comes f
 
 - **Same as the file**, streamed as it is (on Wi-Fi or mobile data), from the song cache, or from its download.
 - **Opus** with its bit rate when your server converts the song for the connection you're on, or when the song was
-  downloaded as Opus. The box is lit then, so a converted song shows at a glance.
+  downloaded as Opus. It's written in the accent colour then, so a converted song shows at a glance.
 - **On** a TV or speaker's name while you cast.
 
 Offline, a downloaded song still shows how it plays, with the file type the library knows. Turn it off in **Settings ›

@@ -484,14 +484,22 @@ fun AboutSongCard(song: Song, surface: Color, stars: Int? = null, playing: Playi
 }
 
 /**
- * File → Playing in About this song (issue #1038): the file as it is on the server at the left, an arrow, and what is
- * really playing at the right, lit in the accent colour only when that isn't the file as it is (converted to Opus, or
- * an Opus download).
+ * File → Playing in About this song (issue #1038): one box (the owner, 16 Nov: "one continuous box for all this info,
+ * slightly smaller, tidier"), the file as it is on the server at the left, an arrow, and what is really playing at the
+ * right, its first line in the accent colour only when that isn't the file as it is (converted to Opus, or an Opus
+ * download).
  */
 @Composable
 internal fun StreamPath(file: Pair<String, String?>, playing: PlayingAs) {
+    // The Flow pad's curve, with room inside it so no word meets the curve.
     Row(
-        Modifier.fillMaxWidth().height(IntrinsicSize.Min).testTag("streamPath"),
+        Modifier
+            .fillMaxWidth()
+            .testTag("streamPath")
+            .clip(RoundedCornerShape(STREAM_CORNER))
+            .background(Color.White.copy(alpha = 0.06f))
+            .padding(horizontal = Space.Page, vertical = Space.Small)
+            .height(IntrinsicSize.Min),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Space.Small),
     ) {
@@ -504,19 +512,10 @@ internal fun StreamPath(file: Pair<String, String?>, playing: PlayingAs) {
 
 @Composable
 private fun StreamEnd(label: String, title: String, detail: String?, lit: Boolean, modifier: Modifier) {
-    // The Flow pad's curve (the owner, 16 Nov: "a bit more pill shaped"), with room inside it so no word meets the
-    // curve. Both boxes start at the top, so their labels and their first lines sit on one line each.
-    val shape = RoundedCornerShape(STREAM_CORNER)
-    Column(
-        modifier
-            .clip(shape)
-            .background(if (lit) Accent.copy(alpha = 0.13f) else Color.White.copy(alpha = 0.06f))
-            .then(if (lit) Modifier.border(1.dp, Accent.copy(alpha = 0.4f), shape) else Modifier)
-            .padding(horizontal = Space.Page, vertical = Space.Medium),
-        verticalArrangement = Arrangement.Top,
-    ) {
+    // Both sides start at the top, so their labels and their first lines sit on one line each.
+    Column(modifier, verticalArrangement = Arrangement.Top) {
         Text(label, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.45f), letterSpacing = 0.4.sp, maxLines = 1)
-        Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = if (lit) Accent else Color.Unspecified, maxLines = 2, overflow = TextOverflow.Ellipsis)
         if (detail != null) Text(detail, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.72f), maxLines = 3, overflow = TextOverflow.Ellipsis)
     }
 }

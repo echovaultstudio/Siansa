@@ -149,8 +149,8 @@ class StarsUiTest {
     }
 
     /**
-     * File → Playing (issue #1038): two boxes of one height with the arrow between them, the same gap on both of its
-     * sides, the Playing box named so a screen reader and the tests can tell what plays.
+     * File → Playing (issue #1038): one box, its two sides of one height with the arrow between them, the same gap on
+     * both of its sides and the same room inside the box at its left and right.
      */
     @Test fun fileAndPlayingSitEvenlySideBySide() {
         var playing by mutableStateOf(app.siansa.playback.PlayingAs.of(null, null, 256, cached = false, wifi = false))
@@ -162,18 +162,21 @@ class StarsUiTest {
         val path = compose.onNodeWithTag("streamPath").getBoundsInRoot()
         val file = compose.onNodeWithTag("streamFile").getBoundsInRoot()
         val now = compose.onNodeWithTag("streamPlaying").getBoundsInRoot()
-        assertEquals("the boxes are one height", file.height.value, now.height.value, 0.6f)
+        assertEquals("the two sides are one height", file.height.value, now.height.value, 0.6f)
         // Their labels, and their first lines, on one line each.
         val labels = compose.onAllNodes(androidx.compose.ui.test.hasText("FILE") or androidx.compose.ui.test.hasText("PLAYING")).fetchSemanticsNodes().map { it.boundsInRoot.top }
         assertEquals(2, labels.size)
         assertEquals("FILE and PLAYING on one line", labels[0], labels[1], 1f)
         assertEquals("the first line", compose.onNodeWithText("FLAC").getBoundsInRoot().top.value, compose.onNodeWithText("Opus " + app.siansa.playback.PlayingAs.kbit(256)).getBoundsInRoot().top.value, 0.6f)
-        assertEquals(path.left.value, file.left.value, 0.6f)
-        assertEquals(path.right.value, now.right.value, 0.6f)
+        // One box around both: the same room inside it at the left and the right, and above and below.
+        assertEquals(Space.Page.value, (file.left - path.left).value, 0.6f)
+        assertEquals(Space.Page.value, (path.right - now.right).value, 0.6f)
+        assertEquals(Space.Small.value, (file.top - path.top).value, 0.6f)
+        assertEquals(Space.Small.value, (path.bottom - file.bottom).value, 0.6f)
         // The arrow sits between them with the same gap on each side.
         val arrow = STREAM_ARROW_FOR_TESTS
         assertEquals((Space.Small * 2 + arrow).value, (now.left - file.right).value, 0.6f)
-        assertTrue("Playing is the wider box", now.width > file.width)
+        assertTrue("Playing is the wider side", now.width > file.width)
         compose.onNodeWithText("Opus " + app.siansa.playback.PlayingAs.kbit(256)).assertExists()
         compose.onNodeWithText("Converted by your server · mobile data").assertExists()
         // The original: "Same as the file", and where it comes from.
