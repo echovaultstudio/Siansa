@@ -318,8 +318,8 @@ object Crossfade {
         nextProfile: TrackProfile? = null,
         beatMatch: Boolean = false,
         blendBars: Int = BeatMatch.BAR_CHOICES[2],
-        /** How long since the listener moved in the song going out (Smart picks a quick swap just after); null: not lately. */
-        sinceSeekMs: Long? = null,
+        /** No room left before the song's end for the blend Smart would pick (the listener moved near it): a quick swap. */
+        noRoom: Boolean = false,
         /** The technique of the last blend, so Smart doesn't use the same twice running when another fits. */
         lastTechnique: Technique? = null,
     ): FadePlan? {
@@ -369,7 +369,7 @@ object Crossfade {
         val fromBeats = outro?.lockMs != null && intro?.lockMs != null
         val choice = if (mode == CrossfadeMode.SMART && matchable && beatMatch && speed != null && fromBeats) {
             TechniquePicker.pick(outro!!, intro!!, speed, TechniquePicker.keys(currentProfile, nextProfile), nextProfile?.dropsMs.orEmpty(),
-                mix = currentMix || nextMix, sinceSeekMs = sinceSeekMs, last = lastTechnique)
+                mix = currentMix || nextMix, noRoom = noRoom, last = lastTechnique)
         } else null
         val matched = if (matchable && beatMatch && currentDurationMs > 0) {
             val bars = BeatMatch.barsFor(outro!!, intro!!, choice?.bars ?: blendBars).let { if (currentMix || nextMix) minOf(it, BeatMatch.MIX_TRACK_BARS) else it }

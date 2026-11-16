@@ -186,7 +186,6 @@ internal class MixedCrossfader(
                 nextProfile = profiles.cached(next.id),
                 beatMatch = beatMatch,
                 blendBars = blending.blendBars,
-                sinceSeekMs = if (userSeekIn == current.id && userSeekAt > 0) SystemClock.elapsedRealtime() - userSeekAt else null,
                 lastTechnique = lastTechnique,
             )
             if (planned == null) {
@@ -206,7 +205,7 @@ internal class MixedCrossfader(
                     mode = s.crossfade, maxMs = maxMs, current = current, next = next, currentDurationMs = duration,
                     nextDurationMs = next.durationSec * 1000L, currentProfile = profiles.cached(current.id),
                     nextProfile = profiles.cached(next.id), beatMatch = beatMatch, blendBars = blending.blendBars,
-                    sinceSeekMs = 0, lastTechnique = lastTechnique,
+                    noRoom = true, lastTechnique = lastTechnique,
                 )
                 var quickAt = quick?.let { duration - it.cutMs - it.overlapMs }
                 var quickHandover = quickAt?.let { EngineFade.handoverAt(it, position) }
@@ -231,6 +230,12 @@ internal class MixedCrossfader(
                 fade = chosen
                 at = quickAt
                 handover = quickHandover
+            }
+            // Moved in the song lately, and the blend picked still fits: it's kept (#63 of the owner's plan, 16 Nov), no
+            // quick swap only because of the move. Said in the log, so a session shows the full blends after a jump.
+            if (fade === planned && userSeekIn == current.id && userSeekAt > 0) {
+                val since = SystemClock.elapsedRealtime() - userSeekAt
+                if (since < MOVED_LATELY_MS) AppLog.i("Crossfade", "Moved in ${current.id} %.0f s ago, and the blend picked still fits: kept (${planned.technique?.label ?: "blend"})".format(java.util.Locale.ROOT, since / 1000.0))
             }
             plannedWithNext = profiles.cached(next.id) != null
             arm(item, fade, at, handover)
@@ -809,6 +814,8 @@ internal class MixedCrossfader(
         /** The tail is made ready this long before the handover. */
         const val PREPARE_MS = 10_000L
         const val MIN_PREPARE_MS = 2_500L
+        /** A move in the song this recent is noted when the blend after it is planned. */
+        const val MOVED_LATELY_MS = 30_000L
         /** A blend of what's left after moving near a song's end is at least this long; less, and the songs just change. */
         const val SHORTEST_LEFT_MS = 1_500L
         /** The handover is this long before the blend: the next song's start loads meanwhile. */

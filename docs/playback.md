@@ -139,8 +139,8 @@ blend them the way a DJ mixes:
     goes; the old song keeps its bass until then. Not when the energy goes down.
   - **Filter fade**, 16 bars: the old song is swept out with a rising high-pass filter, when the next song starts 3 dB
     or more quieter, or the keys only half mix.
-  - **Quick swap**, 4 bars: when the keys clash, a beat is under 90 % sure, or you moved in the song in the last
-    20 seconds.
+  - **Quick swap**, 4 bars: when the keys clash, a beat is under 90 % sure, or you moved so near the end that the
+    blend picked no longer fits. Moving in the song keeps the blend picked whenever it still fits.
   - **Echo out**: when the tempos are too far apart to match, the two never play together. The old song's last bar
     echoes out and it stops on the bar line; the next song drops in at full level on its first downbeat as it stops,
     under the last faint repeats. Only into a song whose beat starts right away: one with an intro without a beat
