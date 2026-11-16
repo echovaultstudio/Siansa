@@ -59,7 +59,9 @@ object SongTraits {
      * Instrumental and Sad. Each once, in the order found.
      */
     fun askedIn(text: String): List<Trait> {
-        var rest = " " + text.lowercase() + " "
+        // "relaxed tempo" is the tempo slider's own words (sliderQuery), not the mood: a vibe made from the sliders alone
+        // mustn't pick Relaxed for the listener.
+        var rest = " " + text.lowercase().replace(Regex("""\brelaxed\s+tempo\b"""), " ") + " "
         val found = ArrayList<Trait>()
         for ((pattern, label) in ASKED) {
             if (pattern.containsMatchIn(rest)) {

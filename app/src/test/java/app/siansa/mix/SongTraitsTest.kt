@@ -62,6 +62,9 @@ class SongTraitsTest {
         assertEquals(listOf("Instrumental", "Sad"), asked("sad instrumental piano"))
         assertEquals(listOf("Vocals", "Happy"), asked("happy songs with singing"))
         assertEquals(emptyList<String>(), asked("rainy sunday"))
+        // The tempo slider's words aren't the mood: nothing is picked for a vibe made from the sliders alone.
+        assertEquals(emptyList<String>(), asked(sliderQuery(VibeTuning(tempo = -1))!!))
+        assertEquals(listOf("Relaxed"), asked("relaxed evening"))
         // "female vocals" isn't read as two asks.
         assertEquals(listOf("Female vocals"), asked("female vocals"))
     }
