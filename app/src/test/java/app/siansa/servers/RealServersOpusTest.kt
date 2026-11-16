@@ -64,8 +64,24 @@ class RealServersOpusTest(private val server: String) {
         return if (kind.embyLike) EmbyApi(http, { settings }, jellyfin = kind == SourceKind.JELLYFIN) else SubsonicApi(http) { settings }
     }
 
-    private fun opus(url: Uri, what: String): Double = http.newCall(Request.Builder().url(url.toString()).build()).execute().use { r ->
-        assertEquals("$what: answer", 200, r.code)
+    /**
+     * Asks for [url], once more after a moment when the server answers with an error: Emby 4.8 sometimes refuses to
+     * start a conversion right after another one ("Error starting ffmpeg", HTTP 500; seen in CI, not on 4.10 or 4.11).
+     */
+    private fun <T> answer(url: Uri, what: String, read: (okhttp3.Response) -> T): T {
+        repeat(2) { attempt ->
+            http.newCall(Request.Builder().url(url.toString()).build()).execute().use { r ->
+                if (r.code < 500 || attempt == 1) {
+                    assertEquals("$what: answer", 200, r.code)
+                    return read(r)
+                }
+            }
+            Thread.sleep(2_000)
+        }
+        error("unreachable")
+    }
+
+    private fun opus(url: Uri, what: String): Double = answer(url, what) { r ->
         val seconds = opusSeconds(r.body!!.bytes())
         assertTrue("$what: Opus in Ogg", seconds > 0)
         seconds
@@ -93,8 +109,7 @@ class RealServersOpusTest(private val server: String) {
         assertTrue("$server: songs converted", converted >= songs.size - 1)
     }
 
-    private fun bytes(url: Uri, what: String): ByteArray = http.newCall(Request.Builder().url(url.toString()).build()).execute().use { r ->
-        assertEquals("$what: answer", 200, r.code)
+    private fun bytes(url: Uri, what: String): ByteArray = answer(url, what) { r ->
         // Navidrome's MP3 comes with an estimated length, which can be more than it sends: read what there is.
         val out = java.io.ByteArrayOutputStream()
         val buffer = ByteArray(64 * 1024)
