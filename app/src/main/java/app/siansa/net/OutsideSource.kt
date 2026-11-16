@@ -21,6 +21,8 @@ class OutsideSource(music: MusicSource) : MusicSource by music {
     override suspend fun sonicPath(startId: String, endId: String, count: Int): List<Song> = emptyList()
     override suspend fun star(id: String) {}
     override suspend fun unstar(id: String) {}
+    override val keepsRatings: Boolean get() = false
+    override suspend fun setRating(id: String, stars: Int) {}
     override suspend fun scrobble(id: String, submission: Boolean, timeMs: Long?) {}
     override suspend fun playbackProgress(id: String, positionMs: Long, paused: Boolean) {}
     override suspend fun playbackStopped(id: String, positionMs: Long) {}

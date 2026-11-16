@@ -517,6 +517,12 @@ class SubsonicApi(
         call("unstar", mapOf("id" to id))
     }
 
+    override val keepsRatings: Boolean get() = true
+
+    override suspend fun setRating(id: String, stars: Int) {
+        call("setRating", mapOf("id" to id, "rating" to stars.coerceIn(0, 5).toString()))
+    }
+
     /** Marks an album as a favourite (Navidrome's star on the album, issue #275). */
     override suspend fun starAlbum(albumId: String) {
         call("star", mapOf("albumId" to albumId))

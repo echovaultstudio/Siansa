@@ -15,7 +15,7 @@ The Subsonic API (`/rest/…`, version 1.16.1, JSON), with OpenSubsonic extensio
 | Library sync and browsing | `getArtists`, `getArtist`, `getArtistInfo2`, `getAlbum`, `getAlbumList2`, `getSong`, `search3`, `getTopSongs`, `getRandomSongs`, `getStarred2` |
 | Playback | `stream` (original with `format=raw`, or Opus with `format=opus&maxBitRate=…`), `getCoverArt` |
 | Lyrics | `getLyricsBySongId` (with word timings when the server has them), `getLyrics` |
-| Favourites and plays | `star`, `unstar`, `scrobble` |
+| Favourites, ratings and plays | `star`, `unstar`, `setRating` (star ratings, when they're switched on), `scrobble` |
 | Playlists | `getPlaylists`, `getPlaylist`, `createPlaylist`, `updatePlaylist` |
 | Similar music | `getSimilarSongs`, `getSimilarSongs2`, and `getSonicSimilarTracks` / `findSonicPath` when the AudioMuse-AI Navidrome plugin is installed |
 | Radio stations | `getInternetRadioStations` (read only, for [Your Stations](stations.md)) |

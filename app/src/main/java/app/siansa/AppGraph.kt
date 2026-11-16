@@ -15,6 +15,7 @@ import app.siansa.mix.GenreRadio
 import app.siansa.mix.BeatsGenres
 import app.siansa.data.ArtistPhotos
 import app.siansa.data.FavouriteRadios
+import app.siansa.data.Ratings
 import app.siansa.data.audioMuseUserFor
 import app.siansa.data.Users
 import app.siansa.data.NoticeStore
@@ -411,6 +412,7 @@ class AppGraph(val app: Application) {
     val favouriteAlbums = FavouriteAlbums(app, source, scope)
     /** Favourite artists, starred in Navidrome (issue #397). */
     val favouriteArtists = FavouriteArtists(app, source, scope)
+    val ratings = Ratings(app, source, scope)
     /** Radios hearted on their page (the owner, 10 Nov): in Your Library › Favourites, and as custom cards. */
     val favouriteRadios = FavouriteRadios(app, scope)
 

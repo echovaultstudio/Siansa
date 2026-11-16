@@ -158,6 +158,10 @@ not here.
 ## Now playing
 
 - **Buttons**: the lyrics, device and queue buttons, or the earlier look with the lyrics card peeking in.
+- **Star ratings** (off at first): rate songs from one to five stars. Pick where the stars show: **Stars under the
+  title**, **Stars in About this song** (the lower part of now playing), or both; one of the two always stays on. Only
+  with a server that keeps ratings (Navidrome and other Subsonic servers): on Emby and Jellyfin this section isn't
+  there. See [Playback](playback.md#star-ratings).
 - **Play button**: whether sliding from the play button does anything, what each way does (DJ mix, Steady radio,
   Song path, Sonic match, Start a mix… or Nothing), and **Record grooves** on the play button while a DJ mix plays.
 - **DJ mix bar**: the order of the places on the bar that opens over the seek bar when you slide up from the play
