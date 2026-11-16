@@ -13,7 +13,7 @@ enum class Technique(val label: String) {
     LONG_BLEND("long blend"),
     /** The usual: 16 bars, the bass swapped over the first half. */
     BASS_SWAP("bass swap"),
-    /** 4 bars, the bass swapped at once: keys that clash, a beat not sure enough, or the listener just moved in the song. */
+    /** 4 bars, the bass swapped at once: keys that clash, a beat not sure enough, or no room left for a longer blend. */
     QUICK_SWAP("quick swap"),
     /** 16 bars, the old song swept out with a rising high-pass filter: cooling down, or keys that only half mix. */
     FILTER_FADE("filter fade"),
@@ -52,8 +52,6 @@ object TechniquePicker {
     const val ROOMY_BARS = 8
     /** The next song's intro this many dB quieter than the end going out: the energy goes down, a filter fade. */
     const val COOLING_DB = 3.0
-    /** Moved in the song less than this before its blend: the listener wants on, a quick swap. */
-    const val SEEK_QUICK_MS = 20_000L
     /** A drop swap is this many bars, the most that fit between the next song's lock and its drop. */
     val DROP_BARS = listOf(16, 8)
     /** A drop further into the next song than this (bars from its lock) would skip too much of it. */
@@ -62,9 +60,13 @@ object TechniquePicker {
     /**
      * The technique for a beat-matched blend from [outgoing] into [incoming] (both matchable, at [speed]), from
      * what's known of them: [keys] how well their keys mix (null unknown), their beat confidence, the bass at their
-     * ends and their loudness, [incomingDrops] (ms), whether either is from a mixed CD ([mix]), how long since the
-     * listener moved in the song ([sinceSeekMs]), and the technique used last ([last]: the next best is taken
-     * rather than the same twice running, when one fits).
+     * ends and their loudness, [incomingDrops] (ms), whether either is from a mixed CD ([mix]), whether there's no
+     * room left for a longer blend before the song ends ([noRoom]: the listener moved near its end), and the technique
+     * used last ([last]: the next best is taken rather than the same twice running, when one fits).
+     *
+     * Moving in the song doesn't force a quick swap by itself any more (the owner's sessions, 12 Nov: with the plan made
+     * a minute before the end, every jump into the last minute landed on it and every blend was a 4-bar swap): the
+     * blend picked is kept whenever it still fits, and [noRoom] is only set when it doesn't.
      */
     fun pick(
         outgoing: BeatEnd,
@@ -73,10 +75,10 @@ object TechniquePicker {
         keys: Double?,
         incomingDrops: List<Long> = emptyList(),
         mix: Boolean = false,
-        sinceSeekMs: Long? = null,
+        noRoom: Boolean = false,
         last: Technique? = null,
     ): TechniqueChoice {
-        val options = options(outgoing, incoming, speed, keys, incomingDrops, mix, sinceSeekMs)
+        val options = options(outgoing, incoming, speed, keys, incomingDrops, mix, noRoom)
         // The first is the best fit; a change of technique only among the ones that fit as well (not a forced one).
         val first = options.first()
         if (first.technique == last && !first.forced) options.drop(1).firstOrNull { !it.forced && it.technique != last }?.let { return it.choice }
@@ -94,7 +96,7 @@ object TechniquePicker {
         keys: Double?,
         drops: List<Long>,
         mix: Boolean,
-        sinceSeekMs: Long?,
+        noRoom: Boolean,
     ): List<Option> {
         val sure = minOf(outgoing.rhythm, incoming.rhythm)
         val shift = abs(speed - 1.0)
@@ -102,7 +104,7 @@ object TechniquePicker {
         fun forced(t: Technique, bars: Int, why: String) = out.add(Option(TechniqueChoice(t, bars, why), forced = true))
         fun fits(t: Technique, bars: Int, why: String, dropAt: Long? = null) = out.add(Option(TechniqueChoice(t, bars, why, dropAt), forced = false))
         // Cases that leave no choice.
-        if (sinceSeekMs != null && sinceSeekMs < SEEK_QUICK_MS) forced(Technique.QUICK_SWAP, 4, "you just moved in the song")
+        if (noRoom) forced(Technique.QUICK_SWAP, 4, "no room left for a longer blend")
         if (mix) forced(Technique.BASS_SWAP, BeatMatch.MIX_TRACK_BARS, "a track from a mixed CD: short, inside its lock")
         if (keys != null && keys < KEYS_CLASH) forced(Technique.QUICK_SWAP, 4, "the keys clash")
         if (sure < UNSURE) forced(Technique.QUICK_SWAP, 4, "the beat is only %.0f %% sure".format(java.util.Locale.ROOT, sure * 100))
