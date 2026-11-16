@@ -5,9 +5,13 @@
 **Settings › Streaming & storage › Streaming quality**, set separately **On Wi-Fi** and **On mobile data**:
 
 - **Original**: the file as it is on your server. Best on Wi-Fi.
-- **Opus 96–320 kbit/s**: converted by your server (Navidrome's "opus" transcoding profile), to save data.
-- **On Emby** the original file is always played and downloaded: Siansa can only have Navidrome and other
-  Subsonic servers convert songs, so the quality choices don't change anything there.
+- **Opus 96–320 kbit/s**: converted by your server, to save data. Navidrome uses its "opus" transcoding profile;
+  Emby and Jellyfin convert with their own ffmpeg (your user there must be allowed audio transcoding, which is the
+  default).
+- A file that is Opus already is played as it is, whatever you choose: it's small, and the servers don't convert it
+  again.
+
+Moving to another spot in a converted song has the server start a new conversion from there, so it takes a moment.
 
 Siansa always plays the quality you chose; it never switches by itself. Changes apply from the next song.
 
@@ -330,7 +334,8 @@ Chromecast:
 It applies to music you start playing after you change it. Siansa asks your server for each song's file type just
 before the songs go to the TV (the library doesn't keep it), which can take a moment for a long queue. Converting to
 FLAC needs Navidrome (or another Subsonic server) with a **flac** transcoding, and Opus its **opus** transcoding (both
-come with Navidrome); with Jellyfin and Emby, those files go as MP3 320.
+come with Navidrome). Jellyfin and Emby convert to FLAC, Opus and MP3 with their own ffmpeg, nothing to set up. A file
+that is in the format already (an MP3 as MP3, say) is sent as it is.
 
 **Adding the FLAC conversion to Navidrome.** Recent Navidrome versions come with it (**Settings › Transcodings**
 lists **flac audio**). If yours doesn't, ALAC songs fall back to MP3 320 on the TV. To add it, sign in to Navidrome as

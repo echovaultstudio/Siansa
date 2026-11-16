@@ -29,8 +29,10 @@ class ServerSeekQueueTest {
 
     @After fun release() = exo.release()
 
-    private fun song(id: String) = MediaItem.Builder().setMediaId(id)
-        .setUri("http://nd.example:4533/rest/stream?u=max&id=$id&format=opus&maxBitRate=256").build()
+    /** The address songs are made with: Navidrome's, unless a test sets Emby's and Jellyfin's (issue #1204). */
+    private var address: (String) -> String = { id -> "http://nd.example:4533/rest/stream?u=max&id=$id&format=opus&maxBitRate=256" }
+
+    private fun song(id: String) = MediaItem.Builder().setMediaId(id).setUri(address(id)).build()
 
     private fun idle() = shadowOf(Looper.getMainLooper()).idle()
 
@@ -79,6 +81,16 @@ class ServerSeekQueueTest {
     @Test fun withShuffleOnASeekStaysInTheSong() = seekStaysInTheSong(shuffle = true)
 
     @Test fun withShuffleOffASeekStaysInTheSong() = seekStaysInTheSong(shuffle = false)
+
+    /** Emby's and Jellyfin's converted songs seek the same way, with their own start time in the address. */
+    @Test fun onEmbyAndJellyfinASeekStaysInTheSong() {
+        address = { id -> "http://emby.example:8096/Audio/$id/stream?Static=true&api_key=t" }
+        seekStaysInTheSong(shuffle = true)
+        assertEquals(null, exo.currentMediaItem?.localConfiguration?.uri?.getQueryParameter(Streaming.OFFSET_PARAM))
+        player.seekTo(64_000)
+        idle()
+        assertEquals("640000000", exo.currentMediaItem?.localConfiguration?.uri?.getQueryParameter(Streaming.TICKS_PARAM))
+    }
 
     /** Another quality (or Opus when the phone can't play the original) is swapped in the same way. */
     @Test fun anotherQualityStaysInTheSong() {

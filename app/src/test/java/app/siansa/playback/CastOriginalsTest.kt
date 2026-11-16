@@ -69,10 +69,9 @@ class CastQualityTest {
         listOf("flac", "mp3", "m4a", "ape", null).forEach { assertNull(it, CastOriginals.source(it, CastQuality.Mp3, raw)) }
     }
 
-    @Test fun onlySubsonicAddressesAreConverted() {
-        // Jellyfin and Emby have their own way to convert: their ALAC still goes as the MP3.
+    /** Jellyfin's and Emby's own FLAC conversion is checked in OpusOnEveryServerTest (it needs Android's addresses). */
+    @Test fun aFlacOnEmbyOrJellyfinGoesAsItIs() {
         val emby = "https://jf.example/Audio/abc/stream?Static=true&ApiKey=x"
-        assertNull(CastOriginals.source("m4a", CastQuality.Lossless, emby))
         assertEquals(CastSource(emby, "audio/flac", false), CastOriginals.source("flac", CastQuality.Lossless, emby))
     }
 

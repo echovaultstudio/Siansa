@@ -33,6 +33,9 @@ fi
 wait
 
 mkdir -p nd-data emby-config jellyfin-config jellyfin-cache
+# Navidrome converts songs (Opus, MP3) with ffmpeg, which it looks for on the PATH: CI has it elsewhere ($FFMPEG, from
+# PyPI), and without it Navidrome sends every song untouched (issue #1204).
+[ -n "${FFMPEG:-}" ] && export ND_FFMPEGPATH="$FFMPEG"
 ND_MUSICFOLDER="$DIR/music" ND_DATAFOLDER="$DIR/nd-data" ND_PORT=4533 ND_ADDRESS=127.0.0.1 ND_SCANNER_SCHEDULE=0 \
   ND_ENABLEEXTERNALSERVICES=false ND_LOGLEVEL=info nohup ./navidrome > "$DIR/navidrome.log" 2>&1 &
 docker run -d --name siansa-emby -p 8096:8096 -e UID="$(id -u)" -e GID="$(id -g)" \

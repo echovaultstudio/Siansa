@@ -342,9 +342,9 @@ class DlnaPlayer(private val device: DlnaDevice, private val api: MusicSource) :
     private suspend fun streamFor(item: MediaItem): Pair<String, String> {
         val song = item.toSong()
         val raw = api.streamUrl(item.mediaId)
-        var url = Streaming.forCast(Uri.parse(raw)).toString()
+        var url = Streaming.forCast(Uri.parse(raw), song.suffix).toString()
         var mime = Streaming.CAST_MIME
-        val opus = Streaming.forCastOpus(Uri.parse(raw)).toString()
+        val opus = Streaming.forCastOpus(Uri.parse(raw), song.suffix).toString()
         if (DlnaFormats.takesOpus(device.formats) && device.id !in Dlna.opusFailed && opus != raw) {
             url = opus
             mime = Streaming.CAST_OPUS_MIME

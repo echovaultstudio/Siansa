@@ -80,7 +80,7 @@ class PlaybackDiagnostics(
         val ms = loadEventInfo.loadDurationMs.coerceAtLeast(1)
         val kbps = loadEventInfo.bytesLoaded * 8 / ms
         val id = streamSongId(loadEventInfo.uri) ?: "?"
-        val format = loadEventInfo.uri.getQueryParameter("format") ?: "original"
+        val format = Streaming.describe(loadEventInfo.uri)
         AppLog.d("Load", "Song $id ($format): ${kb} KB in ${ms}ms = ${kbps} kbit/s")
     }
 

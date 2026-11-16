@@ -71,22 +71,30 @@ object StreamStats {
     val interceptor = Interceptor { chain ->
         val request = chain.request()
         val response = chain.proceed(request)
-        if (request.url.encodedPath.endsWith("/rest/stream")) {
-            val id = request.url.queryParameter("id")
+        val url = request.url.toString()
+        // A song stream, from Navidrome (`/rest/stream`), Emby or Jellyfin (`/Audio/<id>/stream`, issue #1204).
+        val id = if (request.url.encodedPath.endsWith("/rest/stream") || request.url.encodedPath.contains("/Audio/", ignoreCase = true)) streamSongId(url) else null
+        if (id != null) {
             // A ranged answer ("bytes 100-200/34000000") carries the full size after the slash.
             val total = response.header("Content-Range")?.substringAfterLast('/')?.toLongOrNull()
                 ?: response.header("Content-Length")?.toLongOrNull()
-            val duration = id?.let { SongRegistry.get(it)?.durationSec } ?: 0
-            val fmt = request.url.queryParameter("format")
-            if (id != null) formats[id] = if (fmt == null || fmt == "raw") "original" else "$fmt ${request.url.queryParameter("maxBitRate").orEmpty()}".trim()
-            if (id != null && total != null && total > 0 && duration > 0) {
+            val duration = SongRegistry.get(id)?.durationSec ?: 0
+            formats[id] = described(url)
+            if (total != null && total > 0 && duration > 0) {
                 val kbps = (total * 8 / duration / 1000).toInt()
                 if (needed.put(id, kbps) == null) {
-                    val format = request.url.queryParameter("format") ?: "original"
+                    val format = described(url)
                     AppLog.i("Stream", "Song $id ($format): ${"%.1f".format(total / 1_048_576.0)} MB for ${duration}s, needs about $kbps kbit/s")
                 }
             }
         }
         response
+    }
+
+    /** "original", or the format and bitrate a stream is converted to ("opus 256"), read from its address. */
+    fun described(url: String): String {
+        val parts = songCacheKey(url).split(':')
+        val format = parts.getOrNull(2) ?: return "original"
+        return if (format == "raw") "original" else listOfNotNull(format, parts.getOrNull(3)?.takeIf { it.isNotEmpty() }).joinToString(" ")
     }
 }

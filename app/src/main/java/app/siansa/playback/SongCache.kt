@@ -38,9 +38,11 @@ fun songCacheKey(uri: Uri): String = songCacheKey(uri.toString())
 fun songCacheKey(url: String): String {
     val id = streamSongId(url) ?: return url
     val query = runCatching { java.net.URI(url).rawQuery }.getOrNull().orEmpty().split('&')
-    fun param(name: String) = query.firstOrNull { it.startsWith("$name=") }?.substringAfter('=')?.takeIf { it.isNotEmpty() }
-    val format = param("format") ?: "raw"
-    val rate = param("maxBitRate") ?: ""
+    fun param(name: String) = query.firstOrNull { it.startsWith("$name=", ignoreCase = true) }?.substringAfter('=')?.takeIf { it.isNotEmpty() }
+    // Navidrome's format and maxBitRate, or Emby's and Jellyfin's AudioCodec and AudioBitRate when they convert (#1204).
+    val emby = param("format") == null && param("AudioCodec") != null && !param("Static").equals("true", ignoreCase = true)
+    val format = if (emby) param("AudioCodec")!!.lowercase() else param("format") ?: "raw"
+    val rate = if (emby) param("AudioBitRate")?.toIntOrNull()?.div(1000)?.toString().orEmpty() else param("maxBitRate") ?: ""
     return "song:$id:$format:$rate"
 }
 
@@ -86,7 +88,7 @@ class CachingSwitchDataSource(
             active = direct
             return direct.open(dataSpec.withUri(Uri.parse(OutsideMedia.unmarked(url))))
         }
-        val source = if (goesThroughCache(dataSpec.uri.getQueryParameter("format"), useCache())) cached else direct
+        val source = if (goesThroughCache(Streaming.formatOf(dataSpec.uri), useCache())) cached else direct
         active = source
         return source.open(dataSpec)
     }
