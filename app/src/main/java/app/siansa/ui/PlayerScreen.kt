@@ -402,7 +402,16 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                             },
                             cover = { SwipeCover(song, onTap = ::openAlbum, slideLabel = slideLabel) },
                             // Siansa Dev: marks the last DJ blend as bad (the owner, 9 Nov).
-                            belowCover = { BadBlendButton() },
+                            // TEMPORARY (siansa-dev #63): Breakdown and Drop marks for tuning Siansa Beats.
+                            belowCover = {
+                                androidx.compose.foundation.layout.Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(Space.Tight),
+                                ) {
+                                    BadBlendButton()
+                                    SectionButtons(song?.id)
+                                }
+                            },
                             modifier = Modifier.weight(1f).fillMaxWidth(),
                         )
 
