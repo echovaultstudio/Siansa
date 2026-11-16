@@ -29,8 +29,12 @@ object BeatMatch {
      * beat comes in at 1:37).
      */
     const val LATE_LOCK_MS = 8_000.0
-    /** A blend into or out of a track cut from a mixed CD is kept to this many bars, inside its lock. */
-    const val MIX_TRACK_BARS = 8
+    /**
+     * A blend into or out of a track cut from a mixed CD is kept to at most this many bars, inside its lock: fewer when
+     * there isn't room. 8 until 16 Nov, when the owner chose to try 16: on 8 of his 9 mixed-CD tracks the beat held from
+     * the first second to within 3 s of the end, so the room was there.
+     */
+    const val MIX_TRACK_BARS = 16
     /** …and steady enough at this [BeatEnd.steady]. */
     const val MIN_STEADY = 0.5f
     /** A song is played at most this much faster or slower to match (DJ decks go to ±8 %). */
