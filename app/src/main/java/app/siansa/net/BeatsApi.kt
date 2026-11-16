@@ -137,6 +137,8 @@ class BeatsApi(
         /** That server's id there (Siansa Beats 0.23), and every server it reads. */
         val serverId: String? = null,
         val servers: List<MusicServer> = emptyList(),
+        /** Whether it gives each song's voice, moods and danceability by its trained models (0.51, `traits`). */
+        val traits: Boolean = false,
     ) {
         companion object {
             fun parse(body: JsonObject): Capabilities {
@@ -154,6 +156,7 @@ class BeatsApi(
                         setOfNotNull(BeatsListens.PATH.takeIf { feature("scrobbling")?.get("available")?.toString() == "true" }),
                     soundPaths = (feature("sound")?.get("paths") as? JsonObject).orEmpty()
                         .mapNotNull { (name, path) -> (path as? kotlinx.serialization.json.JsonPrimitive)?.content?.let { name to it } }.toMap(),
+                    traits = feature("traits")?.get("available")?.toString() == "true",
                     musicServer = (body["music_server"] as? JsonObject)?.str("kind"),
                     serverId = (body["music_server"] as? JsonObject)?.str("id"),
                     servers = (body["servers"] as? kotlinx.serialization.json.JsonArray).orEmpty().mapNotNull { it as? JsonObject }.mapNotNull { o ->

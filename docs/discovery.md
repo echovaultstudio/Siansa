@@ -161,6 +161,12 @@ box: the mix starts playing and you stay on Flow.
   rest. Each pick starts as **more** of it (filled). Tap it for **less** (dashed, struck through); tap again to
   take it off. A sound steers the search. A genre comes first: with **more** of a genre the mix is made of that
   genre's songs, the ones that fit the rest best first; **less** leaves that genre's songs out.
+  With Siansa Beats (0.51 or newer) there's a third list, **Voice & mood**: **Vocals**, **Instrumental**, **Female
+  vocals**, **Male vocals**, and how songs feel (**Happy**, **Sad**, **Relaxed**, **Party**, **Aggressive**,
+  **Danceable**, **Cheerful**, **Bittersweet**, **Passionate**, **Intense**, **Quirky**, **Acoustic**,
+  **Electronic**). Siansa Beats hears these in every song. **More** of one puts the songs that have it first and adds
+  its words to the search; **less** puts them last. Words you type ask for them too: "sad female vocals" picks
+  **Female vocals** and **Sad** for you, unless you've picked or set them aside already.
 - **Artists**: **Favourites** (the artists you play most), **A mix**, or **New to me** (artists you rarely play).
 - **Or say it**: type what you want to hear ("tired but hopeful", "rainy Sunday", "need to focus"). With AI set
   up it reads your words; what you set on the pad and your picks are used with them. Words count when you press

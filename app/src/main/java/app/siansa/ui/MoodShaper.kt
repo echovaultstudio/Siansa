@@ -94,6 +94,7 @@ import app.siansa.mix.FlowMood
 import app.siansa.mix.MixSound
 import app.siansa.mix.PadDot
 import app.siansa.mix.SoundDial
+import app.siansa.mix.SongTraits
 import app.siansa.mix.VibeTuning
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -436,8 +437,14 @@ internal fun MoodPickerSheet(tuning: VibeTuning, look: MoodLook, inMix: List<Mix
     val words by produceState<List<String>?>(null) { value = graph.generator.soundsToPick() }
     val sounds = words?.let { all -> soundsNotGenres(all, genres.orEmpty().map { it.name }) }
     val heard by produceState(false) { value = withContext(Dispatchers.IO) { graph.beatsGenres.saved(graph.shownLibraries()) != null } }
+    // Siansa Beats' traits (0.51): vocals, whose voice, moods. Only offered when it has them.
+    val traits by produceState(false) {
+        value = graph.settings.current.beatsUrl.isNotBlank() && runCatching { graph.beats.capabilities().traits }.getOrDefault(false)
+    }
+    // A sound word that's also a trait (acoustic, electronic, aggressive) is offered once: as the trait.
+    val shown = sounds?.let { if (traits) soundsNotGenres(it, SongTraits.ALL.map { t -> t.label }) else it }
     ModalBottomSheet(onDismissRequest = onDone, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
-        MoodPicker(tuning, look, sounds, genres, heard, inMix, onChange, onDone, Modifier.fillMaxHeight(0.92f).padding(horizontal = Space.Page))
+        MoodPicker(tuning, look, shown, genres, heard, inMix, onChange, onDone, Modifier.fillMaxHeight(0.92f).padding(horizontal = Space.Page), traits = traits)
     }
 }
 
@@ -460,6 +467,7 @@ internal fun MoodPicker(
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
     startTab: Int = 0,
+    traits: Boolean = false,
 ) {
     var tab by rememberSaveable { mutableIntStateOf(startTab) }
     var find by rememberSaveable { mutableStateOf("") }
@@ -470,11 +478,12 @@ internal fun MoodPicker(
             Text("Add to this mix", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black, modifier = Modifier.weight(1f))
             TextButton(onClick = onDone, modifier = Modifier.testTag("moodPickerDone")) { Text("Done", fontWeight = FontWeight.Bold) }
         }
-        MoodSegment(listOf("Sounds", "Genres"), tab, "moodPickerTabs") { tab = it; find = "" }
+        MoodSegment(if (traits) listOf("Sounds", "Genres", "Voice & mood") else listOf("Sounds", "Genres"), tab, "moodPickerTabs") { tab = it; find = "" }
         Text(
             when {
                 full -> "That's ${FlowMood.MOST_PICKS}. Take one off to add another."
                 tab == 0 -> "Words your sound search understands."
+                tab == 2 -> "What Siansa Beats hears in each song: sung or not, whose voice, how it feels."
                 heard -> "Genres Siansa Beats hears in your music. The main ones first: search for the rest."
                 else -> "Genres from your songs' tags. The main ones first: search for the rest."
             },
@@ -483,12 +492,15 @@ internal fun MoodPicker(
             modifier = Modifier.testTag("moodPickerFrom"),
         )
         FindField(find, "Find one…", "moodPickerFind") { find = it }
-        val loading = if (tab == 0) sounds == null else genres == null
+        val loading = when (tab) { 0 -> sounds == null; 1 -> genres == null; else -> false }
         // A vibe's own sounds first, while nothing is typed: they're what this mix can be shaped by.
         val own = if (tab == 1 && find.isBlank()) inMix else emptyList()
         val ownNames = own.map { it.name.lowercase() }.toSet()
-        val rows: List<Pair<String, Int?>> = if (tab == 0) FlowMood.offered(sounds.orEmpty(), find, Int.MAX_VALUE) { it }.map { it to null }
-        else FlowMood.genres(genres.orEmpty(), find).filter { it.name.lowercase() !in ownNames }.map { it.name to it.songCount }
+        val rows: List<Pair<String, Int?>> = when (tab) {
+            0 -> FlowMood.offered(sounds.orEmpty(), find, Int.MAX_VALUE) { it }.map { it to null }
+            1 -> FlowMood.genres(genres.orEmpty(), find).filter { it.name.lowercase() !in ownNames }.map { it.name to it.songCount }
+            else -> FlowMood.offered(SongTraits.ALL.map { it.label }, find, Int.MAX_VALUE) { it }.map { it to null }
+        }
         LazyColumn(Modifier.weight(1f).fillMaxWidth().testTag("moodPickerList")) {
             if (own.isNotEmpty()) {
                 item(key = "own-title") { PickerHeading("In this mix") }
@@ -501,7 +513,7 @@ internal fun MoodPicker(
             }
             items(rows, key = { "row-" + it.first }) { (name, count) ->
                 PickerRow(name, count, FlowMood.picked(tuning, name), full, look) {
-                    onChange(if (FlowMood.picked(tuning, name)) FlowMood.drop(tuning, name) else FlowMood.pick(tuning, name, genre = tab == 1))
+                    onChange(if (FlowMood.picked(tuning, name)) FlowMood.drop(tuning, name) else FlowMood.pick(tuning, name, genre = tab == 1, trait = tab == 2))
                 }
             }
             if (rows.isEmpty() && own.isEmpty()) {

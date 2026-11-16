@@ -343,6 +343,12 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                         sounds = emptyList(), genres = genres, heard = false, inMix = listOf(app.siansa.mix.MixSound("Drone", 9), app.siansa.mix.MixSound("Ambient", 4)),
                         onChange = {}, onDone = {}, modifier = Modifier.height(460.dp), startTab = 1,
                     )
+                    // Siansa Beats' traits (0.51): the third list, one picked.
+                    app.siansa.ui.MoodPicker(
+                        app.siansa.mix.VibeTuning(sounds = listOf(app.siansa.mix.SoundDial("Female vocals", 3, trait = true))), look,
+                        sounds = emptyList(), genres = genres, heard = true, inMix = emptyList(),
+                        onChange = {}, onDone = {}, modifier = Modifier.height(380.dp), startTab = 2, traits = true,
+                    )
                 }
             },
             // All genres (the owner, 15 Nov): the box to find a genre, empty and with long words typed, and A to Z beside a list.
