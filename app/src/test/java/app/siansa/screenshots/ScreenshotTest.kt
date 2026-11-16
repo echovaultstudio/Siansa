@@ -343,11 +343,15 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                         sounds = emptyList(), genres = genres, heard = false, inMix = listOf(app.siansa.mix.MixSound("Drone", 9), app.siansa.mix.MixSound("Ambient", 4)),
                         onChange = {}, onDone = {}, modifier = Modifier.height(460.dp), startTab = 1,
                     )
-                    // Siansa Beats' traits (0.51): the third list, one picked.
+                }
+            },
+            // Siansa Beats' traits (0.51): the third list, Voice & mood, with one picked.
+            Scene("mood_picker_traits") {
+                Column(Modifier.padding(Space.Page)) {
                     app.siansa.ui.MoodPicker(
-                        app.siansa.mix.VibeTuning(sounds = listOf(app.siansa.mix.SoundDial("Female vocals", 3, trait = true))), look,
-                        sounds = emptyList(), genres = genres, heard = true, inMix = emptyList(),
-                        onChange = {}, onDone = {}, modifier = Modifier.height(380.dp), startTab = 2, traits = true,
+                        app.siansa.mix.VibeTuning(sounds = listOf(app.siansa.mix.SoundDial("Female vocals", 3, trait = true))), app.siansa.ui.MoodLook(-0.5f, 0.5f),
+                        sounds = emptyList(), genres = emptyList(), heard = true, inMix = emptyList(),
+                        onChange = {}, onDone = {}, modifier = Modifier.height(560.dp), startTab = 2, traits = true,
                     )
                 }
             },
