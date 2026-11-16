@@ -479,11 +479,11 @@ internal fun StreamPath(file: Pair<String, String?>, playing: PlayingAs) {
     Row(
         Modifier
             .fillMaxWidth()
+            .testTag("streamPath")
             .clip(RoundedCornerShape(STREAM_CORNER))
             .background(Color.White.copy(alpha = 0.06f))
             .padding(horizontal = Space.Page, vertical = Space.Small)
-            .height(IntrinsicSize.Min)
-            .testTag("streamPath"),
+            .height(IntrinsicSize.Min),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Space.Small),
     ) {
