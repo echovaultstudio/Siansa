@@ -92,8 +92,9 @@ class SongTraitsTest {
         )
         val woman = VibeTuning(sounds = listOf(SoundDial("Female vocals", 3, trait = true)))
         assertEquals(listOf("woman", "man", "unknown", "instrumental"), rankVibe(hits, features, emptyMap(), woman).map { it.id })
+        // Less sad: songs known not to be sad first, then those Beats has no traits for, the sad ones last.
         val notSad = VibeTuning(sounds = listOf(SoundDial("Sad", -3, trait = true)))
-        assertEquals(listOf("unknown", "woman", "man", "instrumental"), rankVibe(hits, features, emptyMap(), notSad).map { it.id })
+        assertEquals(listOf("woman", "unknown", "man", "instrumental"), rankVibe(hits, features, emptyMap(), notSad).map { it.id })
         // Nothing picked: the search's order.
         assertEquals(hits, rankVibe(hits, features, emptyMap(), VibeTuning()))
     }
