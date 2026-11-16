@@ -47,6 +47,7 @@ fun songCacheKey(url: String): String {
 }
 
 /** Whether all of the stream cached under [key] ([songCacheKey]) is in the song cache, so it plays without the network. */
+@androidx.annotation.OptIn(UnstableApi::class)
 fun songFullyCached(cache: androidx.media3.datasource.cache.Cache, key: String): Boolean = runCatching {
     val length = androidx.media3.datasource.cache.ContentMetadata.getContentLength(cache.getContentMetadata(key))
     length > 0 && cache.isCached(key, 0, length)
