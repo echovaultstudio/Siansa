@@ -8,6 +8,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.ShuffleOrder
 import app.siansa.log.AppLog
 
 /**
@@ -104,6 +105,13 @@ class ServerSeekPlayer(
     override fun isCurrentMediaItemSeekable(): Boolean =
         exo.currentMediaItem?.mediaId?.let(converted) == true || exo.isCurrentMediaItemSeekable
 
+    // Every swap of one song (a seek in a converted song, another quality, Opus when the phone can't play the
+    // original) keeps the player in that song and the shuffled order as it was ([swap], issue #1202).
+    override fun replaceMediaItem(index: Int, mediaItem: MediaItem) {
+        if (index !in 0 until exo.mediaItemCount) return exo.replaceMediaItem(index, mediaItem)
+        swap(index, mediaItem)
+    }
+
     override fun seekTo(positionMs: Long) = seekTo(exo.currentMediaItemIndex, positionMs)
 
     override fun seekTo(mediaItemIndex: Int, positionMs: Long) {
@@ -113,7 +121,7 @@ class ServerSeekPlayer(
         val serverSide = uri != null && converted(item.mediaId) && Streaming.canStartAt(uri)
         if (!serverSide) {
             // An original (or a download): seek inside the file; a start offset no longer applies.
-            if (uri != null && Streaming.offsetMs(uri) > 0) exo.replaceMediaItem(mediaItemIndex, item.withUri(Streaming.startingAt(uri, 0)))
+            if (uri != null && Streaming.offsetMs(uri) > 0) swap(mediaItemIndex, item.withUri(Streaming.startingAt(uri, 0)))
             return exo.seekTo(mediaItemIndex, positionMs.coerceAtLeast(0))
         }
         val target = positionMs.coerceAtLeast(0)
@@ -122,7 +130,7 @@ class ServerSeekPlayer(
         if (mediaItemIndex == exo.currentMediaItemIndex && start > 0 && target / 1000 * 1000 == start && exo.currentPosition < 1_000) return
         val next = Streaming.startingAt(uri, target)
         AppLog.i("Stream", "Song ${item.mediaId}: converted, so Navidrome starts it at ${target / 1000}s instead of the player reading up to there")
-        exo.replaceMediaItem(mediaItemIndex, item.withUri(next))
+        swap(mediaItemIndex, item.withUri(next))
         // The new stream starts at that whole second and has no known length, so the player can't jump inside
         // it: it plays from its start (at most a second before where was asked).
         exo.seekTo(mediaItemIndex, 0)
@@ -145,8 +153,25 @@ class ServerSeekPlayer(
             if (i == current) continue
             val item = exo.getMediaItemAt(i)
             val uri = item.localConfiguration?.uri ?: continue
-            if (Streaming.offsetMs(uri) > 0) exo.replaceMediaItem(i, item.withUri(Streaming.startingAt(uri, 0)))
+            if (Streaming.offsetMs(uri) > 0) swap(i, item.withUri(Streaming.startingAt(uri, 0)))
         }
+    }
+
+    /**
+     * Puts [item] in the place of the song at [index], keeping the shuffled order (issue #1202).
+     *
+     * The player's own swap adds the new copy and removes the old one, and the new copy took a random place in the
+     * shuffled order. With shuffle on, removing the playing song then moved the player on to whatever song came next
+     * in that order, and the seek brought it back: the song started again from its beginning (the hop to the other
+     * song had set its stream back to the start, [resetOthers]), and the shuffled order was changed. Here the new
+     * copy is put right after the old one in the shuffled order before the old one goes, so the player moves on to
+     * it, and the order is as it was.
+     */
+    private fun swap(index: Int, item: MediaItem) {
+        val shuffled = shuffledOf(exo.shuffleOrder)
+        exo.addMediaItem(index + 1, item)
+        exo.setShuffleOrder(ShuffleOrder.DefaultShuffleOrder(withCopyAfter(shuffled, index), System.nanoTime()))
+        exo.removeMediaItem(index)
     }
 
     private fun MediaItem.withUri(uri: Uri): MediaItem = buildUpon().setUri(uri).build()
@@ -154,5 +179,26 @@ class ServerSeekPlayer(
     companion object {
         /** Whether a stream is live for the media session: what the player says, except for a converted song. */
         fun live(playerSaysLive: Boolean, converted: Boolean): Boolean = playerSaysLive && !converted
+
+        /** The songs' places in the queue, in the order shuffle plays them. */
+        fun shuffledOf(order: ShuffleOrder): IntArray {
+            val out = ArrayList<Int>(order.length)
+            var i = order.firstIndex
+            while (i != C.INDEX_UNSET && out.size < order.length) { out += i; i = order.getNextIndex(i) }
+            return out.toIntArray()
+        }
+
+        /**
+         * [shuffled] with a copy of the song at [index] added to the queue right after it (at index + 1): the songs
+         * after it move up a place, and the copy is played right after the song in the shuffled order.
+         */
+        fun withCopyAfter(shuffled: IntArray, index: Int): IntArray {
+            val out = ArrayList<Int>(shuffled.size + 1)
+            for (i in shuffled) {
+                out += if (i > index) i + 1 else i
+                if (i == index) out += index + 1
+            }
+            return out.toIntArray()
+        }
     }
 }
