@@ -78,6 +78,7 @@ object SettingsIndex {
         SettingEntry("Status bar", "Theme", "settings/themes", "status-bar", "phone's top bar clock battery see-through black hidden full screen"),
         SettingEntry("Animated covers", "Theme", "settings/themes", "animated-covers", "gif webp moving"),
         SettingEntry("Lyrics button", "Now playing", "settings/now-playing", "buttons", "device queue card classic"),
+        SettingEntry("How the song is playing", "Now playing", "settings/now-playing", "about-this-song", "stream info quality transcoded converted opus original downloaded cache bitrate"),
         SettingEntry("Star ratings", "Now playing", "settings/now-playing", "star-ratings", "stars rate rating five under the title about this song"),
         SettingEntry("Play button slides", "Now playing", "settings/now-playing", "play-button", "swipe up down left right DJ mix steady radio song path sonic match record grooves"),
         SettingEntry("DJ mix bar", "Now playing", "settings/now-playing", "dj-mix-bar", "order places steady vibes build euphoric wind down"),

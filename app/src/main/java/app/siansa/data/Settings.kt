@@ -197,6 +197,8 @@ data class AppSettings(
     val homeShortcuts: Int = 8,
     /** On: now playing's lyrics, device and queue buttons (issue #294). Off: the earlier look, lyrics card peeking in. */
     val nowPlayingLyricsButton: Boolean = true,
+    /** About this song says how the song is playing: original, converted, downloaded or cached (issue #1038). */
+    val nowPlayingStreamInfo: Boolean = true,
     /** Star ratings on Now Playing, and where they show (issue #1043). */
     val stars: StarRatings = StarRatings(),
     /** Sliding from now playing's play button, and what each way does (issue #919). */
@@ -508,6 +510,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         homeMenu = HomeMenuItem.parse(prefs.getString("home_menu", null)),
         homeShortcuts = prefs.getInt("home_shortcuts", 8).coerceIn(2, 8),
         nowPlayingLyricsButton = prefs.getBoolean("now_playing_lyrics_button", true),
+        nowPlayingStreamInfo = prefs.getBoolean("now_playing_stream_info", true),
         stars = StarRatings(
             on = prefs.getBoolean("star_ratings", false),
             underTitle = prefs.getBoolean("stars_under_title", false),
@@ -790,6 +793,11 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
     fun setTopBar(style: TopBarStyle) {
         prefs.edit().putString("top_bar", style.name).apply()
         _state.value = _state.value.copy(topBar = style)
+    }
+
+    fun setNowPlayingStreamInfo(on: Boolean) {
+        prefs.edit().putBoolean("now_playing_stream_info", on).apply()
+        _state.value = _state.value.copy(nowPlayingStreamInfo = on)
     }
 
     fun setStars(stars: StarRatings) {

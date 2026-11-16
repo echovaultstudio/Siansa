@@ -70,6 +70,21 @@ class SpacingPlayerTest : SpacingCheck() {
         assertEven("Rate, as tall as a menu row", rate.bottom - rate.top, app.siansa.ui.MENU_ROW_HEIGHT, tolerance = 1.dp)
     }
 
+    /** File → Playing (issue #1038): the two boxes are one height, and the arrow has the same gap on both sides. */
+    @Test fun fileAndPlayingAreEvenlySpaced() {
+        compose.setContent {
+            androidx.compose.material3.MaterialTheme(colorScheme = app.siansa.ui.playerColors()) {
+                Column(Modifier.width(296.dp)) {
+                    app.siansa.ui.StreamPath("FLAC" to "2,116 kbit/s", app.siansa.playback.PlayingAs.of(null, null, 256, cached = false, wifi = false))
+                }
+            }
+        }
+        val file = compose.onNodeWithTag("streamFile").getBoundsInRoot()
+        val now = compose.onNodeWithTag("streamPlaying").getBoundsInRoot()
+        assertEven("File and Playing, one height", file.bottom - file.top, now.bottom - now.top, tolerance = 1.dp)
+        assertEven("File and Playing, one top", file.top, now.top, tolerance = 1.dp)
+    }
+
     /** A menu row whose label wraps (issue #778) grows to fit it, with the same gap above and below; a short one stays 48 dp. */
     @Test fun aWrappedMenuLabelFitsItsRow() {
         compose.setContent {

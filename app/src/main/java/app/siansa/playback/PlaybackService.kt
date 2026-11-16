@@ -438,13 +438,10 @@ class PlaybackService : MediaLibraryService() {
     private var precachedFor: String? = null
 
     /** Whether all of [item] is in the song cache already (it was loaded ahead), so the next one may load now. */
-    private fun fullyCached(item: MediaItem): Boolean = runCatching {
+    private fun fullyCached(item: MediaItem): Boolean {
         val uri = item.localConfiguration?.uri ?: return false
-        val key = songCacheKey(uri)
-        val cache = graph.songCache
-        val length = androidx.media3.datasource.cache.ContentMetadata.getContentLength(cache.getContentMetadata(key))
-        length > 0 && cache.isCached(key, 0, length)
-    }.getOrDefault(false)
+        return songFullyCached(graph.songCache, songCacheKey(uri))
+    }
 
     private fun precacheNext(player: Player) {
         precacheWriter?.cancel()

@@ -158,6 +158,8 @@ not here.
 ## Now playing
 
 - **Buttons**: the lyrics, device and queue buttons, or the earlier look with the lyrics card peeking in.
+- **About this song**: **How the song is playing** (on at first) shows the file and what really plays side by side in
+  the lower part of now playing. See [Playback](playback.md#how-the-song-is-playing).
 - **Star ratings** (off at first): rate songs from one to five stars. Pick where the stars show: **Stars under the
   title**, **Stars in About this song** (the lower part of now playing), or both; one of the two always stays on. Only
   with a server that keeps ratings (Navidrome and other Subsonic servers): on Emby and Jellyfin this section isn't
