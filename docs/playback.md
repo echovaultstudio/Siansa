@@ -268,6 +268,17 @@ colours of the cover, and the cards take a deep shade of the cover's colour too 
 cover). Scroll back up for the controls. A small slip of the thumb doesn't leave the cards
 peeking in: now playing glides back unless you swipe up or scroll a quarter of the way down.
 
+## Star ratings
+
+Turn on **Settings › Now playing › Star ratings** to rate songs from one to five stars. Tap a star to give that many;
+tap the rating again to take it off. The stars show in **About this song**, in the lower part of now playing, and
+under the title as well if you switch that on. A song's **⋮** menu has **Rate** too, in now playing and in every list.
+
+Ratings are kept on your server with `setRating`, so other apps see them, and Siansa shows what the server has (a copy
+on the phone shows at once and offline). A rating needs the connection: if the server can't be reached, the stars go
+back and Siansa says so. Stars are separate from the heart: a song can have both. Navidrome and other Subsonic servers
+keep ratings; Emby and Jellyfin have no five-star rating, so stars aren't offered there.
+
 ## Lyrics
 
 Lyrics come from your server (Navidrome's lyrics, or the lyrics file or tags it reads). Synced lyrics light up line

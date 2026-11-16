@@ -256,6 +256,24 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     }
                 }
             },
+            // Star ratings (issue #1043): under the title, in About this song with the line under them, and in a song's menu.
+            Scene("player_stars") {
+                OnPlayer {
+                    Column(Modifier.fillMaxWidth().padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Section)) {
+                        app.siansa.ui.TitleRow(app.siansa.data.Song(id = "s1", title = "Harbour Lights at the uncharacteristically long quay", artist = "The Quiet Tide"), liked = true, stars = 4, onArtist = {}) {}
+                        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(nowPlayingCardColor(Color(0xFF7A2E3A))).padding(Space.Page)) {
+                            Text("About this song", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = Space.Medium))
+                            app.siansa.ui.AboutRating(4, line = true) {}
+                            Text("FORMAT", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.45f))
+                            Text("FLAC · 24-bit", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                        }
+                        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(nowPlayingCardColor(Color(0xFF7A2E3A))).padding(Space.Page)) {
+                            app.siansa.ui.AboutRating(0, line = false) {}
+                        }
+                        app.siansa.ui.RateRow(2) {}
+                    }
+                }
+            },
             // The queue's Shape your mix (the owner, 10 Nov): folded, and open with the glide bar and the Surprises bar.
             Scene("queue_mix_shape") {
                 OnPlayer {

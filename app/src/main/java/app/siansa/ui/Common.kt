@@ -592,6 +592,7 @@ fun SongRow(
     val launch = rememberPlayLauncher()
     var menu by remember { mutableStateOf(false) }
     var pickPlaylist by remember { mutableStateOf(false) }
+    var rate by remember { mutableStateOf(false) }
     // Offline, songs that aren't downloaded are dimmed: they can't play until the connection is back.
     val connection by graph.connection.state.collectAsStateWithLifecycle()
     val unavailable = connection.offline && !graph.downloads.isDownloaded(song.id)
@@ -685,6 +686,13 @@ fun SongRow(
                         menu = false
                         pickPlaylist = true
                     })
+                    // Star ratings (issue #1043): when they're on, on a server that keeps them.
+                    if (ratingShown(graph.settings.current.stars.on, graph.ratings.kept, song.id)) {
+                        DropdownMenuItem(text = { Text("Rate…") }, onClick = {
+                            menu = false
+                            rate = true
+                        })
+                    }
                     DropdownMenuItem(text = { Text("Start a mix") }, onClick = {
                         menu = false
                         if (graph.connection.current.offline) launch.notify("You're offline: a mix needs the server")
@@ -744,6 +752,28 @@ fun SongRow(
             message?.let { launch.notify(it) }
         }
     }
+    if (rate) RateDialog(song, notify = { launch.notify(it) }) { rate = false }
+}
+
+/** "Rate…" from a song's menu in a list (issue #1043): the song's name and its five stars. */
+@Composable
+internal fun RateDialog(song: Song, notify: (String) -> Unit, onDismiss: () -> Unit) {
+    val graph = LocalGraph.current
+    val rated by graph.ratings.stars.collectAsStateWithLifecycle()
+    val stars = rated[song.id] ?: 0
+    // The server's own rating, in case it was changed elsewhere.
+    LaunchedEffect(song.id) { graph.ratings.refresh(song.id) }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(song.title, maxLines = 2, overflow = TextOverflow.Ellipsis) },
+        text = {
+            Column(Modifier.fillMaxWidth().testTag("rateDialog"), horizontalAlignment = Alignment.CenterHorizontally) {
+                StarRow(stars, big = true, tag = "dialogStars", dim = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)) { graph.ratings.rate(song.id, it, notify) }
+                Text(app.siansa.data.StarRatings.words(stars), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = Space.Small))
+            }
+        },
+        confirmButton = { androidx.compose.material3.TextButton(onClick = onDismiss) { Text("Done") } },
+    )
 }
 
 /** What the play/pause toggle on the song playing now says to a screen reader: what a tap will do (issue #345). */

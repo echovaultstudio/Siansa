@@ -48,6 +48,28 @@ class SpacingPlayerTest : SpacingCheck() {
         assertEven("Menu rows", app.siansa.ui.MENU_ROW_HEIGHT, 48.dp, tolerance = 0.dp)
     }
 
+    /**
+     * Star ratings (issue #1043): in About this song the line under the stars has the same gap above and below, and
+     * "Rate" in the menu is a row as tall as the others.
+     */
+    @Test fun theStarsAreEvenlySpaced() {
+        compose.setContent {
+            androidx.compose.material3.MaterialTheme(colorScheme = app.siansa.ui.playerColors()) {
+                Column(Modifier.width(296.dp)) {
+                    app.siansa.ui.AboutRating(4, line = true) { }
+                    androidx.compose.foundation.layout.Box(Modifier.fillMaxWidth().height(24.dp).testTag("cells"))
+                    app.siansa.ui.RateRow(4) { }
+                }
+            }
+        }
+        val row = compose.onNodeWithTag("aboutRating").getBoundsInRoot()
+        val line = compose.onNodeWithTag("aboutRatingLine").getBoundsInRoot()
+        val cells = compose.onNodeWithTag("cells").getBoundsInRoot()
+        assertEven("The line under the stars", line.top - row.bottom, cells.top - line.bottom, tolerance = 1.dp)
+        val rate = compose.onNodeWithTag("rateRow").getBoundsInRoot()
+        assertEven("Rate, as tall as a menu row", rate.bottom - rate.top, app.siansa.ui.MENU_ROW_HEIGHT, tolerance = 1.dp)
+    }
+
     /** A menu row whose label wraps (issue #778) grows to fit it, with the same gap above and below; a short one stays 48 dp. */
     @Test fun aWrappedMenuLabelFitsItsRow() {
         compose.setContent {

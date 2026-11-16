@@ -128,6 +128,12 @@ interface MusicSource {
 
     suspend fun star(id: String)
     suspend fun unstar(id: String)
+
+    /** Whether the server keeps a star rating for each song (issue #1043): Subsonic servers do, Emby and Jellyfin don't. */
+    val keepsRatings: Boolean get() = false
+
+    /** Rates a song from 1 to 5 stars; 0 takes the rating off. */
+    suspend fun setRating(id: String, stars: Int) {}
     suspend fun starAlbum(albumId: String)
     suspend fun unstarAlbum(albumId: String)
     suspend fun starredAlbums(): List<Album>

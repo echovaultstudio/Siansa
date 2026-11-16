@@ -1,5 +1,12 @@
 package app.siansa.ui
 
+import app.siansa.data.StarRatings
+import app.siansa.data.OutsideMedia
+import androidx.compose.material.icons.rounded.StarBorder
+import androidx.compose.material.icons.rounded.Star
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.semantics
 import app.siansa.net.soundReady
 import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.ui.graphics.drawscope.clipPath
@@ -170,6 +177,10 @@ fun PlayerMenu(
                     graph.favorites.toggle(song)
                     onDismiss()
                 }
+                if (ratingShown(graph.settings.current.stars.on, graph.ratings.kept, song.id)) {
+                    val rated by graph.ratings.stars.collectAsStateWithLifecycle()
+                    RateRow(rated[song.id] ?: 0) { graph.ratings.rate(song.id, it, notify) }
+                }
                 MenuRow(Icons.AutoMirrored.Rounded.PlaylistAdd, "Add to playlist") { pickPlaylist = true }
                 MenuRow(Icons.AutoMirrored.Rounded.QueueMusic, "Add to queue") {
                     graph.player.addToQueue(song)
@@ -271,6 +282,21 @@ private fun MenuRow(icon: Painter, label: String, tint: Color? = null, enabled: 
 
 internal val MENU_ROW_HEIGHT = 48.dp
 
+/** "Rate" in a song's menu, with the stars at its right (issue #1043). The menu stays open: the stars show the change. */
+@Composable
+internal fun RateRow(stars: Int, onRate: (Int) -> Unit) {
+    val color = MaterialTheme.colorScheme.onSurface
+    Row(
+        Modifier.fillMaxWidth().testTag("rateRow").heightIn(min = MENU_ROW_HEIGHT).padding(horizontal = Space.Page, vertical = Space.Tight),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Rounded.StarBorder, null, tint = color.copy(alpha = 0.85f), modifier = Modifier.size(24.dp))
+        Spacer(Modifier.width(Space.Page))
+        Text("Rate", style = MaterialTheme.typography.bodyLarge, color = color, modifier = Modifier.weight(1f))
+        StarRow(stars, tag = "menuStars", dim = color.copy(alpha = 0.35f), onRate = onRate)
+    }
+}
+
 @Composable
 private fun MenuDivider() {
     HorizontalDivider(Modifier.padding(horizontal = Space.Page, vertical = Space.Tight), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
@@ -358,21 +384,63 @@ fun AboutArtistCard(song: Song, surface: Color, onOpenArtist: () -> Unit) {
     }
 }
 
-/** About this song: what Song details knows, in a small grid, on [surface]. Hidden until Navidrome answers. */
+/**
+ * Five stars to rate a song (issue #1043): a tap gives that many, a tap on the rating it has takes it off. Small under
+ * the title and in a menu, [big] in About this song. [dim] is the colour of the stars not given.
+ */
 @Composable
-fun AboutSongCard(song: Song, surface: Color, onOpenDetails: () -> Unit) {
+fun StarRow(stars: Int, modifier: Modifier = Modifier, big: Boolean = false, tag: String = "stars", dim: Color = Color.White.copy(alpha = 0.45f), onRate: (Int) -> Unit) {
+    Row(modifier.testTag(tag).semantics { stateDescription = StarRatings.words(stars) }) {
+        for (n in 1..StarRatings.MOST) {
+            Box(
+                Modifier
+                    .size(if (big) STAR_TOUCH_BIG else STAR_TOUCH)
+                    .clip(CircleShape)
+                    .clickable(role = Role.Button) { onRate(StarRatings.tapped(stars, n)) }
+                    .testTag("$tag-$n"),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Rounded.Star,
+                    if (n == stars) "Remove the rating" else StarRatings.words(n),
+                    tint = if (n <= stars) Accent else dim,
+                    modifier = Modifier.size(if (big) STAR_SIZE_BIG else STAR_SIZE),
+                )
+            }
+        }
+    }
+}
+
+/** A star and the room around it that takes the tap: small (under the title, in a menu) and big (About this song). */
+internal val STAR_SIZE = 20.dp
+internal val STAR_TOUCH = 32.dp
+internal val STAR_SIZE_BIG = 28.dp
+internal val STAR_TOUCH_BIG = 40.dp
+
+/** Whether a song's stars show: ratings on, a server that keeps them, and a song of that server (not a station). */
+internal fun ratingShown(on: Boolean, kept: Boolean, songId: String?): Boolean = on && kept && songId != null && !OutsideMedia.isOutside(songId)
+
+/**
+ * About this song: the stars when they're shown here ([stars], null when not; issue #1043), then what Song details
+ * knows, in a small grid, on [surface]. Hidden until the server answers.
+ */
+@Composable
+fun AboutSongCard(song: Song, surface: Color, stars: Int? = null, onRate: (Int) -> Unit = {}, onOpenDetails: () -> Unit) {
     val graph = LocalGraph.current
     val details by loadState("details-${song.id}") { graph.source.songDetails(song.id) }
     val d = details.valueOrNull() ?: return
+    // The server's own rating, as it came with the details.
+    LaunchedEffect(d) { if (stars != null) graph.ratings.learn(song.id, d.userRating) }
     val cells = listOfNotNull(
         d.codec?.let { codec -> "Format" to listOfNotNull(codec, d.bitDepth?.let { "$it-bit" }).joinToString(" · ") },
         d.sampleRateHz?.let { "Sample rate" to formatSampleRate(it) },
         d.bitRateKbps?.let { "Bit rate" to "%,d kbit/s".format(it) },
         d.playCount?.let { "Plays" to "$it" },
     )
-    if (cells.isEmpty()) return
-    Column(Modifier.padding(horizontal = Space.Page).fillMaxWidth().clip(CardShape).background(surface).clickable(onClick = onOpenDetails).padding(Space.Page)) {
+    if (cells.isEmpty() && stars == null) return
+    Column(Modifier.padding(horizontal = Space.Page).fillMaxWidth().clip(CardShape).background(surface).clickable(onClick = onOpenDetails).padding(Space.Page).testTag("aboutSong")) {
         CardTitle("About this song")
+        if (stars != null) AboutRating(stars, line = cells.isNotEmpty(), onRate = onRate)
         cells.chunked(2).forEach { row ->
             Row(Modifier.fillMaxWidth().padding(bottom = Space.Medium)) {
                 row.forEach { (label, value) ->
@@ -384,6 +452,26 @@ fun AboutSongCard(song: Song, surface: Color, onOpenDetails: () -> Unit) {
                 if (row.size == 1) Spacer(Modifier.weight(1f))
             }
         }
+    }
+}
+
+/**
+ * The rating in About this song (issue #1043): "Your rating" and what it is in words, the five stars at the right, and
+ * a [line] under it, the same gap above and below, when the song's details follow.
+ */
+@Composable
+internal fun AboutRating(stars: Int, line: Boolean, onRate: (Int) -> Unit) {
+    Row(Modifier.fillMaxWidth().testTag("aboutRating"), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text("YOUR RATING", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.45f), letterSpacing = 0.4.sp, maxLines = 1)
+            Text(StarRatings.words(stars), style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.75f), maxLines = 1)
+        }
+        StarRow(stars, big = true, tag = "aboutStars", onRate = onRate)
+    }
+    if (line) {
+        Spacer(Modifier.height(Space.Medium))
+        HorizontalDivider(Modifier.testTag("aboutRatingLine"), color = Color.White.copy(alpha = 0.14f))
+        Spacer(Modifier.height(Space.Medium))
     }
 }
 

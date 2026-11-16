@@ -199,6 +199,13 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
     BackHandler(enabled = queueOpen) { queueOpen = false }
     val scope = rememberCoroutineScope()
     val snack = LocalSnack.current
+    // Star ratings (issue #1043): shown when they're on, on a server that keeps them. The rating is asked for as the
+    // song comes up; the phone's copy shows until the server answers.
+    val rates = ratingShown(style.stars.on, graph.ratings.kept, song?.id)
+    val ratings by graph.ratings.stars.collectAsStateWithLifecycle()
+    val rating = song?.let { ratings[it.id] } ?: 0
+    LaunchedEffect(song?.id, rates) { if (rates) song?.let { graph.ratings.refresh(it.id) } }
+    fun rate(stars: Int) { song?.let { graph.ratings.rate(it.id, stars) { message -> scope.launch { snack.showSnackbar(message) } } } }
     val openArtist = rememberArtistOpener(beforeOpen = onClose)
     val scroll = rememberScrollState()
     // The cover's colour, for the page, the cards under the player and the lyrics screen.
@@ -401,7 +408,13 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
 
                         // The filled heart of a liked song takes the cover's colour too, with Dynamic colours on (issue #998).
                         WithAccent(dynamic?.controls, dynamic?.onControls) {
-                            TitleRow(song, liked = song != null && heartChanges.let { graph.favorites.isLiked(song) }, onArtist = { song?.let(openArtist) }) {
+                            TitleRow(
+                                song,
+                                liked = song != null && heartChanges.let { graph.favorites.isLiked(song) },
+                                stars = rating.takeIf { rates && style.stars.showsUnderTitle },
+                                onRate = ::rate,
+                                onArtist = { song?.let(openArtist) },
+                            ) {
                                 song?.let { graph.favorites.toggle(it) }
                             }
                         }
@@ -478,7 +491,7 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                         val cards = nowPlayingCardColor(tint)
                         AboutArtistCard(song, cards) { openArtist(song) }
                         Spacer(Modifier.height(Space.Medium))
-                        AboutSongCard(song, cards, onOpenDetails = ::openDetails)
+                        AboutSongCard(song, cards, stars = rating.takeIf { rates && style.stars.showsInAbout }, onRate = ::rate, onOpenDetails = ::openDetails)
                     }
                     Spacer(Modifier.height(Space.Section + navBar))
                 }
@@ -747,7 +760,19 @@ private fun SleepIndicator(onClick: () -> Unit) {
 }
 
 @Composable
-private fun TitleRow(song: Song?, liked: Boolean, onArtist: () -> Unit, onHeart: () -> Unit) {
+internal fun TitleRow(song: Song?, liked: Boolean, stars: Int? = null, onRate: (Int) -> Unit = {}, onArtist: () -> Unit, onHeart: () -> Unit) {
+    Column(Modifier.fillMaxWidth()) {
+        TitleAndHeart(song, liked, onArtist, onHeart)
+        // The stars, when they're shown under the title (issue #1043), on a line of their own so the heart stays where
+        // it is: the first star's left edge under the text's.
+        if (stars != null) {
+            StarRow(stars, Modifier.padding(top = Space.Tight).offset(x = -(STAR_TOUCH - STAR_SIZE) / 2), tag = "titleStars", onRate = onRate) // spacing: exact
+        }
+    }
+}
+
+@Composable
+private fun TitleAndHeart(song: Song?, liked: Boolean, onArtist: () -> Unit, onHeart: () -> Unit) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Text(

@@ -197,6 +197,8 @@ data class AppSettings(
     val homeShortcuts: Int = 8,
     /** On: now playing's lyrics, device and queue buttons (issue #294). Off: the earlier look, lyrics card peeking in. */
     val nowPlayingLyricsButton: Boolean = true,
+    /** Star ratings on Now Playing, and where they show (issue #1043). */
+    val stars: StarRatings = StarRatings(),
     /** Sliding from now playing's play button, and what each way does (issue #919). */
     val playSlides: app.siansa.ui.PlaySlides = app.siansa.ui.PlaySlides(),
     /** The DJ mix bar's places, left to right (issue #1033): Style › DJ Mix Bar puts them in order. */
@@ -506,6 +508,11 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         homeMenu = HomeMenuItem.parse(prefs.getString("home_menu", null)),
         homeShortcuts = prefs.getInt("home_shortcuts", 8).coerceIn(2, 8),
         nowPlayingLyricsButton = prefs.getBoolean("now_playing_lyrics_button", true),
+        stars = StarRatings(
+            on = prefs.getBoolean("star_ratings", false),
+            underTitle = prefs.getBoolean("stars_under_title", false),
+            inAbout = prefs.getBoolean("stars_in_about", true),
+        ),
         playSlides = app.siansa.ui.PlaySlides.parse(prefs.getString("play_slides", null)),
         djBarOrder = app.siansa.ui.DjBarSpot.parse(prefs.getString("dj_bar_order", null)),
         topBar = TopBarStyle.parse(prefs.getString("top_bar", null)),
@@ -783,6 +790,11 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
     fun setTopBar(style: TopBarStyle) {
         prefs.edit().putString("top_bar", style.name).apply()
         _state.value = _state.value.copy(topBar = style)
+    }
+
+    fun setStars(stars: StarRatings) {
+        prefs.edit().putBoolean("star_ratings", stars.on).putBoolean("stars_under_title", stars.underTitle).putBoolean("stars_in_about", stars.inAbout).apply()
+        _state.value = _state.value.copy(stars = stars)
     }
 
     fun setNowPlayingLyricsButton(on: Boolean) {

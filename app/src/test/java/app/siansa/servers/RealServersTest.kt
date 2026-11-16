@@ -272,6 +272,20 @@ class RealServersTest(private val server: String) {
         assertEquals("$server: the song by its id", s.title, source().song(s.id).title)
     }
 
+    /** Star ratings (issue #1043): kept by Navidrome, read back with the song's details, and taken off with 0. */
+    @Test fun starRatingsAreKeptWhereTheServerHasThem() = runBlocking {
+        val source = source()
+        assertEquals("$server keeps ratings", server == "navidrome", source.keepsRatings)
+        assumeTrue("$server has no five-star rating", source.keepsRatings)
+        val s = song("Morning Tone")
+        source.setRating(s.id, 4)
+        assertEquals("$server: rated", 4, source.songDetails(s.id).userRating)
+        source.setRating(s.id, 1)
+        assertEquals("$server: rated again", 1, source.songDetails(s.id).userRating)
+        source.setRating(s.id, 0)
+        assertEquals("$server: the rating taken off", null, source.songDetails(s.id).userRating)
+    }
+
     @Test fun randomSongsAndDetails() = runBlocking {
         assertTrue("$server: random songs", source().randomSongs(5).isNotEmpty())
         source().songDetails(song("Loose Ends").id)
