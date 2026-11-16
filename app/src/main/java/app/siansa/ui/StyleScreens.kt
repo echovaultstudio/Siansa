@@ -145,6 +145,18 @@ fun NowPlayingStyleScreen(nav: NavController) {
                 }
             }
             HorizontalDivider()
+            FoldSection("About this song", if (settings.nowPlayingStreamInfo) "Shows how the song is playing" else "The file's details only") {
+                SwitchRow(
+                    "How the song is playing",
+                    "The file and what plays, side by side: the original, converted to Opus, downloaded, or from the song cache",
+                    settings.nowPlayingStreamInfo,
+                    tag = "streamInfoSwitch",
+                ) {
+                    AppLog.i("Style", "Now playing: stream info ${if (it) "on" else "off"}")
+                    graph.settings.setNowPlayingStreamInfo(it)
+                }
+            }
+            HorizontalDivider()
             FoldSection("Play button", "Slides ${if (settings.playSlides.on) "on" else "off"} · grooves ${if (settings.playSlides.grooves) "on" else "off"}") {
                 PlaySlidesSettings(settings.playSlides, heading = false) { slides ->
                     AppLog.i("Style", "Play button slides: ${slides.format()}")

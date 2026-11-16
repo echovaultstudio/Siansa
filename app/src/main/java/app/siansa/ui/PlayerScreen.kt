@@ -491,7 +491,14 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                         val cards = nowPlayingCardColor(tint)
                         AboutArtistCard(song, cards) { openArtist(song) }
                         Spacer(Modifier.height(Space.Medium))
-                        AboutSongCard(song, cards, stars = rating.takeIf { rates && style.stars.showsInAbout }, onRate = ::rate, onOpenDetails = ::openDetails)
+                        AboutSongCard(
+                            song,
+                            cards,
+                            stars = rating.takeIf { rates && style.stars.showsInAbout },
+                            playing = if (style.nowPlayingStreamInfo) rememberPlayingAs(song, state) else null,
+                            onRate = ::rate,
+                            onOpenDetails = ::openDetails,
+                        )
                     }
                     Spacer(Modifier.height(Space.Section + navBar))
                 }

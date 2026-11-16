@@ -1,5 +1,10 @@
 package app.siansa.ui
 
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material.icons.automirrored.rounded.ArrowForward
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.IntrinsicSize
+import app.siansa.playback.PlayingAs
 import app.siansa.data.StarRatings
 import app.siansa.data.OutsideMedia
 import androidx.compose.material.icons.rounded.StarBorder
@@ -425,10 +430,13 @@ internal fun ratingShown(on: Boolean, kept: Boolean, songId: String?): Boolean =
  * knows, in a small grid, on [surface]. Hidden until the server answers.
  */
 @Composable
-fun AboutSongCard(song: Song, surface: Color, stars: Int? = null, onRate: (Int) -> Unit = {}, onOpenDetails: () -> Unit) {
+fun AboutSongCard(song: Song, surface: Color, stars: Int? = null, playing: PlayingAs? = null, onRate: (Int) -> Unit = {}, onOpenDetails: () -> Unit) {
     val graph = LocalGraph.current
     val details by loadState("details-${song.id}") { graph.source.songDetails(song.id) }
-    val d = details.valueOrNull() ?: return
+    // While the server hasn't answered there's no card. When it can't (offline, a downloaded song), how the song is
+    // playing still shows (issue #1038), with what the library knows of the file.
+    if (details is Load.Loading) return
+    val d = details.valueOrNull() ?: if (playing != null) app.siansa.net.SongDetails() else return
     // The server's own rating, as it came with the details.
     LaunchedEffect(d) { if (stars != null) graph.ratings.learn(song.id, d.userRating) }
     val cells = listOfNotNull(
@@ -437,10 +445,14 @@ fun AboutSongCard(song: Song, surface: Color, stars: Int? = null, onRate: (Int) 
         d.bitRateKbps?.let { "Bit rate" to "%,d kbit/s".format(it) },
         d.playCount?.let { "Plays" to "$it" },
     )
-    if (cells.isEmpty() && stars == null) return
+    if (cells.isEmpty() && stars == null && playing == null) return
     Column(Modifier.padding(horizontal = Space.Page).fillMaxWidth().clip(CardShape).background(surface).clickable(onClick = onOpenDetails).padding(Space.Page).testTag("aboutSong")) {
         CardTitle("About this song")
-        if (stars != null) AboutRating(stars, line = cells.isNotEmpty(), onRate = onRate)
+        if (stars != null) AboutRating(stars, line = cells.isNotEmpty() || playing != null, onRate = onRate)
+        if (playing != null) {
+            StreamPath(PlayingAs.file(d.codec, song.suffix, d.bitRateKbps), playing)
+            if (cells.isNotEmpty()) Spacer(Modifier.height(Space.Page))
+        }
         cells.chunked(2).forEach { row ->
             Row(Modifier.fillMaxWidth().padding(bottom = Space.Medium)) {
                 row.forEach { (label, value) ->
@@ -453,6 +465,71 @@ fun AboutSongCard(song: Song, surface: Color, stars: Int? = null, onRate: (Int) 
             }
         }
     }
+}
+
+/**
+ * File → Playing in About this song (issue #1038): the file as it is on the server at the left, an arrow, and what is
+ * really playing at the right, lit in the accent colour only when that isn't the file as it is (converted to Opus, or
+ * an Opus download).
+ */
+@Composable
+internal fun StreamPath(file: Pair<String, String?>, playing: PlayingAs) {
+    Row(
+        Modifier.fillMaxWidth().height(IntrinsicSize.Min).testTag("streamPath"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Space.Small),
+    ) {
+        StreamEnd("FILE", file.first, file.second, lit = false, Modifier.weight(1f).fillMaxHeight().testTag("streamFile"))
+        Icon(Icons.AutoMirrored.Rounded.ArrowForward, null, tint = Color.White.copy(alpha = 0.45f), modifier = Modifier.size(STREAM_ARROW))
+        StreamEnd("PLAYING", playing.title, playing.detail, lit = playing.differs, Modifier.weight(STREAM_PLAYING_SHARE).fillMaxHeight().testTag("streamPlaying"))
+    }
+}
+
+@Composable
+private fun StreamEnd(label: String, title: String, detail: String?, lit: Boolean, modifier: Modifier) {
+    val shape = RoundedCornerShape(12.dp)
+    Column(
+        modifier
+            .clip(shape)
+            .background(if (lit) Accent.copy(alpha = 0.13f) else Color.White.copy(alpha = 0.06f))
+            .then(if (lit) Modifier.border(1.dp, Accent.copy(alpha = 0.4f), shape) else Modifier)
+            .padding(horizontal = Space.Medium, vertical = Space.Small),
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text(label, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.45f), letterSpacing = 0.4.sp, maxLines = 1)
+        Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        if (detail != null) Text(detail, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.72f), maxLines = 3, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+private val STREAM_ARROW = 18.dp
+internal val STREAM_ARROW_FOR_TESTS get() = STREAM_ARROW
+/** The Playing side is a little wider than the File side: it says more. */
+private const val STREAM_PLAYING_SHARE = 1.35f
+
+/**
+ * How [song] is playing now, for About this song (issue #1038): on a TV or speaker, from its download, converted by the
+ * server, from the song cache, or streamed as it is. Null for a radio station or podcast, which has no file.
+ */
+@Composable
+internal fun rememberPlayingAs(song: Song, state: app.siansa.playback.PlayerState): PlayingAs? {
+    if (OutsideMedia.isOutside(song.id)) return null
+    val graph = LocalGraph.current
+    val context = LocalContext.current
+    val cast by app.siansa.playback.Cast.status.collectAsStateWithLifecycle()
+    val dlna by app.siansa.playback.dlna.Dlna.selected.collectAsStateWithLifecycle()
+    val downloads by graph.downloads.list.collectAsStateWithLifecycle()
+    val download = remember(song.id, downloads) {
+        if (graph.downloads.fileFor(song.id) == null) null else downloads.done.firstOrNull { it.song.id == song.id }?.kbps ?: 0
+    }
+    // Asked as the song comes up and again when it starts or stops loading: a song loaded ahead is all there already.
+    val cached by androidx.compose.runtime.produceState(false, song.id, state.buffering) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            app.siansa.playback.songFullyCached(graph.songCache, app.siansa.playback.songCacheKey(graph.source.streamUrl(song.id)))
+        }
+    }
+    val wifi = remember(song.id, state.transcodeKbps, state.isPlaying) { app.siansa.playback.Streaming.isUnmetered(context) }
+    return PlayingAs.of(device = dlna?.name ?: cast.device, downloadKbps = download, transcodeKbps = state.transcodeKbps, cached = cached, wifi = wifi)
 }
 
 /**

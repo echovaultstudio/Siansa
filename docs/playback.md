@@ -272,6 +272,19 @@ colours of the cover, and the cards take a deep shade of the cover's colour too 
 cover). Scroll back up for the controls. A small slip of the thumb doesn't leave the cards
 peeking in: now playing glides back unless you swipe up or scroll a quarter of the way down.
 
+## How the song is playing
+
+**About this song**, in the lower part of now playing, shows **File → Playing**: the file as it is on your server (its
+format and bit rate) and, beside it, what is really playing and where it comes from:
+
+- **Same as the file**, streamed as it is (on Wi-Fi or mobile data), from the song cache, or from its download.
+- **Opus** with its bit rate when your server converts the song for the connection you're on, or when the song was
+  downloaded as Opus. The box is lit then, so a converted song shows at a glance.
+- **On** a TV or speaker's name while you cast.
+
+Offline, a downloaded song still shows how it plays, with the file type the library knows. Turn it off in **Settings ›
+Now playing › About this song**.
+
 ## Star ratings
 
 Turn on **Settings › Now playing › Star ratings** to rate songs from one to five stars. Tap a star to give that many;

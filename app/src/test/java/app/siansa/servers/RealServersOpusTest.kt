@@ -65,18 +65,19 @@ class RealServersOpusTest(private val server: String) {
     }
 
     /**
-     * Asks for [url], once more after a moment when the server answers with an error: Emby 4.8 sometimes refuses to
-     * start a conversion right after another one ("Error starting ffmpeg", HTTP 500; seen in CI, not on 4.10 or 4.11).
+     * Asks for [url], and again after a moment when the server answers with an error, up to four times: Emby 4.8
+     * sometimes refuses to start a conversion right after another one ("Error starting ffmpeg", HTTP 500; seen on CI's
+     * slower machines only, and not on 4.10 or 4.11). A TV that gets this falls back to its next format.
      */
     private fun <T> answer(url: Uri, what: String, read: (okhttp3.Response) -> T): T {
-        repeat(2) { attempt ->
+        repeat(4) { attempt ->
             http.newCall(Request.Builder().url(url.toString()).build()).execute().use { r ->
-                if (r.code < 500 || attempt == 1) {
+                if (r.code < 500 || attempt == 3) {
                     assertEquals("$what: answer", 200, r.code)
                     return read(r)
                 }
             }
-            Thread.sleep(2_000)
+            Thread.sleep(3_000)
         }
         error("unreachable")
     }

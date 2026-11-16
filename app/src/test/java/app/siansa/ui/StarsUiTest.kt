@@ -148,6 +148,36 @@ class StarsUiTest {
         compose.onNodeWithText("Not rated").assertExists()
     }
 
+    /**
+     * File → Playing (issue #1038): two boxes of one height with the arrow between them, the same gap on both of its
+     * sides, the Playing box named so a screen reader and the tests can tell what plays.
+     */
+    @Test fun fileAndPlayingSitEvenlySideBySide() {
+        var playing by mutableStateOf(app.siansa.playback.PlayingAs.of(null, null, 256, cached = false, wifi = false))
+        compose.setContent {
+            MaterialTheme(colorScheme = playerColors()) {
+                Column(Modifier.width(296.dp)) { StreamPath("FLAC" to "2,116 kbit/s", playing) }
+            }
+        }
+        val path = compose.onNodeWithTag("streamPath").getBoundsInRoot()
+        val file = compose.onNodeWithTag("streamFile").getBoundsInRoot()
+        val now = compose.onNodeWithTag("streamPlaying").getBoundsInRoot()
+        assertEquals("the boxes are one height", file.height.value, now.height.value, 0.6f)
+        assertEquals(path.left.value, file.left.value, 0.6f)
+        assertEquals(path.right.value, now.right.value, 0.6f)
+        // The arrow sits between them with the same gap on each side.
+        val arrow = STREAM_ARROW_FOR_TESTS
+        assertEquals((Space.Small * 2 + arrow).value, (now.left - file.right).value, 0.6f)
+        assertTrue("Playing is the wider box", now.width > file.width)
+        compose.onNodeWithText("Opus 256 kbit/s").assertExists()
+        compose.onNodeWithText("Converted by your server · mobile data").assertExists()
+        // The original: "Same as the file", and where it comes from.
+        playing = app.siansa.playback.PlayingAs.of(null, null, 0, cached = true, wifi = true)
+        compose.waitForIdle()
+        compose.onNodeWithText("Same as the file").assertExists()
+        compose.onNodeWithText("From the song cache on this phone").assertExists()
+    }
+
     /** In a song's menu: "Rate" is a row like the others, and its stars rate without closing it. */
     @Test fun rateInTheMenuIsARowLikeTheOthers() {
         var stars by mutableStateOf(0)

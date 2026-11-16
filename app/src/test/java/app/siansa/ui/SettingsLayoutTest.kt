@@ -84,7 +84,7 @@ class SettingsLayoutTest {
         for (part in listOf("FoldSection(\"Dynamic colours\"", "FoldSection(\"Status bar\"", "FoldSection(\"Animated covers\"")) assertTrue("Theme misses $part", theme.contains(part))
         // Now playing: the buttons, the play button, the DJ mix bar and the mini player.
         val np = source("StyleScreens.kt").substringAfter("fun NowPlayingStyleScreen(").substringBefore("fun PlaySlidesSettings(")
-        for (part in listOf("FoldSection(\"Buttons\"", "FoldSection(\"Star ratings\"", "FoldSection(\"Play button\"", "FoldSection(\"DJ mix bar\"", "FoldSection(\"Mini player\"")) assertTrue("Now playing misses $part", np.contains(part))
+        for (part in listOf("FoldSection(\"Buttons\"", "FoldSection(\"Star ratings\"", "FoldSection(\"About this song\"", "FoldSection(\"Play button\"", "FoldSection(\"DJ mix bar\"", "FoldSection(\"Mini player\"")) assertTrue("Now playing misses $part", np.contains(part))
         assertTrue(source("ScrobblingScreen.kt").contains("\"Show songs not in your library\""))
         assertTrue(source("AboutScreen.kt").contains("\"What's new\""))
         assertFalse("Beat-matched blends are still marked experimental", source("CrossfadeScreen.kt").contains("(experimental)"))
