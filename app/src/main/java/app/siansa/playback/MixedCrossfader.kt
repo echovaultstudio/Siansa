@@ -88,6 +88,9 @@ internal class MixedCrossfader(
     private var baseSpeed = 1f
     private var plannedWithNext = true
     private var stepStats = BeatMatch.StepStats()
+    /** The kicks heard in each song during the blend (ms of the song), for the grid check. */
+    private val outKicks = ArrayList<Double>()
+    private val inKicks = ArrayList<Double>()
     private var loggedStage = 0
     private var lateLogged = false
     private var easingFrom = 0f
@@ -358,6 +361,13 @@ internal class MixedCrossfader(
         stepStats = BeatMatch.StepStats()
         loggedStage = 0
         lateLogged = false
+        outKicks.clear()
+        inKicks.clear()
+        // The grid check (the owner's DJ plan, #63): both songs' kicks are listened for while they're laid beat on beat.
+        if (planned.beat != null) {
+            tMix.kicks = app.siansa.playback.engine.KickListener(engine.outRate)
+            mainMix.kicks = app.siansa.playback.engine.KickListener(engine.outRate)
+        }
         stopEasing()
         phase = Phase.FADING
         level = 0f
@@ -440,6 +450,7 @@ internal class MixedCrossfader(
                 return
             }
             if (beat != null && onNext && heardMix >= incomingMix && !tailDone) check(beat, tMix, heardMix)
+            if (beat != null) hearKicks(tMix, onNext)
             if (onNext && !lateLogged && heardMix >= incomingMix) {
                 lateLogged = true
                 if (mainMix.current?.cueGivenUp == true) AppLog.w("Crossfade", "The next song's cue was given up (seconds of its sound came before the point it was cued to); it plays from where it is")
@@ -493,6 +504,34 @@ internal class MixedCrossfader(
                 handler.postDelayed(this, TICK_MS)
             }
         })
+    }
+
+    /**
+     * The kicks heard since the last tick, at their time in each song: the old song's while it plays, the next one's
+     * from when it came in. Read at once, while each deck can still say where its song was at that moment.
+     */
+    private fun hearKicks(tMix: MixCore.Deck, onNext: Boolean) {
+        tMix.kicks?.take()?.forEach { f -> tMix.mediaUsAt(f.toDouble())?.let { outKicks += it / 1000.0 - GridCheck.HEARD_LATE_MS } }
+        val heard = mainMix.kicks?.take() ?: return
+        if (!onNext) return
+        heard.forEach { f -> if (f >= incomingMix) mainMix.mediaUsAt(f.toDouble())?.let { inKicks += it / 1000.0 - GridCheck.HEARD_LATE_MS } }
+    }
+
+    /** The grid check's line in the log, once the blend is over, and the listening stops. */
+    private fun reportGrids(beat: BeatMatch.Plan?) {
+        val tMix = tailMix
+        if (beat != null && (outKicks.isNotEmpty() || inKicks.isNotEmpty())) {
+            val from = GridCheck.side(outKicks, beat.outgoing)
+            val to = GridCheck.side(inKicks, beat.incoming)
+            val line = GridCheck.describe(outgoing ?: "?", from, incomingId ?: "?", to)
+            if (from.off || to.off) AppLog.w("Crossfade", line, event = "crossfade.grid_off", fields = mapOf("from_off_ms" to from.offMs, "to_off_ms" to to.offMs))
+            else AppLog.i("Crossfade", line)
+            LastBlend.gridChecked(from, to)
+        }
+        tMix?.kicks = null
+        mainMix.kicks = null
+        outKicks.clear()
+        inKicks.clear()
     }
 
     /** How far apart the two songs' beats are, from where each is on the one clock: it should be under a ms. */
@@ -673,6 +712,8 @@ internal class MixedCrossfader(
     private fun finish() {
         handler.removeCallbacks(fadeTick)
         val beat = plan?.beat
+        tailMix?.let { if (beat != null && phase == Phase.FADING) hearKicks(it, main.currentMediaItemIndex == incomingIndex) }
+        reportGrids(beat)
         if (phase == Phase.FADING) {
             if (beat != null && main.currentMediaItemIndex == incomingIndex) {
                 startEasing(beat)
