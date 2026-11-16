@@ -105,7 +105,7 @@ object TechniquePicker {
         fun fits(t: Technique, bars: Int, why: String, dropAt: Long? = null) = out.add(Option(TechniqueChoice(t, bars, why, dropAt), forced = false))
         // Cases that leave no choice.
         if (noRoom) forced(Technique.QUICK_SWAP, 4, "no room left for a longer blend")
-        if (mix) forced(Technique.BASS_SWAP, BeatMatch.MIX_TRACK_BARS, "a track from a mixed CD: short, inside its lock")
+        if (mix) forced(Technique.BASS_SWAP, BeatMatch.MIX_TRACK_BARS, "a track from a mixed CD: inside its lock")
         if (keys != null && keys < KEYS_CLASH) forced(Technique.QUICK_SWAP, 4, "the keys clash")
         if (sure < UNSURE) forced(Technique.QUICK_SWAP, 4, "the beat is only %.0f %% sure".format(java.util.Locale.ROOT, sure * 100))
         if (out.isNotEmpty()) return out
