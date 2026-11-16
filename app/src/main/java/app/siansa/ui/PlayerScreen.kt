@@ -563,7 +563,7 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                 var queueY by remember { mutableFloatStateOf(0f) }
                 var panelHeight by remember { mutableFloatStateOf(1f) }
                 fun settle(speed: Float) {
-                    if (queueY > panelHeight * 0.2f || (queueY > 30f && speed > 1200f)) {
+                    if (pullCloses(queueY, panelHeight, speed)) {
                         queueOpen = false
                     } else if (queueY > 0f) {
                         val from = queueY
@@ -1281,6 +1281,13 @@ private class PlayerSettle(
         return 0f
     }
 }
+
+/**
+ * Whether a panel over the player (the queue, the lyrics) closes when it's let go, pulled down [pulledPx] of its
+ * [heightPx] at [speed] px a second: a fifth of the way, or a quick flick.
+ */
+internal fun pullCloses(pulledPx: Float, heightPx: Float, speed: Float): Boolean =
+    pulledPx > heightPx * 0.2f || (pulledPx > 30f && speed > 1200f)
 
 /** In the classic now playing style, how much of the lyrics card shows under the player before scrolling (issue #346). */
 private val PLAYER_PEEK = 44.dp
