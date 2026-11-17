@@ -3,6 +3,7 @@ package app.siansa.net
 import app.siansa.data.AppSettings
 import app.siansa.data.BeatsUse
 import app.siansa.log.AppLog
+import app.siansa.data.AppJson
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -29,8 +30,24 @@ class BeatsMixes(
     private val settings: () -> AppSettings,
     private val zone: () -> ZoneId = { ZoneId.systemDefault() },
     private val now: () -> Long = System::currentTimeMillis,
+    // The last answer kept on the phone (the owner, 17 Nov: "so they don't just disappear when you start the phone
+    // new until they are loaded"): read once at the start, written when a new answer differs.
+    private val loadKept: () -> String? = { null },
+    private val saveKept: (String) -> Unit = {},
 ) {
-    private val shown = MutableStateFlow<Shelves?>(null)
+    private val shown = MutableStateFlow(kept())
+    private val asking_ = MutableStateFlow(false)
+
+    /** Siansa Beats is being asked for new mixes while the last ones show: Home shows they're being made again. */
+    val refreshing: StateFlow<Boolean> = asking_.asStateFlow()
+
+    /** The kept answer, as it was when it was asked (so it's asked again at once if it's old or another part of the day). */
+    private fun kept(): Shelves? = runCatching {
+        val text = loadKept() ?: return null
+        val o = AppJson.parseToJsonElement(text) as? JsonObject ?: return null
+        val at = (o["kept_at"] as? JsonPrimitive)?.content?.toLongOrNull() ?: 0L
+        parse(o, at).takeIf { it.shelves.isNotEmpty() }
+    }.onFailure { AppLog.d("Beats", "The kept mixes couldn't be read: ${it.message}") }.getOrNull()
     // One ask at a time: two rows of Home show the mixes, and each asks.
     private val asking = Mutex()
 
@@ -51,7 +68,17 @@ class BeatsMixes(
         val s = settings()
         val path = "/api/v1/mixes?user=" + URLEncoder.encode(BeatsListens.listener(s), "UTF-8") +
             "&tz=" + URLEncoder.encode(zone().id, "UTF-8") + "&size=$SIZE"
-        return runCatching { parse(get(path) as? JsonObject ?: throw ApiException("Siansa Beats sent an unexpected answer"), now()) }
+        asking_.value = had != null
+        return runCatching {
+            val o = get(path) as? JsonObject ?: throw ApiException("Siansa Beats sent an unexpected answer")
+            parse(o, now()).also { fresh ->
+                // Kept for the next start; written only when the mixes changed (not every quarter of an hour).
+                if (fresh.shelves != had?.shelves) {
+                    runCatching { saveKept(JsonObject(o + ("kept_at" to JsonPrimitive(fresh.askedAt))).toString()) }
+                        .onFailure { e -> AppLog.w("Beats", "The mixes couldn't be kept on the phone: ${e.message}") }
+                }
+            }
+        }
             .onSuccess {
                 if (had == null || had.part != it.part) {
                     AppLog.i("Beats", "Mixes for the ${it.said}: ${it.shelves.sumOf { s -> s.mixes.size }} from ${it.basis}" +
@@ -61,10 +88,10 @@ class BeatsMixes(
             }
             .onFailure {
                 // Home left while it asked: not a failure (it said "weren't read" each time, the owner's log, 17 Nov).
-                if (it is CancellationException) throw it
+                if (it is CancellationException) { asking_.value = false; throw it }
                 AppLog.w("Beats", "Siansa Beats' mixes weren't read: ${it.message}")
             }
-            .getOrNull() ?: had
+            .getOrNull().also { asking_.value = false } ?: had
     }
 
     /** One mix: [songIds] are the music server's own. */
