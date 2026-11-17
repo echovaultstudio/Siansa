@@ -3,9 +3,6 @@ package app.siansa.ui
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -20,8 +17,10 @@ import app.siansa.data.Song
 import app.siansa.log.AppLog
 import app.siansa.net.BeatsMixes
 import java.time.LocalDate
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Home's mixes from Siansa Beats (0.53, the owner, 17 Nov), in place of your own carousels while they're switched on
@@ -47,42 +46,54 @@ fun BeatsMixesHome(nav: NavController) {
     }
     Column(Modifier.fillMaxWidth().testTag("beatsMixes")) {
         made.shelves.forEachIndexed { i, shelf ->
-            val records = shelf.mixes.mapNotNull { mix -> crateRecord(mix, songs[mix.id].orEmpty(), nav, graph) }
+            val records = shelf.mixes.mapNotNull { mix -> crateRecord(mix, songs[mix.id].orEmpty(), made.keepDays, nav, graph) }
             if (records.isEmpty()) return@forEachIndexed
+            // Just the title: the mixes say the rest (the owner, 17 Nov: no line under it).
             SectionTitle(BeatsMixes.title(shelf), top = if (i == 0) LocalSectionGap.current else Space.Section)
-            if (shelf.key == "now") {
-                // What it's made from and what it's like outside, in a line, as Siansa Beats' page says it.
-                val line = listOfNotNull(made.daylight?.said?.takeIf { it.isNotBlank() }, made.based.takeIf { it.isNotBlank() }).joinToString(" · ")
-                if (line.isNotEmpty()) {
-                    Text(line, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2,
-                        modifier = Modifier.padding(start = Space.Page, end = Space.Page, bottom = Space.Medium).testTag("beatsMixesNote"))
-                }
-            }
             RecordCrate(records)
         }
     }
 }
 
-/** A mix as a record: opens as a mix page (kept for two weeks as the app's own mixes are), plays its songs. */
-private fun crateRecord(mix: BeatsMixes.BeatsMix, songs: List<Song>, nav: NavController, graph: AppGraph): CrateRecord? {
+/**
+ * A mix as a record: shows what's in it under its name, opens as a mix page and plays its songs. Opened or played, it's
+ * kept as the app's own mixes are, for as many days as Siansa Beats keeps it (the owner, 17 Nov), and played it
+ * becomes a shortcut in the recent plays, so it still plays days later.
+ */
+private fun crateRecord(mix: BeatsMixes.BeatsMix, songs: List<Song>, keepDays: Int, nav: NavController, graph: AppGraph): CrateRecord? {
     if (songs.isEmpty()) return null
     val today = LocalDate.now().toString()
-    val id = "beats-$today-${mix.id}"
-    val caption = listOf(mix.why.ifBlank { mix.genres.take(2).joinToString(", ") }, "${songs.size} songs").filter { it.isNotBlank() }.joinToString(" · ")
-    fun saved() = Mix(id, "beats-${mix.id}", today, mix.name, mix.why.ifBlank { "Made by Siansa Beats from your listening" }, "", songs,
-        System.currentTimeMillis(), aiNamed = mix.aiNamed)
+    val id = beatsMixId(mix, today)
+    fun saved() = Mix(id, "beats-${mix.id}", today, mix.name, beatsMixDescription(mix), "", songs,
+        System.currentTimeMillis(), aiNamed = mix.aiNamed, keepDays = keepDays)
+    suspend fun keep(): Mix? = runCatching { saved().also { graph.mixes.save(it) } }
+        .onFailure { AppLog.w("Home", "Siansa Beats' mix ${mix.name} wasn't kept: ${it.message}") }.getOrNull()
     return CrateRecord(
-        key = mix.id + mix.name,
+        key = id,
         name = mix.name,
-        caption = caption,
+        caption = mix.caption,
         covers = songs.map { it.coverArt }.distinct().take(4),
         songs = songs,
         onOpen = {
             graph.scope.launch {
-                runCatching { graph.mixes.save(saved()) }.onFailure { AppLog.w("Home", "Siansa Beats' mix ${mix.name} wasn't kept: ${it.message}") }
-                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { nav.navigate("mix/$id") }
+                keep()
+                withContext(Dispatchers.Main) { nav.navigate("mix/$id") }
             }
         },
-        onPlay = { graph.player.play(songs) },
+        onPlay = {
+            graph.player.play(songs)
+            graph.scope.launch {
+                val kept = keep() ?: return@launch
+                graph.recentPlays.note("mix/$id", kept.title, songs.firstOrNull()?.cover)
+            }
+        },
     )
 }
+
+/** The id a Siansa Beats mix is kept by here: Siansa Beats' own key, which no other mix has (0.55), else the day's. */
+internal fun beatsMixId(mix: BeatsMixes.BeatsMix, today: String): String =
+    "beats-" + mix.key.ifBlank { "$today-${mix.id}" }
+
+/** A Siansa Beats mix's page says what's in it and the artists it's like. */
+internal fun beatsMixDescription(mix: BeatsMixes.BeatsMix): String =
+    listOf(mix.about, mix.why).filter { it.isNotBlank() }.joinToString(". ").ifBlank { "Made by Siansa Beats from your listening" }

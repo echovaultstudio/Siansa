@@ -21,11 +21,11 @@ import java.time.ZonedDateTime
  */
 class BeatsMixesTest {
     private val answer = """{"schema_version":1,"user":"max","part":"early","days":"weekdays","said":"early morning","hours":"05:00–09:00",
-        "basis":"slot","based":"From what you play in the early morning on weekdays.","listens":7614,"songs":840,
+        "basis":"slot","based":"From what you play in the early morning on weekdays.","listens":7614,"songs":840,"keep_days":7,
         "daylight":{"light":"dark","elevation":-12.2,"sunrise":"08:22","sunset":"15:47","said":"Dark outside: the sun rises at 08:22"},
         "shelves":[
           {"key":"now","title":"Your early morning","note":"Weekdays, 05:00–09:00","mixes":[
-            {"id":"now-1","name":"Velvet Undertow","named":"ai","why":"Like A, B and C.","tags":["Sung"],"genres":["Ambient"],"artists":["A"],"energy":0.12,"mood":0.3,"own":2,
+            {"id":"now-1","key":"2026-11-17-early-weekdays-now-1","name":"Velvet Undertow","named":"ai","why":"Like A, B and C.","about":"Slow synths and hazy voices","tags":["Sung"],"genres":["Ambient"],"artists":["A"],"energy":0.12,"mood":0.3,"own":2,
              "songs":[{"id":"s1","title":"One","artist":"A","album":"","own":true},{"id":"s2","title":"Two","artist":"B","album":"","own":false}]},
             {"id":"now-2","name":"Empty","named":"sound","why":"","tags":[],"genres":[],"artists":[],"energy":null,"mood":null,"own":0,"songs":[]}]},
           {"key":"daily","title":"Made for you","note":"","mixes":[]},
@@ -57,6 +57,23 @@ class BeatsMixesTest {
         assertNull(got.shelves[1].mixes.single().energy)
         assertEquals("Dark outside: the sun rises at 08:22", got.daylight?.said)
         assertEquals("early morning", got.said)
+    }
+
+    @Test fun underAMixIsWhatsInItNotItsArtists() {
+        val got = BeatsMixes.parse(AppJson.parseToJsonElement(answer).jsonObject, 1L)
+        assertEquals(7, got.keepDays)
+        val first = got.shelves[0].mixes.single()
+        assertEquals("Slow synths and hazy voices", first.caption)
+        assertEquals("2026-11-17-early-weekdays-now-1", first.key)
+        // Kept by Siansa Beats' key, so a morning mix isn't overwritten by the evening's; its page has the artists too.
+        assertEquals("beats-2026-11-17-early-weekdays-now-1", app.siansa.ui.beatsMixId(first, "2026-11-17"))
+        assertEquals("Slow synths and hazy voices. Like A, B and C.", app.siansa.ui.beatsMixDescription(first))
+        // From an older Siansa Beats: no line, no key, no days.
+        val old = got.shelves[1].mixes.single().copy(about = "", key = "", genres = listOf("Rock", "Indie", "Pop"))
+        assertEquals("Rock, Indie", old.caption)
+        assertEquals("beats-2026-11-17-repeat", app.siansa.ui.beatsMixId(old, "2026-11-17"))
+        assertEquals("What you played most in the last 30 days.", old.copy(genres = emptyList()).caption)
+        assertEquals(0, BeatsMixes.parse(AppJson.parseToJsonElement(answer.replace("\"keep_days\":7,", "")).jsonObject, 1L).keepDays)
     }
 
     @Test fun thePartsOfTheDayAreSiansaBeats() {

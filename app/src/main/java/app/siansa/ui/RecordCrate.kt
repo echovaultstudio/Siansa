@@ -1,6 +1,13 @@
 package app.siansa.ui
 
-import androidx.compose.foundation.Canvas
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -9,15 +16,15 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerDefaults
+import androidx.compose.foundation.pager.PagerSnapDistance
 import androidx.compose.foundation.pager.PageSize
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -31,10 +38,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
@@ -64,10 +69,11 @@ data class CrateRecord(
 )
 
 /**
- * Mixes as records in a crate (the owner, 17 Nov: "a beautiful carousel card for them on Home that resembles flicking
- * through records"): the one in front stands up straight with its record slid half out of the sleeve; the ones behind
- * lean back and stack, as sleeves do when you flick through a crate. Swipe to flick; tap the front one to open it.
- * Under the crate: its name, what it is, and Play.
+ * Mixes as sleeves in a crate (the owner, 17 Nov: "a beautiful carousel card for them on Home that resembles flicking
+ * through records"; later the same day: no record peeking out, and "make the swiping animation really smooth"): the
+ * one in front stands up straight; the ones behind lean back gently and tuck under it. Every change follows the finger
+ * continuously (no step or clamp), and a flick settles on a soft spring without bouncing. Tap the front one to open it.
+ * Under the crate: its name, a short line on what's in it, and Play, fading across as the front one changes.
  */
 @Composable
 fun RecordCrate(
@@ -89,6 +95,12 @@ fun RecordCrate(
             val side = ((maxWidth - slot) / 2).coerceAtLeast(0.dp)
             HorizontalPager(
                 state = pager,
+                // A flick passes a few sleeves at most and settles softly, never with a jolt or a bounce.
+                flingBehavior = PagerDefaults.flingBehavior(
+                    state = pager,
+                    pagerSnapDistance = PagerSnapDistance.atMost(3),
+                    snapAnimationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow),
+                ),
                 pageSize = PageSize.Fixed(slot),
                 contentPadding = PaddingValues(horizontal = side), // spacing: exact (the front sleeve in the middle)
                 beyondViewportPageCount = 3,
@@ -97,32 +109,25 @@ fun RecordCrate(
                 val record = records[page]
                 // How far this sleeve is from the front: 0 in front, 1 one along, negative to the left.
                 val off = (pager.currentPage - page) + pager.currentPageOffsetFraction
-                val far = abs(off).coerceAtMost(2f)
-                val front = (1f - far).coerceIn(0f, 1f)
+                val far = abs(off).coerceAtMost(CRATE_FAR)
+                // Eased, so a sleeve leaves the front slowly and settles slowly: no kink as it passes a neighbour.
+                val eased = FastOutSlowInEasing.transform(far / CRATE_FAR) * CRATE_FAR
                 Box(
                     Modifier
                         .zIndex(-far)
                         .requiredSize(sleeve, sleeve + CRATE_ROOM)
                         .graphicsLayer {
                             // Leaning back into the crate, away from the one in front.
-                            rotationY = (off * CRATE_TILT).coerceIn(-CRATE_TILT * 1.6f, CRATE_TILT * 1.6f)
-                            cameraDistance = 14f * density
-                            val shrink = 1f - CRATE_SHRINK * far
+                            rotationY = kotlin.math.sign(off) * eased / CRATE_FAR * CRATE_TILT
+                            cameraDistance = 16f * density
+                            val shrink = 1f - CRATE_SHRINK * eased
                             scaleX = shrink
                             scaleY = shrink
-                            translationY = CRATE_SINK.toPx() * far
-                            alpha = 1f - 0.25f * (far - 1f).coerceAtLeast(0f)
+                            translationY = CRATE_SINK.toPx() * eased
+                            alpha = 1f - 0.35f * (eased / CRATE_FAR)
                         },
                     contentAlignment = Alignment.TopStart,
                 ) {
-                    // The record, slid out to the right of the one in front.
-                    Vinyl(
-                        record.key,
-                        Modifier
-                            .size(sleeve * 0.94f)
-                            .offset(x = sleeve * 0.06f + sleeve * CRATE_SLIDE * front, y = sleeve * 0.03f)
-                            .graphicsLayer { rotationZ = 160f * front },
-                    )
                     Sleeve(
                         record,
                         Modifier
@@ -139,11 +144,19 @@ fun RecordCrate(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Space.Medium),
         ) {
-            Column(Modifier.weight(1f).clickable(onClick = record.onOpen), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
-                Text(record.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold, maxLines = 1,
-                    overflow = TextOverflow.Ellipsis, modifier = Modifier.testTag("crateName"))
-                Text(record.caption, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2, overflow = TextOverflow.Ellipsis)
+            AnimatedContent(
+                targetState = record,
+                transitionSpec = { fadeIn(tween(CRATE_FADE_MS, delayMillis = CRATE_FADE_MS / 2)) togetherWith fadeOut(tween(CRATE_FADE_MS / 2)) },
+                contentKey = { it.key },
+                label = "crateCaption",
+                modifier = Modifier.weight(1f),
+            ) { shown ->
+                Column(Modifier.fillMaxWidth().clickable(onClick = shown.onOpen), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
+                    Text(shown.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold, maxLines = 1,
+                        overflow = TextOverflow.Ellipsis, modifier = Modifier.testTag("crateName"))
+                    Text(shown.caption, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.testTag("crateCaption"))
+                }
             }
             play(record)
         }
@@ -195,29 +208,13 @@ private fun Sleeve(record: CrateRecord, modifier: Modifier) {
     }
 }
 
-/** A record: black, with grooves, and a label in the mix's colours. */
-@Composable
-private fun Vinyl(key: String, modifier: Modifier) {
-    val colors = remember(key) { tileColors(key) }
-    Canvas(modifier.aspectRatio(1f).testTag("crateVinyl")) {
-        val r = size.minDimension / 2
-        val c = Offset(size.width / 2, size.height / 2)
-        drawCircle(Color(0xFF0E0E10), r, c)
-        for (i in 1..9) drawCircle(Color.White.copy(alpha = 0.05f), r * (0.42f + i * 0.06f), c, style = Stroke(width = 1.dp.toPx()))
-        // A sheen across the grooves.
-        drawCircle(Brush.linearGradient(listOf(Color.White.copy(alpha = 0.10f), Color.Transparent, Color.White.copy(alpha = 0.06f)),
-            start = Offset(0f, 0f), end = Offset(size.width, size.height)), r, c)
-        drawCircle(Brush.linearGradient(listOf(colors.first, colors.second), start = c - Offset(r, r) * 0.3f, end = c + Offset(r, r) * 0.3f), r * 0.34f, c)
-        drawCircle(Color(0xFF0E0E10), r * 0.04f, c)
-    }
-}
-
 private const val CRATE_SLEEVE = 0.62f // of the width
 private const val CRATE_SLEEVE_MOST = 280f // dp
 private const val CRATE_OVERLAP = 0.42f // of a sleeve: how far the ones behind tuck under
-private const val CRATE_TILT = 38f // degrees a sleeve one along leans back
-private const val CRATE_SHRINK = 0.12f
-private const val CRATE_SLIDE = 0.30f // of a sleeve: how far the front record slides out
+private const val CRATE_TILT = 30f // degrees a sleeve two along leans back (about 23 one along, eased)
+private const val CRATE_FAR = 2f // sleeves from the front where the lean, shrink and fade stop growing
+private const val CRATE_SHRINK = 0.06f // per sleeve along
+private const val CRATE_FADE_MS = 220
 private val CRATE_ROOM: Dp = 20.dp // under the sleeves, for the ones behind to sink into
 private val CRATE_SINK: Dp = 8.dp
 private val CRATE_CORNER: Dp = 6.dp

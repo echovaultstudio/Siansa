@@ -335,9 +335,9 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     app.siansa.ui.SectionTitle("For now", top = 0.dp)
                     app.siansa.ui.RecordCrate(
                         listOf(
-                            record("now-1", "Velvet Undertow", "Like Low Lanterns, The Tides and Paper Boats · 40 songs"),
-                            record("now-2", "Neo-Classical Downtempo Drift", "Like Saint Meridian and Young Vessels · 40 songs"),
-                            record("now-3", "Driving Post-Punk", "Like Black Harbours · 40 songs"),
+                            record("now-1", "Velvet Undertow", "Slow synths and hazy voices"),
+                            record("now-2", "Neo-Classical Downtempo Drift", "Strings, soft beats and field recordings drifting by"),
+                            record("now-3", "Driving Post-Punk", "Wiry guitars and restless drums"),
                         ),
                         startAt = 1,
                         play = { r -> app.siansa.ui.RoundPlayButton(false, "Play ${r.name}", app.siansa.ui.CRATE_PLAY, app.siansa.ui.CRATE_PLAY_ICON) {} },
