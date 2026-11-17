@@ -69,6 +69,13 @@ fun HomeSettingsScreen(nav: NavController) {
                     AppLog.i("Settings", "Notices › ${kind.label}: ${mode.label}")
                     graph.settings.setNoticeMode(kind, mode)
                 }
+                // Your own notices (issue #1234), here where the notices are set (they were on the old Notices page,
+                // which nothing opens any more: the owner, 17 Nov, "from where can I make a custom notice?").
+                if (shown) {
+                    HorizontalDivider()
+                    Heading("Your own notices")
+                    YourOwnNotices(nav)
+                }
             }
             HorizontalDivider()
             FoldSection("Home menu", "${settings.homeMenu.size} options") {

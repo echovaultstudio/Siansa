@@ -70,6 +70,7 @@ object SettingsIndex {
         SettingEntry("Skips", "Audiobooks & podcasts", "settings/books", "skips", "back forward seconds book player"),
         SettingEntry("Shortcuts", "Home page", "settings/home", "top-of-home", "played last quick"),
         SettingEntry("Notices", "Home page", "settings/home", "top-of-home", "chips pinned automatic new music carry on downloads"),
+        SettingEntry("Your own notices", "Home page", "settings/home", "top-of-home", "custom notice add a notice rules filter new releases"),
         SettingEntry("Home menu", "Home page", "settings/home", "home-menu", "order roll the dice play on sources arrange"),
         SettingEntry("Cards", "Home page", "settings/cards", words = "made for you your cards custom"),
         SettingEntry("Light or dark", "Theme", "settings/themes", words = "auto theme mode night"),
