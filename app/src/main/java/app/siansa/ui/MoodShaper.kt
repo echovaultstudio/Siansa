@@ -90,6 +90,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.siansa.data.BeatsUse
 import app.siansa.data.Genre
 import app.siansa.mix.FlowMood
 import app.siansa.mix.MixSound
@@ -456,7 +457,7 @@ internal fun MoodPickerSheet(tuning: VibeTuning, look: MoodLook, inMix: List<Mix
 internal fun moodsOffered(): Boolean {
     val has by BeatsSound.traits.collectAsState()
     val settings by LocalGraph.current.settings.state.collectAsState()
-    return has && settings.beatsFor(app.siansa.data.BeatsUse.MOODS)
+    return has && settings.beatsFor(BeatsUse.MOODS)
 }
 
 /** [sounds] without those that are the name of one of [genres], whatever the capitals. */

@@ -14,13 +14,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import app.siansa.AppGraph
 import app.siansa.data.Mix
 import app.siansa.data.Song
 import app.siansa.log.AppLog
 import app.siansa.net.BeatsMixes
+import java.time.LocalDate
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import java.time.LocalDate
 
 /**
  * Home's mixes from Siansa Beats (0.53, the owner, 17 Nov), in place of your own carousels while they're switched on
@@ -63,7 +64,7 @@ fun BeatsMixesHome(nav: NavController) {
 }
 
 /** A mix as a record: opens as a mix page (kept for two weeks as the app's own mixes are), plays its songs. */
-private fun crateRecord(mix: BeatsMixes.BeatsMix, songs: List<Song>, nav: NavController, graph: app.siansa.AppGraph): CrateRecord? {
+private fun crateRecord(mix: BeatsMixes.BeatsMix, songs: List<Song>, nav: NavController, graph: AppGraph): CrateRecord? {
     if (songs.isEmpty()) return null
     val today = LocalDate.now().toString()
     val id = "beats-$today-${mix.id}"

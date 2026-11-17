@@ -1,17 +1,5 @@
 package app.siansa.ui
 
-import app.siansa.net.wordsReady
-import app.siansa.net.soundReady
-import app.siansa.data.normalizeKey
-import app.siansa.mix.mixArtistRadios
-import app.siansa.mix.ArtistRadioPicks
-import androidx.compose.ui.platform.testTag
-
-import app.siansa.mix.resumeStart
-import app.siansa.mix.MixRules
-import app.siansa.mix.MixException
-import app.siansa.data.RecentPlay
-import app.siansa.data.cover
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -34,14 +22,15 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Pause
-import androidx.compose.material.icons.rounded.Radio
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Radio
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -51,13 +40,12 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -66,33 +54,46 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import app.siansa.AppGraph
 import app.siansa.data.Album
+import app.siansa.data.Artist
+import app.siansa.data.BeatsUse
 import app.siansa.data.CardLook
 import app.siansa.data.HomeLook
 import app.siansa.data.HomeMenuItem
 import app.siansa.data.HomeSection
-import app.siansa.data.Artist
 import app.siansa.data.Mix
-import app.siansa.data.Song
 import app.siansa.data.Playlist
+import app.siansa.data.RecentPlay
 import app.siansa.data.Selector
+import app.siansa.data.Song
+import app.siansa.data.cover
+import app.siansa.data.normalizeKey
 import app.siansa.log.AppLog
-import app.siansa.mix.moodRadios
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.launch
-import androidx.compose.runtime.produceState
+import app.siansa.mix.ArtistRadioPicks
+import app.siansa.mix.MixException
 import app.siansa.mix.MixGenerator
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
+import app.siansa.mix.MixRules
+import app.siansa.mix.mixArtistRadios
+import app.siansa.mix.moodRadios
+import app.siansa.mix.resumeStart
+import app.siansa.net.BeatsSound
+import app.siansa.net.soundReady
+import app.siansa.net.wordsReady
 import java.time.LocalDate
 import java.time.LocalTime
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun HomeScreen(nav: NavController) {
@@ -224,8 +225,8 @@ fun HomeScreen(nav: NavController) {
     // (beta testers #37). Showing other music in the source filter doesn't make it again (issue #486). AI mixes
     // need AudioMuse.
     // Siansa Beats' mixes (0.53) in place of your own carousels and Made for you, while switched on under its card.
-    val beatsMakesMixes by app.siansa.net.BeatsSound.mixes.collectAsStateWithLifecycle()
-    val beatsMixesShown = beatsMakesMixes && homeSettings.beatsFor(app.siansa.data.BeatsUse.MIXES)
+    val beatsMakesMixes by BeatsSound.mixes.collectAsStateWithLifecycle()
+    val beatsMixesShown = beatsMakesMixes && homeSettings.beatsFor(BeatsUse.MIXES)
     val aiMixes = MixRules.showsAiMixes(homeSettings.wordsReady)
     LaunchedEffect(hour, aiMixes) {
         graph.mixes.all()

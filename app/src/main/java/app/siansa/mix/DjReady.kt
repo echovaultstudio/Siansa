@@ -1,8 +1,9 @@
 package app.siansa.mix
 
-import app.siansa.net.BeatsSound
 import app.siansa.data.AppSettings
+import app.siansa.data.BeatsUse
 import app.siansa.log.AppLog
+import app.siansa.net.BeatsSound
 import app.siansa.net.ConnectionState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -46,7 +47,7 @@ class DjReady(private val now: () -> Long = System::currentTimeMillis) {
         /** Why a DJ mix can't run now, in a few words for its button, or null when it can. */
         fun problem(settings: AppSettings, connection: ConnectionState, beats: Boolean?, beatsSound: Boolean = BeatsSound.answers(SONGS_SOUND)): String? = when {
             !settings.beatsReady -> "Needs Siansa Beats"
-            !settings.beatsFor(app.siansa.data.BeatsUse.DJ) -> DJ_OFF
+            !settings.beatsFor(BeatsUse.DJ) -> DJ_OFF
             connection.offline -> "Not available now"
             beats == null -> "Checking…"
             !beats -> "Needs Siansa Beats"

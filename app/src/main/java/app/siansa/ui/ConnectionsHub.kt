@@ -1,5 +1,6 @@
 package app.siansa.ui
 
+import SettingsRepository
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.ScrollState
@@ -66,6 +67,7 @@ import app.siansa.AppGraph
 import app.siansa.BuildConfig
 import app.siansa.data.AiProvider
 import app.siansa.data.AppSettings
+import app.siansa.data.BeatsUse
 import app.siansa.data.SettingsRepository
 import app.siansa.data.UserEntry
 import app.siansa.data.UserFiles
@@ -82,6 +84,7 @@ import app.siansa.net.EmbyApi
 import app.siansa.net.SourceKind
 import app.siansa.net.SubsonicApi
 import app.siansa.net.beatsTakesListens
+import app.siansa.playback.LoudnessSource
 import app.siansa.playback.ProfileStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -678,7 +681,7 @@ internal class BeatsUseRow(
     val on: Boolean,
     val offered: Boolean,
     val needs: String,
-    val set: (app.siansa.data.SettingsRepository, Boolean) -> Unit,
+    val set: (SettingsRepository, Boolean) -> Unit,
 )
 
 /** What the app can ask Siansa Beats for, in [s]: the same settings as Scrobbling, Crossfade and the rest. */
@@ -689,16 +692,16 @@ internal fun beatsUses(s: AppSettings): List<BeatsUseRow> {
         BeatsUseRow("beatsUse-scrobble", "Scrobbling and history", "Your listens, kept by Siansa Beats: Listening, reports and its mixes.",
             s.scrobbleBeats, s.beatsTakesListens, "Needs Siansa Beats 0.29") { r, on -> r.save(r.current.copy(scrobbleBeats = on)) },
         BeatsUseRow("beatsUse-loudness", "Loudness and smooth fades", "Each song measured, for even volume and fades that fit.",
-            s.loudnessSource == app.siansa.playback.LoudnessSource.PLUGIN, true, "") { r, on ->
-            r.setLoudness(source = if (on) app.siansa.playback.LoudnessSource.PLUGIN else app.siansa.playback.LoudnessSource.TAGS)
+            s.loudnessSource == LoudnessSource.PLUGIN, true, "") { r, on ->
+            r.setLoudness(source = if (on) LoudnessSource.PLUGIN else LoudnessSource.TAGS)
         },
-        use(app.siansa.data.BeatsUse.DJ, "DJ blends", "Beats and phrases, so DJ mixes blend on the beat."),
-        use(app.siansa.data.BeatsUse.GENRES, "Genres by sound", "Genres heard in the music. Off: your songs' tags."),
-        use(app.siansa.data.BeatsUse.SOUND, "Similar music and sound search", "Songs like a song, radios, blends and the search by words.",
+        use(BeatsUse.DJ, "DJ blends", "Beats and phrases, so DJ mixes blend on the beat."),
+        use(BeatsUse.GENRES, "Genres by sound", "Genres heard in the music. Off: your songs' tags."),
+        use(BeatsUse.SOUND, "Similar music and sound search", "Songs like a song, radios, blends and the search by words.",
             BeatsSound.available, "Needs Siansa Beats 0.25"),
-        use(app.siansa.data.BeatsUse.MOODS, "Moods in Flow", "Vocals, a woman's or a man's voice, and how songs feel.",
+        use(BeatsUse.MOODS, "Moods in Flow", "Vocals, a woman's or a man's voice, and how songs feel.",
             BeatsSound.traits.value, "Needs Siansa Beats 0.51"),
-        use(app.siansa.data.BeatsUse.MIXES, "Mixes on Home", "Made from your listening, for the time of day. Off: your own carousels.",
+        use(BeatsUse.MIXES, "Mixes on Home", "Made from your listening, for the time of day. Off: your own carousels.",
             BeatsSound.mixes.value, "Needs Siansa Beats 0.53"),
     )
 }
