@@ -164,13 +164,13 @@ zone). Three shelves, the same as on Siansa Beats' page:
 - **More of you**: On repeat, Rediscover and New for you.
 
 Each shelf is a crate of sleeves: the one in front stands up, the others lean back behind it. Swipe to flick through,
-tap the front one to open it, or press Play. Under it is its name and a few words on what's in it ("Wiry guitars and
+and tap the front one to open it and play it from there. Under it is its name and a few words on what's in it ("Wiry guitars and
 restless drums"); the artists it's like are on its own page. Siansa Beats makes the next part of the day's mixes a few
 minutes before it starts, so they're there when the hour turns. With an AI service set up on Siansa Beats' page, the
 mixes get their name and words from it; without one, from their sound ("Calm Indie Rock", "Calm ambient, mostly
 instrumental").
 
-A mix you open or play stays on the phone, and in your shortcuts on Home, for as long as Siansa Beats keeps its mixes:
+A mix you open stays on the phone, and once played it's in your shortcuts on Home, for as long as Siansa Beats keeps its mixes:
 7 days, or what **Keep mixes for** on its Mixes page says (Siansa Beats 0.55).
 
 They're on while **Mixes on Home** is switched on under Siansa Beats (Settings › Connections). Switch it off for your

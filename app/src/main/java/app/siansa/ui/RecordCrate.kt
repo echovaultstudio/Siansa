@@ -65,7 +65,6 @@ data class CrateRecord(
     val covers: List<String?>,
     val songs: List<app.siansa.data.Song>,
     val onOpen: () -> Unit,
-    val onPlay: () -> Unit,
 )
 
 /**
@@ -73,15 +72,14 @@ data class CrateRecord(
  * through records"; later the same day: no record peeking out, and "make the swiping animation really smooth"): the
  * one in front stands up straight; the ones behind lean back gently and tuck under it. Every change follows the finger
  * continuously (no step or clamp), and a flick settles on a soft spring without bouncing. Tap the front one to open it.
- * Under the crate: its name, a short line on what's in it, and Play, fading across as the front one changes.
+ * Under the crate: its name and a short line on what's in it, fading across as the front one changes; no Play
+ * button (the owner, 17 Nov): its page has one.
  */
 @Composable
 fun RecordCrate(
     records: List<CrateRecord>,
     modifier: Modifier = Modifier,
     startAt: Int = 0,
-    // Play, for the record in front: it shows Pause while its songs play (drawn plain by the screenshot tests).
-    play: @Composable (CrateRecord) -> Unit = { CratePlay(it) },
 ) {
     if (records.isEmpty()) return
     val scope = androidx.compose.runtime.rememberCoroutineScope()
@@ -158,19 +156,8 @@ fun RecordCrate(
                         maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.testTag("crateCaption"))
                 }
             }
-            play(record)
         }
         CarouselDots(count = records.size, current = pager.currentPage)
-    }
-}
-
-/** Play for the record in front, Pause while its songs are playing. */
-@Composable
-private fun CratePlay(record: CrateRecord) {
-    val graph = LocalGraph.current
-    val card = rememberCardPlay(record.songs)
-    RoundPlayButton(card.playing, if (card.playing) "Pause ${record.name}" else "Play ${record.name}", CRATE_PLAY, CRATE_PLAY_ICON, Modifier.testTag("cratePlay")) {
-        if (card.loaded) graph.player.togglePlay() else record.onPlay()
     }
 }
 
@@ -219,5 +206,3 @@ private val CRATE_ROOM: Dp = 20.dp // under the sleeves, for the ones behind to 
 private val CRATE_SINK: Dp = 8.dp
 private val CRATE_CORNER: Dp = 6.dp
 private val CRATE_SHADOW: Dp = 12.dp
-internal val CRATE_PLAY: Dp = 52.dp
-internal val CRATE_PLAY_ICON: Dp = 30.dp

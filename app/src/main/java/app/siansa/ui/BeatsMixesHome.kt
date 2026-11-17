@@ -14,7 +14,6 @@ import androidx.navigation.NavController
 import app.siansa.AppGraph
 import app.siansa.data.Mix
 import app.siansa.data.Song
-import app.siansa.data.cover
 import app.siansa.log.AppLog
 import app.siansa.net.BeatsMixes
 import java.time.LocalDate
@@ -57,9 +56,9 @@ fun BeatsMixesHome(nav: NavController) {
 }
 
 /**
- * A mix as a record: shows what's in it under its name, opens as a mix page and plays its songs. Opened or played, it's
- * kept as the app's own mixes are, for as many days as Siansa Beats keeps it (the owner, 17 Nov), and played it
- * becomes a shortcut in the recent plays, so it still plays days later.
+ * A mix as a record: shows what's in it under its name and opens as a mix page. Opened, it's kept as the app's own
+ * mixes are, for as many days as Siansa Beats keeps it (the owner, 17 Nov); played from its page it becomes a shortcut
+ * in the recent plays, so it still plays days later.
  */
 private fun crateRecord(mix: BeatsMixes.BeatsMix, songs: List<Song>, keepDays: Int, nav: NavController, graph: AppGraph): CrateRecord? {
     if (songs.isEmpty()) return null
@@ -67,8 +66,8 @@ private fun crateRecord(mix: BeatsMixes.BeatsMix, songs: List<Song>, keepDays: I
     val id = beatsMixId(mix, today)
     fun saved() = Mix(id, "beats-${mix.id}", today, mix.name, beatsMixDescription(mix), "", songs,
         System.currentTimeMillis(), aiNamed = mix.aiNamed, keepDays = keepDays)
-    suspend fun keep(): Mix? = runCatching { saved().also { graph.mixes.save(it) } }
-        .onFailure { AppLog.w("Home", "Siansa Beats' mix ${mix.name} wasn't kept: ${it.message}") }.getOrNull()
+    suspend fun keep() = runCatching { graph.mixes.save(saved()) }
+        .onFailure { AppLog.w("Home", "Siansa Beats' mix ${mix.name} wasn't kept: ${it.message}") }
     return CrateRecord(
         key = id,
         name = mix.name,
@@ -79,13 +78,6 @@ private fun crateRecord(mix: BeatsMixes.BeatsMix, songs: List<Song>, keepDays: I
             graph.scope.launch {
                 keep()
                 withContext(Dispatchers.Main) { nav.navigate("mix/$id") }
-            }
-        },
-        onPlay = {
-            graph.player.play(songs)
-            graph.scope.launch {
-                val kept = keep() ?: return@launch
-                graph.recentPlays.note("mix/$id", kept.title, songs.firstOrNull()?.cover)
             }
         },
     )

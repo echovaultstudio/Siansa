@@ -330,7 +330,7 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
             // Siansa Beats' mixes on Home as records in a crate (the owner, 17 Nov): the one in front with its record slid
             // out, its neighbours leaning back; a long name; no covers (the sleeves' colours show).
             Scene("record_crate") {
-                fun record(key: String, name: String, caption: String) = app.siansa.ui.CrateRecord(key, name, caption, emptyList(), emptyList(), {}, {})
+                fun record(key: String, name: String, caption: String) = app.siansa.ui.CrateRecord(key, name, caption, emptyList(), emptyList(), {})
                 Column(Modifier.padding(vertical = Space.Page)) {
                     app.siansa.ui.SectionTitle("For now", top = 0.dp)
                     app.siansa.ui.RecordCrate(
@@ -340,7 +340,6 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                             record("now-3", "Driving Post-Punk", "Wiry guitars and restless drums"),
                         ),
                         startAt = 1,
-                        play = { r -> app.siansa.ui.RoundPlayButton(false, "Play ${r.name}", app.siansa.ui.CRATE_PLAY, app.siansa.ui.CRATE_PLAY_ICON) {} },
                     )
                 }
             },
