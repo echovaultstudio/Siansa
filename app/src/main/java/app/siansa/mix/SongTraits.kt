@@ -9,35 +9,41 @@ package app.siansa.mix
 object SongTraits {
     /**
      * One trait to pick in a vibe: [label] as shown and as the dial's term, the [words] it adds to the sound search
-     * when picked as "more", and a song's [share] of it from its traits (null when it hasn't them).
+     * when picked as "more", the [group] it's listed under, and a song's [share] of it from its traits (null when
+     * it hasn't them).
      */
-    class Trait(val label: String, val words: String, val share: (Map<String, Double>) -> Double?)
+    class Trait(val label: String, val words: String, val group: String, val share: (Map<String, Double>) -> Double?)
+
+    /** The picker's headings, in its order. */
+    const val VOICE = "Voice"
+    const val MOOD = "Mood"
+    const val SOUND = "Sound"
 
     private fun of(key: String): (Map<String, Double>) -> Double? = { it[key] }
 
     /** A trait at or over this holds for the song. */
     const val HOLDS = 0.5
 
-    /** In the order the picker lists them: voice first, then moods, then the rest. */
+    /** In the order the picker lists them: the voice, then moods, then the sound, each under its heading ([Trait.group]). */
     val ALL: List<Trait> = listOf(
-        Trait("Vocals", "vocals singing", of("voice")),
-        Trait("Instrumental", "instrumental", { t -> t["voice"]?.let { 1 - it } }),
+        Trait("Vocals", "vocals singing", VOICE, of("voice")),
+        Trait("Instrumental", "instrumental", VOICE, { t -> t["voice"]?.let { 1 - it } }),
         // Whose voice: of the voice, so an instrumental song is neither.
-        Trait("Female vocals", "female vocals", { t -> t["voice"]?.let { v -> t["female"]?.let { v * it } } }),
-        Trait("Male vocals", "male vocals", { t -> t["voice"]?.let { v -> t["female"]?.let { v * (1 - it) } } }),
-        Trait("Happy", "happy", of("happy")),
-        Trait("Sad", "sad", of("sad")),
-        Trait("Relaxed", "relaxed", of("relaxed")),
-        Trait("Party", "party", of("party")),
-        Trait("Aggressive", "aggressive", of("aggressive")),
-        Trait("Danceable", "danceable", of("danceable")),
-        Trait("Cheerful", "cheerful fun", of("mirex_cheerful")),
-        Trait("Bittersweet", "wistful bittersweet", of("mirex_bittersweet")),
-        Trait("Passionate", "passionate rousing", of("mirex_passionate")),
-        Trait("Intense", "intense fiery", of("mirex_intense")),
-        Trait("Quirky", "quirky playful", of("mirex_humorous")),
-        Trait("Acoustic", "acoustic", of("acoustic")),
-        Trait("Electronic", "electronic", of("electronic")),
+        Trait("Female vocals", "female vocals", VOICE, { t -> t["voice"]?.let { v -> t["female"]?.let { v * it } } }),
+        Trait("Male vocals", "male vocals", VOICE, { t -> t["voice"]?.let { v -> t["female"]?.let { v * (1 - it) } } }),
+        Trait("Happy", "happy", MOOD, of("happy")),
+        Trait("Sad", "sad", MOOD, of("sad")),
+        Trait("Relaxed", "relaxed", MOOD, of("relaxed")),
+        Trait("Party", "party", MOOD, of("party")),
+        Trait("Aggressive", "aggressive", MOOD, of("aggressive")),
+        Trait("Cheerful", "cheerful fun", MOOD, of("mirex_cheerful")),
+        Trait("Bittersweet", "wistful bittersweet", MOOD, of("mirex_bittersweet")),
+        Trait("Passionate", "passionate rousing", MOOD, of("mirex_passionate")),
+        Trait("Intense", "intense fiery", MOOD, of("mirex_intense")),
+        Trait("Quirky", "quirky playful", MOOD, of("mirex_humorous")),
+        Trait("Danceable", "danceable", SOUND, of("danceable")),
+        Trait("Acoustic", "acoustic", SOUND, of("acoustic")),
+        Trait("Electronic", "electronic", SOUND, of("electronic")),
     )
 
     fun named(label: String): Trait? = ALL.firstOrNull { it.label.equals(label.trim(), ignoreCase = true) }

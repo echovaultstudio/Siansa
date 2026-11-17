@@ -1,6 +1,9 @@
 package app.siansa.net
 
 import app.siansa.data.AppSettings
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 /**
  * What Siansa Beats answers about how songs sound (Siansa Beats 0.25, the owner, 11 Nov): songs like a song, song
@@ -47,6 +50,28 @@ object BeatsSound {
         answers = paths
         where = kept
         onChanged?.invoke(paths, kept)
+    }
+
+    /**
+     * Whether Siansa Beats has each song's voice and moods (its traits, 0.51), as its capabilities last said. Kept, so
+     * Flow offers them at once: asked for when the list was opened, the answer took seconds and the third list came
+     * late (the owner, 17 Nov: "it doesn't show mood until I click on genres").
+     */
+    private val hasTraits = MutableStateFlow(false)
+    val traits: StateFlow<Boolean> = hasTraits.asStateFlow()
+
+    @Volatile
+    var onTraits: ((Boolean) -> Unit)? = null
+
+    /** What Siansa Beats' capabilities just said of its traits. */
+    fun traits(has: Boolean) {
+        if (hasTraits.value == has) return
+        hasTraits.value = has
+        onTraits?.invoke(has)
+    }
+
+    fun restoreTraits(has: Boolean) {
+        hasTraits.value = has
     }
 
     fun restore(paths: Set<String>, own: Map<String, String> = emptyMap()) {

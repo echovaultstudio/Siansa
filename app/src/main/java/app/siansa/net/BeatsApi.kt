@@ -64,6 +64,7 @@ class BeatsApi(
 
     private fun remember(caps: Capabilities, s: AppSettings = settings()): Chosen {
         BeatsSound.heard(caps.sound, caps.soundPaths)
+        BeatsSound.traits(caps.traits)
         val id = serverFor(caps.servers, s.sourceKind, s.navidromeUrl, s.navidromeUser)
         if (chosen[key(s)]?.id != id || !chosen.containsKey(key(s))) {
             AppLog.i("Beats", if (id != null) "Siansa Beats is asked for its server \"$id\" for ${s.navidromeUser.ifBlank { "this login" }} (${caps.servers.size} there)"

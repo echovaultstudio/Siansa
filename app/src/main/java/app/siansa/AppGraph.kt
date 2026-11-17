@@ -556,6 +556,8 @@ class AppGraph(val app: Application) {
         // Its own path for each answer (Siansa Beats 0.44), kept as "name=path".
         val own = prefs.getStringSet("paths", emptySet()).orEmpty().mapNotNull { it.split("=", limit = 2).takeIf { p -> p.size == 2 }?.let { p -> p[0] to p[1] } }.toMap()
         BeatsSound.restore(prefs.getStringSet("answers", emptySet()).orEmpty(), own)
+        BeatsSound.restoreTraits(prefs.getBoolean("traits", false))
+        BeatsSound.onTraits = { has -> QuietWrites.save(prefs) { putBoolean("traits", has) } }
         BeatsSound.onChanged = { paths, where ->
             AppLog.i("Beats", if (paths.isEmpty()) "Siansa Beats doesn't answer what songs sound like (yet)"
             else "Siansa Beats answers what songs sound like: ${paths.joinToString { it.removePrefix("/api/") }}" +
@@ -565,7 +567,7 @@ class AppGraph(val app: Application) {
         // Asked at the start and whenever Siansa Beats' address or key changes, so what the app offers is current.
         scope.launch(CoroutineName("beats-sound")) {
             settings.state.map { it.beatsUrl to it.beatsKey }.distinctUntilChanged().collectLatest { (url, _) ->
-                if (url.isBlank()) BeatsSound.heard(emptySet())
+                if (url.isBlank()) { BeatsSound.heard(emptySet()); BeatsSound.traits(false) }
                 else runCatching { beats.capabilities() }.onFailure {
                     if (it is kotlinx.coroutines.CancellationException) throw it
                     AppLog.d("Beats", "Siansa Beats' capabilities weren't read: ${it.message}")

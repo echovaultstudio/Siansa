@@ -1,6 +1,6 @@
 ### Added
 
-- **Vocals, a woman's or a man's voice, and how songs feel, in your vibes.** With Siansa Beats 0.51 or newer, Flow's **Add a sound or genre** has a third list, **Voice & mood**: vocals or instrumental, female or male vocals, happy, sad, relaxed, party and more. Typed words ask for them too: "sad female vocals" finds sad songs sung by women first.
+- **Vocals, a woman's or a man's voice, and how songs feel, in your vibes.** With Siansa Beats 0.51 or newer, Flow's **Add a sound, genre or mood** has a third list, **Moods**: vocals or instrumental, female or male vocals, happy, sad, relaxed, party and more. Typed words ask for them too: "sad female vocals" finds sad songs sung by women first.
 
 ### Changed
 

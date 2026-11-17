@@ -154,17 +154,18 @@ box: the mix starts playing and you stay on Flow.
   picks and the arrow take the colour of the mood you're in, and its name is under the pad ("Easy groove",
   "Late-night drift", "Get moving"…). Let go and the dot settles on the nearest of its 25 places.
   The line under the pad says it: dragging it while a vibe plays changes the vibe.
-- **Sounds and genres**: tap **+ Add a sound or genre** and pick from the list. Nothing is suggested: you choose,
+- **Sounds and genres**: tap **+ Add a sound or genre** (**+ Add a sound, genre or mood** with Siansa Beats 0.51
+  or newer) and pick from the list. Nothing is suggested: you choose,
   up to six. **Sounds** are the words your sound search understands (piano, vocals, dreamy…), its own list from
   AudioMuse-AI or Siansa Beats, without its genre words. **Genres** are the ones Siansa Beats hears in your music,
   or your songs' genre tags without it: the main ones (those with most songs) first, and the search box finds the
   rest. Each pick starts as **more** of it (filled). Tap it for **less** (dashed, struck through); tap again to
   take it off. A sound steers the search. A genre comes first: with **more** of a genre the mix is made of that
   genre's songs, the ones that fit the rest best first; **less** leaves that genre's songs out.
-  With Siansa Beats (0.51 or newer) there's a third list, **Voice & mood**: **Vocals**, **Instrumental**, **Female
-  vocals**, **Male vocals**, and how songs feel (**Happy**, **Sad**, **Relaxed**, **Party**, **Aggressive**,
-  **Danceable**, **Cheerful**, **Bittersweet**, **Passionate**, **Intense**, **Quirky**, **Acoustic**,
-  **Electronic**). Siansa Beats hears these in every song. **More** of one puts the songs that have it first and adds
+  With Siansa Beats (0.51 or newer) there's a third list, **Moods**, under three headings. **Voice**: **Vocals**,
+  **Instrumental**, **Female vocals**, **Male vocals**. **Mood**: **Happy**, **Sad**, **Relaxed**, **Party**,
+  **Aggressive**, **Cheerful**, **Bittersweet**, **Passionate**, **Intense**, **Quirky**. **Sound**: **Danceable**,
+  **Acoustic**, **Electronic**. Siansa Beats hears these in every song. **More** of one puts the songs that have it first and adds
   its words to the search; **less** puts them last. Words you type ask for them too: "sad female vocals" picks
   **Female vocals** and **Sad** for you, unless you've picked or set them aside already.
 - **Artists**: **Favourites** (the artists you play most), **A mix**, or **New to me** (artists you rarely play).

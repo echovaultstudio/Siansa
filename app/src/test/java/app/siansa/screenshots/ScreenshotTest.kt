@@ -318,13 +318,22 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                 )
                 val dots = (0 until 24).map { app.siansa.mix.PadDot(0.12f + (it * 7 % 11) / 22f, 0.1f + (it * 5 % 9) / 18f) }
                 Column(Modifier.padding(Space.Page)) {
-                    app.siansa.ui.MoodShaper(tuning, app.siansa.ui.MoodLook(-0.5f, 0.5f), app.siansa.ui.MoodHold(), onChange = {}, dots = dots, picker = {})
+                    app.siansa.ui.MoodShaper(tuning, app.siansa.ui.MoodLook(-0.5f, 0.5f), app.siansa.ui.MoodHold(), onChange = {}, dots = dots, traits = false, picker = {})
                 }
             },
             // The same before anything is set (Flow), and at the pad's four corners: every mood's colour and name.
             Scene("mood_shaper_unset") {
                 Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Section)) {
-                    app.siansa.ui.MoodShaper(app.siansa.mix.VibeTuning(), app.siansa.ui.MoodLook(0f, 0f), app.siansa.ui.MoodHold(), onChange = {}, padNote = app.siansa.ui.FLOW_PAD_NOTE, picker = {})
+                    app.siansa.ui.MoodShaper(app.siansa.mix.VibeTuning(), app.siansa.ui.MoodLook(0f, 0f), app.siansa.ui.MoodHold(), onChange = {}, padNote = app.siansa.ui.FLOW_PAD_NOTE, traits = false, picker = {})
+                }
+            },
+            // With Siansa Beats' moods: the picks' heading and the + name them too (the owner, 17 Nov).
+            Scene("mood_shaper_moods") {
+                Column(Modifier.padding(Space.Page)) {
+                    app.siansa.ui.MoodShaper(
+                        app.siansa.mix.VibeTuning(sounds = listOf(app.siansa.mix.SoundDial("Female vocals", 3, trait = true))), app.siansa.ui.MoodLook(0f, 0f), app.siansa.ui.MoodHold(),
+                        onChange = {}, traits = true, picker = {},
+                    )
                 }
             },
             // The list to pick from: sounds (one picked, one found by typing has no count), and genres with a vibe's own
@@ -345,13 +354,13 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     )
                 }
             },
-            // Siansa Beats' traits (0.51): the third list, Voice & mood, with one picked.
+            // Siansa Beats' traits (0.51): the third list, Moods, under its headings (Voice, Mood, Sound), with one picked.
             Scene("mood_picker_traits") {
                 Column(Modifier.padding(Space.Page)) {
                     app.siansa.ui.MoodPicker(
                         app.siansa.mix.VibeTuning(sounds = listOf(app.siansa.mix.SoundDial("Female vocals", 3, trait = true))), app.siansa.ui.MoodLook(-0.5f, 0.5f),
                         sounds = emptyList(), genres = emptyList(), heard = true, inMix = emptyList(),
-                        onChange = {}, onDone = {}, modifier = Modifier.height(560.dp), startTab = 2, traits = true,
+                        onChange = {}, onDone = {}, modifier = Modifier.height(720.dp), startTab = 2, traits = true,
                     )
                 }
             },
