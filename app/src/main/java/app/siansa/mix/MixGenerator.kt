@@ -569,7 +569,8 @@ class MixGenerator(private val graph: AppGraph) {
     suspend fun vibeSongs(words: String, aiSteering: List<Steer>, set: VibeTuning, size: Int = 50): List<Song> {
         // The traits the words ask for by name ("female vocals", "instrumental", "sad"), as if picked (Siansa Beats 0.51,
         // the owner, 16 Nov), unless they're picked already; and the words of the traits picked, added to the search.
-        val tuning = withAskedTraits(set, words)
+        // Typed words ask for moods only while Siansa Beats gives them and they're switched on under its card.
+        val tuning = if (app.siansa.net.BeatsSound.traits.value && graph.settings.current.beatsFor(app.siansa.data.BeatsUse.MOODS)) withAskedTraits(set, words) else set
         val query = withTraitWords(words, tuning)
         val dials = tuning.steering()
         // The dials start at the AI's concepts, so once any is shown they say everything; before that, the AI's.

@@ -223,6 +223,9 @@ fun HomeScreen(nav: NavController) {
     // Today's mix is made once a day; after that only when you tap refresh, also when the hour's vibe moves on
     // (beta testers #37). Showing other music in the source filter doesn't make it again (issue #486). AI mixes
     // need AudioMuse.
+    // Siansa Beats' mixes (0.53) in place of your own carousels and Made for you, while switched on under its card.
+    val beatsMakesMixes by app.siansa.net.BeatsSound.mixes.collectAsStateWithLifecycle()
+    val beatsMixesShown = beatsMakesMixes && homeSettings.beatsFor(app.siansa.data.BeatsUse.MIXES)
     val aiMixes = MixRules.showsAiMixes(homeSettings.wordsReady)
     LaunchedEffect(hour, aiMixes) {
         graph.mixes.all()
@@ -424,12 +427,14 @@ fun HomeScreen(nav: NavController) {
                 HomeSection.CAROUSEL -> {
                     // Your own mixes for this part of the day, set in Vibes (issue #253): AI mixes, so only with
                     // AudioMuse (issue #486).
-                    if (homeSettings.navidromeReady && aiMixes) titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "carousel") { HomeCarousel(nav, aiDown, look) }
+                    if (homeSettings.navidromeReady && beatsMixesShown) titledItem(section !in homeSettings.homeUntitled, key = "beats_mixes") { BeatsMixesHome(nav) }
+                    else if (homeSettings.navidromeReady && aiMixes) titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "carousel") { HomeCarousel(nav, aiDown, look) }
                 }
                 // Audiobookshelf's books and podcasts (issue #521): only with a server set up.
                 HomeSection.BOOKS -> if (homeSettings.booksReady) titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "books") { BooksCarousel(nav, podcasts = false, look = look) }
                 HomeSection.PODCASTS -> if (homeSettings.booksReady) titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "podcasts") { BooksCarousel(nav, podcasts = true, look = look) }
-                HomeSection.MADE_FOR_YOU -> {
+                // Siansa Beats' Made for you is in its mixes above: not a second one.
+                HomeSection.MADE_FOR_YOU -> if (!beatsMixesShown) {
                     // Made for you: the vibe for this hour, then mixes from your own listening.
                     titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "made") {
                         // The same tiles as plain items, for the other looks (issue #655).

@@ -65,6 +65,7 @@ class BeatsApi(
     private fun remember(caps: Capabilities, s: AppSettings = settings()): Chosen {
         BeatsSound.heard(caps.sound, caps.soundPaths)
         BeatsSound.traits(caps.traits)
+        BeatsSound.mixes(caps.mixes)
         val id = serverFor(caps.servers, s.sourceKind, s.navidromeUrl, s.navidromeUser)
         if (chosen[key(s)]?.id != id || !chosen.containsKey(key(s))) {
             AppLog.i("Beats", if (id != null) "Siansa Beats is asked for its server \"$id\" for ${s.navidromeUser.ifBlank { "this login" }} (${caps.servers.size} there)"
@@ -140,6 +141,8 @@ class BeatsApi(
         val servers: List<MusicServer> = emptyList(),
         /** Whether it gives each song's voice, moods and danceability by its trained models (0.51, `traits`). */
         val traits: Boolean = false,
+        /** Whether it makes mixes from each listener's listening (0.53, `/api/v1/mixes`). */
+        val mixes: Boolean = false,
     ) {
         companion object {
             fun parse(body: JsonObject): Capabilities {
@@ -158,6 +161,7 @@ class BeatsApi(
                     soundPaths = (feature("sound")?.get("paths") as? JsonObject).orEmpty()
                         .mapNotNull { (name, path) -> (path as? kotlinx.serialization.json.JsonPrimitive)?.content?.let { name to it } }.toMap(),
                     traits = feature("traits")?.get("available")?.toString() == "true",
+                    mixes = feature("mixes")?.get("available")?.toString() == "true",
                     musicServer = (body["music_server"] as? JsonObject)?.str("kind"),
                     serverId = (body["music_server"] as? JsonObject)?.str("id"),
                     servers = (body["servers"] as? kotlinx.serialization.json.JsonArray).orEmpty().mapNotNull { it as? JsonObject }.mapNotNull { o ->

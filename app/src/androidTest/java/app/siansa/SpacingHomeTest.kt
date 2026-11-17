@@ -371,7 +371,7 @@ class SpacingHomeTest : SpacingCheck() {
             SiansaTheme {
                 app.siansa.ui.MoodShaper(
                     VibeTuning(energy = 1, sounds = listOf(SoundDial("piano", 3), SoundDial("Drone", -3, genre = true))),
-                    app.siansa.ui.MoodLook(0.5f, 0f), app.siansa.ui.MoodHold(), onChange = { }, picker = { },
+                    app.siansa.ui.MoodLook(0.5f, 0f), app.siansa.ui.MoodHold(), onChange = { }, traits = false, picker = { },
                 )
             }
         }
@@ -395,7 +395,7 @@ class SpacingHomeTest : SpacingCheck() {
     @Test fun thePadsNoteIsCentredRightUnderIt() {
         compose.setContent {
             SiansaTheme {
-                app.siansa.ui.MoodShaper(VibeTuning(), app.siansa.ui.MoodLook(0f, 0f), app.siansa.ui.MoodHold(), onChange = { }, padNote = app.siansa.ui.FLOW_PAD_NOTE, picker = { })
+                app.siansa.ui.MoodShaper(VibeTuning(), app.siansa.ui.MoodLook(0f, 0f), app.siansa.ui.MoodHold(), onChange = { }, padNote = app.siansa.ui.FLOW_PAD_NOTE, traits = false, picker = { })
             }
         }
         val pad = compose.onNodeWithTag("soundPad").getBoundsInRoot()

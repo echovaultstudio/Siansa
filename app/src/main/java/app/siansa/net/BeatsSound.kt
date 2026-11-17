@@ -74,6 +74,23 @@ object BeatsSound {
         hasTraits.value = has
     }
 
+    /** Whether Siansa Beats makes mixes from the listening (0.53), as its capabilities last said; kept as [traits] is. */
+    private val hasMixes = MutableStateFlow(false)
+    val mixes: StateFlow<Boolean> = hasMixes.asStateFlow()
+
+    @Volatile
+    var onMixes: ((Boolean) -> Unit)? = null
+
+    fun mixes(has: Boolean) {
+        if (hasMixes.value == has) return
+        hasMixes.value = has
+        onMixes?.invoke(has)
+    }
+
+    fun restoreMixes(has: Boolean) {
+        hasMixes.value = has
+    }
+
     fun restore(paths: Set<String>, own: Map<String, String> = emptyMap()) {
         answers = paths
         where = own
@@ -91,11 +108,11 @@ object BeatsSound {
  * Whether what's found from how songs sound can be asked for: of AudioMuse-AI when it's set up, or of Siansa Beats
  * once it has the songs' sound. The search by words is [wordsReady].
  */
-val AppSettings.soundReady: Boolean get() = audioMuseReady || (beatsReady && BeatsSound.available)
+val AppSettings.soundReady: Boolean get() = audioMuseReady || (beatsSoundReady && BeatsSound.available)
 
 /**
  * Whether music can be found by describing it in words (mixes from a description, the mood radios, vibes and their
  * sliders, cards made from a sound, the sound search): AudioMuse-AI does it, and Siansa Beats from 0.26, with the
  * same models, once it has the songs' vectors for it.
  */
-val AppSettings.wordsReady: Boolean get() = audioMuseReady || (beatsReady && BeatsSound.answers(BeatsSound.WORDS))
+val AppSettings.wordsReady: Boolean get() = audioMuseReady || (beatsSoundReady && BeatsSound.answers(BeatsSound.WORDS))

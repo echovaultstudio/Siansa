@@ -150,7 +150,7 @@ internal fun MoodShaper(
     inMix: List<MixSound> = emptyList(),
     padNote: String? = null,
     // Siansa Beats has each song's voice and moods: the picks' heading and the + say so.
-    traits: Boolean = BeatsSound.traits.collectAsState().value,
+    traits: Boolean = moodsOffered(),
     picker: @Composable (onDone: () -> Unit) -> Unit = { done -> MoodPickerSheet(tuning, look, inMix, { onChange(it); onSettled() }, done) },
 ) {
     var picking by rememberSaveable { mutableStateOf(false) }
@@ -443,12 +443,20 @@ internal fun MoodPickerSheet(tuning: VibeTuning, look: MoodLook, inMix: List<Mix
     val heard by produceState(false) { value = withContext(Dispatchers.IO) { graph.beatsGenres.saved(graph.shownLibraries()) != null } }
     // Siansa Beats' traits (0.51): vocals, whose voice, moods. Only offered when it has them, which the app remembers
     // from Siansa Beats' last answer: the third list is there as the sheet opens, not seconds later.
-    val traits by BeatsSound.traits.collectAsState()
+    val traits = moodsOffered()
     // A sound word that's also a trait (acoustic, electronic, aggressive) is offered once: as the trait.
     val shown = sounds?.let { if (traits) soundsNotGenres(it, SongTraits.ALL.map { t -> t.label }) else it }
     ModalBottomSheet(onDismissRequest = onDone, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         MoodPicker(tuning, look, shown, genres, heard, inMix, onChange, onDone, Modifier.fillMaxHeight(0.92f).padding(horizontal = Space.Page), traits = traits)
     }
+}
+
+/** Whether Flow offers Siansa Beats' moods: it gives them, and they're switched on under its card on Connections. */
+@Composable
+internal fun moodsOffered(): Boolean {
+    val has by BeatsSound.traits.collectAsState()
+    val settings by LocalGraph.current.settings.state.collectAsState()
+    return has && settings.beatsFor(app.siansa.data.BeatsUse.MOODS)
 }
 
 /** [sounds] without those that are the name of one of [genres], whatever the capitals. */

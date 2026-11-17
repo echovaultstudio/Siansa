@@ -327,6 +327,23 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     app.siansa.ui.MoodShaper(app.siansa.mix.VibeTuning(), app.siansa.ui.MoodLook(0f, 0f), app.siansa.ui.MoodHold(), onChange = {}, padNote = app.siansa.ui.FLOW_PAD_NOTE, traits = false, picker = {})
                 }
             },
+            // Siansa Beats' mixes on Home as records in a crate (the owner, 17 Nov): the one in front with its record slid
+            // out, its neighbours leaning back; a long name; no covers (the sleeves' colours show).
+            Scene("record_crate") {
+                fun record(key: String, name: String, caption: String) = app.siansa.ui.CrateRecord(key, name, caption, emptyList(), emptyList(), {}, {})
+                Column(Modifier.padding(vertical = Space.Page)) {
+                    app.siansa.ui.SectionTitle("For now", top = 0.dp)
+                    app.siansa.ui.RecordCrate(
+                        listOf(
+                            record("now-1", "Velvet Undertow", "Like Low Lanterns, The Tides and Paper Boats · 40 songs"),
+                            record("now-2", "Neo-Classical Downtempo Drift", "Like Saint Meridian and Young Vessels · 40 songs"),
+                            record("now-3", "Driving Post-Punk", "Like Black Harbours · 40 songs"),
+                        ),
+                        startAt = 1,
+                        play = { r -> app.siansa.ui.RoundPlayButton(false, "Play ${r.name}", app.siansa.ui.CRATE_PLAY, app.siansa.ui.CRATE_PLAY_ICON) {} },
+                    )
+                }
+            },
             // With Siansa Beats' moods: the picks' heading and the + name them too (the owner, 17 Nov).
             Scene("mood_shaper_moods") {
                 Column(Modifier.padding(Space.Page)) {

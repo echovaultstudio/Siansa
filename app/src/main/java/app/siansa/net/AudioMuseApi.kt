@@ -133,10 +133,10 @@ class AudioMuseApi(
     ): JsonElement {
         val s = settings()
         val asked = query.filter { it.second != null }
-        if (beatsOnly && !(beats != null && s.beatsReady && BeatsSound.answers(path))) {
+        if (beatsOnly && !(beats != null && s.beatsSoundReady && BeatsSound.answers(path))) {
             throw ApiException("Siansa Beats doesn't have the songs' sound yet (it needs 0.25)")
         }
-        if (beats != null && s.beatsReady && BeatsSound.answers(path)) {
+        if (beats != null && s.beatsSoundReady && BeatsSound.answers(path)) {
             val pathAndQuery = path + if (asked.isEmpty()) "" else "?" + asked.joinToString("&") { (k, v) ->
                 java.net.URLEncoder.encode(k, "UTF-8") + "=" + java.net.URLEncoder.encode(v, "UTF-8")
             }
@@ -399,7 +399,7 @@ class AudioMuseApi(
         }.toString()
         // Siansa Beats reads the most played songs with its own sign-in to the music server: it gets no login.
         val forBeats = buildJsonObject { put("n", count) }.toString()
-        val root = if (settings().beatsReady && BeatsSound.answers("/api/sonic_fingerprint/generate")) {
+        val root = if (settings().beatsSoundReady && BeatsSound.answers("/api/sonic_fingerprint/generate")) {
             runCatching { sound("/api/sonic_fingerprint/generate", payload = forBeats) }.getOrElse { e ->
                 if (e is kotlinx.coroutines.CancellationException || !settings().audioMuseReady) throw e
                 executeElement { request("/api/sonic_fingerprint/generate").post(serverInBody(payload, server(emptyList())).toRequestBody(JSON_TYPE)).build() }

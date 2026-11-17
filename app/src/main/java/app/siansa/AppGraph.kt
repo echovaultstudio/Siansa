@@ -346,7 +346,8 @@ class AppGraph(val app: Application) {
     val profiles = ProfileStore({ path -> siansaBeats(path) }, { settings.current }, beats = { beats.capabilities() })
     /** The genres Siansa Beats hears and their songs, when it's there; the songs' tags otherwise. */
     val beatsGenres = BeatsGenres(
-        { path -> siansaBeats(path) }, { settings.current.let { it.beatsReady || it.audioMuseReady } },
+        // With Siansa Beats: unless its genres are switched off under its card (then the songs' tags).
+        { path -> siansaBeats(path) }, { settings.current.let { if (it.beatsReady) it.beatsFor(app.siansa.data.BeatsUse.GENRES) else it.audioMuseReady } },
         // Its genre list (the file's name is from when they were voted with the tags), saved so Search and Home show it at once (and while Siansa Beats is away).
         load = { java.io.File(app.filesDir, "voted-genres.json").takeIf { it.exists() }?.readText() },
         save = { java.io.File(app.filesDir, "voted-genres.json").writeText(it) },
@@ -452,6 +453,8 @@ class AppGraph(val app: Application) {
     val historyApi = HistoryApi(http)
     /** The listening history kept by Siansa Beats, read back for the Time machine, the reports, Rediscover and taste. */
     val beatsHistory = BeatsHistory({ path -> beats.get(path) }, { settings.current })
+    /** Home's mixes made by Siansa Beats from your listening (0.53), when they're switched on under its card. */
+    val beatsMixes = app.siansa.net.BeatsMixes({ path -> beats.get(path) }, { settings.current })
     val taste = Taste(this)
     val generator = MixGenerator(this)
     /** The mix Flow is playing, and what's set on the Flow page (the owner, 15 Nov). */
@@ -558,6 +561,8 @@ class AppGraph(val app: Application) {
         BeatsSound.restore(prefs.getStringSet("answers", emptySet()).orEmpty(), own)
         BeatsSound.restoreTraits(prefs.getBoolean("traits", false))
         BeatsSound.onTraits = { has -> QuietWrites.save(prefs) { putBoolean("traits", has) } }
+        BeatsSound.restoreMixes(prefs.getBoolean("mixes", false))
+        BeatsSound.onMixes = { has -> QuietWrites.save(prefs) { putBoolean("mixes", has) } }
         BeatsSound.onChanged = { paths, where ->
             AppLog.i("Beats", if (paths.isEmpty()) "Siansa Beats doesn't answer what songs sound like (yet)"
             else "Siansa Beats answers what songs sound like: ${paths.joinToString { it.removePrefix("/api/") }}" +
@@ -567,7 +572,7 @@ class AppGraph(val app: Application) {
         // Asked at the start and whenever Siansa Beats' address or key changes, so what the app offers is current.
         scope.launch(CoroutineName("beats-sound")) {
             settings.state.map { it.beatsUrl to it.beatsKey }.distinctUntilChanged().collectLatest { (url, _) ->
-                if (url.isBlank()) { BeatsSound.heard(emptySet()); BeatsSound.traits(false) }
+                if (url.isBlank()) { BeatsSound.heard(emptySet()); BeatsSound.traits(false); BeatsSound.mixes(false) }
                 else runCatching { beats.capabilities() }.onFailure {
                     if (it is kotlinx.coroutines.CancellationException) throw it
                     AppLog.d("Beats", "Siansa Beats' capabilities weren't read: ${it.message}")
