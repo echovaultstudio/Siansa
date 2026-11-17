@@ -17,14 +17,15 @@ object SongTraits {
     /** The picker's headings, in its order. */
     const val VOICE = "Voice"
     const val MOOD = "Mood"
-    const val SOUND = "Sound"
+    // "Style", not "Sound": the picker has a Sounds tab of its own (the owner, 17 Nov).
+    const val STYLE = "Style"
 
     private fun of(key: String): (Map<String, Double>) -> Double? = { it[key] }
 
     /** A trait at or over this holds for the song. */
     const val HOLDS = 0.5
 
-    /** In the order the picker lists them: the voice, then moods, then the sound, each under its heading ([Trait.group]). */
+    /** In the order the picker lists them: the voice, then moods, then the style, each under its heading ([Trait.group]). */
     val ALL: List<Trait> = listOf(
         Trait("Vocals", "vocals singing", VOICE, of("voice")),
         Trait("Instrumental", "instrumental", VOICE, { t -> t["voice"]?.let { 1 - it } }),
@@ -41,9 +42,9 @@ object SongTraits {
         Trait("Passionate", "passionate rousing", MOOD, of("mirex_passionate")),
         Trait("Intense", "intense fiery", MOOD, of("mirex_intense")),
         Trait("Quirky", "quirky playful", MOOD, of("mirex_humorous")),
-        Trait("Danceable", "danceable", SOUND, of("danceable")),
-        Trait("Acoustic", "acoustic", SOUND, of("acoustic")),
-        Trait("Electronic", "electronic", SOUND, of("electronic")),
+        Trait("Danceable", "danceable", STYLE, of("danceable")),
+        Trait("Acoustic", "acoustic", STYLE, of("acoustic")),
+        Trait("Electronic", "electronic", STYLE, of("electronic")),
     )
 
     fun named(label: String): Trait? = ALL.firstOrNull { it.label.equals(label.trim(), ignoreCase = true) }
