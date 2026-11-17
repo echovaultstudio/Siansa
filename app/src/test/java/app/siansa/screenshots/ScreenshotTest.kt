@@ -6,6 +6,8 @@ import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.SwapVert
 import androidx.compose.material.icons.rounded.Dns
 import androidx.compose.material.icons.rounded.Equalizer
+import androidx.compose.material.icons.rounded.Explore
+import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import android.app.Application
 import androidx.compose.foundation.background
