@@ -235,6 +235,10 @@ data class Mix(
      * because the source filter changed (issue #486). "" is everything of the user in use's.
      */
     val scope: String = "",
+    /**
+     * Days it's kept from [date] (Siansa Beats' setting for its mixes, 0.55); 0 keeps it the app's own two weeks.
+     */
+    val keepDays: Int = 0,
 )
 
 /**

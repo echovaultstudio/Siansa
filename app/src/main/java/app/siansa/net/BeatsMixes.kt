@@ -67,7 +67,14 @@ class BeatsMixes(
         val energy: Double?,
         val songIds: List<String>,
         val own: Int,
-    )
+        /** A short line on what's in it (Siansa Beats 0.55): from its AI with the name, else from its sound. */
+        val about: String = "",
+        /** What Siansa Beats keeps it by, which no other mix has (0.55); "" from an older Siansa Beats. */
+        val key: String = "",
+    ) {
+        /** What Home shows under it: what's in it, never the artists (they're on its own page; the owner, 17 Nov). */
+        val caption: String get() = about.ifBlank { genres.take(2).joinToString(", ").ifBlank { why } }
+    }
 
     data class Shelf(val key: String, val title: String, val note: String, val mixes: List<BeatsMix>)
 
@@ -81,6 +88,8 @@ class BeatsMixes(
         val daylight: Daylight?,
         val shelves: List<Shelf>,
         val askedAt: Long,
+        /** How many days Siansa Beats keeps a mix it gave (0.55, set on its page); 0 from an older one. */
+        val keepDays: Int = 0,
     )
 
     companion object {
@@ -127,11 +136,14 @@ class BeatsMixes(
                                 energy = (m["energy"] as? JsonPrimitive)?.doubleOrNull,
                                 songIds = songs,
                                 own = (m["own"] as? JsonPrimitive)?.content?.toIntOrNull() ?: 0,
+                                about = m.text("about").orEmpty(),
+                                key = m.text("key").orEmpty(),
                             )
                         },
                     )
                 }.filter { it.mixes.isNotEmpty() },
                 askedAt = at,
+                keepDays = (o["keep_days"] as? JsonPrimitive)?.content?.toIntOrNull()?.coerceIn(0, 90) ?: 0,
             )
         }
     }

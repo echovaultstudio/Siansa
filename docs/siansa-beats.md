@@ -19,7 +19,7 @@ servers, and nothing is ever changed on them.
 | Your sound (the sonic fingerprint) and the mixes made from it | What your most played songs sound like |
 | Flow's **Moods** list, and vibes asked for in words ("female vocals") | Whether each song is sung, by a woman or a man, and how it feels (0.51) |
 | Your listening, Time Machine | Your listens, kept on your own server ("Scrobble to Siansa Beats") |
-| Home's **For now**, **Made for you** and **More of you** | Mixes made from your listening, for the time of day and whether it's dark outside (0.53) |
+| Home's **For now**, **Made for you** and **More of you** | Mixes made from your listening, for the time of day and whether it's dark outside (0.53), with a few words on what's in each, kept 7 days or as long as you set (0.55) |
 
 ## Set it up
 
