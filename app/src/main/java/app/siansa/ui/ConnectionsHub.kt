@@ -680,19 +680,34 @@ internal class BeatsUseRow(
     val on: Boolean,
     val offered: Boolean,
     val needs: String,
-    val set: (SettingsRepository, Boolean) -> Unit,
+    val set: (BeatsUseStore, Boolean) -> Unit,
 )
+
+/** Where the switches write: the settings each page reads ([SettingsRepository] in the app). */
+internal interface BeatsUseStore {
+    val current: AppSettings
+    fun scrobbleBeats(on: Boolean)
+    fun loudness(source: LoudnessSource)
+    fun use(id: String, on: Boolean)
+}
+
+internal fun SettingsRepository.beatsUseStore(): BeatsUseStore = object : BeatsUseStore {
+    override val current: AppSettings get() = this@beatsUseStore.current
+    override fun scrobbleBeats(on: Boolean) = save(this@beatsUseStore.current.copy(scrobbleBeats = on))
+    override fun loudness(source: LoudnessSource) = setLoudness(source = source)
+    override fun use(id: String, on: Boolean) = setBeatsUse(id, on)
+}
 
 /** What the app can ask Siansa Beats for, in [s]: the same settings as Scrobbling, Crossfade and the rest. */
 internal fun beatsUses(s: AppSettings): List<BeatsUseRow> {
     fun use(id: String, label: String, hint: String, offered: Boolean = true, needs: String = "") =
-        BeatsUseRow("beatsUse-$id", label, hint, s.beatsFor(id), offered, needs) { r, on -> r.setBeatsUse(id, on) }
+        BeatsUseRow("beatsUse-$id", label, hint, s.beatsFor(id), offered, needs) { r, on -> r.use(id, on) }
     return listOf(
         BeatsUseRow("beatsUse-scrobble", "Scrobbling and history", "Your listens, kept by Siansa Beats: Listening, reports and its mixes.",
-            s.scrobbleBeats, s.beatsTakesListens, "Needs Siansa Beats 0.29") { r, on -> r.save(r.current.copy(scrobbleBeats = on)) },
+            s.scrobbleBeats, s.beatsTakesListens, "Needs Siansa Beats 0.29") { r, on -> r.scrobbleBeats(on) },
         BeatsUseRow("beatsUse-loudness", "Loudness and smooth fades", "Each song measured, for even volume and fades that fit.",
             s.loudnessSource == LoudnessSource.PLUGIN, true, "") { r, on ->
-            r.setLoudness(source = if (on) LoudnessSource.PLUGIN else LoudnessSource.TAGS)
+            r.loudness(if (on) LoudnessSource.PLUGIN else LoudnessSource.TAGS)
         },
         use(BeatsUse.DJ, "DJ blends", "Beats and phrases, so DJ mixes blend on the beat."),
         use(BeatsUse.GENRES, "Genres by sound", "Genres heard in the music. Off: your songs' tags."),
@@ -716,7 +731,7 @@ internal fun BeatsUses(graph: AppGraph) {
         Text("Use Siansa Beats for", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
         beatsUses(s).forEach { row ->
             SwitchRow(row.label, if (row.offered) row.hint else row.needs, row.on && row.offered,
-                modifier = if (row.offered) Modifier else Modifier.alpha(0.5f), tag = row.tag) { on -> if (row.offered) row.set(graph.settings, on) }
+                modifier = if (row.offered) Modifier else Modifier.alpha(0.5f), tag = row.tag) { on -> if (row.offered) row.set(graph.settings.beatsUseStore(), on) }
         }
     }
 }
