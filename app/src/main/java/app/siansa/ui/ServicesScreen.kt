@@ -1,7 +1,6 @@
 package app.siansa.ui
 
 import androidx.compose.material3.Icon
-import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.Icons
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
@@ -256,7 +255,6 @@ private fun ServiceRow(s: AppSettings, service: Service, check: ServiceCheck?, o
                 )
             }
         }
-        Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 

@@ -45,7 +45,7 @@ import app.siansa.net.BeatsMixSettings.Value
 import kotlinx.coroutines.launch
 
 /**
- * What goes into your mixes from Siansa Beats (Settings › Connections › Siansa Beats › Mix settings; the owner, 17 Nov:
+ * What goes into your mixes from Siansa Beats (Settings › Mixes & radios › Mix settings; the owner, 17 Nov:
  * "make settings or toggles for everything that is currently automatically chosen"). Kept by Siansa Beats, the same as
  * its own Mixes page shows: switches, numbers on a slider, and genres and artists to leave out. A change is saved at
  * once and Home's mixes are made again.

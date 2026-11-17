@@ -167,7 +167,7 @@ internal fun SourcesPanel(modifier: Modifier = Modifier) {
             users.forEach { user ->
                 val inUse = user.id == Users.active
                 val isShown = if (inUse) !ownHidden else user.id in shown
-                // Only users on the same server show together; others are switched to in Settings › Connections.
+                // Only users on the same server show together; others are switched to in Settings › Your server.
                 val same = if (inUse) true else remember(sameServerFound) { graph.guests.sameServerNow(user.id) }
                 val elsewhere = same == false
                 val checking = same == null

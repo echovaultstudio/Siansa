@@ -522,7 +522,7 @@ private data class StorageUsage(val images: Long, val songs: Long, val downloads
 /** Image and song cache sizes and usage, and what else the app keeps on the phone. */
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 /**
- * Settings › Streaming & storage (the owner, 13 Nov; Data before): the streaming quality, how many songs load ahead,
+ * Settings › Storage & downloads (the owner, 13 Nov; Data before): the streaming quality, how many songs load ahead,
  * the song cache, the downloads with their settings and the covers kept on the phone: what you hear over the
  * network, what it costs in data, and playing on without a connection.
  */
