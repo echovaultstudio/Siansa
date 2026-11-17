@@ -29,6 +29,27 @@ class ThemeTonesTest {
         }
     }
 
+    @Test fun whiteAndBlackButtonsAreAlwaysSeen() {
+        // The owner, 17 Nov: whites and blacks possible, never a button that can't be seen.
+        val white = 0xFFFFFFFF.toInt()
+        val black = 0xFF000000.toInt()
+        for (seed in listOf(white, black, 0xFF808080.toInt(), 0xFFF2F2F2.toInt(), 0xFF111111.toInt())) {
+            for (dark in listOf(false, true)) for (pure in listOf(false, true)) {
+                val r = ThemeTones.scheme(seed, dark, mono = true, black = pure && dark, ink = true)
+                val what = "${ThemeTones.toHex(seed)} dark=$dark black=$pure"
+                assertTrue("$what: button on the page", ThemeTones.contrast(r.primary, r.surface) >= 3.0)
+                assertTrue("$what: button on a card", ThemeTones.contrast(r.primary, r.containerHighest) >= 3.0)
+                assertTrue("$what: its text", ThemeTones.contrast(r.onPrimary, r.primary) >= 4.5)
+            }
+        }
+        // White is white where it's seen (dark), black is black where it's seen (light).
+        assertEquals(white, ThemeTones.scheme(white, dark = true, mono = true, ink = true).primary)
+        assertEquals(black, ThemeTones.scheme(black, dark = false, mono = true, ink = true).primary)
+        // Where it couldn't be seen, as near as can be: a white button on a light page is a mid grey, not white.
+        val light = ThemeTones.scheme(white, dark = false, mono = true, ink = true).primary
+        assertTrue(ThemeTones.lch(light).first in 30.0..65.0)
+    }
+
     @Test fun pureBlackIsBlack() {
         val r = ThemeTones.scheme(ThemeColours.OCEAN.seed!!.toInt(), dark = true, black = true)
         assertEquals(ThemeTones.BLACK, r.surface)
