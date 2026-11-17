@@ -93,6 +93,30 @@ class BeatsMixesTest {
         assertEquals(1, asked.size)
     }
 
+    @Test fun theLastMixesAreKeptOnThePhoneForTheNextStart() = runBlocking {
+        // The owner, 17 Nov: not gone after a restart until they're loaded.
+        var kept: String? = null
+        var writes = 0
+        val first = BeatsMixes({ path -> asked += path; AppJson.parseToJsonElement(answer) }, { settings },
+            { ZoneId.of("Europe/Helsinki") }, { clock.toInstant().toEpochMilli() }, { kept }, { kept = it; writes++ })
+        BeatsSound.restoreMixes(true)
+        assertNull(first.state.value)
+        first.refresh()
+        assertEquals(1, writes)
+        first.refresh(force = true)
+        assertEquals("the same mixes: not written again", 1, writes)
+        assertFalse(first.refreshing.value)
+        // A new start: the kept ones show at once, and are asked for again (they're as old as they were).
+        val next = BeatsMixes({ path -> asked += path; AppJson.parseToJsonElement(answer) }, { settings },
+            { ZoneId.of("Europe/Helsinki") }, { clock.toInstant().toEpochMilli() + 20 * 60_000 }, { kept }, { kept = it })
+        assertEquals(listOf("now", "more"), next.state.value!!.shelves.map { it.key })
+        val before = asked.size
+        next.refresh()
+        assertEquals(before + 1, asked.size)
+        // A broken file is no mixes, not a crash.
+        assertNull(BeatsMixes({ AppJson.parseToJsonElement(answer) }, { settings }, loadKept = { "{broken" }).state.value)
+    }
+
     @Test fun thePartsOfTheDayAreSiansaBeats() {
         assertEquals(listOf("night", "early", "early", "morning", "afternoon", "evening", "evening", "night"),
             listOf(4, 5, 8, 9, 12, 17, 21, 22).map { BeatsMixes.partOf(it) })

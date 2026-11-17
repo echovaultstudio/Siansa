@@ -23,6 +23,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.Alignment
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.platform.testTag
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
@@ -68,7 +73,18 @@ fun BeatsMixesHome(nav: NavController, shelves: Set<String>, look: HomeLook) {
     val songs by produceState<Map<String, List<Song>>>(emptyMap(), shown) {
         value = shown.flatMap { it.mixes }.associate { it.id to graph.library.songs(it.songIds) }
     }
-    Column(Modifier.fillMaxWidth().testTag("beatsMixes")) {
+    // Being made again (the part of the day turned, or settings changed): the last ones stay, a little dimmed, with a
+    // small spinner, instead of vanishing and popping back (the owner, 17 Nov). Only after a moment, so the quick
+    // asks every quarter of an hour don't flicker it; nothing runs while they aren't being made.
+    val asking by graph.beatsMixes.refreshing.collectAsStateWithLifecycle()
+    var remaking by remember { mutableStateOf(false) }
+    LaunchedEffect(asking) {
+        if (asking) delay(REMAKING_AFTER_MS)
+        remaking = asking
+    }
+    val dim by androidx.compose.animation.core.animateFloatAsState(if (remaking) REMAKING_ALPHA else 1f, label = "remaking")
+    androidx.compose.foundation.layout.Box(Modifier.fillMaxWidth()) {
+    Column(Modifier.fillMaxWidth().graphicsLayer { alpha = dim }.testTag("beatsMixes")) {
         shown.forEachIndexed { i, shelf ->
             val mixes = shelf.mixes.mapNotNull { mix -> homeMix(mix, songs[mix.id].orEmpty(), answer.keepDays, nav, graph) }
             if (mixes.isEmpty()) return@forEachIndexed
@@ -81,6 +97,13 @@ fun BeatsMixesHome(nav: NavController, shelves: Set<String>, look: HomeLook) {
                 SectionTitle(title, top = if (i == 0) LocalSectionGap.current else Space.Section)
                 RecordCrate(mixes)
             }
+        }
+    }
+        if (remaking) {
+            androidx.compose.material3.CircularProgressIndicator(
+                strokeWidth = 2.dp,
+                modifier = Modifier.align(Alignment.TopEnd).padding(top = Space.Section, end = Space.Page).size(REMAKING_SPINNER).testTag("beatsMixesRemaking"),
+            )
         }
     }
 }
@@ -105,6 +128,9 @@ internal fun MixMosaicTile(record: CrateRecord) {
 }
 
 private val MOSAIC_TILE = 140.dp // as Home's other tiles
+private val REMAKING_SPINNER = 14.dp
+private const val REMAKING_ALPHA = 0.6f
+private const val REMAKING_AFTER_MS = 600L
 
 /**
  * A mix as a sleeve or a tile: what's in it under its name; it opens as a mix page, kept as the app's own mixes are, for

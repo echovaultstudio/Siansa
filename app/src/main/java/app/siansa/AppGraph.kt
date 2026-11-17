@@ -456,7 +456,13 @@ class AppGraph(val app: Application) {
     /** The listening history kept by Siansa Beats, read back for the Time machine, the reports, Rediscover and taste. */
     val beatsHistory = BeatsHistory({ path -> beats.get(path) }, { settings.current })
     /** Home's mixes made by Siansa Beats from your listening (0.53), when they're switched on under its card. */
-    val beatsMixes = BeatsMixes({ path -> beats.get(path) }, { settings.current })
+    // The last mixes kept on the phone, so Home shows them at once after a restart (the owner, 17 Nov).
+    private val beatsMixesFile get() = java.io.File(app.filesDir, Users.scoped("beats_mixes.json"))
+    val beatsMixes = BeatsMixes(
+        { path -> beats.get(path) }, { settings.current },
+        loadKept = { beatsMixesFile.takeIf { it.exists() }?.readText() },
+        saveKept = { text -> beatsMixesFile.writeText(text) },
+    )
     val beatsMixSettings = BeatsMixSettings({ path -> beats.get(path) }, { path, body -> beats.post(path, body) })
     val taste = Taste(this)
     val generator = MixGenerator(this)
