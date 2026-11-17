@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.BarChart
+import androidx.compose.material.icons.rounded.FilterList
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.SystemUpdate
@@ -200,6 +201,7 @@ internal fun noticeIcon(kind: NoticeKind): ImageVector = when (kind) {
     NoticeKind.YOUR_MONTH -> Icons.Rounded.BarChart
     NoticeKind.NEW_ARTISTS -> Icons.Rounded.Person
     NoticeKind.LIKED -> Icons.Rounded.Favorite
+    NoticeKind.CUSTOM -> Icons.Rounded.FilterList
 }
 
 /** Every notice there is something to say about now; [Notices.order] picks and orders them. Looks only at what's on the phone, except the books in progress. */
@@ -233,4 +235,17 @@ private suspend fun noticeCandidates(graph: AppGraph, settings: AppSettings, syn
     Notices.yourMonth(today)?.let(::add)
     Notices.newArtists(graph.suggestions.savedToday().size, today)?.let(::add)
     if (settings.notices.modeOf(NoticeKind.LIKED) != app.siansa.mix.NoticeMode.OFF) add(Notices.liked())
+    // Your own notices (issue #1234): each one's count, from the songs or albums its rules find.
+    if (settings.notices.modeOf(NoticeKind.CUSTOM) != app.siansa.mix.NoticeMode.OFF && graph.library.isSynced) {
+        graph.pinnedCards.all().filter { it.notice && it.shown }.forEach { card ->
+            try {
+                val found = graph.pinnedCards.content(card)
+                Notices.custom(card.id, card.title, found.songs.size + found.albums.size)?.let(::add)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                AppLog.w("Home", "Notices: \"${card.title}\" couldn't be worked out: ${e.message}")
+            }
+        }
+    }
 }

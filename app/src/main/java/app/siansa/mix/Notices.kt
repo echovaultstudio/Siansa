@@ -22,7 +22,9 @@ enum class NoticeKind(
     NEW_ALBUMS("new_albums", "New in your library", "Albums added in the last 30 days", 2),
     YOUR_MONTH("month", "Your month", "Last month's listening, in the first week", 2),
     NEW_ARTISTS("artists", "Artists for you", "Today's new artists to try", 2),
-    LIKED("liked", "Liked songs", "Your liked songs, a tap away. Off until you add it", 3, NoticeMode.OFF);
+    LIKED("liked", "Liked songs", "Your liked songs, a tap away. Off until you add it", 3, NoticeMode.OFF),
+    // Issue #1234 (the owner, 17 Nov): notices of your own, from rules on any of the songs' or albums' details.
+    CUSTOM("custom", "Your own notices", "What your own notices find, below", 2);
 
     companion object {
         fun byId(id: String): NoticeKind? = entries.firstOrNull { it.id == id.trim() }
@@ -157,6 +159,10 @@ object Notices {
 
     /** Liked songs, always there once you've added it (issue #935). */
     fun liked(): Notice = Notice(NoticeKind.LIKED, "liked", "Liked songs", "liked")
+
+    /** A notice of your own: how many its rules found and its name ("12 new releases"); none while it finds none. */
+    fun custom(id: String, name: String, found: Int): Notice? = if (found <= 0) null else
+        Notice(NoticeKind.CUSTOM, "custom:$id:$found", "$found ${name.trim()}", "pinned/$id")
 
     fun newArtists(count: Int, today: LocalDate): Notice? = if (count <= 0) null else
         Notice(NoticeKind.NEW_ARTISTS, "artists:$today", if (count == 1) "1 artist for you" else "$count artists for you", "discover/artists")

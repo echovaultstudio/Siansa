@@ -509,7 +509,8 @@ fun HomeScreen(nav: NavController) {
                 }
                 HomeSection.CARDS -> {
                     // Your cards (issue #622), in the order set in Settings › Home page › Cards; each is its own row.
-                    pinnedCards.orEmpty().filter { it.shown }.forEach { card ->
+                    // Your own notices (issue #1234) are pills at the top of Home, not cards here.
+                    pinnedCards.orEmpty().filter { it.shown && !it.notice }.forEach { card ->
                         titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "pinned-${card.id}") { PinnedCardSection(nav, card, aiDown) }
                     }
                 }

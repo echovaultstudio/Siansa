@@ -89,6 +89,11 @@ data class PinnedCard(
     val radioTitle: String = "",
     /** Tiles of a [CardLook.GRID] card: 2 to [GRID_MOST], two to a row. */
     val gridSize: Int = GRID_MOST,
+    /**
+     * A notice of your own (issue #1234; the owner, 17 Nov): a pill at the top of Home saying how many songs or albums
+     * its rules find ("12 new releases"), opening them, instead of a card in Your cards. Shown while it finds any.
+     */
+    val notice: Boolean = false,
 ) {
     /** Every rule: [rules], and the single fields of a card made before rules, as rules. */
     val allRules: List<CardRule>
@@ -147,6 +152,7 @@ val BOOK_SORTS = listOf(CardSort.ADDED, CardSort.NAME, CardSort.RANDOM)
 
 /** What a card needs before it can be saved, or null when it's fine. */
 fun pinnedCardProblem(card: PinnedCard, audioMuseReady: Boolean, thisYear: Int = LocalDate.now().year, booksReady: Boolean = true): String? = when {
+    card.notice && card.title.isBlank() -> "Give the notice its words, like \"new releases\"."
     card.title.isBlank() -> "Give the card a name."
     // Books and episodes come from Audiobookshelf, in their own look, without rules (issue #782).
     card.contents.fromBooks && !booksReady -> "Set up Audiobookshelf in Settings › Connections first."

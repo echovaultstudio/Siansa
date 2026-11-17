@@ -76,13 +76,15 @@ fun CardEditorScreen(nav: NavController, id: String) {
     val scope = rememberCoroutineScope()
     // "radio:<page>": a new card of that favourite radio, from the radio's page (the owner, 10 Nov).
     val fromRadio = id.removePrefix("radio:").takeIf { id.startsWith("radio:") }?.let { android.net.Uri.decode(it) }
-    val isNew = id == "new" || fromRadio != null
+    // "notice": a new notice of your own (issue #1234), the pills at the top of Home.
+    val isNew = id == "new" || id == "notice" || fromRadio != null
     var card by remember {
         mutableStateOf<PinnedCard?>(
             if (fromRadio != null) {
                 val title = graph.favouriteRadios.all.value.firstOrNull { it.route == fromRadio }?.title.orEmpty()
                 PinnedCard.new(title).copy(source = app.siansa.mix.CardSource.RADIO, radio = fromRadio, radioTitle = title, look = app.siansa.mix.CardLook.GRID)
-            } else if (isNew) PinnedCard.new() else null,
+            } else if (id == "notice") PinnedCard.new().copy(notice = true, sort = app.siansa.mix.CardSort.NEWEST, size = PinnedCard.SIZE)
+            else if (isNew) PinnedCard.new() else null,
         )
     }
     LaunchedEffect(id) {
@@ -106,7 +108,11 @@ fun CardEditorScreen(nav: NavController, id: String) {
     }
 
     Screen(
-        title = if (isNew) "New custom card" else "Change the card",
+        title = when {
+            card?.notice == true -> if (isNew) "New notice" else "Change the notice"
+            isNew -> "New custom card"
+            else -> "Change the card"
+        },
         nav = nav,
         actions = { TextButton(onClick = ::save, modifier = Modifier.testTag("cardEditorSave")) { Text(if (isNew) "Add" else "Save") } },
     ) { padding ->
@@ -124,10 +130,15 @@ fun CardEditorScreen(nav: NavController, id: String) {
                 .testTag("cardEditor"),
             verticalArrangement = Arrangement.spacedBy(Space.Medium),
         ) {
-            OutlinedTextField(c.title, { change(c.copy(title = it)) }, singleLine = true, label = { Text("Name on Home") }, modifier = Modifier.fillMaxWidth().testTag("pinnedTitle"))
+            OutlinedTextField(c.title, { change(c.copy(title = it)) }, singleLine = true,
+                label = { Text(if (c.notice) "Words after the number" else "Name on Home") },
+                placeholder = { if (c.notice) Text("new releases") },
+                modifier = Modifier.fillMaxWidth().testTag("pinnedTitle"))
+            if (c.notice) Hint("The pill says how many songs or albums the rules find, then these words: \"12 new releases\". It shows while it finds any, and a tap opens them.")
 
             EditorHeading("Shows")
-            ChipRow(CardContents.entries, c.contents, { it.label }, "contents") { contents ->
+            // A notice counts songs or albums from the library: not books, a sound or a radio.
+            ChipRow(if (c.notice) listOf(CardContents.SONGS, CardContents.ALBUMS) else CardContents.entries, c.contents, { it.label }, "contents") { contents ->
                 // Albums come from the library, and only by rules that albums have. Books and episodes come from
                 // Audiobookshelf, without rules, as Cover rows (issue #782).
                 change(
@@ -147,7 +158,7 @@ fun CardEditorScreen(nav: NavController, id: String) {
             }
             Hint(c.contents.hint)
 
-            if (c.contents == CardContents.SONGS) {
+            if (c.contents == CardContents.SONGS && !c.notice) {
                 EditorHeading("Comes from")
                 ChipRow(CardSource.entries, c.source, { it.label }, "source") { change(c.copy(source = it)) }
                 Hint(c.source.hint)
@@ -215,6 +226,7 @@ fun CardEditorScreen(nav: NavController, id: String) {
                 }
             }
 
+            if (!c.notice) {
             EditorHeading("Look on Home")
             // An album card's tiles are its albums, so it has no separate album row.
             val looks = when {
@@ -235,9 +247,12 @@ fun CardEditorScreen(nav: NavController, id: String) {
             }
             Hint(lookHint(c.look, c.contents))
             if (c.look == CardLook.GRID) GridSizeChips(c.gridSize) { change(c.copy(gridSize = it)) }
+            }
 
             problem?.let { ErrorText(it, Modifier.testTag("cardProblem")) }
-            Button(onClick = ::save, modifier = Modifier.fillMaxWidth().testTag("cardEditorSaveBottom")) { Text(if (isNew) "Add the card" else "Save") }
+            Button(onClick = ::save, modifier = Modifier.fillMaxWidth().testTag("cardEditorSaveBottom")) {
+                Text(if (!isNew) "Save" else if (c.notice) "Add the notice" else "Add the card")
+            }
         }
         if (picking) {
             RuleFieldDialog(c.contents, onDismiss = { picking = false }) { field ->
