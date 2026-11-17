@@ -2,6 +2,7 @@ package app.siansa.ui
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,7 +14,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -49,10 +49,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -63,10 +64,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import app.siansa.AppGraph
 import app.siansa.BuildConfig
-import app.siansa.net.BeatsApi
-import app.siansa.playback.ProfileStore
 import app.siansa.data.AiProvider
 import app.siansa.data.AppSettings
+import app.siansa.data.BeatsUse
 import app.siansa.data.SettingsRepository
 import app.siansa.data.UserEntry
 import app.siansa.data.UserFiles
@@ -76,10 +76,15 @@ import app.siansa.mix.audioMuseCheck
 import app.siansa.net.ApiException
 import app.siansa.net.AudioMuseApi
 import app.siansa.net.AudiobookshelfApi
+import app.siansa.net.BeatsApi
+import app.siansa.net.BeatsSound
 import app.siansa.net.ChatApi
 import app.siansa.net.EmbyApi
 import app.siansa.net.SourceKind
 import app.siansa.net.SubsonicApi
+import app.siansa.net.beatsTakesListens
+import app.siansa.playback.LoudnessSource
+import app.siansa.playback.ProfileStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
@@ -320,7 +325,7 @@ fun ConnectionsHub(nav: NavController, open: String? = null) {
                 FoldCard(
                     icon = Icons.Rounded.Speed,
                     title = "Siansa Beats",
-                    subtitle = beatsLine(draft.beatsReady),
+                    subtitle = beatsCardLine(),
                     expanded = "beats" in opened,
                     onToggle = { toggle("beats") },
                     tag = "fold-beats",
@@ -328,6 +333,7 @@ fun ConnectionsHub(nav: NavController, open: String? = null) {
                 ) {
                     BeatsFields(graph, draft) { draft = it; problem = null }
                     Button(onClick = ::save, modifier = Modifier.focusRing().fillMaxWidth()) { Text("Save") }
+                    BeatsUses(graph)
                 }
             }
             FoldCard(
@@ -651,7 +657,84 @@ internal fun AudioMuseFields(graph: AppGraph, draft: AppSettings, onChange: (App
 /** Whether Siansa Beats' card shows: in every build now ([app.siansa.data.Offered]). */
 internal val BEATS_OFFERED: Boolean = app.siansa.data.Offered.beats
 
-internal fun beatsLine(ready: Boolean): String = if (ready) "Beats, loudness and genres · set up" else "Beats, loudness and genres · not set up"
+/** The Siansa Beats card's line: how many of the things it can do the app uses ([beatsUses]), or not set up. */
+@Composable
+internal fun beatsCardLine(): String {
+    val s by LocalGraph.current.settings.state.collectAsStateWithLifecycle()
+    BeatsSound.traits.collectAsStateWithLifecycle().value
+    BeatsSound.mixes.collectAsStateWithLifecycle().value
+    if (!s.beatsReady) return "Not set up"
+    val uses = beatsUses(s)
+    return "Set up · ${uses.count { it.on && it.offered }} of ${uses.count { it.offered }} in use"
+}
+
+/**
+ * One thing the app can ask Siansa Beats for, as its card lists it (the owner, 17 Nov: "toggles for everything it
+ * should talk to Beats about"): [offered] when this Siansa Beats has it (else [needs] says which one does); [on]
+ * reads, and [set] writes, the setting its own page uses too, so the two always agree.
+ */
+internal class BeatsUseRow(
+    val tag: String,
+    val label: String,
+    val hint: String,
+    val on: Boolean,
+    val offered: Boolean,
+    val needs: String,
+    val set: (BeatsUseStore, Boolean) -> Unit,
+)
+
+/** Where the switches write: the settings each page reads ([SettingsRepository] in the app). */
+internal interface BeatsUseStore {
+    val current: AppSettings
+    fun scrobbleBeats(on: Boolean)
+    fun loudness(source: LoudnessSource)
+    fun use(id: String, on: Boolean)
+}
+
+internal fun SettingsRepository.beatsUseStore(): BeatsUseStore = object : BeatsUseStore {
+    override val current: AppSettings get() = this@beatsUseStore.current
+    override fun scrobbleBeats(on: Boolean) = save(this@beatsUseStore.current.copy(scrobbleBeats = on))
+    override fun loudness(source: LoudnessSource) = setLoudness(source = source)
+    override fun use(id: String, on: Boolean) = setBeatsUse(id, on)
+}
+
+/** What the app can ask Siansa Beats for, in [s]: the same settings as Scrobbling, Crossfade and the rest. */
+internal fun beatsUses(s: AppSettings): List<BeatsUseRow> {
+    fun use(id: String, label: String, hint: String, offered: Boolean = true, needs: String = "") =
+        BeatsUseRow("beatsUse-$id", label, hint, s.beatsFor(id), offered, needs) { r, on -> r.use(id, on) }
+    return listOf(
+        BeatsUseRow("beatsUse-scrobble", "Scrobbling and history", "Your listens, kept by Siansa Beats: Listening, reports and its mixes.",
+            s.scrobbleBeats, s.beatsTakesListens, "Needs Siansa Beats 0.29") { r, on -> r.scrobbleBeats(on) },
+        BeatsUseRow("beatsUse-loudness", "Loudness and smooth fades", "Each song measured, for even volume and fades that fit.",
+            s.loudnessSource == LoudnessSource.PLUGIN, true, "") { r, on ->
+            r.loudness(if (on) LoudnessSource.PLUGIN else LoudnessSource.TAGS)
+        },
+        use(BeatsUse.DJ, "DJ blends", "Beats and phrases, so DJ mixes blend on the beat."),
+        use(BeatsUse.GENRES, "Genres by sound", "Genres heard in the music. Off: your songs' tags."),
+        use(BeatsUse.SOUND, "Similar music and sound search", "Songs like a song, radios, blends and the search by words.",
+            BeatsSound.available, "Needs Siansa Beats 0.25"),
+        use(BeatsUse.MOODS, "Moods in Flow", "Vocals, a woman's or a man's voice, and how songs feel.",
+            BeatsSound.traits.value, "Needs Siansa Beats 0.51"),
+        use(BeatsUse.MIXES, "Mixes on Home", "Made from your listening, for the time of day. Off: your own carousels.",
+            BeatsSound.mixes.value, "Needs Siansa Beats 0.53"),
+    )
+}
+
+/** Under Siansa Beats' card, once it's set up: a switch for each thing the app asks it for. */
+@Composable
+internal fun BeatsUses(graph: AppGraph) {
+    val s by graph.settings.state.collectAsStateWithLifecycle()
+    BeatsSound.traits.collectAsStateWithLifecycle().value
+    BeatsSound.mixes.collectAsStateWithLifecycle().value
+    if (!s.beatsReady) return
+    Column(Modifier.fillMaxWidth().padding(top = Space.Small).testTag("beatsUses")) {
+        Text("Use Siansa Beats for", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+        beatsUses(s).forEach { row ->
+            SwitchRow(row.label, if (row.offered) row.hint else row.needs, row.on && row.offered,
+                modifier = if (row.offered) Modifier else Modifier.alpha(0.5f), tag = row.tag) { on -> if (row.offered) row.set(graph.settings.beatsUseStore(), on) }
+        }
+    }
+}
 
 /**
  * Siansa Beats (Siansa Dev, the owner, 10 Nov): its address and API key, and Test. Once set, the app asks it for each
@@ -661,7 +744,7 @@ internal fun beatsLine(ready: Boolean): String = if (ready) "Beats, loudness and
 internal fun BeatsFields(graph: AppGraph, draft: AppSettings, onChange: (AppSettings) -> Unit) {
     val scope = rememberCoroutineScope()
     var result by remember { mutableStateOf<String?>(null) }
-    Hint("Measures each song's beats, loudness and key for DJ blends and smooth fades, and sorts songs into genres. Leave the address empty to use the Siansa plugin on AudioMuse-AI instead, or the songs' tags.")
+    Hint("Siansa's own server: it measures your music, keeps your listening and makes mixes from it. Below, choose what the app asks it for.")
     Field("Server address", draft.beatsUrl, "192.168.1.10:8090") { onChange(draft.copy(beatsUrl = it)) }
     SecretField("API key or password", draft.beatsKey) { onChange(draft.copy(beatsKey = it)) }
     Hint("Only if Siansa Beats asks for one (BEATS_API_KEY or BEATS_PASSWORD).")

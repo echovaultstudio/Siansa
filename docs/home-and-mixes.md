@@ -153,6 +153,25 @@ circle with a plus; a song's own "Add to playlist" is an outlined one). Name it 
 choose **On your server**, so it syncs with your other apps, or **On this phone only**. You can save the play queue
 the same way, from the button next to **Up next** in now playing.
 
+## Mixes from Siansa Beats
+
+With Siansa Beats 0.53 or newer, Home's mixes can come from it instead: made from your own listening, for this part
+of the day on weekdays or at the weekend, and with whether it's dark outside (worked out from the date and your time
+zone). Three shelves, the same as on Siansa Beats' page:
+
+- **For now**: this part of the day, as you listen in it. A line under the heading says what it's like outside and
+  what the mixes are made from.
+- **Made for you**: the kinds of music you play most, each with more like it.
+- **More of you**: On repeat, Rediscover and New for you.
+
+Each shelf is a crate of records: the one in front stands up with its record slid out of the sleeve, the others lean
+back behind it. Swipe to flick through, tap the front one to open it, or press Play. Siansa Beats makes the next part
+of the day's mixes a few minutes before it starts, so they're there when the hour turns. With an AI service set up
+on Siansa Beats' page, the mixes get a name from it; without one, they're named by their sound ("Calm Indie Rock").
+
+They're on while **Mixes on Home** is switched on under Siansa Beats (Settings › Connections). Switch it off for your
+own carousels and Made for you, which stay as you set them.
+
 ## Your mixes carousel
 
 **Home carousel** (from Arrange Home): three or four mixes for each part of the day. Give each a name and what it

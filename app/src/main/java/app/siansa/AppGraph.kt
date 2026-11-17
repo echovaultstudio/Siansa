@@ -1,112 +1,119 @@
 package app.siansa
 
-import kotlinx.serialization.json.JsonElement
-import app.siansa.net.BeatsHistory
-import app.siansa.net.BeatsApi
-import app.siansa.data.StationRepository
-import app.siansa.data.StorageBudget
-import app.siansa.net.OutsideSource
-import app.siansa.net.WebStationPictures
-import app.siansa.playback.ActivePlayer
-import app.siansa.playback.MiniFor
-import app.siansa.mix.Dice
-import app.siansa.mix.DjReady
-import app.siansa.mix.GenreRadio
-import app.siansa.mix.BeatsGenres
-import app.siansa.data.ArtistPhotos
-import app.siansa.data.FavouriteRadios
-import app.siansa.data.Ratings
-import app.siansa.data.audioMuseUserFor
-import app.siansa.data.Users
-import app.siansa.data.NoticeStore
-import app.siansa.data.SavedVibes
-import app.siansa.mix.MixResume
-import app.siansa.data.RecentPlays
-import app.siansa.data.FavouriteAlbums
-import app.siansa.data.FavouriteArtists
-import app.siansa.mix.MadeForYouCards
-import app.siansa.mix.PinnedCards
-import app.siansa.playback.ProfileStore
-import app.siansa.playback.BookPlayer
-import app.siansa.data.BookSpeeds
-import app.siansa.offline.BookDownloads
-import app.siansa.covers.CoverStore
-import app.siansa.covers.CoverVersions
-import app.siansa.net.BeatsSound
-import app.siansa.data.QuietWrites
-import app.siansa.covers.CoverRefresh
-import app.siansa.covers.CoverCache
-import app.siansa.covers.CoverEtags
-import app.siansa.covers.StandIns
-import kotlinx.coroutines.runBlocking
-
 import android.app.Application
-import app.siansa.data.CarouselStore
-import app.siansa.data.ListSortStore
-import app.siansa.data.PlaylistCache
-import app.siansa.data.EqualiserRepository
-import app.siansa.data.Favorites
-import app.siansa.data.Guests
-import app.siansa.data.HistoryStore
-import app.siansa.data.LibraryRepository
-import app.siansa.data.LibrarySync
-import app.siansa.data.LocalPlaylists
-import app.siansa.data.MixStore
-import app.siansa.data.PlaylistEditor
-import app.siansa.data.RemovedPlaylists
-import app.siansa.data.SearchHistory
-import app.siansa.data.SelectorStore
-import app.siansa.data.SettingsRepository
-import app.siansa.data.SyncPhase
-import app.siansa.data.TopSongs
-import app.siansa.log.AppLog
-import app.siansa.log.NetLog
-import app.siansa.mix.Similar
-import app.siansa.mix.Sonic
-import app.siansa.situation.SituationReader
-import app.siansa.mix.SonicFingerprint
-import app.siansa.mix.FlowMix
-import app.siansa.mix.MixGenerator
-import app.siansa.mix.Radios
-import app.siansa.mix.Insights
-import app.siansa.mix.ArtistSuggestions
-import app.siansa.mix.SongPath
-import app.siansa.mix.SongRadio
-import app.siansa.mix.ContinuousPlay
-import app.siansa.mix.WindDown
-import app.siansa.mix.Taste
-import app.siansa.net.AudioMuseApi
-import app.siansa.net.AudiobookshelfApi
-import app.siansa.net.BookCoverSource
-import app.siansa.data.Book
-import app.siansa.data.BookRepository
-import app.siansa.net.DeezerApi
-import app.siansa.net.HistoryApi
-import app.siansa.net.LastFmApi
-import app.siansa.net.ListenBrainzApi
-import app.siansa.net.NavidromeNativeApi
-import app.siansa.net.ChatApi
-import app.siansa.net.Connection
-import app.siansa.net.SubsonicApi
-import app.siansa.net.MusicSource
-import app.siansa.net.ActiveSource
-import app.siansa.net.EmbyApi
-import app.siansa.net.EmbyLogins
-import app.siansa.net.SourceKind
-import app.siansa.offline.Downloads
-import app.siansa.offline.OfflineItem
-import app.siansa.offline.OfflineKind
-import app.siansa.offline.offlineItem
-import app.siansa.playback.PlayerConnection
-import app.siansa.playback.SleepTimer
-import app.siansa.scrobble.Scrobbler
 import androidx.annotation.OptIn
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.database.StandaloneDatabaseProvider
 import androidx.media3.datasource.cache.LeastRecentlyUsedCacheEvictor
 import androidx.media3.datasource.cache.SimpleCache
+import app.siansa.covers.CoverCache
+import app.siansa.covers.CoverEtags
+import app.siansa.covers.CoverRefresh
+import app.siansa.covers.CoverStore
+import app.siansa.covers.CoverVersions
+import app.siansa.covers.StandIns
+import app.siansa.data.ArtistPhotos
+import app.siansa.data.BeatsUse
+import app.siansa.data.Book
+import app.siansa.data.BookRepository
+import app.siansa.data.BookSpeeds
+import app.siansa.data.CarouselStore
+import app.siansa.data.EqualiserRepository
+import app.siansa.data.Favorites
+import app.siansa.data.FavouriteAlbums
+import app.siansa.data.FavouriteArtists
+import app.siansa.data.FavouriteRadios
+import app.siansa.data.Guests
+import app.siansa.data.HistoryStore
+import app.siansa.data.LibraryRepository
+import app.siansa.data.LibrarySync
+import app.siansa.data.ListSortStore
+import app.siansa.data.LocalPlaylists
+import app.siansa.data.MixStore
+import app.siansa.data.NoticeStore
+import app.siansa.data.PlaylistCache
+import app.siansa.data.PlaylistEditor
+import app.siansa.data.QuietWrites
+import app.siansa.data.Ratings
+import app.siansa.data.RecentPlays
+import app.siansa.data.RemovedPlaylists
+import app.siansa.data.SavedVibes
+import app.siansa.data.SearchHistory
+import app.siansa.data.SelectorStore
+import app.siansa.data.SettingsRepository
+import app.siansa.data.StationRepository
+import app.siansa.data.StorageBudget
+import app.siansa.data.SyncPhase
+import app.siansa.data.TopSongs
+import app.siansa.data.Users
+import app.siansa.data.audioMuseUserFor
+import app.siansa.data.mixScopeKey
+import app.siansa.log.AppLog
+import app.siansa.log.NetLog
+import app.siansa.mix.ArtistSuggestions
+import app.siansa.mix.BeatsGenres
+import app.siansa.mix.ContinuousPlay
+import app.siansa.mix.Dice
+import app.siansa.mix.DjReady
+import app.siansa.mix.FlowMix
+import app.siansa.mix.GenreRadio
+import app.siansa.mix.Insights
+import app.siansa.mix.MadeForYouCards
+import app.siansa.mix.MixGenerator
+import app.siansa.mix.MixResume
+import app.siansa.mix.PinnedCards
+import app.siansa.mix.PlayCountLog
+import app.siansa.mix.Radios
+import app.siansa.mix.Similar
+import app.siansa.mix.SongPath
+import app.siansa.mix.SongRadio
+import app.siansa.mix.Sonic
+import app.siansa.mix.SonicFingerprint
+import app.siansa.mix.Taste
+import app.siansa.mix.WindDown
+import app.siansa.net.ActiveSource
+import app.siansa.net.AudioMuseApi
+import app.siansa.net.AudiobookshelfApi
+import app.siansa.net.BeatsApi
+import app.siansa.net.BeatsHistory
+import app.siansa.net.BeatsMixes
+import app.siansa.net.BeatsSound
+import app.siansa.net.BookCoverSource
+import app.siansa.net.ChatApi
+import app.siansa.net.Connection
+import app.siansa.net.DeezerApi
+import app.siansa.net.EmbyApi
+import app.siansa.net.EmbyLogins
+import app.siansa.net.HistoryApi
+import app.siansa.net.LastFmApi
+import app.siansa.net.ListenBrainzApi
+import app.siansa.net.MusicSource
+import app.siansa.net.NavidromeNativeApi
+import app.siansa.net.OutsideSource
+import app.siansa.net.SourceKind
+import app.siansa.net.SubsonicApi
+import app.siansa.net.WebStationPictures
+import app.siansa.offline.BookDownloads
+import app.siansa.offline.Downloads
+import app.siansa.offline.OfflineItem
+import app.siansa.offline.OfflineKind
+import app.siansa.offline.offlineItem
+import app.siansa.playback.ActivePlayer
+import app.siansa.playback.BookPlayer
+import app.siansa.playback.MiniFor
+import app.siansa.playback.PlayerConnection
+import app.siansa.playback.ProfileStore
+import app.siansa.playback.SleepTimer
+import app.siansa.playback.StreamStats
+import app.siansa.scrobble.Scrobbler
+import app.siansa.situation.SituationReader
+import java.io.File
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -114,20 +121,14 @@ import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import okhttp3.Credentials
-import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
+import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.JsonElement
 import okhttp3.ConnectionPool
+import okhttp3.Credentials
 import okhttp3.Dispatcher
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
-import app.siansa.playback.StreamStats
-import java.io.File
-import java.util.concurrent.TimeUnit
-import app.siansa.data.mixScopeKey
-import app.siansa.mix.PlayCountLog
 
 /** Everything the app shares, created once in [SiansaApp]. */
 @OptIn(UnstableApi::class)
@@ -346,7 +347,8 @@ class AppGraph(val app: Application) {
     val profiles = ProfileStore({ path -> siansaBeats(path) }, { settings.current }, beats = { beats.capabilities() })
     /** The genres Siansa Beats hears and their songs, when it's there; the songs' tags otherwise. */
     val beatsGenres = BeatsGenres(
-        { path -> siansaBeats(path) }, { settings.current.let { it.beatsReady || it.audioMuseReady } },
+        // With Siansa Beats: unless its genres are switched off under its card (then the songs' tags).
+        { path -> siansaBeats(path) }, { settings.current.let { if (it.beatsReady) it.beatsFor(BeatsUse.GENRES) else it.audioMuseReady } },
         // Its genre list (the file's name is from when they were voted with the tags), saved so Search and Home show it at once (and while Siansa Beats is away).
         load = { java.io.File(app.filesDir, "voted-genres.json").takeIf { it.exists() }?.readText() },
         save = { java.io.File(app.filesDir, "voted-genres.json").writeText(it) },
@@ -452,6 +454,8 @@ class AppGraph(val app: Application) {
     val historyApi = HistoryApi(http)
     /** The listening history kept by Siansa Beats, read back for the Time machine, the reports, Rediscover and taste. */
     val beatsHistory = BeatsHistory({ path -> beats.get(path) }, { settings.current })
+    /** Home's mixes made by Siansa Beats from your listening (0.53), when they're switched on under its card. */
+    val beatsMixes = BeatsMixes({ path -> beats.get(path) }, { settings.current })
     val taste = Taste(this)
     val generator = MixGenerator(this)
     /** The mix Flow is playing, and what's set on the Flow page (the owner, 15 Nov). */
@@ -558,6 +562,8 @@ class AppGraph(val app: Application) {
         BeatsSound.restore(prefs.getStringSet("answers", emptySet()).orEmpty(), own)
         BeatsSound.restoreTraits(prefs.getBoolean("traits", false))
         BeatsSound.onTraits = { has -> QuietWrites.save(prefs) { putBoolean("traits", has) } }
+        BeatsSound.restoreMixes(prefs.getBoolean("mixes", false))
+        BeatsSound.onMixes = { has -> QuietWrites.save(prefs) { putBoolean("mixes", has) } }
         BeatsSound.onChanged = { paths, where ->
             AppLog.i("Beats", if (paths.isEmpty()) "Siansa Beats doesn't answer what songs sound like (yet)"
             else "Siansa Beats answers what songs sound like: ${paths.joinToString { it.removePrefix("/api/") }}" +
@@ -567,7 +573,7 @@ class AppGraph(val app: Application) {
         // Asked at the start and whenever Siansa Beats' address or key changes, so what the app offers is current.
         scope.launch(CoroutineName("beats-sound")) {
             settings.state.map { it.beatsUrl to it.beatsKey }.distinctUntilChanged().collectLatest { (url, _) ->
-                if (url.isBlank()) { BeatsSound.heard(emptySet()); BeatsSound.traits(false) }
+                if (url.isBlank()) { BeatsSound.heard(emptySet()); BeatsSound.traits(false); BeatsSound.mixes(false) }
                 else runCatching { beats.capabilities() }.onFailure {
                     if (it is kotlinx.coroutines.CancellationException) throw it
                     AppLog.d("Beats", "Siansa Beats' capabilities weren't read: ${it.message}")

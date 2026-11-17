@@ -19,6 +19,7 @@ servers, and nothing is ever changed on them.
 | Your sound (the sonic fingerprint) and the mixes made from it | What your most played songs sound like |
 | Flow's **Moods** list, and vibes asked for in words ("female vocals") | Whether each song is sung, by a woman or a man, and how it feels (0.51) |
 | Your listening, Time Machine | Your listens, kept on your own server ("Scrobble to Siansa Beats") |
+| Home's **For now**, **Made for you** and **More of you** | Mixes made from your listening, for the time of day and whether it's dark outside (0.53) |
 
 ## Set it up
 
@@ -32,6 +33,19 @@ servers, and nothing is ever changed on them.
    set one on its page, its API key or password. **Test** says what it can do, then **Save**.
 
 **Settings › Services** shows whether it's working, and has a switch to turn it off without removing it.
+
+## Choose what the app asks it for
+
+Under its card on **Settings › Connections**, **Use Siansa Beats for** has a switch for each thing:
+
+- **Scrobbling and history**: the same switch as **Scrobble to Siansa Beats** on Scrobbling & history.
+- **Loudness and smooth fades**: the same as the loudness source on Crossfade (off: your songs' ReplayGain tags).
+- **DJ blends**, **Genres by sound** (off: your songs' tags), **Similar music and sound search**, **Moods in Flow**.
+- **Mixes on Home** (Siansa Beats 0.53): Home's mixes come from Siansa Beats. Off: your own carousels and Made for you.
+
+Switch one on the card and it's switched on its own page too, and the other way round. The card's line says how many
+are in use. A switch your Siansa Beats is too old for says which version it needs. Everything that worked by itself
+before starts switched on.
 
 ## Several users
 

@@ -167,6 +167,12 @@ data class AppSettings(
     val scrobbleOffUsers: Set<Int> = emptySet(),
     /** "Scrobble to Siansa Beats": listens go to its listening history (Siansa Beats 0.29, [app.siansa.net.BeatsListens]). */
     val scrobbleBeats: Boolean = false,
+    /**
+     * What the app doesn't ask Siansa Beats for, switched off under its card on Connections (the owner, 17 Nov):
+     * [BeatsUse] ids. Empty: everything it can. Scrobbling and loudness keep their own settings ([scrobbleBeats],
+     * [loudnessSource]), which the same card switches.
+     */
+    val beatsOff: Set<String> = emptySet(),
     val lastFmEnabled: Boolean = false,
     val lastFmApiKey: String = "",
     val lastFmSecret: String = "",
@@ -291,6 +297,10 @@ data class AppSettings(
     /** AudioMuse's login is there, whether or not the service is switched on. */
     val audioMuseSetUp: Boolean get() = audioMuseUrl.isNotBlank()
     val beatsSetUp: Boolean get() = beatsUrl.isNotBlank()
+    /** Siansa Beats is set up and asked for [use] ([BeatsUse]): not switched off under its card. */
+    fun beatsFor(use: String): Boolean = beatsReady && use !in beatsOff
+    /** Songs like a song, the search by words, blends and "Your sound" are asked of Siansa Beats (when it has them). */
+    val beatsSoundReady: Boolean get() = beatsFor(BeatsUse.SOUND)
     val aiSetUp: Boolean get() = aiModel.isNotBlank() && (aiKey.isNotBlank() || !aiProvider.needsKey) && aiCompletionsUrl(aiProvider, aiAddress) != null
     val booksSetUp: Boolean get() = audiobookshelfUrl.isNotBlank() && (audiobookshelfToken.isNotBlank() || (audiobookshelfUser.isNotBlank() && audiobookshelfPassword.isNotBlank()))
     /**
@@ -487,6 +497,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         scrobblePercent = prefs.getInt("scrobble_pct", 50),
         scrobbleOffUsers = prefs.getString("scrobble_off_users", null).orEmpty().split(',').mapNotNull { it.trim().toIntOrNull() }.toSet(),
         scrobbleBeats = prefs.getBoolean("scrobble_beats", false),
+        beatsOff = prefs.getString("beats_off", "").orEmpty().split(",").filter { it.isNotBlank() }.toSet(),
         lastFmEnabled = prefs.getBoolean("lfm_on", false),
         servicesOff = prefs.getString("services_off", "").orEmpty().split(",").filter { it.isNotBlank() }.toSet(),
         lastFmApiKey = prefs.getString("lfm_key", "") ?: "",
@@ -619,6 +630,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
             .putInt("scrobble_pct", s.scrobblePercent)
             .putString("scrobble_off_users", s.scrobbleOffUsers.sorted().joinToString(","))
             .putBoolean("scrobble_beats", s.scrobbleBeats)
+            .putString("beats_off", s.beatsOff.sorted().joinToString(","))
             .putBoolean("lfm_on", s.lastFmEnabled)
             .putString("services_off", s.servicesOff.sorted().joinToString(","))
             .putString("lfm_key", s.lastFmApiKey.trim())
@@ -705,6 +717,13 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
     fun setDynamicColours(on: Boolean) {
         prefs.edit().putBoolean("dynamic_colours", on).apply()
         _state.value = _state.value.copy(dynamicColours = on)
+    }
+
+    /** Switches one thing the app asks Siansa Beats for ([BeatsUse]) on or off. */
+    fun setBeatsUse(use: String, on: Boolean) {
+        val off = if (on) _state.value.beatsOff - use else _state.value.beatsOff + use
+        prefs.edit().putString("beats_off", off.sorted().joinToString(",")).apply()
+        _state.value = _state.value.copy(beatsOff = off)
     }
 
     /** Switches a service on or off under Settings › Services (the owner, 13 Nov): its login stays. */
@@ -1003,4 +1022,22 @@ enum class Service(val id: String, val label: String, val gives: String) {
             AI -> s.aiSetUp
         }
     }
+}
+
+/**
+ * What the app can ask Siansa Beats for, each switched on Connections under its card (the owner, 17 Nov: "toggles
+ * for everything it should talk to Beats about"). Scrobbling and loudness are switched by their own settings, which
+ * their pages show too; these are the rest, all on until switched off ([AppSettings.beatsOff]).
+ */
+object BeatsUse {
+    /** Beats and phrases for DJ mixes. */
+    const val DJ = "dj"
+    /** Genres by their sound, instead of the songs' tags. */
+    const val GENRES = "genres"
+    /** Songs like a song, the search by words, blends and "Your sound". */
+    const val SOUND = "sound"
+    /** Each song's voice and moods, in Flow. */
+    const val MOODS = "moods"
+    /** Home's mixes made from your listening (Siansa Beats 0.53), instead of your own carousels. */
+    const val MIXES = "mixes"
 }

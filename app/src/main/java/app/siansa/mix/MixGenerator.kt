@@ -1,39 +1,39 @@
 package app.siansa.mix
 
-import app.siansa.net.wordsReady
-import app.siansa.net.soundReady
-import app.siansa.data.daysLabel
-
-import app.siansa.data.fittingSelector
-
 import android.content.Context
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import app.siansa.AppGraph
 import app.siansa.data.AppJson
+import app.siansa.data.BeatsUse
 import app.siansa.data.LibraryRepository
 import app.siansa.data.Mix
 import app.siansa.data.Selector
 import app.siansa.data.Song
+import app.siansa.data.daysLabel
+import app.siansa.data.fittingSelector
 import app.siansa.log.AppLog
+import app.siansa.net.BeatsSound
 import app.siansa.net.ClapHit
 import app.siansa.net.Steer
-import app.siansa.situation.Situation
+import app.siansa.net.soundReady
 import app.siansa.net.str
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withPermit
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
-import kotlinx.serialization.json.jsonObject
+import app.siansa.net.wordsReady
+import app.siansa.situation.Situation
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.TextStyle
 import java.util.Locale
 import kotlin.math.max
 import kotlin.random.Random
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
+import kotlinx.serialization.json.jsonObject
 
 class MixException(message: String) : Exception(message)
 
@@ -569,7 +569,8 @@ class MixGenerator(private val graph: AppGraph) {
     suspend fun vibeSongs(words: String, aiSteering: List<Steer>, set: VibeTuning, size: Int = 50): List<Song> {
         // The traits the words ask for by name ("female vocals", "instrumental", "sad"), as if picked (Siansa Beats 0.51,
         // the owner, 16 Nov), unless they're picked already; and the words of the traits picked, added to the search.
-        val tuning = withAskedTraits(set, words)
+        // Typed words ask for moods only while Siansa Beats gives them and they're switched on under its card.
+        val tuning = if (BeatsSound.traits.value && graph.settings.current.beatsFor(BeatsUse.MOODS)) withAskedTraits(set, words) else set
         val query = withTraitWords(words, tuning)
         val dials = tuning.steering()
         // The dials start at the AI's concepts, so once any is shown they say everything; before that, the AI's.
