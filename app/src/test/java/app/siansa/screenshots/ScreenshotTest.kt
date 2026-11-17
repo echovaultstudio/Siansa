@@ -339,7 +339,6 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                             record("now-2", "Neo-Classical Downtempo Drift", "Strings, soft beats and field recordings drifting by"),
                             record("now-3", "Driving Post-Punk", "Wiry guitars and restless drums"),
                         ),
-                        startAt = 1,
                     )
                 }
             },

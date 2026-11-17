@@ -76,7 +76,8 @@ data class CrateRecord(
 fun RecordCrate(
     records: List<CrateRecord>,
     modifier: Modifier = Modifier,
-    startAt: Int = 0,
+    // Where it opens: the second, so there's one on each side (the owner, 17 Nov), unless there are only two.
+    startAt: Int = if (records.size >= 3) 1 else 0,
 ) {
     if (records.isEmpty()) return
     val scope = androidx.compose.runtime.rememberCoroutineScope()
@@ -176,6 +177,6 @@ private fun Sleeve(record: CrateRecord, modifier: Modifier) {
 private const val CRATE_SLEEVE = 0.62f // of the width
 private const val CRATE_SLEEVE_MOST = 280f // dp
 private const val CRATE_SHRINK = 0.12f // how much smaller a sleeve beside the front is
-private const val CRATE_DIM = 0.45f // how much a sleeve beside the front fades
-private val CRATE_BLUR: Dp = 6.dp // how blurred a sleeve beside the front is
+private const val CRATE_DIM = 0.3f // how much a sleeve beside the front fades
+private val CRATE_BLUR: Dp = 3.dp // how blurred a sleeve beside the front: gently (the owner, 17 Nov)
 private val CRATE_CORNER: Dp = 6.dp
