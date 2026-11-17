@@ -335,7 +335,7 @@ class AppTourTest {
                 else if (compose.onAllNodesWithText("Radios").fetchSemanticsNodes().isEmpty()) problems += "Back from a search didn't return to the search page"
             }
             step("vibes") {
-                settingsRow("Radios & mixes")
+                settingsRow("Mixes & radios")
                 click("Today's mix and vibes")
                 idle(1000)
                 shot("17-vibes")
