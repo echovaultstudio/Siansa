@@ -53,6 +53,10 @@ class SongTraitsTest {
         assertTrue(SongTraits.named("Female vocals")!!.share(instrumental)!! < SongTraits.HOLDS)
         assertNull(SongTraits.named("Sad")!!.share(emptyMap()))
         assertEquals(SongTraits.ALL.size, SongTraits.ALL.map { it.label.lowercase() }.toSet().size)
+        // The picker's headings, each group's traits together: the voice, then moods, then the sound.
+        assertEquals(listOf("Voice", "Mood", "Sound"), SongTraits.ALL.map { it.group }.distinct())
+        assertEquals(2, SongTraits.ALL.map { it.group }.zipWithNext().count { (a, b) -> a != b })
+        assertEquals(listOf("Vocals", "Instrumental", "Female vocals", "Male vocals"), SongTraits.ALL.filter { it.group == SongTraits.VOICE }.map { it.label })
     }
 
     @Test fun wordsAskForTraitsByName() {

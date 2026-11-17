@@ -17,7 +17,7 @@ servers, and nothing is ever changed on them.
 | Song path and Flow | A run of songs from one sound to another, or to a mood |
 | Mood radios, vibes, today's mix, cards made from a sound, "Songs that sound like…" in Search | Music found from a description in words |
 | Your sound (the sonic fingerprint) and the mixes made from it | What your most played songs sound like |
-| Flow's **Voice & mood**, and vibes asked for in words ("female vocals") | Whether each song is sung, by a woman or a man, and how it feels (0.51) |
+| Flow's **Moods** list, and vibes asked for in words ("female vocals") | Whether each song is sung, by a woman or a man, and how it feels (0.51) |
 | Your listening, Time Machine | Your listens, kept on your own server ("Scrobble to Siansa Beats") |
 
 ## Set it up

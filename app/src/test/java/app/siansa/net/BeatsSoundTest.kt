@@ -63,7 +63,30 @@ class BeatsSoundTest {
     private val audioMuseOnly = AppSettings(audioMuseUrl = "http://am.local:8000", audioMuseToken = "t")
     private val everything = setOf("/api/similar_tracks", "/api/mood_centroids", "/api/find_path", "/api/alchemy", "/api/sonic_fingerprint/generate", "/api/sync")
 
-    @After fun forget() = BeatsSound.heard(emptySet())
+    @After fun forget() {
+        BeatsSound.heard(emptySet())
+        BeatsSound.onTraits = null
+        BeatsSound.restoreTraits(false)
+    }
+
+    /**
+     * Whether Siansa Beats has each song's voice and moods is remembered from its last answer and saved once per
+     * change, so Flow's list of them is there as it opens (the owner, 17 Nov: it came seconds late).
+     */
+    @Test fun whetherSiansaBeatsHasMoodsIsRemembered() {
+        val saved = mutableListOf<Boolean>()
+        BeatsSound.onTraits = { saved += it }
+        assertFalse(BeatsSound.traits.value)
+        BeatsSound.traits(true)
+        BeatsSound.traits(true)
+        assertTrue(BeatsSound.traits.value)
+        BeatsSound.traits(false)
+        assertEquals(listOf(true, false), saved)
+        // At the app's start, what was saved is put back without being saved again.
+        BeatsSound.restoreTraits(true)
+        assertTrue(BeatsSound.traits.value)
+        assertEquals(2, saved.size)
+    }
 
     @Test fun siansaBeatsIsAskedFirstAtAudioMusesOwnPaths() = runBlocking {
         BeatsSound.heard(everything)
