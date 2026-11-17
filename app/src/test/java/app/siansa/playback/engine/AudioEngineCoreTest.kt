@@ -1,6 +1,7 @@
 package app.siansa.playback.engine
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.nio.ByteBuffer
@@ -286,6 +287,27 @@ class AudioEngineCoreTest {
         }
         // 1.050 s is 50 ms after the cued 1.000 s: 2 205 frames after mix frame 44 100.
         assertEquals(46_305L, click)
+    }
+
+    @Test fun aSongPlayedOutToItsEndLeavesTheMix() {
+        // The owner's log, 17 Nov: after two songs played back to back, the first stayed in its deck for good (playing
+        // false, its fade still up), so the mix never counted as quiet and the output never rested.
+        val core = MixCore(44_100)
+        val deck = core.deck("main")
+        val stream = DeckStream(44_100, 2, DeckStream.Encoding.PCM_FLOAT, 3_000)
+        stream.write(float(FloatArray(2_000 * 2) { 0.4f }))
+        stream.play()
+        deck.add(stream)
+        stream.endOfStream()
+        val out = FloatArray(512)
+        var mix = 0L
+        repeat(20) { core.render(out, 256, mix); mix += 256 }
+        assertTrue(stream.finished)
+        stream.release()  // as the player does once its song has played out
+        assertFalse("nothing left to fade", stream.audible)
+        core.render(out, 256, mix)
+        assertTrue("let go of", deck.streams.isEmpty())
+        assertFalse(core.active)
     }
 
     @Test fun aStreamLeftHeldByAFadeIsFreed() {
