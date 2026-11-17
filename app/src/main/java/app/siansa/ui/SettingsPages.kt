@@ -35,6 +35,7 @@ import app.siansa.mix.NoticePrefs
 import app.siansa.data.HomeMenuItem
 import androidx.compose.material3.TextButton
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 
 /**
  * Settings › Home page (the owner, 13 Nov; Notices and Cards, Style › Home and Style › Home Menu before): the top of
@@ -161,7 +162,41 @@ fun NoticesSettingsScreen(nav: NavController) {
                         }
                     }
                 }
+                HorizontalDivider()
+                YourOwnNotices(nav)
             }
+        }
+    }
+}
+
+/**
+ * Notices of your own (issue #1234; the owner, 17 Nov: "custom ones should have ability to filter any metadata in or
+ * out"): each a pill saying how many songs or albums its rules find. Made with the same rules as custom cards.
+ */
+@Composable
+private fun YourOwnNotices(nav: NavController) {
+    val graph = LocalGraph.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val pinned by graph.pinnedCards.state.collectAsStateWithLifecycle()
+    androidx.compose.runtime.LaunchedEffect(Unit) { graph.pinnedCards.all() }
+    val mine = pinned.orEmpty().filter { it.notice }
+    Column(Modifier.testTag("yourOwnNotices"), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
+        if (mine.isEmpty()) Hint("None yet. A notice of your own counts the songs or albums that match your rules (a genre, an artist, a record label, when it was added…), like \"12 new releases\".")
+        mine.forEach { notice ->
+            Row(Modifier.fillMaxWidth().testTag("ownNotice-${notice.id}"), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                Column(Modifier.weight(1f).clickable { nav.navigate("settings/cards/edit/${notice.id}") }) {
+                    Text(notice.title.ifBlank { "No name" }, style = MaterialTheme.typography.bodyLarge)
+                    Hint(notice.detail)
+                }
+                androidx.compose.material3.IconButton(onClick = { scope.launch { graph.pinnedCards.remove(notice.id) } }) {
+                    androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Rounded.Delete, "Remove ${notice.title}")
+                }
+                androidx.compose.material3.Switch(checked = notice.shown, onCheckedChange = { on -> scope.launch { graph.pinnedCards.setShown(notice.id, on) } })
+            }
+        }
+        androidx.compose.material3.OutlinedButton(onClick = { nav.navigate("settings/cards/edit/notice") }, modifier = Modifier.testTag("addOwnNotice")) {
+            androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Rounded.Add, null)
+            Text("Add a notice", Modifier.padding(start = Space.Small))
         }
     }
 }

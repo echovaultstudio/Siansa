@@ -166,4 +166,19 @@ class NoticesTest {
         // It isn't counted as turned off while it's simply not added.
         assertEquals("Shown", noticesLine(true, NoticePrefs()))
     }
+
+    @Test fun aNoticeOfYourOwnSaysHowManyItFoundAndOpensThem() {
+        // Issue #1234 (the owner, 17 Nov): a pill from rules on the songs' or albums' details.
+        assertEquals(null, Notices.custom("pin-1", "new releases", 0))
+        val n = Notices.custom("pin-1", " new releases ", 12)!!
+        assertEquals("12 new releases", n.text)
+        assertEquals("pinned/pin-1", n.route)
+        assertEquals(NoticeKind.CUSTOM, n.kind)
+        assertEquals("a new count is a new notice", false, n.key == Notices.custom("pin-1", "new releases", 13)!!.key)
+        assertEquals(NoticeMode.AUTO, NoticePrefs().modeOf(NoticeKind.CUSTOM))
+        val notice = PinnedCard.new().copy(notice = true, rules = listOf(CardRule(RuleField.ADDED, RuleOp.WITHIN, "30")))
+        assertEquals("Give the notice its words, like \"new releases\".", pinnedCardProblem(notice, audioMuseReady = false))
+        assertEquals(null, pinnedCardProblem(notice.copy(title = "new releases"), audioMuseReady = false))
+        assertEquals(false, PinnedCard.new().notice)
+    }
 }

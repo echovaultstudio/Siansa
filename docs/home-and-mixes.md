@@ -100,12 +100,19 @@ their own: a finished book, albums older than three days or last month's report 
 | **Your October** | The first week of a month: last month's listening. | The month's report |
 | **4 artists for you** | New artists to try were found today. | Artists for you |
 | **Liked songs** | Always, once you add it: it's **Off** until you set it to Automatic or Pinned. | Liked songs |
+| **12 new releases** (your own) | A notice of your own finds songs or albums by your rules. | What it found |
 
 At most five show. By default they're ordered for you: what needs you first, then what you're in the middle of, then
 what's new; among the new ones, the kinds you tap most come first. In **Settings › Home page › Top of Home** you can hide the
 row, or set each kind to **Pinned**, **Automatic** or **Off**. Pinned kinds always show, first and in the order you
 pin them, and are never pushed out by other notices; the automatic ones fill the places left. The notices are
 always at the top of Home, so they're not in Arrange Home.
+
+**Notices of your own**: under **Your own notices** in Settings › Home page › Top of Home, **Add a notice**. Choose
+songs or albums, then rules on their details to keep or leave out: a genre, an artist, an album, a record label, a
+release type, the year, the length, when it was added or last played, play and skip counts, favourites, compilations.
+Give it the words to show after the number ("new releases"). It shows while its rules find any, and a tap opens what
+it found. The switch beside each one turns it off without removing it.
 
 ## Vibes and today's mix
 
