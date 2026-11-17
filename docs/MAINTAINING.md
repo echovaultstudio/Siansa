@@ -11,6 +11,10 @@ belongs to, and into [API](api.md) or [Privacy](privacy-and-logs.md) when it cha
 A pull request that adds a `### Added` or `### Changed` changelog note also updates these pages, in the same pull
 request, and says which page in its description.
 
+After each release, the release opens an issue labelled `claude` asking for these pages to be checked against what
+the version changed (`scripts/docs_issue.py`). The owner's scheduled task answers it with one pull request, which
+the owner reviews; it's never merged on its own.
+
 ## Where things go
 
 | Change | Page |
