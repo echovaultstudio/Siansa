@@ -163,7 +163,7 @@ zone). Three shelves, the same as on Siansa Beats' page:
 - **Made for you**: the kinds of music you play most, each with more like it.
 - **More of you**: On repeat, Rediscover and New for you.
 
-Each shelf is a crate of sleeves: the one in front stands up, the others lean back behind it. Swipe to flick through,
+Each shelf is a row of mixes: the one in the middle is sharp, the ones beside it smaller and blurred. Swipe to flick through,
 and tap the front one to open it and play it from there. Under it is its name and a few words on what's in it ("Wiry guitars and
 restless drums"); the artists it's like are on its own page. Siansa Beats makes the next part of the day's mixes a few
 minutes before it starts, so they're there when the hour turns. With an AI service set up on Siansa Beats' page, the
