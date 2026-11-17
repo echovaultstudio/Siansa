@@ -408,7 +408,7 @@ fun DownloadPickerScreen(nav: NavController) {
                 is Load.Ok -> {
                     if (o.value.isEmpty()) item {
                         Text(
-                            "Nothing here yet. Sync your library first (Settings › Connections, under your server).",
+                            "Nothing here yet. Sync your library first (Settings › Your server, under your server).",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(Space.Page),
@@ -725,7 +725,7 @@ private fun CoverDownloadSection() {
         CoverDownload.schedule(context, graph.settings.current)
         if (on) CoverDownload.startNow(context, graph) else CoverDownload.stop(context)
     }
-    SwitchRow("Download on Wi-Fi only", settings.coverDownloadWifiOnly) { on ->
+    SwitchRow("Download covers on Wi-Fi only", settings.coverDownloadWifiOnly) { on ->
         graph.settings.setCoverDownload(settings.coverDownload, wifiOnly = on)
         refresh++
     }

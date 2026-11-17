@@ -936,10 +936,10 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     app.siansa.ui.ServicesCard(s, health) {}
                     app.siansa.ui.HubGroupLabel("Playing")
                     app.siansa.ui.HubTiles(listOf(
-                        app.siansa.ui.HubTile(androidx.compose.material.icons.Icons.Rounded.Equalizer, "Sound", "a"),
-                        app.siansa.ui.HubTile(androidx.compose.material.icons.Icons.Rounded.Schedule, "Radios & mixes", "b"),
-                        app.siansa.ui.HubTile(androidx.compose.material.icons.Icons.Rounded.SwapVert, "Streaming & storage", "c"),
-                        app.siansa.ui.HubTile(androidx.compose.material.icons.Icons.AutoMirrored.Rounded.MenuBook, "Audiobooks & podcasts", "d"),
+                        app.siansa.ui.HubTile(androidx.compose.material.icons.Icons.Rounded.Equalizer, "Sound & playback", "a"),
+                        app.siansa.ui.HubTile(androidx.compose.material.icons.Icons.Rounded.Schedule, "Mixes & radios", "b"),
+                        app.siansa.ui.HubTile(androidx.compose.material.icons.Icons.Rounded.Explore, "Discovery", "c"),
+                        app.siansa.ui.HubTile(androidx.compose.material.icons.Icons.Rounded.GraphicEq, "Listening", "d"),
                     )) {}
                 }
             },

@@ -221,14 +221,14 @@ class BeatsSoundTest {
     /** From the same log: with AudioMuse-AI's address cleared, Song path and the mix slides said "not available". */
     @Test fun theSoundFeaturesArentHeldBackByAudioMuseBeingOff() {
         val connection = ConnectionState(network = true, server = true, audioMuse = null)
-        assertEquals("Siansa Beats or AudioMuse-AI isn't set up. Add it in Settings › Connections.", connection.soundProblem(beatsOnly))
+        assertEquals("Siansa Beats or AudioMuse-AI isn't set up. Add it in Settings › Services.", connection.soundProblem(beatsOnly))
         BeatsSound.heard(everything)
         assertEquals(null, connection.soundProblem(beatsOnly))
         assertEquals(null, ConnectionState(audioMuse = false).soundProblem(both))  // AudioMuse-AI down: Siansa Beats answers
         assertEquals("You're offline.", ConnectionState(network = false).soundProblem(beatsOnly))
         assertEquals("Only downloaded music is on.", connection.soundProblem(beatsOnly.copy(downloadedOnly = true)))
         // The search by words is still AudioMuse-AI's, and says so plainly.
-        assertEquals("Describing music in words needs Siansa Beats 0.26 or newer, or AudioMuse-AI (Settings › Connections).", connection.aiProblem(beatsOnly))
+        assertEquals("Describing music in words needs Siansa Beats 0.26 or newer, or AudioMuse-AI (Settings › Services).", connection.aiProblem(beatsOnly))
         assertEquals(null, connection.aiProblem(both))
         // Without Siansa Beats, as before.
         assertEquals("AudioMuse-AI isn't answering.", ConnectionState(audioMuse = false).soundProblem(audioMuseOnly))

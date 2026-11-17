@@ -91,7 +91,7 @@ Settings) always open that tab's own page, wherever you are.
 
 ## AudioMuse
 
-With AudioMuse set up (on the phone or under **Settings › Connections** on the TV), the TV has what it adds on
+With AudioMuse set up (on the phone or under **Settings › Services** on the TV), the TV has what it adds on
 the phone:
 
 - **Your sound** and **Discover for you** among Your mixes on Home, made when you pick them.
@@ -168,7 +168,7 @@ and play in stereo, with the centre and surround channels folded in.
 - Those songs play without crossfades, DJ blends, levelling, the equaliser or Siansa's volume: the receiver decides
   how they sound. Use the receiver's volume.
 - Dolby Atmos songs often play quieter than FLACs or the TV's own sound at the same volume, because the receiver turns
-  them down to the level they're marked with. **Settings › Sound › Dolby songs on your receiver** has them played
+  them down to the level they're marked with. **Settings › Sound & playback › Dolby songs on your receiver** has them played
   3 to 12 dB louder: Siansa marks them nearer the receiver's full level on their way, without changing the sound. A
   song can't go past full level, so one already marked near it gets less. It works for Dolby Atmos and Dolby Digital
   Plus, not for Dolby TrueHD, DTS or plain Dolby Digital. If a song doesn't seem louder, send a report after playing

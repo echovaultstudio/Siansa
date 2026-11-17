@@ -1,5 +1,9 @@
 package app.siansa.ui
 
+import androidx.compose.material3.Icon
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.Icons
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -163,10 +167,14 @@ internal fun ServiceDot(ok: Boolean?, modifier: Modifier = Modifier) {
     Box(modifier.size(8.dp).background(colour, CircleShape))  // spacing: exact
 }
 
+/** AudioMuse-AI isn't listed while Siansa Beats is on and set up: Beats does everything it did (the owner, 17 Nov). */
+internal fun hiddenByBeats(s: AppSettings, service: Service): Boolean =
+    service == Service.AUDIOMUSE && s.beatsReady && Service.on(s, Service.BEATS)
+
 /**
- * Settings › Services (the owner, 13 Nov): what Siansa talks to besides the music server, each with its switch,
- * what it gives, and whether it answers; and "For the best Siansa" at the top, which says what's not needed and
- * what's broken. A service switched off is left alone and shown nowhere.
+ * Settings › Services (the owner, 13 Nov; one list, one page per service, the owner, 17 Nov): every service with its dot
+ * and what it's doing, each opening its own page (Last.fm and ListenBrainz: Listening, where they're set). AudioMuse-AI
+ * is left out while Siansa Beats is on; "For the best Siansa" says what's not needed and what's broken.
  */
 @Composable
 fun ServicesScreen(nav: NavController) {
@@ -179,12 +187,24 @@ fun ServicesScreen(nav: NavController) {
             Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState()).padding(Space.Page),
             verticalArrangement = Arrangement.spacedBy(Space.Medium),
         ) {
-            Hint("What Siansa talks to besides your music server. A service turned off is left alone and shown nowhere.")
+            Hint("What Siansa talks to besides your music server. Each opens its own page.")
+            SettingsCard(tag = "servicesList") {
+                Service.entries.forEach { service ->
+                    if (service == Service.BOOKS && app.siansa.BuildConfig.TV_APP) return@forEach  // the TV has no books (issue #860)
+                    if (hiddenByBeats(settings, service)) return@forEach
+                    ServiceRow(settings, service, health[service.id]) { nav.navigate(service.settingsRoute) }
+                }
+            }
+            if (settings.beatsReady && Service.on(settings, Service.BEATS)) {
+                SettingsCard(tag = "doneByBeats") {
+                    HubGroupLabel("DONE BY SIANSA BEATS")
+                    Hint("AudioMuse-AI isn't listed while Siansa Beats is on: Beats does all it did. Switch Siansa Beats off and it comes back here.")
+                }
+            }
             SettingsCard(tag = "bestSiansa") {
                 HubGroupLabel("FOR THE BEST SIANSA")
                 bestLines(settings, health).forEach { line ->
                     Row(Modifier.fillMaxWidth().testTag("best-${line.mark}"), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
-                        // The marks differ in width: each in a column of its own, so the words line up.
                         Box(Modifier.width(Space.Section), contentAlignment = Alignment.Center) {
                             Text(
                                 when (line.mark) { "ok" -> "✓"; "bad" -> "✕"; "warn" -> "!"; "dash" -> "–"; else -> "○" },
@@ -205,52 +225,38 @@ fun ServicesScreen(nav: NavController) {
                     }
                 }
             }
-            Service.entries.forEach { service ->
-                if (service == Service.BOOKS && app.siansa.BuildConfig.TV_APP) return@forEach  // the TV has no books (issue #860)
-                ServiceCard(graph, settings, service, health[service.id], nav)
-            }
         }
     }
 }
 
+/** A service in the list: its name, its dot and what it's doing (off, not set up, its check), the whole row the tap. */
 @Composable
-private fun ServiceCard(graph: AppGraph, s: AppSettings, service: Service, check: ServiceCheck?, nav: NavController) {
+private fun ServiceRow(s: AppSettings, service: Service, check: ServiceCheck?, onClick: () -> Unit) {
     val on = Service.on(s, service)
     val setUp = Service.setUp(s, service)
-    SettingsCard(tag = "service-${service.id}", modifier = Modifier.alpha(if (on) 1f else 0.7f)) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(service.label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-            Switch(
-                checked = on,
-                onCheckedChange = { want ->
-                    AppLog.i("Settings", "Services: ${service.label} ${if (want) "on" else "off"}")
-                    when (service) {
-                        Service.LASTFM -> graph.settings.save(graph.settings.current.copy(lastFmEnabled = want))
-                        Service.LISTENBRAINZ -> graph.settings.save(graph.settings.current.copy(listenBrainzEnabled = want))
-                        else -> graph.settings.setServiceOn(service, want)
-                    }
-                },
-                modifier = Modifier.testTag("serviceSwitch-${service.id}"),
-            )
+    Row(
+        Modifier.fillMaxWidth().clickable(onClickLabel = "Open ${service.label}", onClick = onClick).padding(vertical = Space.Small).testTag("service-${service.id}"),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
+            Text(service.label, style = MaterialTheme.typography.bodyLarge)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+                ServiceDot(if (!on || !setUp) null else check?.ok)
+                Text(
+                    when {
+                        !on -> "Off"
+                        !setUp -> "Not set up"
+                        check == null -> "Checking…"
+                        else -> check.words
+                    } + if (service == Service.LASTFM || service == Service.LISTENBRAINZ) " · set on Listening" else "",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (on && setUp && check?.ok == false) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    modifier = Modifier.testTag("serviceStatus-${service.id}"),
+                )
+            }
         }
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
-            ServiceDot(if (!on || !setUp) null else check?.ok)
-            Text(
-                when {
-                    !on -> "Off" + if (service == Service.AUDIOMUSE && s.beatsReady) " · Siansa Beats covers it" else ""
-                    !setUp -> "Not set up"
-                    check == null -> "Checking…"
-                    else -> check.words
-                },
-                style = MaterialTheme.typography.bodySmall,
-                color = if (on && setUp && check?.ok == false) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.testTag("serviceStatus-${service.id}"),
-            )
-        }
-        Hint(service.gives)
-        Row(horizontalArrangement = Arrangement.spacedBy(Space.Page)) {
-            TextButton(onClick = { nav.navigate(service.settingsRoute) }) { Text(if (setUp) "Set up" else "Set it up") }
-        }
+        Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 

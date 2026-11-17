@@ -10,7 +10,7 @@ object AudioMuseErrors {
      * than this user's (an Emby user, beta report 810dc85c): its name in AudioMuse goes in Settings › Connections.
      */
     const val NOT_KNOWN = "AudioMuse-AI doesn't know this song. Has it been analysed? If AudioMuse-AI reads more than one " +
-        "music server, enter its name in Settings › Connections, under the server the song is from (another user's " +
+        "music server, enter its name in Settings › Your server, under the server the song is from (another user's " +
         "too): Server name in AudioMuse-AI."
 
     /**

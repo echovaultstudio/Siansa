@@ -81,7 +81,7 @@ class SimilarTest {
         // A Siansa Beats without the songs' sound only passes questions on: then it is AudioMuse-AI's trouble.
         assertFalse(Similar.beatsCouldntSay(reported, beatsSound = false))
         // Anything else is said as it is.
-        assertFalse(Similar.beatsCouldntSay("Siansa Beats wants its API key or password: check it in Settings › Connections", beatsSound = true))
+        assertFalse(Similar.beatsCouldntSay("Siansa Beats wants its API key or password: check it in Settings › Services", beatsSound = true))
         assertFalse(Similar.beatsCouldntSay("Failed to connect to /192.168.1.106:8090", beatsSound = true))
         assertFalse(Similar.beatsCouldntSay(null, beatsSound = true))
     }

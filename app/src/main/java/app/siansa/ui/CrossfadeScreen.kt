@@ -67,7 +67,7 @@ fun CrossfadeScreen(nav: NavController) {
     val scope = rememberCoroutineScope()
     var test by remember { mutableStateOf<String?>(null) }
     val eq by graph.equaliser.state.collectAsStateWithLifecycle()
-    Screen(title = "Sound", nav = nav) { padding ->
+    Screen(title = "Sound & playback", nav = nav) { padding ->
         Column(
             Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState()).padding(Space.Page),
             verticalArrangement = Arrangement.spacedBy(CROSSFADE_GAP),
@@ -82,7 +82,7 @@ fun CrossfadeScreen(nav: NavController) {
             Hint(if (settings.loudnessSource == LoudnessSource.PLUGIN && settings.beatsReady) "Measured by Siansa Beats." else settings.loudnessSource.detail + ".")
             if (settings.loudnessSource == LoudnessSource.PLUGIN) {
                 if (!settings.audioMuseReady && !settings.beatsReady) {
-                    Hint("Set up Siansa Beats or AudioMuse-AI in Settings › Connections first. Until then, song tags are used.")
+                    Hint("Set up Siansa Beats or AudioMuse-AI in Settings › Services first. Until then, song tags are used.")
                 } else {
                     Row(Modifier.tvFocusGroup(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
                         OutlinedButton(modifier = Modifier.focusRing(), onClick = {
@@ -130,7 +130,7 @@ fun CrossfadeScreen(nav: NavController) {
                 Hint(levellingHint(settings))
             }
             HorizontalDivider()
-            FoldSection("Crossfade", crossfadeFoldSummary(settings)) {
+            FoldSection("Crossfade & DJ blends", crossfadeFoldSummary(settings)) {
                 CrossfadeModeRow(settings.crossfade) { graph.settings.setCrossfade(mode = it) }
                 Hint(crossfadeHint(settings))
                 // Smart decides every change; only Fixed has a length and bars to set (the owner, 9 Nov).
@@ -142,12 +142,26 @@ fun CrossfadeScreen(nav: NavController) {
                         FixedBlendBars(settings.blendBars, graph.settings::setBlendBars)
                     }
                 }
+                // DJ blends on Siansa Beats' beat grids: here with the fades (the owner, 17 Nov), not on Beats' page.
+                BeatsUseSwitch(graph, app.siansa.data.BeatsUse.DJ)
                 if (settings.crossfade != CrossfadeMode.OFF) {
                     Hint(
                         // The TV app plays on the TV itself and has no sleep timer (issue #860).
                         if (app.siansa.BuildConfig.TV_APP) "Not used with Repeat one, or for Dolby and DTS songs sent to your receiver."
                         else "Only on this phone: on a TV or speaker, songs play back to back. Not used with Repeat one, or while the sleep timer lets a song finish.",
                     )
+                }
+            }
+            // The book player's skips (the owner, 17 Nov: "move these into playback"; the Audiobooks & podcasts page
+            // before). The TV has no books (issue #860).
+            if (!app.siansa.BuildConfig.TV_APP) {
+                HorizontalDivider()
+                FoldSection("Book skips", "Back ${settings.bookSkipBackSec} s · forward ${settings.bookSkipForwardSec} s") {
+                    Hint("How far the book player's skip buttons jump.")
+                    Text("Back", style = MaterialTheme.typography.bodyMedium)
+                    SkipChips(settings.bookSkipBackSec, "bookSkipBack") { graph.settings.save(graph.settings.current.copy(bookSkipBackSec = it)) }
+                    Text("Forward", style = MaterialTheme.typography.bodyMedium)
+                    SkipChips(settings.bookSkipForwardSec, "bookSkipForward") { graph.settings.save(graph.settings.current.copy(bookSkipForwardSec = it)) }
                 }
             }
             HorizontalDivider()

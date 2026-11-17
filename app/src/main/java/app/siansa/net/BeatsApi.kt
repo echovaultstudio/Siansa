@@ -241,7 +241,7 @@ class BeatsApi(
 
         /** A failed answer in plain words. */
         fun message(http: Int, reason: String): String = when (http) {
-            401, 403 -> "Siansa Beats wants its API key or password: check it in Settings › Connections"
+            401, 403 -> "Siansa Beats wants its API key or password: check it in Settings › Services"
             // Its own reason when it gives one ("The sound of none of those songs is known yet"): only a path it
             // doesn't have at all means it's too old. Not "0.20 or newer": a newer one can lack a newer path too
             // (the reports' numbers need 0.33, and the log said 0.20 to someone on 0.32).

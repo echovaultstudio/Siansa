@@ -29,23 +29,24 @@ servers, and nothing is ever changed on them.
 2. **On its page** (port 8090), the **Get started** card walks through adding your music server and choosing the
    libraries to analyse. A big library takes a while the first time; the app uses what's ready as it comes.
 3. **In Siansa**, connect it: on first setup choose **Add Siansa Beats**, or later
-   **Settings › Connections › Siansa Beats**. Enter its address (for example `http://192.168.1.10:8090`) and, if you
+   **Settings › Services › Siansa Beats**. Enter its address (for example `http://192.168.1.10:8090`) and, if you
    set one on its page, its API key or password. **Test** says what it can do, then **Save**.
 
 **Settings › Services** shows whether it's working, and has a switch to turn it off without removing it.
 
 ## Choose what the app asks it for
 
-Under its card on **Settings › Connections**, **Use Siansa Beats for** has a switch for each thing:
+Its page (**Settings › Services › Siansa Beats**) only connects it; under **Used for**, each thing it does opens the
+page where it's switched:
 
-- **Scrobbling and history**: the same switch as **Scrobble to Siansa Beats** on Scrobbling & history.
-- **Loudness and smooth fades**: the same as the loudness source on Crossfade (off: your songs' ReplayGain tags).
-- **DJ blends**, **Genres by sound** (off: your songs' tags), **Similar music and sound search**, **Moods in Flow**.
-- **Mixes on Home** (Siansa Beats 0.53): Home's mixes come from Siansa Beats. Off: your own carousels and Made for you.
+- **Loudness and DJ blends**: Sound & playback (the loudness source; **DJ blends** under Crossfade & DJ blends).
+- **Home's mixes and Mix settings**: Mixes & radios (**Home's mixes**: Siansa Beats or this phone).
+- **Genres, similar music, moods**: Discovery (**Genres** by sound, off: your songs' tags; **Similar music & search
+  by words**; **Moods in Flow**).
+- **Your listens**: Listening (**Scrobble to Siansa Beats**).
 
-Switch one on the card and it's switched on its own page too, and the other way round. The card's line says how many
-are in use. A switch your Siansa Beats is too old for says which version it needs. Everything that worked by itself
-before starts switched on.
+A switch your Siansa Beats is too old for says which version it needs. Everything that worked by itself before
+starts switched on.
 
 ## Several users
 

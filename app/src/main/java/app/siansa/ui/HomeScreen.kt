@@ -227,15 +227,17 @@ fun HomeScreen(nav: NavController) {
     // Siansa Beats' mixes (0.53) in place of your own carousels and Made for you, while switched on under its card.
     val beatsMakesMixes by BeatsSound.mixes.collectAsStateWithLifecycle()
     val beatsMixesShown = beatsMakesMixes && homeSettings.beatsFor(BeatsUse.MIXES)
-    val aiMixes = MixRules.showsAiMixes(homeSettings.wordsReady)
+    // While Siansa Beats makes Home's mixes, the phone makes none of its own (the owner, 17 Nov).
+    val aiMixes = MixRules.showsAiMixes(homeSettings.wordsReady) && !beatsMixesShown
     LaunchedEffect(hour, aiMixes) {
         graph.mixes.all()
         graph.selectors.all()
         current = null
         if (aiMixes) build(null, force = false, open = false)
     }
-    // Today's personal mixes are made quietly in the background once the page is up.
-    LaunchedEffect(aiMixes) {
+    // Today's personal mixes are made quietly in the background once the page is up; not while Siansa Beats makes them.
+    LaunchedEffect(aiMixes, beatsMixesShown) {
+        if (beatsMixesShown) return@LaunchedEffect
         delay(1500)
         val today = LocalDate.now().toString()
         for (kind in MixGenerator.Personal.entries.filter { MixRules.showsPersonal(it, graph.settings.current.soundReady) }) {
@@ -381,7 +383,8 @@ fun HomeScreen(nav: NavController) {
                         }
                     }
                 }
-                HomeSection.TODAY -> {
+                // The phone's Today's mix: not while Siansa Beats makes Home's mixes (the owner, 17 Nov).
+                HomeSection.TODAY -> if (!beatsMixesShown) {
                     titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "today") {
                         val mix = current
                         when {
@@ -802,7 +805,7 @@ internal fun MakeTodayCard(onMake: () -> Unit) {
         Row(Modifier.padding(Space.Page), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("Today's mix", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Text("None made yet. Auto update is off in Settings › Radios & mixes › Today's mix and vibes, so it's made when you ask.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("None made yet. Auto update is off in Settings › Mixes & radios › Today's mix and vibes, so it's made when you ask.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Spacer(Modifier.width(Space.Page))
             FilledTonalButton(onClick = onMake) { Text("Make it") }

@@ -100,7 +100,10 @@ fun HomeSettingsScreen(nav: NavController) {
                 }
             }
             HorizontalDivider()
-            PageLink("Cards", "Made for you and your own cards", "homeCards") { nav.navigate("settings/cards") }
+            // Its own page here too, besides the sheet on Home's button (the owner, 17 Nov).
+            PageLink("Arrange Home", "Order, what shows, each row's look", "homeArrange") { nav.navigate("settings/home/arrange") }
+            HorizontalDivider()
+            PageLink("Your cards", "Made for you and your own cards", "homeCards") { nav.navigate("settings/cards") }
         }
     }
 }
@@ -123,56 +126,6 @@ internal fun NoticeKinds(prefs: NoticePrefs, onPick: (NoticeKind, NoticeMode) ->
                         modifier = Modifier.testTag("notice-${kind.id}-${mode.id}"),
                     )
                 }
-            }
-        }
-    }
-}
-
-/**
- * Notices on their own page (issue #784; since the owner's 13 Nov they're on Home page too, and this page is kept for
- * old links): the chips at the top of Home, shown or not, and each kind pinned (always first, in the order pinned),
- * automatic (ordered by what matters and what you tap) or off.
- */
-@Composable
-fun NoticesSettingsScreen(nav: NavController) {
-    val graph = LocalGraph.current
-    val settings by graph.settings.state.collectAsStateWithLifecycle()
-    val shown = HomeSection.NOTICES !in settings.homeHidden
-    Screen(title = "Notices", nav = nav) { padding ->
-        Column(
-            Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState()).padding(Space.Page),
-            verticalArrangement = Arrangement.spacedBy(Space.Medium),
-        ) {
-            SwitchRow("Show notices on Home", shown) { on ->
-                AppLog.i("Settings", "Notices on Home: $on")
-                graph.settings.setHomeHidden(if (on) settings.homeHidden - HomeSection.NOTICES else settings.homeHidden + HomeSection.NOTICES)
-            }
-            Hint("A row of chips at the top of Home. Automatic puts what needs you first, then what you're in the middle of, then what's new. Pinned ones always come first.")
-            if (shown) {
-                NoticeKind.entries.forEach { kind ->
-                    HorizontalDivider()
-                    Column(Modifier.testTag("noticeKind"), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
-                        Column {
-                            Heading(kind.label)
-                            Hint(kind.hint)
-                        }
-                        Row(Modifier.tvFocusGroup().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
-                            NoticeMode.entries.forEach { mode ->
-                                FilterChip(
-                                    selected = settings.notices.modeOf(kind) == mode,
-                                    onClick = {
-                                        AppLog.i("Settings", "Notices › ${kind.label}: ${mode.label}")
-                                        graph.settings.setNoticeMode(kind, mode)
-                                    },
-                                    label = { Text(mode.label) },
-                                    modifier = Modifier.testTag("notice-${kind.id}-${mode.id}"),
-                                )
-                            }
-                        }
-                    }
-                }
-                HorizontalDivider()
-                YourOwnNotices(nav)
             }
         }
     }
