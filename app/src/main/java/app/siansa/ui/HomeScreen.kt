@@ -428,14 +428,17 @@ fun HomeScreen(nav: NavController) {
                 HomeSection.CAROUSEL -> {
                     // Your own mixes for this part of the day, set in Vibes (issue #253): AI mixes, so only with
                     // AudioMuse (issue #486).
-                    if (homeSettings.navidromeReady && beatsMixesShown) titledItem(section !in homeSettings.homeUntitled, key = "beats_mixes") { BeatsMixesHome(nav) }
+                    // With Siansa Beats' mixes on: its For now, in this row's look (the owner, 17 Nov).
+                    if (homeSettings.navidromeReady && beatsMixesShown) titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "beats_mixes") { BeatsMixesHome(nav, setOf("now"), look) }
                     else if (homeSettings.navidromeReady && aiMixes) titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "carousel") { HomeCarousel(nav, aiDown, look) }
                 }
                 // Audiobookshelf's books and podcasts (issue #521): only with a server set up.
                 HomeSection.BOOKS -> if (homeSettings.booksReady) titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "books") { BooksCarousel(nav, podcasts = false, look = look) }
                 HomeSection.PODCASTS -> if (homeSettings.booksReady) titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "podcasts") { BooksCarousel(nav, podcasts = true, look = look) }
-                // Siansa Beats' Made for you is in its mixes above: not a second one.
-                HomeSection.MADE_FOR_YOU -> if (!beatsMixesShown) {
+                // With Siansa Beats' mixes on: its Made for you and More of you, in this row's look (the owner, 17 Nov).
+                HomeSection.MADE_FOR_YOU -> if (beatsMixesShown) {
+                    if (homeSettings.navidromeReady) titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "beats_made") { BeatsMixesHome(nav, setOf("daily", "more"), look) }
+                } else {
                     // Made for you: the vibe for this hour, then mixes from your own listening.
                     titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "made") {
                         // The same tiles as plain items, for the other looks (issue #655).

@@ -3,9 +3,12 @@ package app.siansa.net
 import app.siansa.data.AppSettings
 import app.siansa.data.BeatsUse
 import app.siansa.log.AppLog
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -28,6 +31,8 @@ class BeatsMixes(
     private val now: () -> Long = System::currentTimeMillis,
 ) {
     private val shown = MutableStateFlow<Shelves?>(null)
+    // One ask at a time: two rows of Home show the mixes, and each asks.
+    private val asking = Mutex()
 
     /** The last shelves Siansa Beats gave; null before any. */
     val state: StateFlow<Shelves?> = shown.asStateFlow()
@@ -36,7 +41,9 @@ class BeatsMixes(
     val on: Boolean get() = settings().beatsFor(BeatsUse.MIXES) && BeatsSound.mixes.value
 
     /** Asks for the shelves when there are none, they're from another part of the day, or [force]. */
-    suspend fun refresh(force: Boolean = false): Shelves? {
+    suspend fun refresh(force: Boolean = false): Shelves? = asking.withLock { ask(force) }
+
+    private suspend fun ask(force: Boolean): Shelves? {
         if (!on) return null
         val had = shown.value
         val part = partOf(java.time.Instant.ofEpochMilli(now()).atZone(zone()).hour)
@@ -52,7 +59,11 @@ class BeatsMixes(
                 }
                 shown.value = it
             }
-            .onFailure { AppLog.w("Beats", "Siansa Beats' mixes weren't read: ${it.message}") }
+            .onFailure {
+                // Home left while it asked: not a failure (it said "weren't read" each time, the owner's log, 17 Nov).
+                if (it is CancellationException) throw it
+                AppLog.w("Beats", "Siansa Beats' mixes weren't read: ${it.message}")
+            }
             .getOrNull() ?: had
     }
 

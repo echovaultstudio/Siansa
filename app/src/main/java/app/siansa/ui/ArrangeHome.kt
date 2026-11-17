@@ -85,8 +85,9 @@ fun HomeSettingsSheet(nav: androidx.navigation.NavController, startOnSources: Bo
     }
     val graph = LocalGraph.current
     val s by graph.settings.state.collectAsStateWithLifecycle()
+    val beatsMakesMixes by app.siansa.net.BeatsSound.mixes.collectAsStateWithLifecycle()
     // The notices are the top of Home (issue #872), not a section to move: shown or not in Settings › Home page › Top of Home.
-    ArrangeHomeSheet(s.homeOrder - HomeSection.NOTICES, s.homeHidden, gap = s.homeGap, onGapChange = {
+    ArrangeHomeSheet(s.homeOrder - HomeSection.NOTICES, s.homeHidden, holds = beatsRows(beatsMakesMixes && s.beatsFor(app.siansa.data.BeatsUse.MIXES)), gap = s.homeGap, onGapChange = {
         AppLog.i("Home", "Spacing: ${homeGapLabel(it)}")
         graph.settings.setHomeGap(it)
     }, onChange = {
@@ -147,6 +148,8 @@ fun ArrangeHomeSheet(
     onChange: (List<HomeSection>) -> Unit,
     onHiddenChange: (Set<HomeSection>) -> Unit,
     onDismiss: () -> Unit,
+    // What another service puts in a row instead of its own (Siansa Beats' mixes, the owner, 17 Nov), said under it.
+    holds: Map<HomeSection, String> = emptyMap(),
     // The gap between Home's sections, a step of the spacing scale (#554).
     gap: Int = AppSettings.HOME_GAP_DEFAULT,
     onGapChange: (Int) -> Unit = {},
@@ -341,7 +344,7 @@ fun ArrangeHomeSheet(
                                     color = if (isHidden) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
                                 )
                                 // A row in another look says which (issue #655), and its cards' own colour; a hidden one says so.
-                                val line = if (isHidden) "Hidden" else listOfNotNull(looks[section]?.label, cardLooks[section]?.label).joinToString(" · ").ifEmpty { null }
+                                val line = if (isHidden) "Hidden" else listOfNotNull(holds[section], looks[section]?.label, cardLooks[section]?.label).joinToString(" · ").ifEmpty { null }
                                 if (line != null) Text(line, style = MaterialTheme.typography.bodySmall, color = if (isHidden) MaterialTheme.colorScheme.onSurfaceVariant else Accent, modifier = Modifier.testTag("homeLookLabel"))
                             }
                             IconButton(onClick = {
@@ -553,3 +556,13 @@ internal fun GridSizeChips(size: Int, modifier: Modifier = Modifier, onPick: (In
         }
     }
 }
+
+/**
+ * The rows of Arrange Home that show Siansa Beats' mixes while they're on (the owner, 17 Nov: their look is the row's),
+ * and which of them: said under each row, so it's clear which cog changes them.
+ */
+internal fun beatsRows(on: Boolean): Map<HomeSection, String> =
+    if (!on) emptyMap() else mapOf(
+        HomeSection.CAROUSEL to "Siansa Beats: For now",
+        HomeSection.MADE_FOR_YOU to "Siansa Beats: Made for you, More of you",
+    )

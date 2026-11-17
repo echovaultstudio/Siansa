@@ -163,7 +163,7 @@ zone). Three shelves, the same as on Siansa Beats' page:
 - **Made for you**: the kinds of music you play most, each with more like it.
 - **More of you**: On repeat, Rediscover and New for you.
 
-Each shelf is a crate of sleeves: the one in front stands up, the others lean back behind it. Swipe to flick through,
+Each shelf is a row of mixes: the one in the middle is sharp, the ones beside it smaller and blurred. Swipe to flick through,
 and tap the front one to open it and play it from there. Under it is its name and a few words on what's in it ("Wiry guitars and
 restless drums"); the artists it's like are on its own page. Siansa Beats makes the next part of the day's mixes a few
 minutes before it starts, so they're there when the hour turns. With an AI service set up on Siansa Beats' page, the
@@ -175,6 +175,10 @@ A mix you open stays on the phone, and once played it's in your shortcuts on Hom
 
 They're on while **Mixes on Home** is switched on under Siansa Beats (Settings › Connections). Switch it off for your
 own carousels and Made for you, which stay as you set them.
+
+In **Arrange Home**, For now takes the place of **Your mixes carousel**, and Made for you and More of you the place of
+**Made for you** (each row says so under its name). Move, hide or change those rows as any other: their cog sets the
+look, so the mixes can be tiles, a banner, a list, cover rows or a shortcut grid instead of the row of mixes.
 
 ## Your mixes carousel
 

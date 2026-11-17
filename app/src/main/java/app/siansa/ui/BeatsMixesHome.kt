@@ -13,7 +13,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import app.siansa.AppGraph
 import app.siansa.data.Mix
+import app.siansa.data.HomeLook
 import app.siansa.data.Song
+import app.siansa.data.cover
 import app.siansa.log.AppLog
 import app.siansa.net.BeatsMixes
 import java.time.LocalDate
@@ -25,61 +27,82 @@ import kotlinx.coroutines.withContext
 /**
  * Home's mixes from Siansa Beats (0.53, the owner, 17 Nov), in place of your own carousels while they're switched on
  * under Siansa Beats on Connections: **For now** (this part of the day, as you listen in it, and whether it's dark),
- * **Made for you** (the kinds of music you play most) and **More of you** (On repeat, Rediscover, New for you), each a
- * crate of records to flick through ([RecordCrate]).
+ * **Made for you** (the kinds of music you play most) and **More of you** (On repeat, Rediscover, New for you).
+ *
+ * Each stands in a row of Arrange Home and follows it (the owner, 17 Nov: "you cannot change the mixes card type, it
+ * needs to be possible"): For now in **Your mixes carousel**, Made for you and More of you in **Made for you**, so
+ * each row's place, whether it shows, its cards' colours and its look are the row's. "As it is" is the row of sleeves
+ * to flick through ([RecordCrate]); any other look draws the mixes as that look does.
  */
 @Composable
-fun BeatsMixesHome(nav: NavController) {
+fun BeatsMixesHome(nav: NavController, shelves: Set<String>, look: HomeLook) {
     val graph = LocalGraph.current
-    val shelves by graph.beatsMixes.state.collectAsStateWithLifecycle()
-    // Asked when Home shows, again at the next part of the day (Siansa Beats has made them ahead) and now and then.
+    val made by graph.beatsMixes.state.collectAsStateWithLifecycle()
+    // Asked when Home shows, again at the next part of the day (Siansa Beats has made them ahead) and now and then;
+    // asked once however many rows show them (BeatsMixes.refresh waits for an ask under way).
     LaunchedEffect(Unit) {
         while (true) {
             graph.beatsMixes.refresh()
             delay(60_000)
         }
     }
-    val made = shelves ?: return
+    val answer = made ?: return
+    val shown = answer.shelves.filter { it.key in shelves }
+    if (shown.isEmpty()) return
     // Each mix's songs, from the phone's copy of the library (the ids are the music server's own).
-    val songs by produceState<Map<String, List<Song>>>(emptyMap(), made) {
-        value = made.shelves.flatMap { it.mixes }.associate { it.id to graph.library.songs(it.songIds) }
+    val songs by produceState<Map<String, List<Song>>>(emptyMap(), shown) {
+        value = shown.flatMap { it.mixes }.associate { it.id to graph.library.songs(it.songIds) }
     }
     Column(Modifier.fillMaxWidth().testTag("beatsMixes")) {
-        made.shelves.forEachIndexed { i, shelf ->
-            val records = shelf.mixes.mapNotNull { mix -> crateRecord(mix, songs[mix.id].orEmpty(), made.keepDays, nav, graph) }
-            if (records.isEmpty()) return@forEachIndexed
-            // Just the title: the mixes say the rest (the owner, 17 Nov: no line under it).
-            SectionTitle(BeatsMixes.title(shelf), top = if (i == 0) LocalSectionGap.current else Space.Section)
-            RecordCrate(records)
+        shown.forEachIndexed { i, shelf ->
+            val mixes = shelf.mixes.mapNotNull { mix -> homeMix(mix, songs[mix.id].orEmpty(), answer.keepDays, nav, graph) }
+            if (mixes.isEmpty()) return@forEachIndexed
+            val title = BeatsMixes.title(shelf)
+            if (look == HomeLook.AS_IS) {
+                // Just the title: the mixes say the rest (the owner, 17 Nov: no line under it).
+                SectionTitle(title, top = if (i == 0) LocalSectionGap.current else Space.Section)
+                RecordCrate(mixes.map { it.record })
+            } else {
+                HomeLookRow(look, "beats-${shelf.key}", title, mixes.map { it.item }, songs = mixes.first().songs)
+            }
         }
     }
 }
 
+/** A Siansa Beats mix as Home draws it: a sleeve for the crate, an item for the other looks. */
+private class HomeMix(val record: CrateRecord, val item: HomeItem, val songs: List<Song>)
+
 /**
- * A mix as a record: shows what's in it under its name and opens as a mix page. Opened, it's kept as the app's own
- * mixes are, for as many days as Siansa Beats keeps it (the owner, 17 Nov); played from its page it becomes a shortcut
- * in the recent plays, so it still plays days later.
+ * A mix: shows what's in it under its name and opens as a mix page. Opened, or played from a look whose cover plays it,
+ * it's kept as the app's own mixes are, for as many days as Siansa Beats keeps it (the owner, 17 Nov); played it
+ * becomes a shortcut in the recent plays, so it still plays days later.
  */
-private fun crateRecord(mix: BeatsMixes.BeatsMix, songs: List<Song>, keepDays: Int, nav: NavController, graph: AppGraph): CrateRecord? {
+private fun homeMix(mix: BeatsMixes.BeatsMix, songs: List<Song>, keepDays: Int, nav: NavController, graph: AppGraph): HomeMix? {
     if (songs.isEmpty()) return null
     val today = LocalDate.now().toString()
     val id = beatsMixId(mix, today)
     fun saved() = Mix(id, "beats-${mix.id}", today, mix.name, beatsMixDescription(mix), "", songs,
         System.currentTimeMillis(), aiNamed = mix.aiNamed, keepDays = keepDays)
-    suspend fun keep() = runCatching { graph.mixes.save(saved()) }
-        .onFailure { AppLog.w("Home", "Siansa Beats' mix ${mix.name} wasn't kept: ${it.message}") }
-    return CrateRecord(
-        key = id,
-        name = mix.name,
-        caption = mix.caption,
-        covers = songs.map { it.coverArt }.distinct().take(4),
+    suspend fun keep() = runCatching { saved().also { graph.mixes.save(it) } }
+        .onFailure { AppLog.w("Home", "Siansa Beats' mix ${mix.name} wasn't kept: ${it.message}") }.getOrNull()
+    val open = {
+        graph.scope.launch {
+            keep()
+            withContext(Dispatchers.Main) { nav.navigate("mix/$id") }
+        }
+        Unit
+    }
+    val play = {
+        graph.player.play(songs)
+        graph.scope.launch { keep()?.let { graph.recentPlays.note("mix/$id", it.title, songs.firstOrNull()?.cover) } }
+        Unit
+    }
+    val covers = songs.map { it.coverArt }.distinct().take(4)
+    return HomeMix(
+        record = CrateRecord(key = id, name = mix.name, caption = mix.caption, covers = covers, songs = songs, onOpen = open),
+        item = HomeItem(key = id, title = mix.name, subtitle = mix.caption, coverArt = covers.firstOrNull { it != null },
+            open = open, play = play, meta = "${songs.size} songs"),
         songs = songs,
-        onOpen = {
-            graph.scope.launch {
-                keep()
-                withContext(Dispatchers.Main) { nav.navigate("mix/$id") }
-            }
-        },
     )
 }
 
