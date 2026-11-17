@@ -329,6 +329,15 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
             },
             // Siansa Beats' mixes on Home as records in a crate (the owner, 17 Nov): the one in front with its record slid
             // out, its neighbours leaning back; a long name; no covers (the sleeves' colours show).
+            // Siansa Beats' mixes as tiles (the owner, 17 Nov): four covers each, two by two, and what's in it.
+            Scene("beats_mix_tiles") {
+                fun record(key: String, name: String, caption: String) = app.siansa.ui.CrateRecord(key, name, caption, emptyList(), emptyList(), {})
+                app.siansa.ui.Shelf("More of you", listOf(
+                    record("repeat", "On repeat", "Your most played, lately"),
+                    record("rediscover", "Rediscover", "Old favourites, back again"),
+                    record("new", "New for you", "Fresh finds near your taste"),
+                ), key = { it.key }) { app.siansa.ui.MixMosaicTile(it) }
+            },
             // Siansa Beats' mix settings (the owner, 17 Nov): switches, a number, names left out, how long they're kept.
             Scene("beats_mix_settings") {
                 val on = { name: String, label: String, v: Boolean -> app.siansa.net.BeatsMixSettings.Setting(name, app.siansa.net.BeatsMixSettings.Kind.ON, label, 0, 0, app.siansa.net.BeatsMixSettings.Value(on = v)) }

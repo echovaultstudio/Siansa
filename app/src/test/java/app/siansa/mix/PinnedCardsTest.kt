@@ -103,7 +103,8 @@ class PinnedCardsTest {
 
     @Test fun homeHasAPlaceForTheCardsAfterMadeForYou() {
         val order = HomeSection.parse("quick,today,made,rediscover")  // saved before the section existed
-        assertEquals(HomeSection.MADE_FOR_YOU, order[order.indexOf(HomeSection.CARDS) - 1])
+        // After Made for you and Siansa Beats' More of you, which follows it (the owner, 17 Nov).
+        assertEquals(listOf(HomeSection.MADE_FOR_YOU, HomeSection.MORE_OF_YOU), order.subList(order.indexOf(HomeSection.CARDS) - 2, order.indexOf(HomeSection.CARDS)))
     }
 
     // ---- Issue #663: rules to include or leave out, and album cards ----

@@ -81,7 +81,8 @@ class BeatsMixesTest {
         assertEquals(emptyMap<app.siansa.data.HomeSection, String>(), app.siansa.ui.beatsRows(false))
         val rows = app.siansa.ui.beatsRows(true)
         assertEquals("Siansa Beats: For now", rows[app.siansa.data.HomeSection.CAROUSEL])
-        assertEquals("Siansa Beats: Made for you, More of you", rows[app.siansa.data.HomeSection.MADE_FOR_YOU])
+        assertEquals("Siansa Beats: Made for you", rows[app.siansa.data.HomeSection.MADE_FOR_YOU])
+        assertEquals("Siansa Beats: On repeat, Rediscover, New for you", rows[app.siansa.data.HomeSection.MORE_OF_YOU])
     }
 
     @Test fun twoRowsAskingAtOnceAskOnce() = runBlocking {

@@ -14,6 +14,8 @@ enum class HomeSection(val id: String, val label: String) {
     BOOKS("books", "Your books"),
     PODCASTS("podcasts", "Your podcasts"),
     MADE_FOR_YOU("made", "Made for you"),
+    /** Siansa Beats' On repeat, Rediscover and New for you (the owner, 17 Nov: its own row); empty without them. */
+    MORE_OF_YOU("more_of_you", "More of you"),
     /** Custom cards pinned to Home (issue #622); each shows in its own look, in the order set in Settings › Home page › Cards. */
     CARDS("cards", "Your cards"),
     REDISCOVER("rediscover", "Rediscover"),
