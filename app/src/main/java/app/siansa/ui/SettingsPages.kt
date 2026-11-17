@@ -36,6 +36,8 @@ import app.siansa.data.HomeMenuItem
 import androidx.compose.material3.TextButton
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Delete
 
 /**
  * Settings › Home page (the owner, 13 Nov; Notices and Cards, Style › Home and Style › Home Menu before): the top of
@@ -189,13 +191,13 @@ private fun YourOwnNotices(nav: NavController) {
                     Hint(notice.detail)
                 }
                 androidx.compose.material3.IconButton(onClick = { scope.launch { graph.pinnedCards.remove(notice.id) } }) {
-                    androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Rounded.Delete, "Remove ${notice.title}")
+                    androidx.compose.material3.Icon(Icons.Rounded.Delete, "Remove ${notice.title}")
                 }
                 androidx.compose.material3.Switch(checked = notice.shown, onCheckedChange = { on -> scope.launch { graph.pinnedCards.setShown(notice.id, on) } })
             }
         }
         androidx.compose.material3.OutlinedButton(onClick = { nav.navigate("settings/cards/edit/notice") }, modifier = Modifier.testTag("addOwnNotice")) {
-            androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Rounded.Add, null)
+            androidx.compose.material3.Icon(Icons.Rounded.Add, null)
             Text("Add a notice", Modifier.padding(start = Space.Small))
         }
     }
