@@ -870,7 +870,7 @@ fun parseSteering(element: kotlinx.serialization.json.JsonElement?, concepts: Li
  * What a vibe or mood playlist says when none of AudioMuse's songs could be found on this server, instead of an
  * empty list (beta testers #40). The AudioMuse test in Settings says which case it is.
  */
-const val NOT_ON_THIS_SERVER = "None of the songs AudioMuse-AI found are on this server. Test AudioMuse-AI in Settings › Connections to see why."
+const val NOT_ON_THIS_SERVER = "None of the songs AudioMuse-AI found are on this server. Test AudioMuse-AI in Settings › Services to see why."
 
 /**
  * A sound search's [hits], and which of them are songs here ([here], by AudioMuse's id); [foreign] when none of

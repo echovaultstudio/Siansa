@@ -117,7 +117,7 @@ it found. The switch beside each one turns it off without removing it.
 ## Vibes and today's mix
 
 A **vibe** covers part of the day. Siansa starts with Morning, Daytime, Evening and Night. When you open the app,
-the vibe for the current hour builds **today's mix**. **Settings › Radios & mixes › Today's mix and vibes** lets you change them:
+the vibe for the current hour builds **today's mix**. **Settings › Mixes & radios › Today's mix and vibes** lets you change them:
 
 - **Name**, **Days** (or every day), and **hours** (0–23; a vibe from 22 to 5 runs past midnight). When several
   vibes fit, the most specific wins: one set for a day before an everyday one, one for some hours before an
@@ -133,7 +133,7 @@ the vibe for the current hour builds **today's mix**. **Settings › Radios & mi
 
 How the songs are picked is explained in [How it works](how-it-works.md#todays-mix-and-vibes).
 
-**Today's mix** has settings of its own at the top of **Settings › Radios & mixes › Today's mix and vibes**, which apply to it whichever
+**Today's mix** has settings of its own at the top of **Settings › Mixes & radios › Today's mix and vibes**, which apply to it whichever
 vibe makes it:
 
 - **Auto update** (on by default): the mix follows the time of day. A new one is made as the day or the hour's vibe
@@ -181,15 +181,16 @@ instrumental").
 A mix you open stays on the phone, and once played it's in your shortcuts on Home, for as long as Siansa Beats keeps its mixes:
 7 days, or what **Keep mixes for** on its Mixes page says (Siansa Beats 0.55).
 
-They're on while **Mixes on Home** is switched on under Siansa Beats (Settings › Connections). Switch it off for your
-own carousels and Made for you, which stay as you set them.
+They're on while **Home's mixes** is set to **Siansa Beats** (Settings › Mixes & radios). While they are, the phone
+makes none of its own: no hourly Today's mix and no mixes in the background. Set it to **This phone** for your own
+carousels, Today's mix and Made for you, which stay as you set them.
 
 In **Arrange Home**, For now takes the place of **Your mixes carousel**, Made for you the place of **Made for you**, and
 More of you has a row of its own, **More of you** (listed only while Siansa Beats' mixes are on). Each row says so under
 its name. Move or hide them as any other; their cog picks one of two looks: **Carousel** (big covers to flick through)
 or **Tiles** (a row of tiles, each with four of the mix's covers).
 
-**Mix settings** (Settings › Connections › Siansa Beats, under **Mixes on Home**; Siansa Beats 0.56 or newer) choose
+**Mix settings** (Settings › Mixes & radios, under **Home's mixes**; Siansa Beats 0.56 or newer) choose
 what goes into them: which mixes are made and how many, songs in a mix, how many of them you know, songs by one artist,
 how long a song you played stays out, genres and artists to leave out, whether the part of the day, weekends, the dark
 and this time of year count, how far back your listening counts, On repeat's and Rediscover's spans, names from the AI

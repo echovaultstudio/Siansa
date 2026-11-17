@@ -48,7 +48,11 @@ fun NavGraphBuilder.siansaRoutes(nav: NavController, except: Set<String> = empty
     page("welcome") { SourcePickerScreen(nav) }
     page("welcome/extras/{source}") { SmartExtrasScreen(nav, it.arguments?.getString("source").orEmpty()) }
     page("settings/users") { ConnectionsHub(nav, open = "server") }
-    page("settings/connections/{open}") { ConnectionsHub(nav, open = it.arguments?.getString("open")) }
+    // One page per service (the owner, 17 Nov): its card alone; "server" stays the servers page.
+    page("settings/connections/{open}") {
+        val open = it.arguments?.getString("open")
+        ConnectionsHub(nav, open = open, only = open?.takeIf { o -> o in SERVICE_PAGES })
+    }
     page("settings/beats/mixes") { BeatsMixSettingsScreen(nav) }
     // Settings regrouped (the owner, 13 Nov): Services, a search, and twelve pages. Old addresses still lead somewhere.
     page("settings/services") { ServicesScreen(nav) }
@@ -70,14 +74,17 @@ fun NavGraphBuilder.siansaRoutes(nav: NavController, except: Set<String> = empty
     page("settings/equaliser") { EqualiserScreen(nav) }
     page("settings/storage") { StreamingDataScreen(nav) }
     page("settings/streaming") { StreamingDataScreen(nav) }
-    page("settings/books") { BooksSettingsScreen(nav) }
+    // Book skips are in Sound & playback now (the owner, 17 Nov).
+    page("settings/books") { CrossfadeScreen(nav) }
+    page("settings/discovery") { DiscoveryScreen(nav) }
+    page("settings/home/arrange") { ArrangeHomePage(nav) }
     page("settings/home") { HomeSettingsScreen(nav) }
-    page("settings/home/notices") { NoticesSettingsScreen(nav) }
+    page("settings/home/notices") { HomeSettingsScreen(nav) }
     page("downloads") { DownloadsScreen(nav) }
     page("downloads/add") { DownloadPickerScreen(nav) }
     page("downloads/songs") { DownloadedSongsScreen(nav) }
     page("settings/help") { HelpScreen(nav) }
-    page("settings/audiobookshelf") { ConnectionsHub(nav, open = "books") }
+    page("settings/audiobookshelf") { ConnectionsHub(nav, open = "books", only = "books") }
     page("settings/logs") { LogsScreen(nav) }
     page("settings/report") { ProblemReportScreen(nav) }
     page("settings/backup") { BackupScreen(nav) }

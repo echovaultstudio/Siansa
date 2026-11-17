@@ -80,7 +80,7 @@ fun ScrobblingScreen(nav: NavController) {
         }
     }
 
-    Screen(title = "Scrobbling & history", nav = nav) { padding ->
+    Screen(title = "Listening", nav = nav) { padding ->
         Column(
             Modifier
                 .padding(top = padding.calculateTopPadding())

@@ -335,7 +335,7 @@ class AppTourTest {
                 else if (compose.onAllNodesWithText("Radios").fetchSemanticsNodes().isEmpty()) problems += "Back from a search didn't return to the search page"
             }
             step("vibes") {
-                settingsRow("Radios & mixes")
+                settingsRow("Mixes & radios")
                 click("Today's mix and vibes")
                 idle(1000)
                 shot("17-vibes")
@@ -346,7 +346,7 @@ class AppTourTest {
                 idle(800)
                 shot("18-settings")
                 // Regrouped (the owner, 13 Nov): you and the services first, then twelve tiles.
-                listOf("Sound", "Radios & mixes", "Streaming & storage", "Audiobooks & podcasts", "Home page", "Theme", "Now playing", "Bottom bar", "Scrobbling & history", "Help & feedback").forEachIndexed { i, page ->
+                listOf("Sound & playback", "Mixes & radios", "Discovery", "Listening", "Storage & downloads", "Home page", "Theme", "Now playing", "Bottom bar", "Help & feedback").forEachIndexed { i, page ->
                     settingsRow(page)
                     idle(1200)
                     shot("19-settings-${i + 1}-" + page.lowercase().replace(Regex("[^a-z0-9]+"), "-"))
@@ -355,7 +355,7 @@ class AppTourTest {
                 }
                 // The services' page, from Manage on the start page.
                 tab("Settings")
-                waitText("Manage")
+                waitText("All services")
                 // Scrolled into view: the start page stays where the last tile left it.
                 compose.onNodeWithTag("hubManage").performScrollTo().performClick()
                 idle(1500)
@@ -378,7 +378,7 @@ class AppTourTest {
                 back()
                 idle(400)
                 // Issue #302: Download all covers is in Settings › Streaming & storage, under the song download settings.
-                settingsRow("Streaming & storage")
+                settingsRow("Storage & downloads")
                 idle(800)
                 compose.onAllNodesWithText("Download all covers").onFirst().performScrollTo()
                 idle(600)
@@ -427,7 +427,7 @@ class AppTourTest {
                 }
             }
             step("equaliser") {
-                settingsRow("Sound")
+                settingsRow("Sound & playback")
                 click("Equaliser")
                 idle(1200)
                 shot("19b-equaliser")
@@ -436,7 +436,7 @@ class AppTourTest {
             }
             step("crossfade and levelling") {
                 try {
-                    settingsRow("Sound")
+                    settingsRow("Sound & playback")
                     idle(1000)
                     shot("19j-crossfade")
                     // Issue #214: levelling (ReplayGain) lives here now, with what levels the song playing now.

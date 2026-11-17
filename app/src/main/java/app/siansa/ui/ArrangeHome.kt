@@ -1,5 +1,8 @@
 package app.siansa.ui
 
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
@@ -77,7 +80,7 @@ import app.siansa.data.movesFirstVisible
  * ([startOnSources]) or Arrange. Your cards' cog closes it and opens Settings › Home page › Cards.
  */
 @Composable
-fun HomeSettingsSheet(nav: androidx.navigation.NavController, startOnSources: Boolean, onDismiss: () -> Unit) {
+fun HomeSettingsSheet(nav: androidx.navigation.NavController, startOnSources: Boolean, asPage: Boolean = false, onDismiss: () -> Unit) {
     // Sources is a sheet of its own (the owner, 12 Nov): Arrange isn't part of it.
     if (startOnSources) {
         SourcesSheet(onDismiss)
@@ -101,7 +104,7 @@ fun HomeSettingsSheet(nav: androidx.navigation.NavController, startOnSources: Bo
     }, onHiddenChange = {
         AppLog.i("Home", "Hidden: ${HomeSection.formatHidden(it).ifEmpty { "none" }}")
         graph.settings.setHomeHidden(it)
-    }, onDismiss = onDismiss,
+    }, onDismiss = onDismiss, asPage = asPage,
         looks = s.homeLooks,
         untitled = s.homeUntitled,
         onTitleShownChange = { section, shown ->
@@ -152,6 +155,8 @@ fun ArrangeHomeSheet(
     onChange: (List<HomeSection>) -> Unit,
     onHiddenChange: (Set<HomeSection>) -> Unit,
     onDismiss: () -> Unit,
+    // Drawn as a page of its own (Settings › Home page › Arrange Home) rather than a sheet.
+    asPage: Boolean = false,
     // What another service puts in a row instead of its own (Siansa Beats' mixes, the owner, 17 Nov), said under it.
     holds: Map<HomeSection, String> = emptyMap(),
     // The gap between Home's sections, a step of the spacing scale (#554).
@@ -252,11 +257,12 @@ fun ArrangeHomeSheet(
         }
     }
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+    SheetOrPage(asPage, onDismiss) {
         Column(Modifier.navigationBarsPadding().padding(bottom = Space.Small)) {
             Row(Modifier.fillMaxWidth().padding(start = Space.Page, end = Space.Small), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("Arrange Home", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    // As a page, its title is the page's (the owner, 17 Nov: Arrange Home has its own page in Home page).
+                    if (!asPage) Text("Arrange Home", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     Text(
                         "What's on Home, in what order, and how its cards look.",
                         style = MaterialTheme.typography.bodySmall,
@@ -594,4 +600,25 @@ internal fun keepUnlisted(arranged: List<HomeSection>, before: List<HomeSection>
         out.add(if (after == null) 0 else out.indexOf(after) + 1, section)
     }
     return out
+}
+
+/** A sheet over the page, or the same as a page of its own ([asPage]). */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SheetOrPage(asPage: Boolean, onDismiss: () -> Unit, content: @Composable () -> Unit) {
+    if (asPage) content()
+    else ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) { content() }
+}
+
+/**
+ * Settings › Home page › Arrange Home (the owner, 17 Nov: a page of its own in Home settings, not a link): the same as
+ * the sheet behind Home's button, the order, what shows, each row's look and title, the cards' colours and the spacing.
+ */
+@Composable
+fun ArrangeHomePage(nav: androidx.navigation.NavController) {
+    Screen(title = "Arrange Home", nav = nav) { padding ->
+        Box(Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().testTag("arrangeHomePage")) {
+            HomeSettingsSheet(nav, startOnSources = false, onDismiss = { nav.popBackStack() }, asPage = true)
+        }
+    }
 }
