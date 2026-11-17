@@ -90,8 +90,30 @@ fun HomeLookRow(
         HomeLook.BUTTON -> HomeButton(id, title, items, open, play, songs)
         HomeLook.COVER_ROWS -> HomeCoverRows(title, items, open)
         HomeLook.GRID -> TileGrid(title, items.map { GridTile(it.key, it.title, it.coverArt, it.colors, onClick = it.open) }, gridSize, openAll)
+        HomeLook.CAROUSEL -> HomeCarouselLook(title, items)
     }
 }
+
+/**
+ * Any row as a carousel (the owner, 17 Nov): its items as big covers to flick through, the one in the middle in focus,
+ * its name and what it is under the row ([RecordCrate], as Siansa Beats' mixes are).
+ */
+@Composable
+private fun HomeCarouselLook(title: String, items: List<HomeItem>) {
+    SectionTitle(title)
+    RecordCrate(items.map(::crateRecordOf), Modifier.testTag("homeLookCarousel"))
+}
+
+/** A Home item as a carousel's sleeve: its cover, else its colours; under it the small line, else the third. */
+internal fun crateRecordOf(item: HomeItem): CrateRecord = CrateRecord(
+    key = item.key,
+    name = item.title,
+    caption = item.subtitle.ifBlank { item.meta },
+    covers = listOf(item.coverArt),
+    songs = emptyList(),
+    onOpen = item.open,
+    colors = item.colors,
+)
 
 /**
  * Cover rows for a row of Home (issue #789): the same shelf as a custom card's, three rows to a column. Each item's

@@ -32,7 +32,19 @@ class HomeLookTest {
     }
 
     @Test fun theLooksAreTheCustomCardsLooks() {
-        assertEquals(listOf("As it is", "Tiles", "Banner", "List", "Play button", "Cover rows", "Shortcut grid"), HomeLook.entries.map { it.label })
+        assertEquals(listOf("As it is", "Tiles", "Banner", "List", "Play button", "Cover rows", "Shortcut grid", "Carousel"), HomeLook.entries.map { it.label })
+    }
+
+    @Test fun anyRowCanBeACarousel() {
+        // The owner, 17 Nov: every look for every row, the carousel too.
+        val looks = mapOf(HomeSection.RECENT to HomeLook.CAROUSEL, HomeSection.CAROUSEL to HomeLook.CAROUSEL)
+        assertEquals("carousel:carousel,recent:carousel", HomeLook.format(looks))
+        assertEquals(looks, HomeLook.parse(HomeLook.format(looks)))
+        val item = app.siansa.ui.HomeItem("al-1", "Hell Is Just a Halfway House", subtitle = "", coverArt = "al-1", meta = "11 songs · 2024", open = {})
+        val sleeve = app.siansa.ui.crateRecordOf(item)
+        assertEquals(listOf("al-1"), sleeve.covers)
+        assertEquals("11 songs · 2024", sleeve.caption)  // no small line: the third
+        assertEquals("Radio", app.siansa.ui.crateRecordOf(item.copy(subtitle = "Radio")).caption)
     }
 
     @Test fun theSlimCardSaysWhatATapDoes() {

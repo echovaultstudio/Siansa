@@ -58,7 +58,8 @@ fun BeatsMixesHome(nav: NavController, shelves: Set<String>, look: HomeLook) {
             val mixes = shelf.mixes.mapNotNull { mix -> homeMix(mix, songs[mix.id].orEmpty(), answer.keepDays, nav, graph) }
             if (mixes.isEmpty()) return@forEachIndexed
             val title = BeatsMixes.title(shelf)
-            if (look == HomeLook.AS_IS) {
+            // Its own look and Carousel are the same row of sleeves, with four covers on each.
+            if (look == HomeLook.AS_IS || look == HomeLook.CAROUSEL) {
                 // Just the title: the mixes say the rest (the owner, 17 Nov: no line under it).
                 SectionTitle(title, top = if (i == 0) LocalSectionGap.current else Space.Section)
                 RecordCrate(mixes.map { it.record })
