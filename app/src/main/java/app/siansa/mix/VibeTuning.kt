@@ -32,7 +32,7 @@ data class VibeTuning(
     val set: VibeTuning get() = copy(sounds = sounds.filter { it.value != 0 })
 
     /** The sound dials as steering for AudioMuse's search: the ones set, each with its weight. */
-    fun steering(): List<Steer> = sounds.filter { it.value != 0 && !it.genre }.map { Steer(it.term, it.value > 0, steerWeight(it.value)) }
+    fun steering(): List<Steer> = sounds.filter { it.value != 0 && !it.genre && !it.trait }.map { Steer(it.term, it.value > 0, steerWeight(it.value)) }
 
     /** Every slider and dial back in the middle, keeping which sounds the dials are for (issue #369). */
     fun cleared(): VibeTuning = VibeTuning(sounds = sounds.map { it.copy(value = 0) })
@@ -86,9 +86,11 @@ data class VibeTuning(
 /**
  * One sound dial: an AudioMuse concept and how far towards (+) or away from (−) it. [genre]: one of the mix's own
  * sounds instead, a genre Siansa Beats hears in some of its songs, which re-ranks the songs and doesn't steer the search.
+ * [trait]: one of Siansa Beats' traits ([SongTraits]: vocals, a woman's voice, sad…), which puts the songs that have it
+ * first ("more") or last ("less").
  */
 @Serializable
-data class SoundDial(val term: String, val value: Int = 0, val genre: Boolean = false)
+data class SoundDial(val term: String, val value: Int = 0, val genre: Boolean = false, val trait: Boolean = false)
 
 /**
  * The search words for a vibe made from the sliders alone (no description typed): energy, tempo and the
@@ -108,7 +110,7 @@ fun sliderQuery(tuning: VibeTuning): String? {
             tuning.tempo == -1 -> add("relaxed tempo")
             tuning.tempo <= -2 -> add("slow tempo")
         }
-        tuning.sounds.filter { it.value > 0 }.sortedByDescending { it.value }.forEach { add(it.term) }
+        tuning.sounds.filter { it.value > 0 }.sortedByDescending { it.value }.forEach { add(if (it.trait) SongTraits.named(it.term)?.words ?: it.term else it.term) }
     }
     if (words.isEmpty()) return if (tuning.familiar != 0 || tuning.sounds.any { it.value != 0 }) "music" else null
     return words.joinToString(" ") + " music"
@@ -156,7 +158,25 @@ fun rankVibe(
             }
         }
         hit to score
-    }.sortedByDescending { it.second }.map { it.first }
+    }.sortedByDescending { it.second }.map { it.first }.let { traitsFirst(it, features, tuning) }
+}
+
+/**
+ * [ranked] with the traits picked ([SoundDial.trait]) put in their place: songs that have every trait picked as "more"
+ * first, songs that have one picked as "less" last, each group in its order. Songs Siansa Beats has no traits for sit
+ * between. A trait, unlike a sound, isn't a matter of degree to a listener (a song is sung or it isn't), so it sorts.
+ */
+fun traitsFirst(ranked: List<ClapHit>, features: Map<String, TrackFeatures>, tuning: VibeTuning): List<ClapHit> {
+    val more = tuning.sounds.filter { it.trait && it.value > 0 }.mapNotNull { SongTraits.named(it.term) }
+    val less = tuning.sounds.filter { it.trait && it.value < 0 }.mapNotNull { SongTraits.named(it.term) }
+    if (more.isEmpty() && less.isEmpty()) return ranked
+    fun place(hit: ClapHit): Int {
+        val traits = features[hit.id]?.traits.orEmpty()
+        if (traits.isEmpty()) return 1
+        if (less.any { (it.share(traits) ?: 0.0) >= SongTraits.HOLDS }) return 2
+        return if (more.all { (it.share(traits) ?: 0.0) >= SongTraits.HOLDS }) 0 else 1
+    }
+    return ranked.sortedBy(::place) // stable: each group keeps its order
 }
 
 /** How much a slider at either end can move a song against its place in the search (1.0 = the whole list). */
@@ -170,4 +190,24 @@ private fun pull(slider: Int, value: Double?, range: ClosedFloatingPointRange<Do
     if (slider == 0 || value == null || range == null) return 0.0
     val position = (value - range.start) / (range.endInclusive - range.start) // 0 = lowest, 1 = highest
     return (slider.toDouble() / VibeTuning.SLIDER_MAX) * (position * 2 - 1)
+}
+
+/**
+ * [tuning] with the traits [query] asks for by name ([SongTraits.askedIn]) as "more", where neither picked nor set aside
+ * already, while there's room ([FlowMood.MOST_PICKS]).
+ */
+fun withAskedTraits(tuning: VibeTuning, query: String): VibeTuning {
+    val have = tuning.sounds.filter { it.value != 0 }.map { it.term.lowercase() }.toSet()
+    val asked = SongTraits.askedIn(query).filter { it.label.lowercase() !in have }
+    val room = (FlowMood.MOST_PICKS - have.size).coerceAtLeast(0)
+    if (asked.isEmpty() || room == 0) return tuning
+    val added = asked.take(room).map { SoundDial(it.label, FlowMood.MORE, trait = true) }
+    return tuning.copy(sounds = tuning.sounds.filterNot { d -> added.any { it.term.equals(d.term, ignoreCase = true) } } + added)
+}
+
+/** [query] with the words of each trait picked as "more" ([SongTraits.Trait.words]) that it doesn't say already. */
+fun withTraitWords(query: String, tuning: VibeTuning): String {
+    val words = tuning.sounds.filter { it.trait && it.value > 0 }.mapNotNull { SongTraits.named(it.term)?.words }
+        .filter { !query.contains(it, ignoreCase = true) }
+    return (listOf(query.trim()) + words).filter { it.isNotEmpty() }.joinToString(" ")
 }

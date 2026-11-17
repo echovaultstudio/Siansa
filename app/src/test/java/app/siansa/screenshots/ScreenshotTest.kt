@@ -345,6 +345,16 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     )
                 }
             },
+            // Siansa Beats' traits (0.51): the third list, Voice & mood, with one picked.
+            Scene("mood_picker_traits") {
+                Column(Modifier.padding(Space.Page)) {
+                    app.siansa.ui.MoodPicker(
+                        app.siansa.mix.VibeTuning(sounds = listOf(app.siansa.mix.SoundDial("Female vocals", 3, trait = true))), app.siansa.ui.MoodLook(-0.5f, 0.5f),
+                        sounds = emptyList(), genres = emptyList(), heard = true, inMix = emptyList(),
+                        onChange = {}, onDone = {}, modifier = Modifier.height(560.dp), startTab = 2, traits = true,
+                    )
+                }
+            },
             // All genres (the owner, 15 Nov): the box to find a genre, empty and with long words typed, and A to Z beside a list.
             Scene("genres_find") {
                 Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Small)) {

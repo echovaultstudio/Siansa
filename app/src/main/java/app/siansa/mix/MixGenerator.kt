@@ -566,10 +566,14 @@ class MixGenerator(private val graph: AppGraph) {
      * The songs for a vibe: AudioMuse's sound search for [query] steered by the sound dials (or the AI's
      * concepts while no dial is set), re-ranked by the energy, tempo and familiar sliders (issue #339).
      */
-    suspend fun vibeSongs(query: String, aiSteering: List<Steer>, tuning: VibeTuning, size: Int = 50): List<Song> {
+    suspend fun vibeSongs(words: String, aiSteering: List<Steer>, set: VibeTuning, size: Int = 50): List<Song> {
+        // The traits the words ask for by name ("female vocals", "instrumental", "sad"), as if picked (Siansa Beats 0.51,
+        // the owner, 16 Nov), unless they're picked already; and the words of the traits picked, added to the search.
+        val tuning = withAskedTraits(set, words)
+        val query = withTraitWords(words, tuning)
         val dials = tuning.steering()
         // The dials start at the AI's concepts, so once any is shown they say everything; before that, the AI's.
-        val steering = if (tuning.sounds.isNotEmpty()) dials else aiSteering
+        val steering = if (set.sounds.isNotEmpty()) dials else aiSteering
         // A genre picked comes first (the owner, 15 Nov: "more progressive metal" on a calm search got a downtempo song,
         // as the genre only re-ordered what the search had found): the mix is drawn from that genre's songs, the ones
         // the search likes best first, and a genre picked as "less" is left out altogether.
@@ -596,7 +600,8 @@ class MixGenerator(private val graph: AppGraph) {
         }
         if (found.hits.isEmpty()) throw MixException("AudioMuse-AI found nothing for that vibe")
         val hits = hitsToPick(found)
-        val features = if (tuning.energy != 0 || tuning.tempo != 0) {
+        val traitsSet = tuning.sounds.any { it.trait && it.value != 0 }
+        val features = if (tuning.energy != 0 || tuning.tempo != 0 || traitsSet) {
             runCatching { graph.audioMuse.features(hits.map { it.id }).associateBy { it.id } }
                 .onFailure { AppLog.w("Vibe", "Couldn't load energy and tempo, leaving them out: ${it.message}") }
                 .getOrDefault(emptyMap())
@@ -621,7 +626,8 @@ class MixGenerator(private val graph: AppGraph) {
         AppLog.i(
             "Vibe",
             "Search \"$query\" · ${tuning.summary().ifEmpty { "no sliders moved" }} · ${hits.size} found, " +
-                "${features.size} with energy/tempo, ${genres.size} with genres, ${picked.size} picked",
+                "${features.size} with energy/tempo, ${genres.size} with genres, " +
+                (if (traitsSet) "${features.values.count { it.traits.isNotEmpty() }} with traits, " else "") + "${picked.size} picked",
         )
         return spreadArtists(songsFor(picked, found)).ifEmpty { throw MixException(NOT_ON_THIS_SERVER) }
     }
