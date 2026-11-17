@@ -3,6 +3,7 @@ package app.siansa.net
 import app.siansa.data.AppJson
 import app.siansa.data.AppSettings
 import app.siansa.data.BeatsUse
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.jsonObject
 import org.junit.After
@@ -74,6 +75,21 @@ class BeatsMixesTest {
         assertEquals("beats-2026-11-17-repeat", app.siansa.ui.beatsMixId(old, "2026-11-17"))
         assertEquals("What you played most in the last 30 days.", old.copy(genres = emptyList()).caption)
         assertEquals(0, BeatsMixes.parse(AppJson.parseToJsonElement(answer.replace("\"keep_days\":7,", "")).jsonObject, 1L).keepDays)
+    }
+
+    @Test fun arrangeHomeSaysWhichRowsHoldThem() {
+        assertEquals(emptyMap<app.siansa.data.HomeSection, String>(), app.siansa.ui.beatsRows(false))
+        val rows = app.siansa.ui.beatsRows(true)
+        assertEquals("Siansa Beats: For now", rows[app.siansa.data.HomeSection.CAROUSEL])
+        assertEquals("Siansa Beats: Made for you, More of you", rows[app.siansa.data.HomeSection.MADE_FOR_YOU])
+    }
+
+    @Test fun twoRowsAskingAtOnceAskOnce() = runBlocking {
+        BeatsSound.restoreMixes(true)
+        kotlinx.coroutines.coroutineScope {
+            repeat(2) { launch { mixes.refresh() } }
+        }
+        assertEquals(1, asked.size)
     }
 
     @Test fun thePartsOfTheDayAreSiansaBeats() {
