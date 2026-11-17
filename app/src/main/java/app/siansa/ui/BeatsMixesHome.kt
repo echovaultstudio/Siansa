@@ -14,6 +14,7 @@ import androidx.navigation.NavController
 import app.siansa.AppGraph
 import app.siansa.data.Mix
 import app.siansa.data.Song
+import app.siansa.data.cover
 import app.siansa.log.AppLog
 import app.siansa.net.BeatsMixes
 import java.time.LocalDate
