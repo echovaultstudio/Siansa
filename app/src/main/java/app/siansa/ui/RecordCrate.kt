@@ -59,6 +59,8 @@ data class CrateRecord(
     val covers: List<String?>,
     val songs: List<app.siansa.data.Song>,
     val onOpen: () -> Unit,
+    /** The sleeve's colours where there's no cover; the key's own when not given. */
+    val colors: Pair<Color, Color>? = null,
 )
 
 /**
@@ -141,7 +143,7 @@ fun RecordCrate(
 /** A sleeve: four covers in a square (one when there's one), the mix's colours behind. */
 @Composable
 private fun Sleeve(record: CrateRecord, modifier: Modifier) {
-    val colors = remember(record.key) { tileColors(record.key) }
+    val colors = remember(record.key, record.colors) { record.colors ?: tileColors(record.key) }
     val shape = RoundedCornerShape(CRATE_CORNER)
     Box(
         modifier
