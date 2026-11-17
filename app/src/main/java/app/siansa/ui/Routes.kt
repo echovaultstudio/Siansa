@@ -49,6 +49,7 @@ fun NavGraphBuilder.siansaRoutes(nav: NavController, except: Set<String> = empty
     page("welcome/extras/{source}") { SmartExtrasScreen(nav, it.arguments?.getString("source").orEmpty()) }
     page("settings/users") { ConnectionsHub(nav, open = "server") }
     page("settings/connections/{open}") { ConnectionsHub(nav, open = it.arguments?.getString("open")) }
+    page("settings/beats/mixes") { BeatsMixSettingsScreen(nav) }
     // Settings regrouped (the owner, 13 Nov): Services, a search, and twelve pages. Old addresses still lead somewhere.
     page("settings/services") { ServicesScreen(nav) }
     page("settings/find") { SettingsSearchScreen(nav) }

@@ -338,6 +338,28 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     record("new", "New for you", "Fresh finds near your taste"),
                 ), key = { it.key }) { app.siansa.ui.MixMosaicTile(it) }
             },
+            // Siansa Beats' mix settings (the owner, 17 Nov): switches, a number, names left out, how long they're kept.
+            Scene("beats_mix_settings") {
+                val on = { name: String, label: String, v: Boolean -> app.siansa.net.BeatsMixSettings.Setting(name, app.siansa.net.BeatsMixSettings.Kind.ON, label, 0, 0, app.siansa.net.BeatsMixSettings.Value(on = v)) }
+                val number = { name: String, label: String, low: Int, high: Int -> app.siansa.net.BeatsMixSettings.Setting(name, app.siansa.net.BeatsMixSettings.Kind.NUMBER, label, low, high, app.siansa.net.BeatsMixSettings.Value()) }
+                val settings = listOf(
+                    on("now", "For now: mixes for this part of the day", true), number("now_count", "How many For now mixes", 1, 6),
+                    on("daily", "Made for you: the kinds of music you play most", false), number("daily_count", "How many Made for you mixes", 1, 8),
+                    number("size", "Songs in a mix", 10, 100), number("fresh_days", "Leave out songs you played in the last … days", 0, 180),
+                    app.siansa.net.BeatsMixSettings.Setting("leave_genres", app.siansa.net.BeatsMixSettings.Kind.WORDS, "Genres to leave out", 0, 0, app.siansa.net.BeatsMixSettings.Value()),
+                    on("ai_names", "Names and lines from the AI service", true),
+                )
+                val values = mapOf(
+                    "now" to app.siansa.net.BeatsMixSettings.Value(on = true), "now_count" to app.siansa.net.BeatsMixSettings.Value(number = 4),
+                    "daily" to app.siansa.net.BeatsMixSettings.Value(on = false), "size" to app.siansa.net.BeatsMixSettings.Value(number = 40),
+                    "fresh_days" to app.siansa.net.BeatsMixSettings.Value(number = 45),
+                    "leave_genres" to app.siansa.net.BeatsMixSettings.Value(words = listOf("Christmas", "Neo-Classical Downtempo With Field Recordings")),
+                    "ai_names" to app.siansa.net.BeatsMixSettings.Value(on = true),
+                )
+                Column(Modifier.padding(Space.Page)) {
+                    app.siansa.ui.MixSettingsBody(app.siansa.net.BeatsMixSettings.Settings("max", settings, values, 7), "Saved: your mixes are made again", emptyList()) { _, _ -> }
+                }
+            },
             Scene("record_crate") {
                 fun record(key: String, name: String, caption: String) = app.siansa.ui.CrateRecord(key, name, caption, emptyList(), emptyList(), {})
                 Column(Modifier.padding(vertical = Space.Page)) {

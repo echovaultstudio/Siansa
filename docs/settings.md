@@ -131,7 +131,8 @@ not here.
 
 - **Light or dark and colours**: Auto (follows your phone, including its dark-mode schedule), Light or Dark; **Pure black** when dark
   (saves battery on OLED screens); a colour scheme, or **Your colour** (pick one colour and Siansa makes the rest,
-  in light and dark), or colours from your wallpaper; and the accent colour for selected items and buttons. Siansa
+  in light and dark; white, black or a grey makes white, black or grey buttons, as near to it as can still be seen on
+  each page), or colours from your wallpaper; and the accent colour for selected items and buttons. Siansa
   starts on its own **Siansa** colours, with the accent matching them (**Match theme**, Siansa's amber). **Pages and cards** sets the colour behind everything
   (pages, cards, menus and sheets): **Grey** to start with, **Warm grey**, **Blue grey**, or **Match
   theme** for the colour scheme's own tinted backgrounds. Album, artist and now playing pages keep their colours from

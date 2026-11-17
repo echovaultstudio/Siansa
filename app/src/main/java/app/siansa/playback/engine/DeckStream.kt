@@ -383,7 +383,12 @@ class DeckStream(
                 if (holdGrid) readPos += ratio
                 continue
             }
-            if (ended && whole >= end) break
+            if (ended && whole >= end) {
+                // Played to its end: nothing is left to fade, so it's let go (the owner's log, 17 Nov: a song played back
+                // to back stayed in the mix for good, its fade still up, so the output never rested).
+                envelope = 0.0
+                break
+            }
             var l: Double
             var r: Double
             if (stretching) {

@@ -58,12 +58,18 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 
+/** A quick pick: ten fit across a phone. */
+private val QUICK_SIZE = 30.dp
+
 /** The even gap between the parts of the "Your colour" picker. */
 internal val PICKER_GAP = Space.Page
 
-/** Quick picks under the hue slider: red, orange, yellow, green, teal, indigo, purple and pink. */
+/**
+ * Quick picks under the hue slider: red, orange, yellow, green, teal, indigo, purple and pink, then white and black (the
+ * owner, 17 Nov), whose buttons stay as near white or black as can still be seen on each page.
+ */
 internal val QUICK_COLOURS = listOf(
-    0xFFE53935, 0xFFF4511E, 0xFFF6BF26, 0xFF33B679, 0xFF0E9AA7, 0xFF3F51B5, 0xFF8E24AA, 0xFFD81B60,
+    0xFFE53935, 0xFFF4511E, 0xFFF6BF26, 0xFF33B679, 0xFF0E9AA7, 0xFF3F51B5, 0xFF8E24AA, 0xFFD81B60, 0xFFFFFFFF, 0xFF000000,
 ).map { it.toInt() }
 
 /**
@@ -107,10 +113,12 @@ internal fun YourColourPicker(start: Int, onCancel: () -> Unit, onUse: (Int) -> 
                 val selected = (c and 0xFFFFFF) == (seed and 0xFFFFFF)
                 Box(
                     Modifier
-                        .size(34.dp)
+                        .size(QUICK_SIZE)
                         .then(if (selected) Modifier.border(2.dp, MaterialTheme.colorScheme.onSurface, CircleShape).padding(3.dp) else Modifier)  // spacing: exact (the ring around the chosen colour)
                         .clip(CircleShape)
                         .background(Color(c))
+                        // White and black have an edge, so each shows on the page that's its own colour.
+                        .then(if (ThemeTones.isGrey(c)) Modifier.border(1.dp, MaterialTheme.colorScheme.outline, CircleShape) else Modifier)
                         .selectable(selected, role = Role.RadioButton) { pick(c) }
                         .semantics { contentDescription = ThemeTones.toHex(c) },
                 )

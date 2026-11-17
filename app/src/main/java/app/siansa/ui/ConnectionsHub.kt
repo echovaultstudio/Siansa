@@ -333,7 +333,7 @@ fun ConnectionsHub(nav: NavController, open: String? = null) {
                 ) {
                     BeatsFields(graph, draft) { draft = it; problem = null }
                     Button(onClick = ::save, modifier = Modifier.focusRing().fillMaxWidth()) { Text("Save") }
-                    BeatsUses(graph)
+                    BeatsUses(graph) { nav.navigate("settings/beats/mixes") }
                 }
             }
             FoldCard(
@@ -722,7 +722,7 @@ internal fun beatsUses(s: AppSettings): List<BeatsUseRow> {
 
 /** Under Siansa Beats' card, once it's set up: a switch for each thing the app asks it for. */
 @Composable
-internal fun BeatsUses(graph: AppGraph) {
+internal fun BeatsUses(graph: AppGraph, onMixSettings: () -> Unit = {}) {
     val s by graph.settings.state.collectAsStateWithLifecycle()
     BeatsSound.traits.collectAsStateWithLifecycle().value
     BeatsSound.mixes.collectAsStateWithLifecycle().value
@@ -732,6 +732,12 @@ internal fun BeatsUses(graph: AppGraph) {
         beatsUses(s).forEach { row ->
             SwitchRow(row.label, if (row.offered) row.hint else row.needs, row.on && row.offered,
                 modifier = if (row.offered) Modifier else Modifier.alpha(0.5f), tag = row.tag) { on -> if (row.offered) row.set(graph.settings.beatsUseStore(), on) }
+            // What goes into those mixes (Siansa Beats 0.56; the owner, 17 Nov), while they're on.
+            if (row.tag == "beatsUse-${BeatsUse.MIXES}" && row.on && row.offered) {
+                androidx.compose.material3.OutlinedButton(onClick = onMixSettings, modifier = Modifier.padding(bottom = Space.Small).testTag("beatsMixSettingsOpen")) {
+                    Text("Mix settings")
+                }
+            }
         }
     }
 }
