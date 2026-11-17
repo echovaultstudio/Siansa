@@ -177,9 +177,10 @@ A mix you open stays on the phone, and once played it's in your shortcuts on Hom
 They're on while **Mixes on Home** is switched on under Siansa Beats (Settings › Connections). Switch it off for your
 own carousels and Made for you, which stay as you set them.
 
-In **Arrange Home**, For now takes the place of **Your mixes carousel**, and Made for you and More of you the place of
-**Made for you** (each row says so under its name). Move, hide or change those rows as any other: their cog sets the
-look, so the mixes can be tiles, a banner, a list, cover rows or a shortcut grid instead of the row of mixes.
+In **Arrange Home**, For now takes the place of **Your mixes carousel**, Made for you the place of **Made for you**, and
+More of you has a row of its own, **More of you** (listed only while Siansa Beats' mixes are on). Each row says so under
+its name. Move or hide them as any other; their cog picks one of two looks: **Carousel** (big covers to flick through)
+or **Tiles** (a row of tiles, each with four of the mix's covers).
 
 ## Your mixes carousel
 

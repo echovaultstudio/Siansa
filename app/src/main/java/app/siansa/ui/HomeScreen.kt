@@ -435,9 +435,9 @@ fun HomeScreen(nav: NavController) {
                 // Audiobookshelf's books and podcasts (issue #521): only with a server set up.
                 HomeSection.BOOKS -> if (homeSettings.booksReady) titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "books") { BooksCarousel(nav, podcasts = false, look = look) }
                 HomeSection.PODCASTS -> if (homeSettings.booksReady) titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "podcasts") { BooksCarousel(nav, podcasts = true, look = look) }
-                // With Siansa Beats' mixes on: its Made for you and More of you, in this row's look (the owner, 17 Nov).
+                // With Siansa Beats' mixes on: its Made for you, in this row's look (the owner, 17 Nov).
                 HomeSection.MADE_FOR_YOU -> if (beatsMixesShown) {
-                    if (homeSettings.navidromeReady) titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "beats_made") { BeatsMixesHome(nav, setOf("daily", "more"), look) }
+                    if (homeSettings.navidromeReady) titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "beats_made") { BeatsMixesHome(nav, setOf("daily"), look) }
                 } else {
                     // Made for you: the vibe for this hour, then mixes from your own listening.
                     titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "made") {
@@ -619,6 +619,10 @@ fun HomeScreen(nav: NavController) {
                             )
                         }
                     }
+                }
+                // Siansa Beats' More of you, a row of its own (the owner, 17 Nov); nothing without its mixes.
+                HomeSection.MORE_OF_YOU -> if (beatsMixesShown && homeSettings.navidromeReady) {
+                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "beats_more") { BeatsMixesHome(nav, setOf("more"), look) }
                 }
                 HomeSection.RANDOM -> {
                     titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "random") {
@@ -817,8 +821,12 @@ private fun BuildingCard() {
 }
 
 @Composable
-fun CoverMosaic(mix: Mix, modifier: Modifier = Modifier) {
-    val covers = mix.songs.mapNotNull { it.cover }.distinct().take(4)
+fun CoverMosaic(mix: Mix, modifier: Modifier = Modifier) = CoverMosaic(mix.songs.mapNotNull { it.cover }, modifier)
+
+/** Four of [covers] in a square, two by two (one when there are fewer than four). */
+@Composable
+fun CoverMosaic(covers: List<String?>, modifier: Modifier = Modifier) {
+    @Suppress("NAME_SHADOWING") val covers = covers.filterNotNull().distinct().take(4)
     if (covers.size < 4) {
         Cover(covers.firstOrNull(), 300, modifier)
         return
