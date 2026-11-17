@@ -456,6 +456,7 @@ class AppGraph(val app: Application) {
     val beatsHistory = BeatsHistory({ path -> beats.get(path) }, { settings.current })
     /** Home's mixes made by Siansa Beats from your listening (0.53), when they're switched on under its card. */
     val beatsMixes = BeatsMixes({ path -> beats.get(path) }, { settings.current })
+    val beatsMixSettings = app.siansa.net.BeatsMixSettings({ path -> beats.get(path) }, { path, body -> beats.post(path, body) })
     val taste = Taste(this)
     val generator = MixGenerator(this)
     /** The mix Flow is playing, and what's set on the Flow page (the owner, 15 Nov). */

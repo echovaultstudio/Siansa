@@ -47,6 +47,7 @@ object SettingsIndex {
         SettingEntry("Library sync", "Connections", "settings/connections", words = "refresh new music hours"),
         SettingEntry("Add a music server", "Connections", "settings/connections", words = "another login user"),
         SettingEntry("Siansa Beats", "Services", "settings/services", "service-beats", "beats loudness keys genres similar listening"),
+        SettingEntry("Mix settings", "Siansa Beats", "settings/beats/mixes", words = "beats mixes for now made for you on repeat rediscover new leave out genres artists songs per mix"),
         SettingEntry("AudioMuse-AI", "Services", "settings/services", "service-audiomuse", "sound similar search by words"),
         SettingEntry("Audiobookshelf", "Services", "settings/services", "service-books", "books podcasts"),
         SettingEntry("Last.fm", "Services", "settings/services", "service-lastfm", "scrobble listening"),

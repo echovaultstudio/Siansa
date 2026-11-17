@@ -180,6 +180,13 @@ In **Arrange Home**, For now takes the place of **Your mixes carousel**, and Mad
 **Made for you** (each row says so under its name). Move, hide or change those rows as any other: their cog sets the
 look, so the mixes can be tiles, a banner, a list, cover rows or a shortcut grid instead of the row of mixes.
 
+**Mix settings** (Settings › Connections › Siansa Beats, under **Mixes on Home**; Siansa Beats 0.56 or newer) choose
+what goes into them: which mixes are made and how many, songs in a mix, how many of them you know, songs by one artist,
+how long a song you played stays out, genres and artists to leave out, whether the part of the day, weekends, the dark
+and this time of year count, how far back your listening counts, On repeat's and Rediscover's spans, names from the AI
+service, and how long a mix is kept. Siansa Beats keeps them, and its own Mixes page changes the same. **As they come**
+puts every one back.
+
 ## Your mixes carousel
 
 **Home carousel** (from Arrange Home): three or four mixes for each part of the day. Give each a name and what it
