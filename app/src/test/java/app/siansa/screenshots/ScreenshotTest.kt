@@ -354,7 +354,7 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     )
                 }
             },
-            // Siansa Beats' traits (0.51): the third list, Moods, under its headings (Voice, Mood, Sound), with one picked.
+            // Siansa Beats' traits (0.51): the third list, Moods, under its headings (Voice, Mood, Style), with one picked.
             Scene("mood_picker_traits") {
                 Column(Modifier.padding(Space.Page)) {
                     app.siansa.ui.MoodPicker(

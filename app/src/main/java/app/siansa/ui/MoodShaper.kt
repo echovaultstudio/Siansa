@@ -505,7 +505,7 @@ internal fun MoodPicker(
             1 -> FlowMood.genres(genres.orEmpty(), find).filter { it.name.lowercase() !in ownNames }.map { it.name to it.songCount }
             else -> FlowMood.offered(SongTraits.ALL.map { it.label }, find, Int.MAX_VALUE) { it }.map { it to null }
         }
-        // The moods under their headings (Voice, Mood, Sound) while nothing is typed: seventeen in a row read as clutter.
+        // The moods under their headings (Voice, Mood, Style) while nothing is typed: seventeen in a row read as clutter.
         val grouped = tab == 2 && find.isBlank()
         val pickRow: @Composable (String, Int?) -> Unit = { name, count ->
             PickerRow(name, count, FlowMood.picked(tuning, name), full, look) {

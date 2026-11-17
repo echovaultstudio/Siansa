@@ -164,7 +164,7 @@ box: the mix starts playing and you stay on Flow.
   genre's songs, the ones that fit the rest best first; **less** leaves that genre's songs out.
   With Siansa Beats (0.51 or newer) there's a third list, **Moods**, under three headings. **Voice**: **Vocals**,
   **Instrumental**, **Female vocals**, **Male vocals**. **Mood**: **Happy**, **Sad**, **Relaxed**, **Party**,
-  **Aggressive**, **Cheerful**, **Bittersweet**, **Passionate**, **Intense**, **Quirky**. **Sound**: **Danceable**,
+  **Aggressive**, **Cheerful**, **Bittersweet**, **Passionate**, **Intense**, **Quirky**. **Style**: **Danceable**,
   **Acoustic**, **Electronic**. Siansa Beats hears these in every song. **More** of one puts the songs that have it first and adds
   its words to the search; **less** puts them last. Words you type ask for them too: "sad female vocals" picks
   **Female vocals** and **Sad** for you, unless you've picked or set them aside already.
