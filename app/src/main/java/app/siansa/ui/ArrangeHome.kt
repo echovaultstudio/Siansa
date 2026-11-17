@@ -80,7 +80,7 @@ import app.siansa.data.movesFirstVisible
  * ([startOnSources]) or Arrange. Your cards' cog closes it and opens Settings › Home page › Cards.
  */
 @Composable
-fun HomeSettingsSheet(nav: androidx.navigation.NavController, startOnSources: Boolean, onDismiss: () -> Unit, asPage: Boolean = false) {
+fun HomeSettingsSheet(nav: androidx.navigation.NavController, startOnSources: Boolean, asPage: Boolean = false, onDismiss: () -> Unit) {
     // Sources is a sheet of its own (the owner, 12 Nov): Arrange isn't part of it.
     if (startOnSources) {
         SourcesSheet(onDismiss)
