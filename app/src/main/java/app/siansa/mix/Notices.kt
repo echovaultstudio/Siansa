@@ -162,8 +162,8 @@ object Notices {
     fun liked(): Notice = Notice(NoticeKind.LIKED, "liked", "Liked songs", "liked")
 
     /** A notice of your own: how many its rules found and its name ("12 new releases"); none while it finds none. */
-    fun custom(id: String, name: String, found: Int, icon: String = ""): Notice? = if (found <= 0) null else
-        Notice(NoticeKind.CUSTOM, "custom:$id:$found", "$found ${name.trim()}", "pinned/$id", icon)
+    fun custom(id: String, name: String, found: Int, icon: String = "", showCount: Boolean = true): Notice? = if (found <= 0) null else
+        Notice(NoticeKind.CUSTOM, "custom:$id:$found", if (showCount) "$found ${name.trim()}" else name.trim().replaceFirstChar { it.uppercase() }, "pinned/$id", icon)
 
     fun newArtists(count: Int, today: LocalDate): Notice? = if (count <= 0) null else
         Notice(NoticeKind.NEW_ARTISTS, "artists:$today", if (count == 1) "1 artist for you" else "$count artists for you", "discover/artists")

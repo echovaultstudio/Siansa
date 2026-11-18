@@ -298,4 +298,10 @@ class PinnedCardsTest {
         val old = Json { ignoreUnknownKeys = true }.decodeFromString(PinnedCard.serializer(), Json.encodeToString(PinnedCard.serializer(), songs).replace(",\"noticeIcon\":\"\"", ""))
         assertEquals("", old.noticeIcon)
     }
+
+    @Test fun aNoticeKeepsWhetherItShowsItsNumber() {
+        val card = PinnedCard.new().copy(notice = true, noticeCount = false)
+        assertEquals(card, Json.decodeFromString(PinnedCard.serializer(), Json.encodeToString(PinnedCard.serializer(), card)))
+        assertEquals("shown unless switched off", true, PinnedCard.new().noticeCount)
+    }
 }

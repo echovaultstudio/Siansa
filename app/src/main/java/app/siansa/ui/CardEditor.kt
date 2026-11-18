@@ -131,10 +131,13 @@ fun CardEditorScreen(nav: NavController, id: String) {
             verticalArrangement = Arrangement.spacedBy(Space.Medium),
         ) {
             OutlinedTextField(c.title, { change(c.copy(title = it)) }, singleLine = true,
-                label = { Text(if (c.notice) "Words after the number" else "Name on Home") },
+                label = { Text(if (c.notice && c.noticeCount) "Words after the number" else if (c.notice) "Name" else "Name on Home") },
                 placeholder = { if (c.notice) Text("new releases") },
                 modifier = Modifier.fillMaxWidth().testTag("pinnedTitle"))
-            if (c.notice) Hint("The pill says how many songs or albums the rules find, then these words: \"12 new releases\". It shows while it finds any, and a tap opens them.")
+            if (c.notice) Hint(if (c.noticeCount) "The pill says how many songs or albums the rules find, then these words: \"12 new releases\". It shows while it finds any, and a tap opens them."
+                else "The pill shows only these words: \"New releases\". It shows while the rules find any, and a tap opens them.")
+            // Only the words, without the number (the owner, 18 Nov).
+            if (c.notice) SwitchRow("Show the number", "Off: only the words show on the pill", c.noticeCount, tag = "noticeCount") { change(c.copy(noticeCount = it)) }
             if (c.notice) {
                 // Its icon on the pill (the owner, 18 Nov): Auto is an album for albums and a note for songs.
                 EditorHeading("Icon")

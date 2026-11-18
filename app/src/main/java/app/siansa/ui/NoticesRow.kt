@@ -244,7 +244,7 @@ private suspend fun noticeCandidates(graph: AppGraph, settings: AppSettings, syn
         graph.pinnedCards.all().filter { it.notice && it.shown }.forEach { card ->
             try {
                 val found = graph.pinnedCards.content(card)
-                Notices.custom(card.id, card.title, found.shownCount, card.noticeIconKey)?.let(::add)
+                Notices.custom(card.id, card.title, found.shownCount, card.noticeIconKey, card.noticeCount)?.let(::add)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

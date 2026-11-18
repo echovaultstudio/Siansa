@@ -112,7 +112,7 @@ always at the top of Home, so they're not in Arrange Home.
 songs or albums, then rules on their details to keep or leave out: a genre, an artist, an album, a record label, a
 release type, the year, the length, when it was added or last played, play and skip counts, favourites, compilations.
 Give it the words to show after the number ("new releases"), and an **Icon** for its pill (**Auto**: an album for
-albums, a note for songs). It shows while its rules find any, and a tap opens what
+albums, a note for songs). **Show the number** off shows only the words ("New releases"). It shows while its rules find any, and a tap opens what
 it found. The switch beside each one turns it off without removing it.
 
 ## Vibes and today's mix
