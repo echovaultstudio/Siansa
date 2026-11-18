@@ -181,4 +181,9 @@ class NoticesTest {
         assertEquals(null, pinnedCardProblem(notice.copy(title = "new releases"), audioMuseReady = false))
         assertEquals(false, PinnedCard.new().notice)
     }
+
+    @Test fun aNoticeOfYourOwnCarriesItsIcon() {
+        assertEquals("fire", Notices.custom("pin-1", "new releases", 3, "fire")!!.icon)
+        assertEquals("", Notices.custom("pin-1", "new releases", 3)!!.icon)
+    }
 }

@@ -1075,6 +1075,16 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     app.siansa.ui.PlaylistNameWithBadge("Core Radio", 0)
                 }
             },
+            // A notice of your own's icon (the owner, 18 Nov): the picker in its editor, and pills with chosen icons.
+            Scene("notice_icons") {
+                Column(Modifier.width(360.dp).padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
+                    app.siansa.ui.NoticeIconPicker("fire") {}
+                    Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+                        app.siansa.ui.NoticePillContent(app.siansa.ui.NoticeIcons.of("fire")!!, "103 Test")
+                        app.siansa.ui.NoticePillContent(app.siansa.ui.NoticeIcons.of("album")!!, "12 new releases")
+                    }
+                }
+            },
             Scene("card_rule") {
                 Column(Modifier.padding(Space.Page)) {
                     RuleCard(CardRule(RuleField.LABEL, RuleOp.CONTAINS, "Ninja Tune"), suggestions = listOf("Ninja Tune", "Warp", "Hospital Records"), onChange = {}, onRemove = {})
