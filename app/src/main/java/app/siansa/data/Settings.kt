@@ -991,7 +991,7 @@ enum class Service(val id: String, val label: String, val gives: String) {
     BOOKS("books", "Audiobookshelf", "Audiobooks and podcasts, with your place in each."),
     LASTFM("lastfm", "Last.fm", "Your listening, scrobbled as you go."),
     LISTENBRAINZ("listenbrainz", "ListenBrainz / Koito", "Your listening, sent to ListenBrainz or a Koito of your own."),
-    AI("ai", "AI", "Mix titles and sound searches in your own words.");
+    AI("ai", "AI", "Mix titles and sound searches in your own words, when Siansa Beats has no AI.");
 
     /** The name on a half-width tile, where "ListenBrainz / Koito" would be cut off. */
     val short: String get() = if (this == LISTENBRAINZ) "ListenBrainz" else label

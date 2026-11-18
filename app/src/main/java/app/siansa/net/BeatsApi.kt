@@ -41,6 +41,14 @@ class BeatsApi(
     suspend fun post(path: String, body: String): JsonElement =
         send(request(forServer(path, songIdsIn(path) + songIdsInBody(body))).post(body.toRequestBody(JSON)).build())
 
+    /**
+     * A playlist's plan from Siansa Beats' AI (0.57): [brief] is what the phone's AI was asked (the moment, the guidance,
+     * recent plays, the sound words the search knows); the answer is `{"title", "query", "description", "steer"}`.
+     */
+    suspend fun plan(brief: String): JsonObject =
+        post(PLAN, kotlinx.serialization.json.buildJsonObject { put("brief", kotlinx.serialization.json.JsonPrimitive(brief)) }.toString())
+            as? JsonObject ?: throw ApiException("Siansa Beats sent an unexpected plan")
+
     /** What this Siansa Beats can do and how far it is ([Capabilities]), for the songs of the server this app plays from. */
     suspend fun capabilities(): Capabilities {
         val all = Capabilities.parse(send(request(CAPABILITIES).get().build()) as? JsonObject ?: throw ApiException("Siansa Beats sent an unexpected answer"))
@@ -66,6 +74,7 @@ class BeatsApi(
         BeatsSound.heard(caps.sound, caps.soundPaths)
         BeatsSound.traits(caps.traits)
         BeatsSound.mixes(caps.mixes)
+        BeatsSound.plans(caps.plans)
         val id = serverFor(caps.servers, s.sourceKind, s.navidromeUrl, s.navidromeUser)
         if (chosen[key(s)]?.id != id || !chosen.containsKey(key(s))) {
             AppLog.i("Beats", if (id != null) "Siansa Beats is asked for its server \"$id\" for ${s.navidromeUser.ifBlank { "this login" }} (${caps.servers.size} there)"
@@ -143,6 +152,8 @@ class BeatsApi(
         val traits: Boolean = false,
         /** Whether it makes mixes from each listener's listening (0.53, `/api/v1/mixes`). */
         val mixes: Boolean = false,
+        /** Whether it plans the app's playlists with its own AI (0.57, `POST /api/v1/plan`). */
+        val plans: Boolean = false,
     ) {
         companion object {
             fun parse(body: JsonObject): Capabilities {
@@ -162,6 +173,7 @@ class BeatsApi(
                         .mapNotNull { (name, path) -> (path as? kotlinx.serialization.json.JsonPrimitive)?.content?.let { name to it } }.toMap(),
                     traits = feature("traits")?.get("available")?.toString() == "true",
                     mixes = feature("mixes")?.get("available")?.toString() == "true",
+                    plans = feature("plans")?.get("available")?.toString() == "true",
                     musicServer = (body["music_server"] as? JsonObject)?.str("kind"),
                     serverId = (body["music_server"] as? JsonObject)?.str("id"),
                     servers = (body["servers"] as? kotlinx.serialization.json.JsonArray).orEmpty().mapNotNull { it as? JsonObject }.mapNotNull { o ->
@@ -184,6 +196,7 @@ class BeatsApi(
 
     companion object {
         const val CAPABILITIES = "/api/v1/capabilities"
+        const val PLAN = "/api/v1/plan"
         private const val SIMILAR = "/api/v1/similar/"
         /** How long after Siansa Beats couldn't be asked which servers it reads before it's asked again. */
         const val AGAIN_MS = 60_000L

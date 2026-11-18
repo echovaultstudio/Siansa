@@ -45,6 +45,10 @@ page where it's switched:
   by words**; **Moods in Flow**).
 - **Your listens**: Listening (**Scrobble to Siansa Beats**).
 
+With an AI set up on its page (Setup › **AI**, 0.57 or newer), it also writes the names and sound searches of the app's
+vibes, Today's mix, Flow's words and the mood radios, and the phone's own AI is switched off and left out of Settings ›
+Services. See [AI features](ai.md).
+
 A switch your Siansa Beats is too old for says which version it needs. Everything that worked by itself before
 starts switched on.
 
