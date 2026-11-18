@@ -265,15 +265,18 @@ internal fun PlaylistNameWithBadge(name: String, times: Int) {
  * How many times the songs are in a playlist already (issue #1235): a red circle with the number, beside its name.
  * Said in words for TalkBack.
  */
+/** The badge's red, the same in light and dark (the dark theme's error colour is a pale pink); white on it is 5 to 1. */
+private val ALREADY_RED = Color(0xFFD32F2F)
+
 @Composable
 private fun AlreadyBadge(times: Int) {
     val words = if (times == 1) "In it once already" else "In it $times times already"
     Box(
-        Modifier.defaultMinSize(minWidth = 20.dp, minHeight = 20.dp).clip(CircleShape).background(MaterialTheme.colorScheme.error)
+        Modifier.defaultMinSize(minWidth = 20.dp, minHeight = 20.dp).clip(CircleShape).background(ALREADY_RED)
             .padding(horizontal = Space.Tight).testTag("alreadyIn").semantics { contentDescription = words },
         contentAlignment = Alignment.Center,
     ) {
-        Text(if (times > 99) "99+" else "$times", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onError, fontWeight = FontWeight.Bold)
+        Text(if (times > 99) "99+" else "$times", style = MaterialTheme.typography.labelSmall, color = Color.White, fontWeight = FontWeight.Bold)
     }
 }
 
