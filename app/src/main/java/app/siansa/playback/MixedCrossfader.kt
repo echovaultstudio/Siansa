@@ -190,6 +190,7 @@ internal class MixedCrossfader(
                 beatMatch = beatMatch,
                 blendBars = blending.blendBars,
                 lastTechnique = lastTechnique,
+                profilesUsed = profiles.active,
             )
             if (planned == null) {
                 val why = Crossfade.whyNoFade(s.crossfade, maxMs, current, next, profiles.cached(current.id), profiles.cached(next.id), beatMatch)
@@ -208,7 +209,7 @@ internal class MixedCrossfader(
                     mode = s.crossfade, maxMs = maxMs, current = current, next = next, currentDurationMs = duration,
                     nextDurationMs = next.durationSec * 1000L, currentProfile = profiles.cached(current.id),
                     nextProfile = profiles.cached(next.id), beatMatch = beatMatch, blendBars = blending.blendBars,
-                    noRoom = true, lastTechnique = lastTechnique,
+                    noRoom = true, lastTechnique = lastTechnique, profilesUsed = profiles.active,
                 )
                 var quickAt = quick?.let { duration - it.cutMs - it.overlapMs }
                 var quickHandover = quickAt?.let { EngineFade.handoverAt(it, position) }

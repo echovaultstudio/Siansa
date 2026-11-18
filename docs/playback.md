@@ -73,6 +73,9 @@ How Smart decides:
 
 - Smart crossfades follow how songs end and start, measured by the Siansa plugin. A long fade-out starts blending
   early, a hard ending doesn't blend at all. A slow intro fades in slowly, a hard hit comes in at once.
+- A song Siansa Beats hasn't analysed, or couldn't be asked about at that moment, blends quickly (1.5 seconds), so two
+  beats it can't line up never run over each other. After Siansa Beats can't be reached, it's asked again after half a
+  minute, then after longer waits if it still doesn't answer.
 - **Cold ends**: when a song ends hard (loud to its last second) and the next one starts hard (loud straight away),
   they don't overlap at all: the old song plays to its very last sound, then a short pause (0.4 seconds, 0.6 when
   their tempos are far apart), then the next song from its start, as a radio DJ plays a cold end. Both songs stay

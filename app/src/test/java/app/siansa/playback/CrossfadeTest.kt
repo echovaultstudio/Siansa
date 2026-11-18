@@ -136,6 +136,24 @@ class CrossfadePlanTest {
         assertNull(Crossfade.plan(CrossfadeMode.OFF, 6_000, a1, b1, minutes4, minutes4))
     }
 
+
+    /**
+     * The owner, 18 Nov: a Flow mix of drum and bass, its songs not known to Siansa Beats at that moment, blended blind
+     * for 20 s and clashed. With profiles in use, a song without one blends short; with song tags, as before.
+     */
+    @Test fun smartBlendsShortWhenABeatIsntKnown() {
+        val unknown = Crossfade.plan(CrossfadeMode.SMART, 20_000, a1, b1, minutes4, minutes4, profilesUsed = true)!!
+        assertEquals(BeatMatch.CLASH_MS, unknown.overlapMs)
+        assertTrue(unknown.why, unknown.why.contains("neither song's beat is known"))
+        val tags = Crossfade.plan(CrossfadeMode.SMART, 20_000, a1, b1, minutes4, minutes4, profilesUsed = false)!!
+        assertEquals(20_000L, tags.overlapMs)
+        // Fixed is the listener's own length, whatever is known.
+        assertEquals(20_000L, Crossfade.plan(CrossfadeMode.FIXED, 20_000, a1, b1, minutes4, minutes4, profilesUsed = true)!!.overlapMs)
+        // The known one without a beat: nothing to clash with.
+        assertTrue(Crossfade.unknownBeatClashes(currentKnown = false, currentBeatless = false, nextKnown = false, nextBeatless = false))
+        assertTrue(!Crossfade.unknownBeatClashes(currentKnown = true, currentBeatless = true, nextKnown = false, nextBeatless = false))
+        assertTrue(!Crossfade.unknownBeatClashes(currentKnown = true, currentBeatless = false, nextKnown = true, nextBeatless = false))
+    }
     @Test fun fixedFadesTheWholeLength() {
         val plan = Crossfade.plan(CrossfadeMode.FIXED, 6_000, a1, b1, minutes4, minutes4)!!
         assertEquals(6_000L, plan.overlapMs)
@@ -572,6 +590,26 @@ class ProfileStoreTest {
         time += ProfileStore.BACK_OFF_MS + 1
         store.fetch(listOf("a"))
         assertEquals(2, asked.size)
+    }
+
+    /** The owner, 18 Nov: Siansa Beats restarted, and five minutes of a Flow mix had no beat grids. Half a minute first. */
+    @Test fun aFailureWaitsBrieflyFirstThenLonger() = runBlocking {
+        reply = { throw java.net.ConnectException("Failed to connect to /192.168.1.106:8090") }
+        store.fetch(listOf("a"))
+        assertEquals(1, asked.size)
+        time += 29_000; store.fetch(listOf("a"))
+        assertEquals("not within half a minute", 1, asked.size)
+        time += 2_000; store.fetch(listOf("a"))
+        assertEquals("asked again after half a minute", 2, asked.size)
+        time += 31_000; store.fetch(listOf("a"))
+        assertEquals("a second failure waits a minute", 2, asked.size)
+        time += 30_000; store.fetch(listOf("a"))
+        assertEquals(3, asked.size)
+        // It answers again: a later failure starts from half a minute once more.
+        reply = { PluginProfilesJson.parse(answer(profileJson("a", -9.0, ramp(), ramp()))) }
+        time += 2 * 60_000 + 1; store.fetch(listOf("a"))
+        assertEquals(4, asked.size)
+        assertEquals(listOf(30_000L, 60_000L, 120_000L, ProfileStore.BACK_OFF_MS, ProfileStore.BACK_OFF_MS), (1..5).map(ProfileStore::backOffMs))
     }
 
     @Test fun nothingIsFetchedWithSongTags() = runBlocking {
