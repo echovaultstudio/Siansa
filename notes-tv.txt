@@ -1,0 +1,47 @@
+Showcase: shot tv-signin 1920x1080, 156 KB
+Showcase: OK sign in
+app: I/Siansa/Library( 3489): Showing every library
+Showcase: sync DONE
+Showcase: 144 songs
+Showcase: 1500 plays
+Showcase: sync on opening DONE
+Showcase: shot tv-home 1920x1080, 157 KB
+Showcase: shot anim-tv-home-00-1200 960x540, 50 KB
+Showcase: shot anim-tv-home-01-700 960x540, 52 KB
+Showcase: shot anim-tv-home-02-600 960x540, 53 KB
+Showcase: shot anim-tv-home-03-600 960x540, 50 KB
+Showcase: shot anim-tv-home-04-600 960x540, 50 KB
+Showcase: shot anim-tv-home-05-600 960x540, 50 KB
+Showcase: shot anim-tv-home-06-900 960x540, 52 KB
+Showcase: shot anim-tv-home-07-600 960x540, 52 KB
+Showcase: shot anim-tv-home-08-900 960x540, 61 KB
+Showcase: shot anim-tv-home-09-600 960x540, 62 KB
+Showcase: shot tv-home-more 1920x1080, 181 KB
+Showcase: shot tv-home-rows 1920x1080, 187 KB
+Showcase: OK home
+Showcase: shot tv-library 1920x1080, 292 KB
+Showcase: OK library
+Showcase: shot tv-search 1920x1080, 101 KB
+Showcase: OK search
+Showcase: shot tv-settings 1920x1080, 116 KB
+Showcase: OK settings
+Showcase: shot tv-now-playing 1920x1080, 200 KB
+Showcase: shot anim-tv-player-00-1400 960x540, 39 KB
+Showcase: shot anim-tv-player-01-650 960x540, 46 KB
+Showcase: shot anim-tv-player-02-650 960x540, 46 KB
+Showcase: shot anim-tv-player-03-650 960x540, 46 KB
+Showcase: shot anim-tv-player-04-650 960x540, 46 KB
+Showcase: shot anim-tv-player-05-650 960x540, 46 KB
+Showcase: shot anim-tv-player-06-650 960x540, 46 KB
+Showcase: shot anim-tv-player-07-650 960x540, 46 KB
+Showcase: shot anim-tv-player-08-650 960x540, 46 KB
+Showcase: shot anim-tv-player-09-650 960x540, 46 KB
+Showcase: shot anim-tv-player-10-650 960x540, 46 KB
+Showcase: shot anim-tv-player-11-650 960x540, 46 KB
+Showcase: shot anim-tv-player-12-650 960x540, 46 KB
+Showcase: shot anim-tv-player-13-650 960x540, 46 KB
+Showcase: shot anim-tv-player-14-650 960x540, 46 KB
+Showcase: shot anim-tv-player-15-1600 960x540, 46 KB
+Showcase: shot tv-lyrics 1920x1080, 141 KB
+Showcase: shot tv-up-next 1920x1080, 88 KB
+Showcase: OK now playing
