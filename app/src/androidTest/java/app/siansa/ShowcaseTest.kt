@@ -139,7 +139,8 @@ class ShowcaseTest {
             runCatching { playHarbourLights(20_000) }.onFailure { println("Showcase: playing: $it") }
             step("home") {
                 tab("Home")
-                waitText("Today's mix", 90_000)
+                // Siansa Beats makes Home's mixes since 1.6 (For now first); the phone's Today's mix without it.
+                compose.waitUntil(90_000) { exists("For now") || exists("Today's mix") }
                 idle(5000)
                 shot("home")
                 swipe()

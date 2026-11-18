@@ -2,11 +2,11 @@
 
 <p align="center"><img src="docs/brand/siansa-banner.png" alt="Siansa" width="720"></p>
 
-A music player for your own music server (**Navidrome** or another **OpenSubsonic** server, **Emby** or **Jellyfin**), with mixes made for the moment from **AudioMuse-AI**'s sound search: for the time of day, the weather or a mood you describe, named by an AI service of your choice if you like. Audiobooks and podcasts from **Audiobookshelf** play alongside.
+A music player for your own music server (**Navidrome** or another **OpenSubsonic** server, **Emby** or **Jellyfin**), with mixes made for the moment by **Siansa Beats**, its own companion service (or **AudioMuse-AI**): from your listening, for the time of day, the weather or a mood you describe, named by an AI service of your choice if you like, and DJ mixes that blend on the beat. Audiobooks and podcasts from **Audiobookshelf** play alongside.
 
 Siansa is **open source** under the GNU GPL, version 3 or later ([LICENSE](LICENSE)): the code is here to read, build and improve. Website: [siansa.app](https://siansa.app). Docs: [docs.siansa.app](https://docs.siansa.app) (the [docs folder](docs/README.md) until then).
 
-<p align="center"><img src="docs/screenshots/hero.png" alt="Siansa: Your year, Home and now playing" width="900"></p>
+<p align="center"><img src="docs/screenshots/hero.png" alt="Siansa: Your year, Home with For now, and now playing" width="900"></p>
 
 > ⭐ **Like Siansa? Give it a star.** Navidrome lists open-source apps on its website once they have 15 stars on
 > GitHub, so every star helps more people find Siansa. It takes one click, at the top of this page. Thank you!
@@ -32,28 +32,36 @@ More in the [install guide](docs/testing.md).
 
 ## What it does
 
-- **New in 1.0**: slide from the play button to start a DJ mix, a radio, a song path or songs that sound like the one
-  playing; a DJ mix of any album, slid from its Shuffle onto Play; a new audio engine with beat-matched DJ blends;
-  Android Auto; Siansa's own screen on a Chromecast or Google TV; internet radio and podcasts in Your Stations; and
-  Siansa for Android TV and Google TV ([in beta](docs/tv.md)).
+- **New in 1.6**: mixes made from your listening on Home (**For now**, **Made for you**, **More of you**) with Mix
+  settings to tune them; a new **Flow** with a mood pad, moods (vocals or instrumental, a woman's or a man's voice,
+  happy, sad, party…) and a mix you steer while it plays; **star ratings** kept on your server; About this song shows
+  the file beside what really plays (converted to Opus, downloaded, cached); Emby and Jellyfin convert to Opus and
+  cast real streams; a **Carousel** look and **notices of your own** on Home; a new title bar on every page with a
+  cover; settings grouped by what they do, each service on its own page; and steadier DJ blends that never fall
+  silent. All of it in the [changelog](CHANGELOG.md).
+- **Earlier**: Siansa Beats with DJ mixes on real beat grids, genres by sound and the DJ mix bar (1.5); Siansa for
+  Android TV and Google TV ([in beta](docs/tv.md), 1.1); slide from the play button for a DJ mix, a radio, a song
+  path or songs like it, a DJ mix of any album, a new audio engine, Android Auto, Siansa's own screen on a Chromecast,
+  and internet radio and podcasts in Your Stations (1.0).
 - **Library**: albums (A–Z, recently added, most played, random), artists, album and artist pages, search.
 - **Player**: background playback with notification and lock-screen controls, gapless playback, shuffle and repeat, a queue, ReplayGain (track or album, with pre-amp), and scrobbling back to Navidrome.
 - **Lyrics**: synced lyrics from Navidrome's OpenSubsonic API that scroll and highlight along with the song (tap a line to jump), plain lyrics otherwise.
 - **Animated covers**: animated cover.gif / cover.webp move on the album page and in now playing (lists show the first frame). An animated WebP, which Navidrome can't shrink, is downloaded once and kept on the phone.
 - **Covers offline**: optionally download every album, artist and playlist cover in the background on your home Wi-Fi, with an image cache that can have no size limit.
-- **Vibes and daily mixes**: each vibe covers part of the day (Morning, Daytime, Evening, Night by default). When you open the app, the vibe for the current hour builds today's mix:
+- **Mixes from your listening**: with Siansa Beats 0.53 or newer, it makes Home's mixes (**For now**, **Made for you**, **More of you**) from what you play, the part of the day and whether it's dark, and the phone makes none of its own. **Settings › Mixes & radios › Mix settings** sets which, how many and how long.
+- **Vibes and daily mixes** (made on the phone, with AudioMuse-AI and no Siansa Beats): each vibe covers part of the day (Morning, Daytime, Evening, Night by default). When you open the app, the vibe for the current hour builds today's mix:
   1. If AI is on, OpenRouter gets a small prompt: the vibe's guidance, its forbidden words, the day and time, the audio device (car Bluetooth, headphones…), your last 20 plays and the sound concepts AudioMuse understands. It answers with a title, a sound search and a one-line description. **Your library is never sent.**
   2. The answer is rejected if it uses a forbidden word, and the vibe's fallback search is used instead.
   3. AudioMuse's text search finds matching tracks by sound. The app picks a varied set, skips songs from recent days, limits tracks per artist and avoids the same artist twice in a row.
   4. The mix is saved **only on the phone**. Nothing is written to Navidrome's playlists.
-- **Sound search**: the Search tab can also describe a sound ("rainy jazz piano") and play what AudioMuse finds.
+- **Sound search**: the Search tab can also describe a sound ("rainy jazz piano") and play what Siansa Beats or AudioMuse-AI finds.
 
 ## A look around
 
 <table align="center">
 <tr>
-<td align="center" width="33%"><img src="docs/screenshots/home.png" alt="Home in the morning: shortcuts and Today's mix" width="240"><br><sub><b>Home</b>: a mix for each part of the day</sub></td>
-<td align="center" width="33%"><img src="docs/screenshots/flow.png" alt="Flow: rainy jazz piano described, with the energy and tempo dials" width="240"><br><sub><b>Flow</b>: describe a sound, set the dials</sub></td>
+<td align="center" width="33%"><img src="docs/screenshots/home.png" alt="Home: shortcuts, and For now, mixes made from your listening" width="240"><br><sub><b>Home</b>: mixes from your listening</sub></td>
+<td align="center" width="33%"><img src="docs/screenshots/flow.png" alt="Flow: rainy jazz piano typed, with the mood pad's dot on Wind down" width="240"><br><sub><b>Flow</b>: words and the mood pad</sub></td>
 <td align="center" width="33%"><img src="docs/screenshots/vibe.png" alt="The vibe made from it, named by the AI" width="240"><br><sub><b>The vibe</b> it makes, named by AI</sub></td>
 </tr>
 <tr>
@@ -80,6 +88,19 @@ More in the [install guide](docs/testing.md).
 
 <p align="center"><sub>The covers, artist pictures and names in these screenshots are made up; in the app you see your own library.</sub></p>
 
+## What's next
+
+- **Vocal analysis in Siansa Beats**: where the singing is in each song, not only whether it's sung, so a DJ blend
+  never lays two voices over each other, a mix can keep to the instrumental parts, and a blend can wait for a
+  verse to end. To be tried first on how well it hears your music, then as options: vocals or instrumental per song,
+  where the vocals are in time, and how clear they are over the music.
+- **Mix out at the breakdown, in before the drop**: a DJ blend that starts where the old song's bass drops out and
+  lands the next one's drop on a phrase.
+- **Smoother blends**: the bass, mids and highs handed over one after the other, and the tempo eased over a few bars.
+- **Google Play for everyone**, free: [join the test](https://siansa.app/#join) to help get there.
+
+The full list, with what's already done, is on the [roadmap](https://siansa.app/tracking).
+
 ## Getting it
 
 There's no APK to download here: the app comes from
@@ -93,14 +114,14 @@ Both update on their own. Or build it from this source (below): a build of your 
 
 1. In Settings, enter:
    - **Your server**: address (e.g. `http://192.168.1.10:4533`), username, password.
-   - **Siansa Beats** (under Settings › Connections): its address, for the mixes, radios, levelling and DJ blends.
+   - **Siansa Beats** (Settings › Services › Siansa Beats): its address, for the mixes, radios, levelling and DJ blends.
    - **AudioMuse-AI** (optional, when there's no Siansa Beats): address of its web/API port (e.g. `http://192.168.1.10:8000`) and its API token if authentication is on. Text search (CLAP) must be enabled.
    - **OpenRouter** (optional): API key and model id (default `google/gemini-2.5-flash`; any OpenRouter model id works).
-   - **Audiobookshelf** (optional, under Settings › Connections): address and an API token or login.
+   - **Audiobookshelf** (optional, Settings › Services › Audiobookshelf): address and an API token or login.
 2. Use **Test** next to each section, then **Save**.
-3. Optional: install the **Siansa plugin** on AudioMuse-AI (see [siansa-beats](https://github.com/echovaultstudio/siansa-beats)) and choose it
-   under Settings › Sound. It measures each song's loudness and how it starts and ends, for
-   levelling and smooth crossfades, and finds similar albums and artists.
+3. Optional, with AudioMuse-AI and no Siansa Beats: install the **Siansa plugin** on AudioMuse-AI (see
+   [siansa-beats](https://github.com/echovaultstudio/siansa-beats)). It measures each song's loudness and how it
+   starts and ends, for levelling and smooth crossfades, and finds similar albums and artists.
 
 Inside the app, with **Settings › Help & feedback › Debug logs** on, the log records each start (version, phone, settings that change behaviour), why the app last closed (crash, freeze, killed for memory, swiped away; Android 11+), every error in background work, playback decisions, downloads and covers. **Report a problem** on the same page sends it with your words.
 
