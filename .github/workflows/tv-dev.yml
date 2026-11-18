@@ -9,6 +9,17 @@ name: Siansa TV Dev
 on:
   push:
     branches: [dev, "claude/tv-*"]
+    # A push that changes only what the TV app never builds or runs is skipped (the owner, 18 Nov; instead of the module
+    # split, #886): the phone's start screen (the TV opens its own, AppEntry), the phone's manifest (the TV has its own,
+    # tv/src/main), Siansa Dev's icon (app/src/dev) and the phone's tests. Every pull request still builds and tests the
+    # TV app in CI (ci.yml), so nothing that breaks it gets past. Not Android Auto (app/src/main/java/app/siansa/car): the
+    # TV's Home and the shared playback service use its code.
+    paths-ignore:
+      - "app/src/main/java/app/siansa/MainActivity.kt"
+      - "app/src/main/AndroidManifest.xml"
+      - "app/src/dev/**"
+      - "app/src/test/**"
+      - "app/src/androidTest/**"
 
 permissions:
   contents: write
