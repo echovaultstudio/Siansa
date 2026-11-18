@@ -151,7 +151,7 @@ internal fun MoodShaper(
     inMix: List<MixSound> = emptyList(),
     padNote: String? = null,
     // Siansa Beats has each song's voice and moods: the picks' heading and the + say so.
-    traits: Boolean = moodsOffered(),
+    traits: Boolean = moodsOffered().first.isNotEmpty(),
     picker: @Composable (onDone: () -> Unit) -> Unit = { done -> MoodPickerSheet(tuning, look, inMix, { onChange(it); onSettled() }, done) },
 ) {
     var picking by rememberSaveable { mutableStateOf(false) }
@@ -444,20 +444,34 @@ internal fun MoodPickerSheet(tuning: VibeTuning, look: MoodLook, inMix: List<Mix
     val heard by produceState(false) { value = withContext(Dispatchers.IO) { graph.beatsGenres.saved(graph.shownLibraries()) != null } }
     // Siansa Beats' traits (0.51): vocals, whose voice, moods. Only offered when it has them, which the app remembers
     // from Siansa Beats' last answer: the third list is there as the sheet opens, not seconds later.
-    val traits = moodsOffered()
-    // A sound word that's also a trait (acoustic, electronic, aggressive) is offered once: as the trait.
-    val shown = sounds?.let { if (traits) soundsNotGenres(it, SongTraits.ALL.map { t -> t.label }) else it }
+    val (moods, from) = moodsOffered()
+    // A sound word that's also a mood (acoustic, electronic, aggressive, chill) is offered once: as the mood.
+    val shown = sounds?.let { if (moods.isNotEmpty()) soundsNotGenres(it, moods.map { t -> t.label }) else it }
     ModalBottomSheet(onDismissRequest = onDone, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
-        MoodPicker(tuning, look, shown, genres, heard, inMix, onChange, onDone, Modifier.fillMaxHeight(0.92f).padding(horizontal = Space.Page), traits = traits)
+        MoodPicker(tuning, look, shown, genres, heard, inMix, onChange, onDone, Modifier.fillMaxHeight(0.92f).padding(horizontal = Space.Page),
+            traits = moods.isNotEmpty(), moods = moods, from = from)
     }
 }
 
-/** Whether Flow offers Siansa Beats' moods: it gives them, and they're switched on under its card on Connections. */
+/**
+ * The moods Flow offers, and who gives them (the owner, 18 Nov: "from either beats or audiomuse from what's available
+ * but not mixed"): Siansa Beats when it answers about songs' sound (its trained moods and AudioMuse-AI's tags, both
+ * made there; Moods in Flow switched on under Discovery), else AudioMuse-AI (its tags only). Empty: no Moods tab.
+ */
 @Composable
-internal fun moodsOffered(): Boolean {
+internal fun moodsOffered(): Pair<List<SongTraits.Trait>, String> {
     val has by BeatsSound.traits.collectAsState()
     val settings by LocalGraph.current.settings.state.collectAsState()
-    return has && settings.beatsFor(BeatsUse.MOODS)
+    return moodsFrom(settings, has)
+}
+
+/** [moodsOffered] for [settings], with [trained] whether Siansa Beats gives its trained moods. */
+internal fun moodsFrom(settings: app.siansa.data.AppSettings, trained: Boolean): Pair<List<SongTraits.Trait>, String> = when {
+    settings.beatsSoundReady && BeatsSound.available ->
+        if (!settings.beatsFor(BeatsUse.MOODS)) emptyList<SongTraits.Trait>() to "Siansa Beats"
+        else SongTraits.offered(trained = trained, tags = true) to "Siansa Beats"
+    settings.audioMuseReady -> SongTraits.offered(trained = false, tags = true) to "AudioMuse-AI"
+    else -> emptyList<SongTraits.Trait>() to ""
 }
 
 /** [sounds] without those that are the name of one of [genres], whatever the capitals. */
@@ -480,6 +494,9 @@ internal fun MoodPicker(
     modifier: Modifier = Modifier,
     startTab: Int = 0,
     traits: Boolean = false,
+    /** The moods to offer ([moodsOffered]), and who gives them, for the line under the tabs. */
+    moods: List<SongTraits.Trait> = SongTraits.ALL,
+    from: String = "Siansa Beats",
 ) {
     var tab by rememberSaveable { mutableIntStateOf(startTab) }
     var find by rememberSaveable { mutableStateOf("") }
@@ -496,7 +513,8 @@ internal fun MoodPicker(
             when {
                 full -> "That's ${FlowMood.MOST_PICKS}. Take one off to add another."
                 tab == 0 -> "Words your sound search understands."
-                tab == 2 -> "What Siansa Beats hears in each song: who sings and how it feels."
+                tab == 2 -> if (moods.any { it.group == SongTraits.VOICE }) "What $from hears in each song: who sings and how it feels."
+                    else "What $from hears in each song: how it feels."
                 heard -> "Genres Siansa Beats hears in your music. The main ones first: search for the rest."
                 else -> "Genres from your songs' tags. The main ones first: search for the rest."
             },
@@ -512,7 +530,7 @@ internal fun MoodPicker(
         val rows: List<Pair<String, Int?>> = when (tab) {
             0 -> FlowMood.offered(sounds.orEmpty(), find, Int.MAX_VALUE) { it }.map { it to null }
             1 -> FlowMood.genres(genres.orEmpty(), find).filter { it.name.lowercase() !in ownNames }.map { it.name to it.songCount }
-            else -> FlowMood.offered(SongTraits.ALL.map { it.label }, find, Int.MAX_VALUE) { it }.map { it to null }
+            else -> FlowMood.offered(moods.map { it.label }, find, Int.MAX_VALUE) { it }.map { it to null }
         }
         // The moods under their headings (Voice, Mood, Style) while nothing is typed: seventeen in a row read as clutter.
         val grouped = tab == 2 && find.isBlank()
@@ -532,7 +550,7 @@ internal fun MoodPicker(
                 if (rows.isNotEmpty()) item(key = "all-title") { PickerHeading("In your music") }
             }
             if (grouped) {
-                SongTraits.ALL.groupBy { it.group }.forEach { (group, traitsIn) ->
+                moods.groupBy { it.group }.forEach { (group, traitsIn) ->
                     item(key = "group-$group") { PickerHeading(group) }
                     items(traitsIn, key = { "row-" + it.label }) { pickRow(it.label, null) }
                 }

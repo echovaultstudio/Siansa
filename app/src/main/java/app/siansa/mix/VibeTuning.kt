@@ -171,10 +171,12 @@ fun traitsFirst(ranked: List<ClapHit>, features: Map<String, TrackFeatures>, tun
     val less = tuning.sounds.filter { it.trait && it.value < 0 }.mapNotNull { SongTraits.named(it.term) }
     if (more.isEmpty() && less.isEmpty()) return ranked
     fun place(hit: ClapHit): Int {
-        val traits = features[hit.id]?.traits.orEmpty()
-        if (traits.isEmpty()) return 1
-        if (less.any { (it.share(traits) ?: 0.0) >= SongTraits.HOLDS }) return 2
-        return if (more.all { (it.share(traits) ?: 0.0) >= SongTraits.HOLDS }) 0 else 1
+        val song = features[hit.id]
+        val picked = more + less
+        // Nothing to say about the song (no traits, no tags): it sits between.
+        if (picked.all { it.shareOf(song) == null }) return 1
+        if (less.any { (it.shareOf(song) ?: 0.0) >= SongTraits.HOLDS }) return 2
+        return if (more.all { (it.shareOf(song) ?: 0.0) >= SongTraits.HOLDS }) 0 else 1
     }
     return ranked.sortedBy(::place) // stable: each group keeps its order
 }
