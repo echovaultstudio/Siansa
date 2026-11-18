@@ -7,7 +7,8 @@ Source: `app/src/main/java/app/siansa/`. Unit tests: `app/src/test/`. Emulator t
 
 - **Big work and new features go to `dev`** (the owner decided, after v1.0): branch from `dev` and open the pull
   request against `dev`. Each push to `dev` builds Siansa Dev (`.github/workflows/dev-app.yml`) and Siansa TV Dev
-  (`tv-dev.yml`), test builds installed next to the real apps, for the owner to try before they reach everyone.
+  (`tv-dev.yml`; skipped when a push changes only phone-only files: see its `paths-ignore`), test builds installed next
+  to the real apps, for the owner to try before they reach everyone.
   A pull request against `dev` doesn't close its issue on merge (GitHub only does that on `main`): leave the issue
   open with a comment that it's in Siansa Dev; it closes when `dev` reaches `main`.
 - **Bug fixes and security fixes go straight to `main`**, as they're urgent: branch from `main` and open the pull
