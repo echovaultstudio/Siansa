@@ -14,6 +14,8 @@ data class SongDetails(
     val sizeBytes: Long? = null,
     val path: String? = null,
     val playCount: Long? = null,
+    /** The user's own star rating, 1 to 5, or null when the song isn't rated (issue #1043). */
+    val userRating: Int? = null,
     /** What the tags say: artists, roles, genres, dates… (issue #504). */
     val tags: SongTags = SongTags(),
 )
@@ -28,6 +30,7 @@ fun parseSongDetails(o: JsonObject) = SongDetails(
     sizeBytes = o.long("size")?.takeIf { it > 0 },
     path = o.str("path")?.takeIf { it.isNotBlank() },
     playCount = o.long("playCount"),
+    userRating = o.int("userRating")?.takeIf { it in 1..5 },
     tags = Tags.subsonicSong(o),
 )
 

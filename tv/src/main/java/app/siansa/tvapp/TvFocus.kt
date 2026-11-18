@@ -1,5 +1,8 @@
 package app.siansa.tvapp
 
+import androidx.compose.foundation.focusGroup
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -244,14 +247,48 @@ private fun TvChoicePill(text: String, onClick: () -> Unit, modifier: Modifier =
 }
 
 /**
+ * A row the remote moves along (the owner, 14 Nov: going right along Today's mixes, the focus jumped to the top of
+ * Home). Left and right stay in the row: the remote looks for the next one among the row's own first, and a row that
+ * scrolls brings in the next card that isn't on screen yet, where before the nearest thing to the right anywhere on
+ * the page was taken (a pill in the bar at the top). At the row's ends, left and right do nothing; up and down leave it.
+ */
+@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
+fun Modifier.tvRow(): Modifier = this
+    .focusProperties {
+        exit = { direction ->
+            if (direction == FocusDirection.Left || direction == FocusDirection.Right) FocusRequester.Cancel else FocusRequester.Default
+        }
+    }
+    .focusGroup()
+
+/**
  * Where the remote starts on a page: the main button (Play on an album, the first row of a list). Without it nothing has
  * the focus when a page opens, and the first press only finds a place to start.
  */
 @Composable
 fun Modifier.initialFocus(): Modifier {
     val requester = remember { FocusRequester() }
-    LaunchedEffect(Unit) { runCatching { requester.requestFocus() } }
+    val page = LocalStartFocus.current
+    LaunchedEffect(Unit) {
+        // Once for each time the page is opened (the owner, 14 Nov: going right along Today's mixes, Home jumped to
+        // its top). The button this is on sits in a list that scrolls: when it scrolled out of sight and came back,
+        // even by the few pixels a focused card moves the page, it took the focus again, from wherever the remote was.
+        if (page != null && page.given) return@LaunchedEffect
+        page?.given = true
+        runCatching { requester.requestFocus() }
+    }
     return focusRequester(requester)
+}
+
+/** Whether a page has put the remote where it starts yet: once for each time the page is opened ([TvPage]). */
+class StartFocus { var given = false }
+
+val LocalStartFocus = androidx.compose.runtime.staticCompositionLocalOf<StartFocus?> { null }
+
+/** One of the TV's pages: where the remote starts on it is set once, when it opens, not again as it scrolls. */
+@Composable
+fun TvPage(content: @Composable () -> Unit) {
+    androidx.compose.runtime.CompositionLocalProvider(LocalStartFocus provides remember { StartFocus() }, content = content)
 }
 
 /**
@@ -281,7 +318,7 @@ fun TvPillBar(modifier: Modifier = Modifier, content: androidx.compose.foundatio
         contentPadding = androidx.compose.foundation.layout.PaddingValues(Space.Tight),
         horizontalArrangement = Arrangement.spacedBy(Space.Tight),
         verticalAlignment = Alignment.CenterVertically,
-        modifier = modifier.padding(horizontal = TV_EDGE).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(percent = 50)),
+        modifier = modifier.padding(horizontal = TV_EDGE).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(percent = 50)).tvRow(),
         content = content,
     )
 }

@@ -15,7 +15,7 @@ The Subsonic API (`/rest/…`, version 1.16.1, JSON), with OpenSubsonic extensio
 | Library sync and browsing | `getArtists`, `getArtist`, `getArtistInfo2`, `getAlbum`, `getAlbumList2`, `getSong`, `search3`, `getTopSongs`, `getRandomSongs`, `getStarred2` |
 | Playback | `stream` (original with `format=raw`, or Opus with `format=opus&maxBitRate=…`), `getCoverArt` |
 | Lyrics | `getLyricsBySongId` (with word timings when the server has them), `getLyrics` |
-| Favourites and plays | `star`, `unstar`, `scrobble` |
+| Favourites, ratings and plays | `star`, `unstar`, `setRating` (star ratings, when they're switched on), `scrobble` |
 | Playlists | `getPlaylists`, `getPlaylist`, `createPlaylist`, `updatePlaylist` |
 | Similar music | `getSimilarSongs`, `getSimilarSongs2`, and `getSonicSimilarTracks` / `findSonicPath` when the AudioMuse-AI Navidrome plugin is installed |
 | Radio stations | `getInternetRadioStations` (read only, for [Your Stations](stations.md)) |
@@ -29,7 +29,7 @@ lists the `apiKeyAuthentication` extension, every request sends `apiKey` instead
 |---|---|
 | Connect | `POST /Users/AuthenticateByName`, `GET /System/Info/Public` |
 | Library | `/Users/{user}/Views`, `/Users/{user}/Items`, `/Artists/AlbumArtists`, `/Items/{id}/Similar`, `/Songs/{id}/InstantMix` |
-| Playback | `/Audio/{id}/stream?Static=true`, `/Items/{id}/Images/Primary`, lyrics from the item's subtitle stream |
+| Playback | `/Audio/{id}/stream` (original with `Static=true`, or converted with `Static=false&Container=…&AudioCodec=…&AudioBitRate=…&PlaySessionId=…`: Opus for the phone, Opus, MP3 or FLAC for a TV or speaker, and `StartTimeTicks` after a seek), `/Items/{id}/Images/Primary`, lyrics from the item's subtitle stream |
 | Favourites | `/Users/{user}/FavoriteItems/{id}` |
 | Plays | `POST /Users/{user}/PlayedItems/{id}?DatePlayed=yyyyMMddHHmmss`, and `/Sessions/Playing`, `/Sessions/Playing/Progress`, `/Sessions/Playing/Stopped` for "now playing" |
 | Playlists | `/Playlists`, `/Playlists/{id}/Items` |
@@ -42,7 +42,7 @@ a server name is set. See [AudioMuse-AI](audiomuse.md#several-music-servers-in-o
 | Call | Used for |
 |---|---|
 | `POST /api/clap/search` | Search by sound, vibes, mood radios, Flow |
-| `GET /api/clap/concepts` | The sound concepts for steering and Flow's dials |
+| `GET /api/clap/concepts` | The sound concepts for steering and Flow's list of sounds |
 | `GET /api/similar_tracks?item_id=…` | Song radio, similar songs, Keep playing |
 | `GET /api/similar_tracks?mood=…&centroid_index=…` | Mood radios around AudioMuse-AI's mood centres |
 | `GET /api/mood_centroids` | The mood centres |

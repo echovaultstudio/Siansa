@@ -7,7 +7,7 @@ Long-press a song (or use its menu) and pick **Start a mix**, or slide from the 
 adds songs that sound like it and share its mood. When only a few are left, it finds more, so it keeps going.
 Playing anything else ends the radio.
 
-**Settings › Radios & mixes › Radio wandering** sets how far it may wander:
+**Settings › Mixes & radios › Radio wandering** sets how far it may wander:
 
 | Choice | What happens |
 |---|---|
@@ -81,7 +81,7 @@ Without AudioMuse-AI, song radio uses Navidrome's similar songs, or Emby's Insta
 
 ## Keep playing
 
-**Settings › Radios & mixes › When the queue ends**: what happens when the queue is about to end.
+**Settings › Mixes & radios › When the queue ends**: what happens when the queue is about to end.
 
 | Choice | What happens |
 |---|---|
@@ -123,8 +123,11 @@ have (**Albums**, **EPs**, **Singles**, **Live**, **DJ-mixes**…). Pick one to 
 tapping the chosen one again) shows the whole page: popular songs, every release, **Appears on**, **About** and **Fans
 also like**. With more types than fit, the bar scrolls sideways: it fades out at the right, and the › under the Play
 button scrolls it on. As you scroll down, the page slides softly over the artist's picture and the bar stays pinned
-under the title bar. The artist's name, large at the foot of the picture, moves up with the page and then glides into
-the title bar, shrinking as it goes, to become the page's title; scroll back and it glides out again.
+under the title bar. The artist's name, large at the foot of the picture with their releases and songs under it, moves
+up with the page (both of them, never behind it); as the name goes under the
+title bar it fades out and the bar comes in, in one step: a wash of the picture's colour that the page dissolves
+into, with the name small in its middle. Scroll back and it all goes the other way. The heart and Play stay on the
+page, not in the bar.
 
 An artist with no releases of their own in your library (one who only features on others' songs, or is on a
 compilation) shows **Their songs**, the songs they're credited on, in place of popular songs, and **Play** and
@@ -144,22 +147,51 @@ from the sound of one to the other. Choose how many songs. Play it, or save it a
 
 ## Flow
 
-The **Flow** tab is for vibes on the spot. **Describe what you want to hear** ("tired but hopeful", "rainy
-Sunday", "need to focus") and Siansa makes a mix for it. Then **shape your sound**, on Flow before you make a
-vibe or on the vibe's own page (the sliders button next to Pin to Home):
+The **Flow** tab is for vibes on the spot. Shape one, say one, or both, then press the round arrow beside the words
+box: the mix starts playing and you stay on Flow.
 
-- **The sound pad**: one dot sets two things at once. Drag it up for more energy or down for calmer, right for
-  faster or left for slower. On a vibe's page each small dot is one of its songs, so you see where the mix is now;
-  the dot can go anywhere, also where the mix has no songs yet (an ambient mix drifting into something faster).
-- **Niche ↔ Familiar**: from artists you rarely play to artists you play most.
-- **Sounds**: a dial for each sound, turned towards or away from it. On a vibe's page they're the sounds the AI
-  picked for it and **the mix's own sounds**: genres some of its songs are in and others aren't, as Siansa Beats
-  hears them (an ambient mix isn't offered "more rock"). **Also in this mix** lists its other sounds: tap one to
-  add a dial for it. Without Siansa Beats the dials are the AI's alone. On Flow, before there's a mix, they're a
-  few of AudioMuse-AI's sound concepts (piano, acoustic, electronic…).
+- **The mood pad**: drag its dot. Up is more energy, down is calmer; right is faster, left is slower. The pad, your
+  picks and the arrow take the colour of the mood you're in, and its name is under the pad ("Easy groove",
+  "Late-night drift", "Get moving"…). Let go and the dot settles on the nearest of its 25 places.
+  The line under the pad says it: dragging it while a vibe plays changes the vibe.
+- **Sounds and genres**: tap **+ Add a sound or genre** (**+ Add a sound, genre or mood** with Siansa Beats 0.51
+  or newer) and pick from the list. Nothing is suggested: you choose,
+  up to six. **Sounds** are the words your sound search understands (piano, vocals, dreamy…), its own list from
+  AudioMuse-AI or Siansa Beats, without its genre words. **Genres** are the ones Siansa Beats hears in your music,
+  or your songs' genre tags without it: the main ones (those with most songs) first, and the search box finds the
+  rest. Each pick starts as **more** of it (filled). Tap it for **less** (dashed, struck through); tap again to
+  take it off. A sound steers the search. A genre comes first: with **more** of a genre the mix is made of that
+  genre's songs, the ones that fit the rest best first; **less** leaves that genre's songs out.
+  With Siansa Beats (0.51 or newer) there's a third list, **Moods**, under four headings. **Voice**: **Vocals**,
+  **Instrumental**, **Female vocals**, **Male vocals**. **Mood**: **Happy**, **Sad**, **Relaxed**, **Party**,
+  **Aggressive**, **Cheerful**, **Bittersweet**, **Passionate**, **Intense**, **Quirky**. **Style**: **Danceable**,
+  **Acoustic**, **Electronic**. **Tags**: **Beautiful**, **Chill**, **Mellow**, **Easy listening**, **Catchy**, **Sexy**,
+  AudioMuse-AI's own mood words, from each song's strongest tags. Siansa Beats hears these in every song. With
+  AudioMuse-AI and no Siansa Beats, Moods has what AudioMuse-AI's tags say: **Happy**, **Sad**, **Party** and the Tags.
+  They come from one or the other, never both: Siansa Beats when it has your songs' sound. **More** of one puts the songs that have it first and adds
+  its words to the search; **less** puts them last. Words you type ask for them too: "sad female vocals" picks
+  **Female vocals** and **Sad** for you, unless you've picked or set them aside already.
+- **Artists**: **Favourites** (the artists you play most), **A mix**, or **New to me** (artists you rarely play).
+- **Or say it**: type what you want to hear ("tired but hopeful", "rainy Sunday", "need to focus"). With AI set
+  up it reads your words; what you set on the pad and your picks are used with them. Words count when you press
+  the arrow.
 
-Letting go re-runs the search and re-ranks the songs without asking the AI again; **Reset** puts everything back
-in the middle. Vibes you make are kept, and can be renamed or deleted.
+**One player.** Flow has no bar of its own: the mini player is the same as everywhere, and shows what's playing
+on Flow too. The arrow beside the words starts a vibe, with words or with only what you set on the page.
+
+**Steer it while it plays.** The Flow page stays in charge of its mix: move the dot, change a pick or Artists, and
+the songs that come next change, while the one playing carries on. The mix keeps the name it started with. It ends
+when you stop playback or play something else; pausing keeps it. While it plays:
+
+- now playing says **Now playing from** and the mix's name at its top (tap it for the mix's own page), and the
+  queue says it under **Up next**;
+- **+** in the mini player and in now playing saves the whole mix as a playlist, under its name;
+- the queue's **Shape your mix** is hidden, as the Flow page shapes this mix, unless a DJ mix is running.
+
+**Reset** puts everything back. Every mix is kept under **Your vibes**, where it can be opened, renamed or
+deleted. On a vibe's own page, the sliders button next to Pin to Home opens the same shaping for that mix: each
+small dot on the pad is one of its songs, the list of genres starts with the ones in this mix, and the mix is made
+again as soon as you change something.
 
 ## Search
 
@@ -172,7 +204,9 @@ Names are listed best first: the one called exactly what you typed, then names t
 a word that starts with it, and last the ones that only have the letters inside a word. Typing the artist too
 ("moderat gita") narrows it down.
 
-Before you type, Search shows your genres to browse, the 30 with the most songs, then **All genres** for every one. In
+Before you type, Search shows your genres to browse, the 30 with the most songs, then **All genres** for every one,
+A to Z: type in **Find a genre…** at its top to narrow the list, or tap or drag the letters down its right edge to jump
+to one (a long list has them). In
 Siansa with Siansa Beats, they're the genres Siansa Beats hears in your music, most songs first: a song is in every genre
 it sounds like (its tags play no part there), and a genre's page lists all its songs. The list is saved on your phone, so it shows at once, and it's brought up to date in the background every
 half hour. When Siansa Beats is slow or away, the saved list stays. A genre whose songs are all in libraries you hide

@@ -555,8 +555,9 @@ class Downloads(
     private suspend fun download(song: Song, kbps: Int): Long? {
         val target = File(dir, OfflinePlan.fileName(song.id))
         val part = File(dir, OfflinePlan.fileName(song.id) + PART)
-        // The original file, or an Opus conversion by Navidrome when that's the chosen download quality.
-        val url = if (kbps > 0) Streaming.rewrite(android.net.Uri.parse(subsonic.streamUrl(song.id)), kbps).toString() else subsonic.streamUrl(song.id)
+        // The original file, or an Opus conversion by the server when that's the chosen download quality (a file
+        // that is Opus already is kept as it is, issue #1204).
+        val url = if (kbps > 0 && !Streaming.keepsOriginal(subsonic.kind, song.suffix)) Streaming.rewrite(android.net.Uri.parse(subsonic.streamUrl(song.id)), kbps).toString() else subsonic.streamUrl(song.id)
         val call = http.newCall(Request.Builder().url(url).build())
         val cancel = coroutineContext[Job]?.invokeOnCompletion { call.cancel() }
         try {

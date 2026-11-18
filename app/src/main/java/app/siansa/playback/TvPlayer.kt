@@ -547,11 +547,20 @@ class TvPlayer(
 }
 
 /** The few songs of the phone's queue the TV holds (issue #114), as index arithmetic. */
-/** Whether a TV stream is the server converting the song as it plays (Navidrome's stream with a format other than raw). */
+/**
+ * Whether a TV stream is the server converting the song as it plays: Navidrome's stream with a format other than raw,
+ * or Emby's and Jellyfin's with an AudioCodec and not Static (issue #1204).
+ */
 object TvSeek {
     fun isConversion(url: String?): Boolean {
-        if (url == null || !url.substringBefore('?').endsWith("/rest/stream")) return false
-        val format = url.substringAfter('?', "").split('&').firstOrNull { it.startsWith("format=") }?.substringAfter('=')
+        if (url == null) return false
+        val path = url.substringBefore('?')
+        val query = url.substringAfter('?', "").split('&')
+        fun param(name: String) = query.firstOrNull { it.startsWith("$name=", ignoreCase = true) }?.substringAfter('=')
+        if (Regex("""/Audio/[^/]+/stream[^/]*$""", RegexOption.IGNORE_CASE).containsMatchIn(path))
+            return param("AudioCodec") != null && !param("Static").equals("true", ignoreCase = true)
+        if (!path.endsWith("/rest/stream")) return false
+        val format = param("format")
         return format != null && format != "raw"
     }
 }

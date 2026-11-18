@@ -1,17 +1,5 @@
 package app.siansa.ui
 
-import app.siansa.net.wordsReady
-import app.siansa.net.soundReady
-import app.siansa.data.normalizeKey
-import app.siansa.mix.mixArtistRadios
-import app.siansa.mix.ArtistRadioPicks
-import androidx.compose.ui.platform.testTag
-
-import app.siansa.mix.resumeStart
-import app.siansa.mix.MixRules
-import app.siansa.mix.MixException
-import app.siansa.data.RecentPlay
-import app.siansa.data.cover
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -34,14 +22,15 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Pause
-import androidx.compose.material.icons.rounded.Radio
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Radio
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -51,13 +40,12 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -66,33 +54,46 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import app.siansa.AppGraph
 import app.siansa.data.Album
+import app.siansa.data.Artist
+import app.siansa.data.BeatsUse
 import app.siansa.data.CardLook
 import app.siansa.data.HomeLook
 import app.siansa.data.HomeMenuItem
 import app.siansa.data.HomeSection
-import app.siansa.data.Artist
 import app.siansa.data.Mix
-import app.siansa.data.Song
 import app.siansa.data.Playlist
+import app.siansa.data.RecentPlay
 import app.siansa.data.Selector
+import app.siansa.data.Song
+import app.siansa.data.cover
+import app.siansa.data.normalizeKey
 import app.siansa.log.AppLog
-import app.siansa.mix.moodRadios
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.launch
-import androidx.compose.runtime.produceState
+import app.siansa.mix.ArtistRadioPicks
+import app.siansa.mix.MixException
 import app.siansa.mix.MixGenerator
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
+import app.siansa.mix.MixRules
+import app.siansa.mix.mixArtistRadios
+import app.siansa.mix.moodRadios
+import app.siansa.mix.resumeStart
+import app.siansa.net.BeatsSound
+import app.siansa.net.soundReady
+import app.siansa.net.wordsReady
 import java.time.LocalDate
 import java.time.LocalTime
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun HomeScreen(nav: NavController) {
@@ -223,15 +224,20 @@ fun HomeScreen(nav: NavController) {
     // Today's mix is made once a day; after that only when you tap refresh, also when the hour's vibe moves on
     // (beta testers #37). Showing other music in the source filter doesn't make it again (issue #486). AI mixes
     // need AudioMuse.
-    val aiMixes = MixRules.showsAiMixes(homeSettings.wordsReady)
+    // Siansa Beats' mixes (0.53) in place of your own carousels and Made for you, while switched on under its card.
+    val beatsMakesMixes by BeatsSound.mixes.collectAsStateWithLifecycle()
+    val beatsMixesShown = beatsMakesMixes && homeSettings.beatsFor(BeatsUse.MIXES)
+    // While Siansa Beats makes Home's mixes, the phone makes none of its own (the owner, 17 Nov).
+    val aiMixes = MixRules.showsAiMixes(homeSettings.wordsReady) && !beatsMixesShown
     LaunchedEffect(hour, aiMixes) {
         graph.mixes.all()
         graph.selectors.all()
         current = null
         if (aiMixes) build(null, force = false, open = false)
     }
-    // Today's personal mixes are made quietly in the background once the page is up.
-    LaunchedEffect(aiMixes) {
+    // Today's personal mixes are made quietly in the background once the page is up; not while Siansa Beats makes them.
+    LaunchedEffect(aiMixes, beatsMixesShown) {
+        if (beatsMixesShown) return@LaunchedEffect
         delay(1500)
         val today = LocalDate.now().toString()
         for (kind in MixGenerator.Personal.entries.filter { MixRules.showsPersonal(it, graph.settings.current.soundReady) }) {
@@ -377,7 +383,8 @@ fun HomeScreen(nav: NavController) {
                         }
                     }
                 }
-                HomeSection.TODAY -> {
+                // The phone's Today's mix: not while Siansa Beats makes Home's mixes (the owner, 17 Nov).
+                HomeSection.TODAY -> if (!beatsMixesShown) {
                     titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "today") {
                         val mix = current
                         when {
@@ -424,12 +431,17 @@ fun HomeScreen(nav: NavController) {
                 HomeSection.CAROUSEL -> {
                     // Your own mixes for this part of the day, set in Vibes (issue #253): AI mixes, so only with
                     // AudioMuse (issue #486).
-                    if (homeSettings.navidromeReady && aiMixes) titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "carousel") { HomeCarousel(nav, aiDown, look) }
+                    // With Siansa Beats' mixes on: its For now, in this row's look (the owner, 17 Nov).
+                    if (homeSettings.navidromeReady && beatsMixesShown) titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "beats_mixes") { BeatsMixesHome(nav, setOf("now"), look) }
+                    else if (homeSettings.navidromeReady && aiMixes) titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "carousel") { HomeCarousel(nav, aiDown, look) }
                 }
                 // Audiobookshelf's books and podcasts (issue #521): only with a server set up.
                 HomeSection.BOOKS -> if (homeSettings.booksReady) titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "books") { BooksCarousel(nav, podcasts = false, look = look) }
                 HomeSection.PODCASTS -> if (homeSettings.booksReady) titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "podcasts") { BooksCarousel(nav, podcasts = true, look = look) }
-                HomeSection.MADE_FOR_YOU -> {
+                // With Siansa Beats' mixes on: its Made for you, in this row's look (the owner, 17 Nov).
+                HomeSection.MADE_FOR_YOU -> if (beatsMixesShown) {
+                    if (homeSettings.navidromeReady) titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "beats_made") { BeatsMixesHome(nav, setOf("daily"), look) }
+                } else {
                     // Made for you: the vibe for this hour, then mixes from your own listening.
                     titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "made") {
                         // The same tiles as plain items, for the other looks (issue #655).
@@ -500,7 +512,8 @@ fun HomeScreen(nav: NavController) {
                 }
                 HomeSection.CARDS -> {
                     // Your cards (issue #622), in the order set in Settings › Home page › Cards; each is its own row.
-                    pinnedCards.orEmpty().filter { it.shown }.forEach { card ->
+                    // Your own notices (issue #1234) are pills at the top of Home, not cards here.
+                    pinnedCards.orEmpty().filter { it.shown && !it.notice }.forEach { card ->
                         titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "pinned-${card.id}") { PinnedCardSection(nav, card, aiDown) }
                     }
                 }
@@ -610,6 +623,10 @@ fun HomeScreen(nav: NavController) {
                             )
                         }
                     }
+                }
+                // Siansa Beats' More of you, a row of its own (the owner, 17 Nov); nothing without its mixes.
+                HomeSection.MORE_OF_YOU -> if (beatsMixesShown && homeSettings.navidromeReady) {
+                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "beats_more") { BeatsMixesHome(nav, setOf("more"), look) }
                 }
                 HomeSection.RANDOM -> {
                     titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "random") {
@@ -788,7 +805,7 @@ internal fun MakeTodayCard(onMake: () -> Unit) {
         Row(Modifier.padding(Space.Page), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("Today's mix", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Text("None made yet. Auto update is off in Settings › Radios & mixes › Today's mix and vibes, so it's made when you ask.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("None made yet. Auto update is off in Settings › Mixes & radios › Today's mix and vibes, so it's made when you ask.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Spacer(Modifier.width(Space.Page))
             FilledTonalButton(onClick = onMake) { Text("Make it") }
@@ -808,8 +825,12 @@ private fun BuildingCard() {
 }
 
 @Composable
-fun CoverMosaic(mix: Mix, modifier: Modifier = Modifier) {
-    val covers = mix.songs.mapNotNull { it.cover }.distinct().take(4)
+fun CoverMosaic(mix: Mix, modifier: Modifier = Modifier) = CoverMosaic(mix.songs.mapNotNull { it.cover }, modifier)
+
+/** Four of [covers] in a square, two by two (one when there are fewer than four). */
+@Composable
+fun CoverMosaic(covers: List<String?>, modifier: Modifier = Modifier) {
+    @Suppress("NAME_SHADOWING") val covers = covers.filterNotNull().distinct().take(4)
     if (covers.size < 4) {
         Cover(covers.firstOrNull(), 300, modifier)
         return

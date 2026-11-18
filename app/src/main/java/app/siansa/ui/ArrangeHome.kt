@@ -1,5 +1,8 @@
 package app.siansa.ui
 
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
@@ -77,7 +80,7 @@ import app.siansa.data.movesFirstVisible
  * ([startOnSources]) or Arrange. Your cards' cog closes it and opens Settings › Home page › Cards.
  */
 @Composable
-fun HomeSettingsSheet(nav: androidx.navigation.NavController, startOnSources: Boolean, onDismiss: () -> Unit) {
+fun HomeSettingsSheet(nav: androidx.navigation.NavController, startOnSources: Boolean, asPage: Boolean = false, onDismiss: () -> Unit) {
     // Sources is a sheet of its own (the owner, 12 Nov): Arrange isn't part of it.
     if (startOnSources) {
         SourcesSheet(onDismiss)
@@ -85,18 +88,23 @@ fun HomeSettingsSheet(nav: androidx.navigation.NavController, startOnSources: Bo
     }
     val graph = LocalGraph.current
     val s by graph.settings.state.collectAsStateWithLifecycle()
+    val beatsMakesMixes by app.siansa.net.BeatsSound.mixes.collectAsStateWithLifecycle()
     // The notices are the top of Home (issue #872), not a section to move: shown or not in Settings › Home page › Top of Home.
-    ArrangeHomeSheet(s.homeOrder - HomeSection.NOTICES, s.homeHidden, gap = s.homeGap, onGapChange = {
+    val beatsRows = beatsRows(beatsMakesMixes && s.beatsFor(app.siansa.data.BeatsUse.MIXES))
+    // More of you is Siansa Beats' alone: listed only while its mixes are on.
+    val offered = if (HomeSection.MORE_OF_YOU in beatsRows) emptySet() else setOf(HomeSection.NOTICES, HomeSection.MORE_OF_YOU)
+    ArrangeHomeSheet(s.homeOrder - offered - HomeSection.NOTICES, s.homeHidden, holds = beatsRows,
+        sections = HomeSection.default - HomeSection.NOTICES - offered, gap = s.homeGap, onGapChange = {
         AppLog.i("Home", "Spacing: ${homeGapLabel(it)}")
         graph.settings.setHomeGap(it)
     }, onChange = {
-        val order = listOf(HomeSection.NOTICES) + (it - HomeSection.NOTICES)
+        val order = keepUnlisted(listOf(HomeSection.NOTICES) + (it - HomeSection.NOTICES), s.homeOrder)
         AppLog.i("Home", "Arranged: ${HomeSection.format(order)}")
         graph.settings.setHomeOrder(order)
     }, onHiddenChange = {
         AppLog.i("Home", "Hidden: ${HomeSection.formatHidden(it).ifEmpty { "none" }}")
         graph.settings.setHomeHidden(it)
-    }, onDismiss = onDismiss,
+    }, onDismiss = onDismiss, asPage = asPage,
         looks = s.homeLooks,
         untitled = s.homeUntitled,
         onTitleShownChange = { section, shown ->
@@ -147,6 +155,10 @@ fun ArrangeHomeSheet(
     onChange: (List<HomeSection>) -> Unit,
     onHiddenChange: (Set<HomeSection>) -> Unit,
     onDismiss: () -> Unit,
+    // Drawn as a page of its own (Settings › Home page › Arrange Home) rather than a sheet.
+    asPage: Boolean = false,
+    // What another service puts in a row instead of its own (Siansa Beats' mixes, the owner, 17 Nov), said under it.
+    holds: Map<HomeSection, String> = emptyMap(),
     // The gap between Home's sections, a step of the spacing scale (#554).
     gap: Int = AppSettings.HOME_GAP_DEFAULT,
     onGapChange: (Int) -> Unit = {},
@@ -178,6 +190,7 @@ fun ArrangeHomeSheet(
             onTitleShown = { onTitleShownChange(section, it) },
             // The grid stays open, so how many tiles it has can be picked there.
             onPick = { onLookChange(section, it); if (it != HomeLook.GRID) picking = null },
+            only = if (section in holds) BEATS_LOOKS else null,
             onDismiss = { picking = null },
             gridSize = gridSizes[section] ?: HomeLook.GRID_MOST,
             onGridSize = { onGridSizeChange(section, it) },
@@ -244,11 +257,12 @@ fun ArrangeHomeSheet(
         }
     }
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+    SheetOrPage(asPage, onDismiss) {
         Column(Modifier.navigationBarsPadding().padding(bottom = Space.Small)) {
             Row(Modifier.fillMaxWidth().padding(start = Space.Page, end = Space.Small), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("Arrange Home", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    // As a page, its title is the page's (the owner, 17 Nov: Arrange Home has its own page in Home page).
+                    if (!asPage) Text("Arrange Home", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     Text(
                         "What's on Home, in what order, and how its cards look.",
                         style = MaterialTheme.typography.bodySmall,
@@ -341,7 +355,8 @@ fun ArrangeHomeSheet(
                                     color = if (isHidden) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
                                 )
                                 // A row in another look says which (issue #655), and its cards' own colour; a hidden one says so.
-                                val line = if (isHidden) "Hidden" else listOfNotNull(looks[section]?.label, cardLooks[section]?.label).joinToString(" · ").ifEmpty { null }
+                                val shownLook = if (section in holds) beatsLook(looks[section]).label else looks[section]?.label
+                                val line = if (isHidden) "Hidden" else listOfNotNull(holds[section], shownLook, cardLooks[section]?.label).joinToString(" · ").ifEmpty { null }
                                 if (line != null) Text(line, style = MaterialTheme.typography.bodySmall, color = if (isHidden) MaterialTheme.colorScheme.onSurfaceVariant else Accent, modifier = Modifier.testTag("homeLookLabel"))
                             }
                             IconButton(onClick = {
@@ -391,10 +406,12 @@ private fun HomeLookDialog(
     cardLook: CardLook = CardLook.AS_HOME,
     homeCardLook: CardLook = CardLook.DEFAULT,
     onCardLook: (CardLook) -> Unit = {},
+    // The only looks offered (a row of Siansa Beats' mixes: Carousel and Tiles); null: every look.
+    only: List<HomeLook>? = null,
 ) {
     // The switch shows its change at once: the dialog stays open for the look.
     var shown by remember(section) { mutableStateOf(titleShown) }
-    var look by remember(section) { mutableStateOf(current) }
+    var look by remember(section) { mutableStateOf(if (only != null) beatsLook(current) else current) }
     var tiles by remember(section) { mutableStateOf(gridSize) }
     var colour by remember(section) { mutableStateOf(cardLook) }
     AlertDialog(
@@ -427,7 +444,7 @@ private fun HomeLookDialog(
                 }
                 HorizontalDivider(Modifier.padding(vertical = Space.Small))
                 // Shortcuts is the grid already: its size is set in Settings › Home page.
-                HomeLook.entries.filter { it != HomeLook.GRID || section != HomeSection.QUICK }.forEach { option ->
+                (only ?: HomeLook.entries.filter { it != HomeLook.GRID || section != HomeSection.QUICK }).forEach { option ->
                     Row(
                         Modifier.fillMaxWidth().clickable { look = option; onPick(option) }.padding(vertical = Space.Small).testTag("homeLook-${option.id}"),
                         verticalAlignment = Alignment.CenterVertically,
@@ -550,6 +567,58 @@ internal fun GridSizeChips(size: Int, modifier: Modifier = Modifier, onPick: (In
                 label = { Text("$n tiles") },
                 modifier = Modifier.testTag("gridSize-$n"),
             )
+        }
+    }
+}
+
+/**
+ * The rows of Arrange Home that show Siansa Beats' mixes while they're on (the owner, 17 Nov: their look is the row's),
+ * and which of them: said under each row, so it's clear which cog changes them.
+ */
+/** The looks a row of Siansa Beats' mixes can have (the owner, 17 Nov: "only 2 types of cards, the big carousel and tiles"). */
+internal val BEATS_LOOKS = listOf(HomeLook.CAROUSEL, HomeLook.TILES)
+
+/** The look a row of Siansa Beats' mixes shows for [saved]: Tiles when it's Tiles, else the carousel. */
+internal fun beatsLook(saved: HomeLook?): HomeLook = if (saved == HomeLook.TILES) HomeLook.TILES else HomeLook.CAROUSEL
+
+internal fun beatsRows(on: Boolean): Map<HomeSection, String> =
+    if (!on) emptyMap() else mapOf(
+        HomeSection.CAROUSEL to "Siansa Beats: For now",
+        HomeSection.MADE_FOR_YOU to "Siansa Beats: Made for you",
+        HomeSection.MORE_OF_YOU to "Siansa Beats: On repeat, Rediscover, New for you",
+    )
+
+/**
+ * [arranged] with the sections it doesn't list (More of you while Siansa Beats' mixes are off) back where they were in
+ * [before], after the same section, so a row hidden from the list keeps its place for when it's back.
+ */
+internal fun keepUnlisted(arranged: List<HomeSection>, before: List<HomeSection>): List<HomeSection> {
+    val out = arranged.toMutableList()
+    for (section in before) {
+        if (section in out) continue
+        val after = before.subList(0, before.indexOf(section)).lastOrNull { it in out }
+        out.add(if (after == null) 0 else out.indexOf(after) + 1, section)
+    }
+    return out
+}
+
+/** A sheet over the page, or the same as a page of its own ([asPage]). */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SheetOrPage(asPage: Boolean, onDismiss: () -> Unit, content: @Composable () -> Unit) {
+    if (asPage) content()
+    else ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) { content() }
+}
+
+/**
+ * Settings › Home page › Arrange Home (the owner, 17 Nov: a page of its own in Home settings, not a link): the same as
+ * the sheet behind Home's button, the order, what shows, each row's look and title, the cards' colours and the spacing.
+ */
+@Composable
+fun ArrangeHomePage(nav: androidx.navigation.NavController) {
+    Screen(title = "Arrange Home", nav = nav) { padding ->
+        Box(Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().testTag("arrangeHomePage")) {
+            HomeSettingsSheet(nav, startOnSources = false, onDismiss = { nav.popBackStack() }, asPage = true)
         }
     }
 }

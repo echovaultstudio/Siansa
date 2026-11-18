@@ -6,6 +6,8 @@ import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.SwapVert
 import androidx.compose.material.icons.rounded.Dns
 import androidx.compose.material.icons.rounded.Equalizer
+import androidx.compose.material.icons.rounded.Explore
+import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import android.app.Application
 import androidx.compose.foundation.background
@@ -23,6 +25,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.clipToBounds
+import app.siansa.ui.dissolveUnderBar
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -253,6 +258,43 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     }
                 }
             },
+            // Star ratings (issue #1043): under the title, in About this song with the line under them, and in a song's menu.
+            Scene("player_stars") {
+                OnPlayer {
+                    Column(Modifier.fillMaxWidth().padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Section)) {
+                        app.siansa.ui.TitleRow(app.siansa.data.Song(id = "s1", title = "Harbour Lights at the uncharacteristically long quay", artist = "The Quiet Tide"), liked = true, stars = 4, onArtist = {}) {}
+                        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(nowPlayingCardColor(Color(0xFF7A2E3A))).padding(Space.Page)) {
+                            Text("About this song", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = Space.Medium))
+                            app.siansa.ui.AboutRating(4, line = true) {}
+                            Text("FORMAT", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.45f))
+                            Text("FLAC · 24-bit", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                        }
+                        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(nowPlayingCardColor(Color(0xFF7A2E3A))).padding(Space.Page)) {
+                            app.siansa.ui.AboutRating(0, line = false) {}
+                        }
+                        app.siansa.ui.RateRow(2) {}
+                    }
+                }
+            },
+            // File → Playing in About this song (issue #1038): converted (lit), the original streamed, an Opus download,
+            // on a TV with a long name, and offline with only the file type known.
+            Scene("player_stream_path") {
+                OnPlayer {
+                    Column(Modifier.fillMaxWidth().padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Page)) {
+                        listOf(
+                            app.siansa.playback.PlayingAs.file("FLAC", null, 2116) to app.siansa.playback.PlayingAs.of(null, null, 256, cached = false, wifi = false),
+                            app.siansa.playback.PlayingAs.file("FLAC", null, 2116) to app.siansa.playback.PlayingAs.of(null, null, 0, cached = false, wifi = true),
+                            app.siansa.playback.PlayingAs.file("ALAC", null, 1411) to app.siansa.playback.PlayingAs.of(null, 192, 0, cached = false, wifi = true),
+                            app.siansa.playback.PlayingAs.file("MP3", null, 320) to app.siansa.playback.PlayingAs.of("Uncharacteristically long living room television", null, 0, cached = false, wifi = true),
+                            ("M4A" to null) to app.siansa.playback.PlayingAs.of(null, 0, 0, cached = true, wifi = false),
+                        ).forEach { (file, playing) ->
+                            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(nowPlayingCardColor(Color(0xFF7A2E3A))).padding(Space.Page)) {
+                                app.siansa.ui.StreamPath(file, playing)
+                            }
+                        }
+                    }
+                }
+            },
             // The queue's Shape your mix (the owner, 10 Nov): folded, and open with the glide bar and the Surprises bar.
             Scene("queue_mix_shape") {
                 OnPlayer {
@@ -264,27 +306,119 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     }
                 }
             },
-            // Shape your sound (the owner, 11 Nov): the pad with a mix's songs on it, the Niche ↔ Familiar pill, the dials
-            // (the AI's and the mix's own, with a long name) and the mix's sounds to add; on the page, and on a dark one.
-            Scene("shape_your_sound") {
+            // Flow's mood pad (the owner's pick, 15 Nov): the pad in its mood's colour with a mix's songs on it, the mood's
+            // name, the picks (more and less of a sound, a genre with a long name), + to add, and whose music.
+            Scene("mood_shaper") {
                 val tuning = app.siansa.mix.VibeTuning(
                     energy = -1, tempo = 1, familiar = -2,
                     sounds = listOf(
-                        app.siansa.mix.SoundDial("dance", -5),
-                        app.siansa.mix.SoundDial("Experimental Field Recordings", 2, genre = true),
+                        app.siansa.mix.SoundDial("piano", 3),
+                        app.siansa.mix.SoundDial("vocals", -3),
+                        app.siansa.mix.SoundDial("Experimental Field Recordings", 3, genre = true),
+                        app.siansa.mix.SoundDial("Drone", -3, genre = true),
                     ),
                 )
                 val dots = (0 until 24).map { app.siansa.mix.PadDot(0.12f + (it * 7 % 11) / 22f, 0.1f + (it * 5 % 9) / 18f) }
-                val more = listOf("Drone", "Neo-Classical Downtempo").map { app.siansa.mix.MixSound(it, 4) }
                 Column(Modifier.padding(Space.Page)) {
-                    app.siansa.ui.VibeSliders(tuning, onChange = {}, dots = dots, soundsTitle = "Sounds in this mix", more = more)
+                    app.siansa.ui.MoodShaper(tuning, app.siansa.ui.MoodLook(-0.5f, 0.5f), app.siansa.ui.MoodHold(), onChange = {}, dots = dots, traits = false, picker = {})
                 }
             },
-            // The same before there's a mix (Flow): nothing set, no songs on the pad, one sound; on a dark page.
-            Scene("shape_your_sound_unset") {
-                OnPlayer {
-                    Column(Modifier.padding(Space.Page)) {
-                        app.siansa.ui.VibeSliders(app.siansa.mix.VibeTuning(sounds = listOf(app.siansa.mix.SoundDial("piano", 0))), onChange = {})
+            // The same before anything is set (Flow), and at the pad's four corners: every mood's colour and name.
+            Scene("mood_shaper_unset") {
+                Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Section)) {
+                    app.siansa.ui.MoodShaper(app.siansa.mix.VibeTuning(), app.siansa.ui.MoodLook(0f, 0f), app.siansa.ui.MoodHold(), onChange = {}, padNote = app.siansa.ui.FLOW_PAD_NOTE, traits = false, picker = {})
+                }
+            },
+            // Siansa Beats' mixes on Home as records in a crate (the owner, 17 Nov): the one in front with its record slid
+            // out, its neighbours leaning back; a long name; no covers (the sleeves' colours show).
+            // Siansa Beats' mixes as tiles (the owner, 17 Nov): four covers each, two by two, and what's in it.
+            Scene("beats_mix_tiles") {
+                fun record(key: String, name: String, caption: String) = app.siansa.ui.CrateRecord(key, name, caption, emptyList(), emptyList(), {})
+                app.siansa.ui.Shelf("More of you", listOf(
+                    record("repeat", "On repeat", "Your most played, lately"),
+                    record("rediscover", "Rediscover", "Old favourites, back again"),
+                    record("new", "New for you", "Fresh finds near your taste"),
+                ), key = { it.key }) { app.siansa.ui.MixMosaicTile(it) }
+            },
+            // Siansa Beats' mix settings (the owner, 17 Nov): switches, a number, names left out, how long they're kept.
+            Scene("beats_mix_settings") {
+                val on = { name: String, label: String, v: Boolean -> app.siansa.net.BeatsMixSettings.Setting(name, app.siansa.net.BeatsMixSettings.Kind.ON, label, 0, 0, app.siansa.net.BeatsMixSettings.Value(on = v)) }
+                val number = { name: String, label: String, low: Int, high: Int -> app.siansa.net.BeatsMixSettings.Setting(name, app.siansa.net.BeatsMixSettings.Kind.NUMBER, label, low, high, app.siansa.net.BeatsMixSettings.Value()) }
+                val settings = listOf(
+                    on("now", "For now: mixes for this part of the day", true), number("now_count", "How many For now mixes", 1, 6),
+                    on("daily", "Made for you: the kinds of music you play most", false), number("daily_count", "How many Made for you mixes", 1, 8),
+                    number("size", "Songs in a mix", 10, 100), number("fresh_days", "Leave out songs you played in the last … days", 0, 180),
+                    app.siansa.net.BeatsMixSettings.Setting("leave_genres", app.siansa.net.BeatsMixSettings.Kind.WORDS, "Genres to leave out", 0, 0, app.siansa.net.BeatsMixSettings.Value()),
+                    on("ai_names", "Names and lines from the AI service", true),
+                )
+                val values = mapOf(
+                    "now" to app.siansa.net.BeatsMixSettings.Value(on = true), "now_count" to app.siansa.net.BeatsMixSettings.Value(number = 4),
+                    "daily" to app.siansa.net.BeatsMixSettings.Value(on = false), "size" to app.siansa.net.BeatsMixSettings.Value(number = 40),
+                    "fresh_days" to app.siansa.net.BeatsMixSettings.Value(number = 45),
+                    "leave_genres" to app.siansa.net.BeatsMixSettings.Value(words = listOf("Christmas", "Neo-Classical Downtempo With Field Recordings")),
+                    "ai_names" to app.siansa.net.BeatsMixSettings.Value(on = true),
+                )
+                Column(Modifier.padding(Space.Page)) {
+                    app.siansa.ui.MixSettingsBody(app.siansa.net.BeatsMixSettings.Settings("max", settings, values, 7), "Saved: your mixes are made again", emptyList()) { _, _ -> }
+                }
+            },
+            Scene("record_crate") {
+                fun record(key: String, name: String, caption: String) = app.siansa.ui.CrateRecord(key, name, caption, emptyList(), emptyList(), {})
+                Column(Modifier.padding(vertical = Space.Page)) {
+                    app.siansa.ui.SectionTitle("For now", top = 0.dp)
+                    app.siansa.ui.RecordCrate(
+                        listOf(
+                            record("now-1", "Velvet Undertow", "Slow synths and hazy voices"),
+                            record("now-2", "Neo-Classical Downtempo Drift", "Strings, soft beats and field recordings drifting by"),
+                            record("now-3", "Driving Post-Punk", "Wiry guitars and restless drums"),
+                        ),
+                    )
+                }
+            },
+            // With Siansa Beats' moods: the picks' heading and the + name them too (the owner, 17 Nov).
+            Scene("mood_shaper_moods") {
+                Column(Modifier.padding(Space.Page)) {
+                    app.siansa.ui.MoodShaper(
+                        app.siansa.mix.VibeTuning(sounds = listOf(app.siansa.mix.SoundDial("Female vocals", 3, trait = true))), app.siansa.ui.MoodLook(0f, 0f), app.siansa.ui.MoodHold(),
+                        onChange = {}, traits = true, picker = {},
+                    )
+                }
+            },
+            // The list to pick from: sounds (one picked, one found by typing has no count), and genres with a vibe's own
+            // first, their song counts, a long name, and the note once six are picked.
+            Scene("mood_picker") {
+                val look = app.siansa.ui.MoodLook(-0.5f, 0.5f)
+                val genres = listOf("Rock" to 1204, "Electronic" to 986, "Neo-Classical Downtempo With Field Recordings" to 31, "Jazz" to 12).map { app.siansa.data.Genre(it.first, it.second) }
+                Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Section)) {
+                    app.siansa.ui.MoodPicker(
+                        app.siansa.mix.VibeTuning(sounds = listOf(app.siansa.mix.SoundDial("piano", 3))), look,
+                        sounds = listOf("acoustic", "piano", "vocals", "dreamy"), genres = genres, heard = true, inMix = emptyList(),
+                        onChange = {}, onDone = {}, modifier = Modifier.height(380.dp),
+                    )
+                    app.siansa.ui.MoodPicker(
+                        app.siansa.mix.VibeTuning(sounds = listOf("a", "b", "c", "d", "e", "Drone").map { app.siansa.mix.SoundDial(it, 3, genre = true) }), look,
+                        sounds = emptyList(), genres = genres, heard = false, inMix = listOf(app.siansa.mix.MixSound("Drone", 9), app.siansa.mix.MixSound("Ambient", 4)),
+                        onChange = {}, onDone = {}, modifier = Modifier.height(460.dp), startTab = 1,
+                    )
+                }
+            },
+            // Siansa Beats' traits (0.51): the third list, Moods, under its headings (Voice, Mood, Style), with one picked.
+            Scene("mood_picker_traits") {
+                Column(Modifier.padding(Space.Page)) {
+                    app.siansa.ui.MoodPicker(
+                        app.siansa.mix.VibeTuning(sounds = listOf(app.siansa.mix.SoundDial("Female vocals", 3, trait = true))), app.siansa.ui.MoodLook(-0.5f, 0.5f),
+                        sounds = emptyList(), genres = emptyList(), heard = true, inMix = emptyList(),
+                        onChange = {}, onDone = {}, modifier = Modifier.height(720.dp), startTab = 2, traits = true,
+                    )
+                }
+            },
+            // All genres (the owner, 15 Nov): the box to find a genre, empty and with long words typed, and A to Z beside a list.
+            Scene("genres_find") {
+                Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
+                    app.siansa.ui.FindField("", "Find a genre…", "genreFind") {}
+                    app.siansa.ui.FindField("neo-classical downtempo with field recordings", "Find a genre…", "genreFind") {}
+                    Box(Modifier.fillMaxWidth().height(360.dp)) {
+                        app.siansa.ui.AlphabetBar(setOf('#', 'A', 'B', 'H', 'J', 'R', 'U'), 'J', {}, Modifier.align(Alignment.TopEnd))
                     }
                 }
             },
@@ -616,31 +750,82 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     }
                 }
             },
-            // An artist's name on their page (the owner, 10 Nov): at rest on the picture, riding up with the page, halfway into
-            // the title bar (shrinking, sideways past the back arrow), and settled there as the bar's title. A long name too.
-            Scene("artist_name_glide") {
+            // The mini player's song while it's swiped for the next one (the owner, 14 Nov): at rest, a little way, and
+            // most of the way. The cover stays; only the words go, fading, and never across the cover. A long title too.
+            Scene("mini_swipe") {
+                Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
+                    listOf(0f, -140f, -520f, 260f).forEach { dragged ->
+                        androidx.compose.runtime.CompositionLocalProvider(androidx.compose.material3.LocalContentColor provides Color.White) {
+                            Row(
+                                Modifier.fillMaxWidth().clip(androidx.compose.foundation.shape.RoundedCornerShape(10.dp)).background(Color(0xFF3B2A1E)).padding(Space.Small),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                app.siansa.ui.MiniSong(
+                                    "Mauro Picotto in the Mix: Metamorphosis, Disc Two", "Various Artists and Friends",
+                                    dragged = { dragged }, barWidth = 1000, modifier = Modifier.weight(1f),
+                                    cover = { Box(it.clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp)).background(Color(0xFFD4813A))) },
+                                )
+                                // Where the bar's buttons are.
+                                repeat(3) { Box(Modifier.padding(start = Space.Small).size(40.dp).clip(androidx.compose.foundation.shape.CircleShape).background(Color.White.copy(alpha = 0.2f))) }
+                            }
+                        }
+                    }
+                }
+            },
+            // The glass title bar on an artist's page (the owner, 15 Nov): the name at rest on the picture, riding up with
+            // the page, going under the bar (it fades as the bar's wash comes in), and gone, with the name small in the
+            // middle of the bar. A long name too: cut off in the bar, never under the back arrow.
+            Scene("artist_glass_bar") {
                 val density = androidx.compose.ui.platform.LocalDensity.current
-                val hero = 150.dp
+                val hero = 300.dp  // about the page's own, so the page's soft edge is as it is there
                 val heroPx = with(density) { hero.toPx() }
                 Column(verticalArrangement = Arrangement.spacedBy(Space.Small)) {
                     listOf(
-                        "Joy Orbison" to 0f, "Joy Orbison" to heroPx * 0.62f,
-                        "Joy Orbison" to heroPx * 2f, "Tayo Meets Acid Rockers Uptown" to heroPx * 0.62f,
-                        // A name too long for the bar, settled there with the heart and Play: it fades out before them
-                        // (the owner, 14 Nov). Five rows, so this last one still fits in the picture.
-                        "Stevie Ray Vaughan and Double Trouble" to heroPx * 2f,
-                    ).forEach { (name, scrolled) ->
-                        Box(Modifier.fillMaxWidth().height(170.dp)) {
+                        Triple("Joy Orbison", 0.dp, 320.dp), Triple("Joy Orbison", 150.dp, 190.dp), Triple("Joy Orbison", 205.dp, 170.dp),
+                        Triple("Joy Orbison", 240.dp, 170.dp), Triple("Joy Orbison", 600.dp, 170.dp),
+                        Triple("Stevie Ray Vaughan and Double Trouble with Friends", 600.dp, 170.dp),
+                    ).forEach { (name, by, tall) ->
+                        val scrolled = with(density) { by.toPx() }
+                        Box(Modifier.fillMaxWidth().height(tall).clipToBounds()) {
                             app.siansa.ui.HeroPage(
                                 title = name, heroHeight = hero, scrolledPx = scrolled, onBack = {}, color = Color(0xFF4A2A26),
                                 image = { m -> Box(m.background(androidx.compose.ui.graphics.Brush.radialGradient(listOf(Color(0xFF7A5A4C), Color(0xFF26171A))))) },
-                                actions = {
-                                    if (name.startsWith("Stevie")) {
-                                        app.siansa.ui.FavouriteHeart(on = true, iconSize = 28.dp) { }
-                                        app.siansa.ui.BarPlayButton(radio = false, colour = Color(0xFFD9A0A0), onColour = Color.Black, playing = false, onClick = {})
+                                // The line under the name rides up with it, never behind the page (the owner, 15 Nov).
+                                about = "7 releases · 112 songs",
+                            ) { page ->
+                                // The page's rows, scrolled as far: the first starts where the picture ends.
+                                Box(page.fillMaxSize()) {
+                                    Column(Modifier.graphicsLayer { translationY = heroPx - scrolled }) {
+                                        repeat(40) { Text("Release ${it + 1} · 2019", Modifier.padding(horizontal = Space.Page, vertical = Space.Small)) }
                                     }
-                                },
-                            ) { page -> Box(page.fillMaxSize()) }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            // The glass title bar over a list (an album, a playlist, liked songs…): the page's colour strongest at the top
+            // and running out below the bar with no edge, the rows dissolving into it, the title in the middle. Half way
+            // in and all the way, on a dark, a bright and a grey cover, with a long title and a button at the right.
+            Scene("glass_bar") {
+                val density = androidx.compose.ui.platform.LocalDensity.current
+                val wash = app.siansa.ui.GlassBar.HEIGHT + app.siansa.ui.GlassBar.TAIL
+                val washPx = with(density) { wash.toPx() }
+                val solidPx = with(density) { (app.siansa.ui.GlassBar.HEIGHT - app.siansa.ui.GlassBar.SOFT).toPx() }
+                Column(verticalArrangement = Arrangement.spacedBy(Space.Small)) {
+                    listOf(
+                        Triple(Color(0xFF1D444B), "Low Tide Signals", 0.5f), Triple(Color(0xFF1D444B), "Low Tide Signals", 1f),
+                        Triple(Color(0xFFD9703A), "Supercalifragilistic expialidocious, the Tenth Anniversary Deluxe Edition", 1f),
+                        Triple(Color(0xFF8A8A92), "Liked songs", 1f),
+                    ).forEachIndexed { n, (colour, title, step) ->
+                        Box(Modifier.fillMaxWidth().height(150.dp).background(MaterialTheme.colorScheme.surface)) {
+                            app.siansa.ui.GlassWash(colour, wash, amount = { step })
+                            Column(Modifier.fillMaxSize().dissolveUnderBar({ washPx }, { solidPx }, { step })) {
+                                repeat(7) { Text("${it + 1}   Song number ${it + 1} of the list", Modifier.padding(horizontal = Space.Page, vertical = Space.Tight)) }
+                            }
+                            app.siansa.ui.GlassTitleBar(title, onBack = {}, titleAmount = { app.siansa.ui.GlassBar.barTitle(step) }) {
+                                if (n == 2) androidx.compose.material3.IconButton(onClick = {}) { androidx.compose.material3.Icon(Icons.Rounded.DownloadForOffline, "Download", tint = Color.White) }
+                            }
                         }
                     }
                 }
@@ -753,10 +938,10 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     app.siansa.ui.ServicesCard(s, health) {}
                     app.siansa.ui.HubGroupLabel("Playing")
                     app.siansa.ui.HubTiles(listOf(
-                        app.siansa.ui.HubTile(androidx.compose.material.icons.Icons.Rounded.Equalizer, "Sound", "a"),
-                        app.siansa.ui.HubTile(androidx.compose.material.icons.Icons.Rounded.Schedule, "Radios & mixes", "b"),
-                        app.siansa.ui.HubTile(androidx.compose.material.icons.Icons.Rounded.SwapVert, "Streaming & storage", "c"),
-                        app.siansa.ui.HubTile(androidx.compose.material.icons.Icons.AutoMirrored.Rounded.MenuBook, "Audiobooks & podcasts", "d"),
+                        app.siansa.ui.HubTile(androidx.compose.material.icons.Icons.Rounded.Equalizer, "Sound & playback", "a"),
+                        app.siansa.ui.HubTile(androidx.compose.material.icons.Icons.Rounded.Schedule, "Mixes & radios", "b"),
+                        app.siansa.ui.HubTile(androidx.compose.material.icons.Icons.Rounded.Explore, "Discovery", "c"),
+                        app.siansa.ui.HubTile(androidx.compose.material.icons.Icons.Rounded.GraphicEq, "Listening", "d"),
                     )) {}
                 }
             },
@@ -838,14 +1023,6 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     app.siansa.ui.GridSizeChips(6, Modifier.padding(Space.Page)) {}
                 }
             },
-            // A page's Play in the title bar once its own has scrolled away, and a radio's (the owner, 10 Nov).
-            Scene("bar_play") {
-                Row(Modifier.background(Color(0xFF7A1F2B)).padding(Space.Page), horizontalArrangement = Arrangement.spacedBy(Space.Page)) {
-                    app.siansa.ui.BarPlayButton(radio = false, colour = Color(0xFFFFB547), onColour = Color(0xFF1A1200), playing = false) {}
-                    app.siansa.ui.BarPlayButton(radio = false, colour = Color(0xFF9DB4C8), onColour = Color(0xFF120D00), playing = true) {}
-                    app.siansa.ui.BarPlayButton(radio = true, colour = Color(0xFFE53935), onColour = Color.White, playing = false) {}
-                }
-            },
             // A list's sort (liked songs, playlists): Your Library's arrows and menu, not chips; and the line under a
             // drawn cover with its heart and New picks, the same on radios, mood playlists and cards (the owner, 10 Nov).
             Scene("song_sort_and_picks") {
@@ -890,6 +1067,24 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                 }
             },
             // Custom card editor: a rule (issue #663).
+            // Add to playlist (issue #1235): a red number beside a playlist that has the song already; a long name gives way.
+            Scene("playlist_already_in") {
+                Column(Modifier.width(300.dp).padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
+                    app.siansa.ui.PlaylistNameWithBadge("Acoustic Relax Radio", 1)
+                    app.siansa.ui.PlaylistNameWithBadge("An unbelievably long playlist name for a long evening", 12)
+                    app.siansa.ui.PlaylistNameWithBadge("Core Radio", 0)
+                }
+            },
+            // A notice of your own's icon (the owner, 18 Nov): the picker in its editor, and pills with chosen icons.
+            Scene("notice_icons") {
+                Column(Modifier.width(360.dp).padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
+                    app.siansa.ui.NoticeIconPicker("fire") {}
+                    Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+                        app.siansa.ui.NoticePillContent(app.siansa.ui.NoticeIcons.of("fire")!!, "103 Test")
+                        app.siansa.ui.NoticePillContent(app.siansa.ui.NoticeIcons.of("album")!!, "12 new releases")
+                    }
+                }
+            },
             Scene("card_rule") {
                 Column(Modifier.padding(Space.Page)) {
                     RuleCard(CardRule(RuleField.LABEL, RuleOp.CONTAINS, "Ninja Tune"), suggestions = listOf("Ninja Tune", "Warp", "Hospital Records"), onChange = {}, onRemove = {})

@@ -126,7 +126,7 @@ class ProfileStore(
             synchronized(lock) { backOffUntil = 0L }
             return checkBeats(s)
         }
-        if (!s.audioMuseReady) return CheckResult(false, "Set up Siansa Beats or AudioMuse-AI in Settings › Connections first")
+        if (!s.audioMuseReady) return CheckResult(false, "Set up Siansa Beats or AudioMuse-AI in Settings › Services first")
         synchronized(lock) { backOffUntil = 0L }
         return try {
             val health = get(HEALTH_PATH) as? JsonObject
@@ -214,7 +214,7 @@ class ProfileStore(
             return when {
                 app.siansa.net.AudioMuseErrors.PLUGIN_MISSING in text || "HTTP 404" in text -> app.siansa.net.AudioMuseErrors.PLUGIN_MISSING
                 // Without a login, AudioMuse sends its login page instead of an answer.
-                "isn't JSON" in text || "needs a login" in text -> "AudioMuse-AI wants a login for the plugin: check the AudioMuse-AI login in Settings › Connections"
+                "isn't JSON" in text || "needs a login" in text -> "AudioMuse-AI wants a login for the plugin: check the AudioMuse-AI login in Settings › Services"
                 text.isBlank() -> "Couldn't reach the Siansa plugin"
                 else -> text
             }

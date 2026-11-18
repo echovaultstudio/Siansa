@@ -263,6 +263,26 @@ class RealServersTest(private val server: String) {
         assertEquals("$server: renamed", "CI renamed", name)
     }
 
+    /** Issue #1235: a song added again is in the playlist twice, and the app counts it so from the server's answer. */
+    @Test fun aSongAddedAgainIsCounted() = runBlocking {
+        val a = song("Morning Tone")
+        val made = source().createPlaylist("CI twice", listOf(a.id))
+        val id = made?.id ?: source().playlists().first { it.name == "CI twice" }.id
+        val adding = listOf(a)
+        val before = source().playlist(id).songs.map { it.id }
+        assertEquals("$server: in it once, but it holds $before", 1, app.siansa.data.PlaylistDuplicates.count(before, adding))
+        source().addToPlaylist(id, listOf(a.id))
+        val after = source().playlist(id).songs.map { it.id }
+        println("$server: after adding the song again, the playlist holds $after")
+        // Navidrome and Emby keep it twice; an older Jellyfin (10.10) keeps each song once, and the app says so after
+        // Add again. Either way the badge counts what the server lists.
+        if (server != "jellyfin") assertEquals("$server: added again, but it holds $after", listOf(a.id, a.id), after)
+        else assertTrue("$server: holds $after", after == listOf(a.id) || after == listOf(a.id, a.id))
+        assertEquals("$server: counted as listed", after.count { it == a.id }, app.siansa.data.PlaylistDuplicates.count(after, adding))
+        val said = app.siansa.data.PlaylistDuplicates.notAddedAgain(before, after, adding, server, "CI twice")
+        assertEquals("$server: said only when not added again", after.size == 1, said != null)
+    }
+
     @Test fun playsAreReported() = runBlocking {
         val s = song("Landing")
         source().scrobble(s.id, submission = false)
@@ -270,6 +290,20 @@ class RealServersTest(private val server: String) {
         source().playbackStopped(s.id, 30_000)
         source().scrobble(s.id, submission = true, timeMs = System.currentTimeMillis())
         assertEquals("$server: the song by its id", s.title, source().song(s.id).title)
+    }
+
+    /** Star ratings (issue #1043): kept by Navidrome, read back with the song's details, and taken off with 0. */
+    @Test fun starRatingsAreKeptWhereTheServerHasThem() = runBlocking {
+        val source = source()
+        assertEquals("$server keeps ratings", server == "navidrome", source.keepsRatings)
+        assumeTrue("$server has no five-star rating", source.keepsRatings)
+        val s = song("Morning Tone")
+        source.setRating(s.id, 4)
+        assertEquals("$server: rated", 4, source.songDetails(s.id).userRating)
+        source.setRating(s.id, 1)
+        assertEquals("$server: rated again", 1, source.songDetails(s.id).userRating)
+        source.setRating(s.id, 0)
+        assertEquals("$server: the rating taken off", null, source.songDetails(s.id).userRating)
     }
 
     @Test fun randomSongsAndDetails() = runBlocking {

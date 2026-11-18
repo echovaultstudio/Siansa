@@ -29,8 +29,12 @@ object BeatMatch {
      * beat comes in at 1:37).
      */
     const val LATE_LOCK_MS = 8_000.0
-    /** A blend into or out of a track cut from a mixed CD is kept to this many bars, inside its lock. */
-    const val MIX_TRACK_BARS = 8
+    /**
+     * A blend into or out of a track cut from a mixed CD is kept to at most this many bars, inside its lock: fewer when
+     * there isn't room. 8 until 16 Nov, when the owner chose to try 16: on 8 of his 9 mixed-CD tracks the beat held from
+     * the first second to within 3 s of the end, so the room was there.
+     */
+    const val MIX_TRACK_BARS = 16
     /** …and steady enough at this [BeatEnd.steady]. */
     const val MIN_STEADY = 0.5f
     /** A song is played at most this much faster or slower to match (DJ decks go to ±8 %). */
@@ -204,7 +208,26 @@ object BeatMatch {
         val phraseBars: Int? = null,
         /** The end of the song going out that's left out, so it's let go at the end of a phrase (its last part-phrase). */
         val cutMs: Long = 0L,
+        /** Why the two were lined up this way (how many phrases and why, or why not phrase on phrase), for [aligned]. */
+        val chosen: String? = null,
     ) {
+        /**
+         * For the log (the plan after the 12 Nov sessions: "wrong phrase" must be seen in the log): which point of
+         * the song going out meets which point of the next song, and why. "the old song's phrase at 4:45.0 meets the
+         * new song's first phrase at 0:01.9 (2 of up to 4 8-bar phrases fit 32.0 s; its last 5.0 s, under half a
+         * phrase, are left out)".
+         */
+        val aligned: String
+            get() {
+                val unit = when {
+                    phraseBars != null -> "phrase"
+                    onBars -> "bar"
+                    else -> "beat"
+                }
+                return "the old song's $unit at ${clock(startMs)} meets the new song's first $unit at ${clock(incomingStartMs)}" +
+                    (chosen?.let { " ($it)" } ?: "")
+            }
+
         /** Where the next song should be (its own ms) when the song going out is at [outgoingMs]. */
         fun incomingAt(outgoingMs: Long): Long = incomingStartMs + ((outgoingMs - startMs) * speed.toDouble()).roundToLong()
 
@@ -256,8 +279,23 @@ object BeatMatch {
         if (start <= 0 || endMs - start < outgoing.beatLengthMs) return null
         val incomingStart = (if (onBars) incoming.barMs!! else incoming.beatMs).coerceAtLeast(0.0)
         val overlap = endMs - start
-        return Plan(start.roundToLong(), overlap.roundToLong(), incomingStart.roundToLong(), speed, wholeBars(overlap, bar), onBars, outgoing, incoming)
+        val unphrased = when {
+            outgoing.phraseMs == null && incoming.phraseMs == null -> "no phrases found in either song"
+            outgoing.phraseMs == null || outgoing.phraseBars == null -> "no phrases found at the old song's end"
+            incoming.phraseMs == null || incoming.phraseBars == null -> "no phrases found at the new song's start"
+            else -> "not one whole phrase fits %.1f s".format(java.util.Locale.ROOT, maxMs / 1000.0)
+        }
+        val chosen = unphrased + if (onBars) "" else ": and no bars " + when {
+            outgoing.barMs == null && incoming.barMs == null -> "in either"
+            outgoing.barMs == null -> "at the old song's end"
+            else -> "at the new song's start"
+        }
+        return Plan(start.roundToLong(), overlap.roundToLong(), incomingStart.roundToLong(), speed, wholeBars(overlap, bar), onBars, outgoing, incoming,
+            chosen = chosen)
     }
+
+    /** A place in a song for the log: "4:45.0". */
+    internal fun clock(ms: Long): String = "%d:%04.1f".format(java.util.Locale.ROOT, ms / 60_000, (ms % 60_000) / 1000.0)
 
     /**
      * Phrase on phrase (issue #757), as a DJ mixes, when the plugin found the phrases at both ends: the next song's
@@ -291,9 +329,30 @@ object BeatMatch {
         // Half a phrase of 8 bars, when not even one fits (a short crossfade setting).
         if (lengths.isEmpty() && cut > 0 && phraseBars == 8 && 4 * bar <= maxMs + slack) lengths += (last - 4 * bar) to 4 * bar
         val (start, overlap) = lengths.firstOrNull { it.first > 0 } ?: return null
+        // Why these phrases, for the log.
+        val whole = ((last - start) / phrase).roundToLong()
+        val fit = "%.1f s".format(java.util.Locale.ROOT, maxMs / 1000.0)
+        val units = "$phraseBars-bar phrase" + if (outgoing.phraseBars != inBars) " (the old song's are ${outgoing.phraseBars}-bar, the new one's $inBars-bar)" else ""
+        val length = when {
+            last - start > bar / 2 && last - start < phrase - bar / 2 -> "half of one $units: a whole one doesn't fit $fit"
+            whole == 0L -> "the old song's last $units, to its end"
+            else -> "$whole of up to $MAX_PHRASES ${units}s fit $fit"
+        }
+        val ending = when {
+            cut > 0 -> "; its last %.1f s, under half a phrase, are left out".format(java.util.Locale.ROOT, cut / 1000.0)
+            rest >= bar / 2 -> "; its last %.1f s after its last phrase start play out".format(java.util.Locale.ROOT, rest / 1000.0)
+            else -> ""
+        }
+        val assumed = when {
+            outgoing.assumed && incoming.assumed -> "; both songs' phrases are assumed from their grids"
+            outgoing.assumed -> "; the old song's phrases are assumed from its grid"
+            incoming.assumed -> "; the new song's phrases are assumed from its grid"
+            else -> ""
+        }
         return Plan(
             start.roundToLong(), overlap.roundToLong(), inPhrase.coerceAtLeast(0.0).roundToLong(), speed,
             floor(overlap / bar).toInt(), onBars = true, outgoing, incoming, phraseBars = phraseBars, cutMs = cut.roundToLong(),
+            chosen = length + ending + assumed,
         )
     }
 

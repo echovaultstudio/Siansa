@@ -1,6 +1,7 @@
 package app.siansa.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,13 +14,17 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
 import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material.icons.outlined.PushPin
@@ -51,12 +56,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -68,9 +76,7 @@ import app.siansa.data.SavedVibe
 import app.siansa.log.AppLog
 import app.siansa.mix.MixOffer
 import app.siansa.mix.VibeTuning
-import app.siansa.mix.addSound
-import app.siansa.mix.soundsToAdd
-import app.siansa.mix.vibeDials
+import app.siansa.mix.FlowMood
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -110,18 +116,24 @@ private object VibeMaking {
 
 /**
  * Makes a vibe in the background and opens its page when it's ready (issue #339): from [words] (the AI's plan,
- * or the words searched as they are) and the sliders in [with]; with no words, from the sliders alone. Shared
- * by Dscvr and Search's "Make a vibe from …". [notify] shows what went wrong.
+ * or the words searched as they are) and the mood and picks in [with]; with no words, from those alone. Shared
+ * by Flow and Search's "Make a vibe from …". [notify] shows what went wrong; [onMade] runs once its page is open.
  */
-internal fun makeVibe(graph: app.siansa.AppGraph, nav: NavController, notify: (String) -> Unit, words: String, with: VibeTuning) {
+internal fun makeVibe(
+    graph: app.siansa.AppGraph,
+    nav: NavController,
+    notify: (String) -> Unit,
+    words: String,
+    with: VibeTuning,
+    onMade: (SavedVibe) -> Unit = {},
+) {
     if (VibeMaking.busy.value) return
     VibeMaking.busy.value = true
     graph.scope.launch {
         try {
             val plan = graph.generator.vibePlan(words, with)
-            // A typed vibe starts from the AI's own concepts on its dials; the sliders already set carry over.
-            val start = if (words.isBlank()) with else VibeTuning.start(plan.steering, graph.generator.soundConcepts())
-                .copy(energy = with.energy, tempo = with.tempo, familiar = with.familiar)
+            // A typed vibe starts from the AI's own sounds; the mood and the sounds and genres picked go over them.
+            val start = if (words.isBlank()) with else FlowMood.over(VibeTuning.start(plan.steering, emptyList()), with)
             val songs = graph.generator.vibeSongs(plan.query, plan.steering, start)
             val saved = graph.savedVibes.save(
                 SavedVibe(
@@ -138,7 +150,10 @@ internal fun makeVibe(graph: app.siansa.AppGraph, nav: NavController, notify: (S
                 ),
             )
             AppLog.i("Vibe", "Made \"${saved.title}\" (${songs.size} songs)")
-            withContext(Dispatchers.Main) { nav.navigate("vibe/${saved.id}") }
+            withContext(Dispatchers.Main) {
+                nav.navigate("vibe/${saved.id}")
+                onMade(saved)
+            }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -155,30 +170,32 @@ internal fun makeVibe(graph: app.siansa.AppGraph, nav: NavController, notify: (S
 internal fun vibeMakingBusy(): Boolean = VibeMaking.busy.collectAsStateWithLifecycle().value
 
 /**
- * Flow (issue #339, renamed in #369): describe what you want to hear and get a vibe; "Shape your sound" opens the
- * optional sliders. Recent vibes below (the last five, plus pinned ones), each one tap from playing again, and
- * each can be renamed or deleted.
+ * Flow (issue #339, renamed in #369; the mood pad, the owner's pick of 15 Nov): say what you want to hear, or shape
+ * it: drag the pad's dot for the mood, pick sounds and genres with +, choose whose music. The page takes the mood's
+ * colour, and the arrow beside the words makes the vibe and plays it. Recent vibes below (the last five, plus
+ * pinned ones), each one tap from playing again, and each can be renamed or deleted.
  */
 @Composable
 fun DscvrScreen(nav: NavController) {
     val graph = LocalGraph.current
     val launch = rememberPlayLauncher()
     val aiProblem = rememberAiProblem()
-    val busy by VibeMaking.busy.collectAsStateWithLifecycle()
-    var text by rememberSaveable { mutableStateOf("") }
-    var tuning by remember { mutableStateOf<VibeTuning?>(null) }
+    val flow = graph.flow
+    // What's set lives with the mix (FlowMix), so it's still here after a look at another tab, and steers a mix playing.
+    val text by flow.text.collectAsStateWithLifecycle()
+    val tuning by flow.tuning.collectAsStateWithLifecycle()
+    val steering by flow.steering.collectAsStateWithLifecycle()
+    val player by graph.player.state.collectAsStateWithLifecycle()
+    val mix = flow.live(player)
+    val hold = remember { MoodHold() }
+    val look = rememberMoodLook(tuning, hold)
     val vibes by graph.savedVibes.state.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { graph.savedVibes.all() }
-    // The sound dials: concepts AudioMuse knows, filled in once they've loaded.
-    LaunchedEffect(aiProblem) {
-        if (aiProblem == null && tuning == null) tuning = VibeTuning.start(emptyList(), graph.generator.soundConcepts())
-    }
-    val current = tuning ?: VibeTuning()
-    // The sliders are optional and folded away until opened (issue #369); only the ones moved are used.
-    var shaping by rememberSaveable { mutableStateOf(false) }
     var renaming by remember { mutableStateOf<SavedVibe?>(null) }
 
-    fun make(words: String, with: VibeTuning) = makeVibe(graph, nav, launch::notify, words, with)
+    // One player (the owner, 15 Nov): nothing of Flow's own stands in the mini player's place. The arrow beside the
+    // words starts the mix, with or without words, and puts the keyboard away.
+    val focus = LocalFocusManager.current
 
     renaming?.let { vibe ->
         RenameVibeDialog(vibe, onDismiss = { renaming = null }) { name ->
@@ -187,62 +204,56 @@ fun DscvrScreen(nav: NavController) {
         }
     }
 
-    Screen(title = "Flow", nav = null) { padding ->
+    Box(Modifier.fillMaxSize().testTag("flowPage")) {
+        MoodGlow(look)
         LazyColumn(
-            Modifier.fillMaxSize().aboveKeyboard(),
-            contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = bottomBarPadding(Space.Section)),
+            Modifier.fillMaxSize().statusBarsPadding().aboveKeyboard(),
+            contentPadding = PaddingValues(top = Space.Page, bottom = bottomBarPadding(Space.Section)),
         ) {
-            item(key = "aura") {
-                AuraBox(
-                    text = text,
-                    onText = { text = it },
-                    aiProblem = aiProblem,
-                    busy = busy,
-                    onGo = { make(text, current) },
-                    modifier = Modifier.padding(horizontal = Space.Page),
-                )
-            }
-            if (aiProblem == null) {
-                item(key = "shape") {
-                    Column(Modifier.padding(start = Space.Page, end = Space.Page, top = Space.Section)) {
-                        Row(
-                            Modifier.fillMaxWidth().clickable { shaping = !shaping }.testTag("shapeToggle"),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Column(Modifier.weight(1f)) {
-                                Text("Shape your sound", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                                Text(
-                                    shapeHint(current),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                            Icon(
-                                if (shaping) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
-                                if (shaping) "Hide Shape your sound" else "Show Shape your sound",
-                            )
-                        }
-                        if (shaping) {
-                            Spacer(Modifier.height(Space.Medium))
-                            VibeSliders(current, onChange = { tuning = it })
-                            Spacer(Modifier.height(Space.Medium))
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                TextButton(onClick = { tuning = current.cleared() }, enabled = !current.isNeutral) { Text("Reset") }
-                                Spacer(Modifier.width(Space.Small))
-                                Button(
-                                    onClick = { make(text, current) },
-                                    enabled = !busy && (text.trim().length >= 3 || !current.isNeutral),
-                                    colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = OnAccent),
-                                    modifier = Modifier.weight(1f).testTag("vibeGenerate"),
-                                ) {
-                                    if (busy) CircularProgressIndicator(Modifier.size(18.dp), color = OnAccent, strokeWidth = 2.dp) // spacing: exact
-                                    else Icon(DscvrStars, null, Modifier.size(18.dp))
-                                    Spacer(Modifier.width(Space.Small))
-                                    Text(if (busy) "Generating…" else "Generate")
-                                }
+            item(key = "top") {
+                Column(Modifier.fillMaxWidth().padding(start = Space.Page, end = Space.Small)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Flow", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black, modifier = Modifier.weight(1f).testTag("flowTitle"))
+                        if (aiProblem == null) {
+                            TextButton(onClick = { flow.reset() }, enabled = !tuning.isNeutral || text.isNotEmpty(), modifier = Modifier.testTag("flowReset")) {
+                                Text("Reset")
                             }
                         }
                     }
+                    // While its mix plays, the page says so: what's moved here changes what comes next.
+                    if (mix != null) {
+                        Text(
+                            flowLiveLine(mix.name, steering),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(end = Space.Small).testTag("flowLive"),
+                        )
+                    }
+                }
+            }
+            if (aiProblem != null) {
+                // Nothing to shape while the sound search can't be reached: it would only make an empty vibe.
+                item(key = "problem") { AiUnavailable(aiProblem, Modifier.padding(horizontal = Space.Page, vertical = Space.Medium)) }
+            } else {
+                item(key = "ask") {
+                    val making by flow.making.collectAsStateWithLifecycle()
+                    AskPill(
+                        text, onText = { flow.text.value = it }, look = look, busy = making,
+                        onGo = { focus.clearFocus(); flow.play(launch::notify) }, modifier = Modifier.padding(start = Space.Page, end = Space.Page, top = Space.Small),
+                    )
+                }
+                item(key = "shape") {
+                    // The dot moving only sets what's shown; a finger lifted, a pick or Artists changed also steers a mix playing.
+                    MoodShaper(
+                        tuning, look, hold,
+                        onChange = { flow.set(it, settled = false) },
+                        onSettled = { flow.set(flow.tuning.value, settled = true) },
+                        // The owner, 15 Nov: say right under the pad that it also steers a vibe that's playing.
+                        padNote = FLOW_PAD_NOTE,
+                        modifier = Modifier.padding(start = Space.Page, end = Space.Page, top = Space.Medium),
+                    )
                 }
             }
             val recent = vibes.orEmpty()
@@ -265,59 +276,74 @@ fun DscvrScreen(nav: NavController) {
     }
 }
 
-/** "Describe what you want to hear" (issue #369): the words for a vibe, made with the stars button or the keyboard's Go. */
+/** Right under Flow's pad. */
+internal const val FLOW_PAD_NOTE = "Drag while it plays to change the vibe."
+
+/** Under Flow's title while its mix plays: which mix the page is steering. */
+internal fun flowLiveLine(name: String, steering: Boolean): String =
+    "Playing “$name”. " + if (steering) "Changing what comes next…" else "Move anything here to change what comes next."
+
+/**
+ * The mood's colour glowing down from the top of the page, behind everything: all of it at the top, none at its end,
+ * on [GlassBar.colour]'s curve in many dithered steps under the same grain as the title bar's wash, so it shows no
+ * lines (the owner, 15 Nov: a plain radial fade did).
+ */
 @Composable
-private fun AuraBox(
-    text: String,
-    onText: (String) -> Unit,
-    aiProblem: String?,
-    busy: Boolean,
-    onGo: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val colors = Color(0xFF4B2BD6) to Color(0xFFD6338A)
-    val ready = text.trim().length >= 3 && !busy
-    Column(
+private fun MoodGlow(look: MoodLook) {
+    val dark = darkPage()
+    Box(Modifier.fillMaxWidth().height(MOOD_GLOW).testTag("moodGlow")) {
+        GlassWash(if (dark) look.deep else look.colour, MOOD_GLOW, amount = { if (dark) 0.85f else 0.22f })
+    }
+}
+
+private val MOOD_GLOW = 320.dp
+
+/**
+ * "Or say it" (issue #369): the words for a vibe in one pill, and the round arrow at its end that plays the vibe, as
+ * does the keyboard's Go. The arrow is how a vibe starts, with words or with only the mood and picks (the owner, 15 Nov).
+ */
+@Composable
+private fun AskPill(text: String, onText: (String) -> Unit, look: MoodLook, busy: Boolean, onGo: () -> Unit, modifier: Modifier = Modifier) {
+    val scheme = MaterialTheme.colorScheme
+    Row(
         modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(Brush.linearGradient(listOf(lerp(colors.first, Color.Black, 0.2f), lerp(colors.second, Color.Black, 0.35f))))
-            .padding(Space.Page)
+            .clip(CircleShape)
+            .background(scheme.surfaceContainer)
+            .border(1.dp, scheme.outlineVariant.copy(alpha = 0.5f), CircleShape)
+            .padding(start = Space.Medium, end = Space.Tight, top = Space.Tight, bottom = Space.Tight)
             .testTag("auraBox"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Space.Small),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(DscvrStars, null, tint = Color.White, modifier = Modifier.size(22.dp))
-            Spacer(Modifier.width(Space.Small))
-            Text("Describe what you want to hear", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White)
+        Icon(DscvrStars, null, tint = look.colour, modifier = Modifier.size(20.dp))
+        Box(Modifier.weight(1f)) {
+            if (text.isEmpty()) {
+                Text("Or say it: rainy Sunday, need to focus…", style = MaterialTheme.typography.bodyLarge, color = scheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            BasicTextField(
+                value = text,
+                onValueChange = { onText(it.take(200)) },
+                singleLine = true,
+                textStyle = MaterialTheme.typography.bodyLarge.copy(color = scheme.onSurface),
+                cursorBrush = SolidColor(scheme.onSurface),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
+                keyboardActions = KeyboardActions(onGo = { if (!busy) onGo() }),
+                modifier = Modifier.fillMaxWidth().testTag("auraField"),
+            )
         }
-        Spacer(Modifier.height(Space.Small))
-        if (aiProblem != null) {
-            // Nothing to type into while AudioMuse can't be reached: it would only make an empty vibe.
-            AiUnavailable(aiProblem, onDark = true)
-            return@Column
+        Box(
+            Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(look.colour)
+                .clickable(enabled = !busy, onClickLabel = "Play this vibe", role = androidx.compose.ui.semantics.Role.Button, onClick = onGo)
+                .testTag("auraGo"),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (busy) CircularProgressIndicator(Modifier.size(20.dp), color = look.ink, strokeWidth = 2.dp) // spacing: exact
+            else Icon(Icons.AutoMirrored.Rounded.ArrowForward, "Play this vibe", tint = look.ink, modifier = Modifier.size(20.dp))
         }
-        OutlinedTextField(
-            value = text,
-            onValueChange = onText,
-            placeholder = { Text("e.g. tired but hopeful, rainy Sunday, need to focus", color = Color.White.copy(alpha = 0.6f)) },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
-            keyboardActions = KeyboardActions(onGo = { if (ready) onGo() }),
-            trailingIcon = {
-                IconButton(onClick = onGo, enabled = ready) {
-                    if (busy) CircularProgressIndicator(Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp) // spacing: exact
-                    else Icon(DscvrStars, "Make my vibe", tint = Color.White)
-                }
-            },
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = Color.White,
-                unfocusedTextColor = Color.White,
-                focusedBorderColor = Color.White,
-                unfocusedBorderColor = Color.White.copy(alpha = 0.5f),
-                cursorColor = Color.White,
-            ),
-            modifier = Modifier.fillMaxWidth().testTag("auraField"),
-        )
     }
 }
 
@@ -382,11 +408,6 @@ internal fun RenameVibeDialog(vibe: SavedVibe, onDismiss: () -> Unit, onRename: 
     )
 }
 
-/** Under "Shape your sound": what it's for while nothing is set, otherwise what is (issue #369). */
-internal fun shapeHint(tuning: VibeTuning): String =
-    if (tuning.isNeutral) "Optional. Only what you move is used."
-    else "Using: " + tuning.summary()
-
 /** A vibe from Dscvr: its songs, Save as playlist, Pin to Home, and the sliders to tune it again (issue #339). */
 @Composable
 fun VibeScreen(nav: NavController, id: String) {
@@ -405,17 +426,15 @@ fun VibeScreen(nav: NavController, id: String) {
     LaunchedEffect(songIds, tuneOpen) {
         val v = vibe ?: return@LaunchedEffect
         if (!tuneOpen || v.songs.isEmpty()) return@LaunchedEffect
-        val first = offer == null
-        val found = graph.generator.mixOffer(v.songs)
-        offer = found
-        // Dials moved before the mix's sounds came: they join them now. Later (tuned again), the dials stay as they are.
-        if (first) tuning?.let { tuning = vibeDials(it, v.steered, found.sounds) }
+        offer = graph.generator.mixOffer(v.songs)
     }
     var retuning by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
     var savedAs by rememberSaveable { mutableStateOf<String?>(null) }
-    // The dials: the AI's own and the mix's sounds, never a fixed list (the owner, 11 Nov).
-    val shown = tuning ?: vibe?.let { vibeDials(it.tuning, it.steered, offer?.sounds.orEmpty()) } ?: VibeTuning()
+    // What's picked: the AI's own sounds and mine, never a fixed list (the owner, 11 Nov; picked with +, 15 Nov).
+    val shown = tuning ?: vibe?.tuning ?: VibeTuning()
+    val hold = remember { MoodHold() }
+    val look = rememberMoodLook(shown, hold)
     var menu by remember { mutableStateOf(false) }
     var renaming by remember { mutableStateOf(false) }
     if (renaming && vibe != null) {
@@ -517,7 +536,7 @@ fun VibeScreen(nav: NavController, id: String) {
                 }
                 if (tuneOpen) {
                     Box(Modifier.fillMaxWidth()) {
-                        Column {
+                        Column(Modifier.padding(bottom = Space.Small)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text("Shape your sound", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                                 TextButton(
@@ -526,15 +545,13 @@ fun VibeScreen(nav: NavController, id: String) {
                                     modifier = Modifier.testTag("vibeReset"),
                                 ) { Text("Reset") }
                             }
-                            // State is written as soon as the dot or a dial moves, so reading it when let go gets the last step.
-                            VibeSliders(
-                                shown,
+                            // State is written as soon as the dot moves or a pick changes, so reading it then gets the last one.
+                            MoodShaper(
+                                shown, look, hold,
                                 onChange = { tuning = it },
                                 onSettled = { tuning?.let { retune(it) } },
                                 dots = offer?.dots.orEmpty(),
-                                soundsTitle = "Sounds in this mix",
-                                more = soundsToAdd(shown, offer?.sounds.orEmpty()),
-                                onAdd = { name -> tuning = addSound(shown, name) },
+                                inMix = offer?.sounds.orEmpty(),
                             )
                             if (retuning) {
                                 Spacer(Modifier.height(Space.Small))

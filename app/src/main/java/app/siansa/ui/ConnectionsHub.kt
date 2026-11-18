@@ -1,7 +1,11 @@
 package app.siansa.ui
 
+import app.siansa.net.beatsPlansReady
+import androidx.compose.material3.HorizontalDivider
+import app.siansa.data.Service
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,7 +17,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -49,10 +52,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -63,10 +67,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import app.siansa.AppGraph
 import app.siansa.BuildConfig
-import app.siansa.net.BeatsApi
-import app.siansa.playback.ProfileStore
 import app.siansa.data.AiProvider
 import app.siansa.data.AppSettings
+import app.siansa.data.BeatsUse
 import app.siansa.data.SettingsRepository
 import app.siansa.data.UserEntry
 import app.siansa.data.UserFiles
@@ -76,22 +79,27 @@ import app.siansa.mix.audioMuseCheck
 import app.siansa.net.ApiException
 import app.siansa.net.AudioMuseApi
 import app.siansa.net.AudiobookshelfApi
+import app.siansa.net.BeatsApi
+import app.siansa.net.BeatsSound
 import app.siansa.net.ChatApi
 import app.siansa.net.EmbyApi
 import app.siansa.net.SourceKind
 import app.siansa.net.SubsonicApi
+import app.siansa.net.beatsTakesListens
+import app.siansa.playback.LoudnessSource
+import app.siansa.playback.ProfileStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 /**
- * Settings › Connections (issue #665): everything Siansa connects to, on one page, where Users and Connections were
+ * Settings › Your server (issue #665, Connections before): everything Siansa connects to, on one page, where Users and Connections were
  * two. **Servers**: each music server login (a "user": its own library, history and settings), with its address,
  * login, its name in AudioMuse-AI and its library sync, then Audiobookshelf. **Services**: AudioMuse-AI and the AI
  * service that writes mix titles and sound searches. Each folds open with its arrow, folded to start with; [open]
  * ("server", "books", "audiomuse", "ai") opens one. One Save keeps every change on the page.
  */
 @Composable
-fun ConnectionsHub(nav: NavController, open: String? = null) {
+fun ConnectionsHub(nav: NavController, open: String? = null, only: String? = null) {
     val graph = LocalGraph.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -216,7 +224,7 @@ fun ConnectionsHub(nav: NavController, open: String? = null) {
     }
 
     Screen(
-        title = "Connections",
+        title = only?.let { serviceOf(it)?.label } ?: "Your server",
         nav = nav,
         actions = { IconButton(onClick = ::save, modifier = Modifier.testTag("connectionsSave")) { Icon(Icons.Rounded.Check, "Save") } },
     ) { padding ->
@@ -230,7 +238,14 @@ fun ConnectionsHub(nav: NavController, open: String? = null) {
                 .testTag("connections"),
             verticalArrangement = Arrangement.spacedBy(Space.Small),
         ) {
-            Hint("Everything Siansa connects to. Tap a server or service to open its settings; Save keeps every change.")
+            // One page per service (the owner, 17 Nov): opened from Settings › Services, its settings alone.
+            val service = only?.let(::serviceOf)
+            if (service != null) {
+                ServicePage(graph, service, draft, { draft = it; problem = null }, ::save, nav)
+                problem?.let { ErrorText(it, Modifier) }
+                return@Column
+            }
+            Hint("Your music servers and logins. Services (Siansa Beats, Audiobookshelf and the rest) are under Settings › Services.")
 
             SectionHeading("Servers")
             users.forEach { user ->
@@ -263,19 +278,6 @@ fun ConnectionsHub(nav: NavController, open: String? = null) {
                     }
                 }
             }
-            // The TV has no books (issue #860; the owner, 12 Nov): Audiobookshelf is set up on the phone.
-            if (!app.siansa.BuildConfig.TV_APP) FoldCard(
-                icon = Icons.AutoMirrored.Rounded.MenuBook,
-                title = "Audiobookshelf",
-                subtitle = absLine(draft.booksReady),
-                expanded = "books" in opened,
-                onToggle = { toggle("books") },
-                tag = "fold-books",
-                jumpTo = scroll.takeIf { open == "books" },
-            ) {
-                AudiobookshelfFields(graph, draft) { draft = it; problem = null }
-                Button(onClick = ::save, modifier = Modifier.focusRing().fillMaxWidth()) { Text("Save") }
-            }
             if (adding) {
                 FoldCard(
                     icon = Icons.Rounded.Add,
@@ -303,45 +305,6 @@ fun ConnectionsHub(nav: NavController, open: String? = null) {
                 }
             }
 
-            SectionHeading("Services")
-            FoldCard(
-                icon = Icons.Rounded.GraphicEq,
-                title = "AudioMuse-AI",
-                subtitle = if (draft.audioMuseUrl.isNotBlank()) "Sound analysis · set up" else "Sound analysis · not set up",
-                expanded = "audiomuse" in opened,
-                onToggle = { toggle("audiomuse") },
-                tag = "fold-audiomuse",
-                jumpTo = scroll.takeIf { open == "audiomuse" },
-            ) {
-                AudioMuseFields(graph, draft) { draft = it; problem = null }
-                Button(onClick = ::save, modifier = Modifier.focusRing().fillMaxWidth()) { Text("Save") }
-            }
-            if (BEATS_OFFERED) {
-                FoldCard(
-                    icon = Icons.Rounded.Speed,
-                    title = "Siansa Beats",
-                    subtitle = beatsLine(draft.beatsReady),
-                    expanded = "beats" in opened,
-                    onToggle = { toggle("beats") },
-                    tag = "fold-beats",
-                    jumpTo = scroll.takeIf { open == "beats" },
-                ) {
-                    BeatsFields(graph, draft) { draft = it; problem = null }
-                    Button(onClick = ::save, modifier = Modifier.focusRing().fillMaxWidth()) { Text("Save") }
-                }
-            }
-            FoldCard(
-                icon = Icons.Rounded.AutoAwesome,
-                title = "AI",
-                subtitle = aiLine(draft),
-                expanded = "ai" in opened,
-                onToggle = { toggle("ai") },
-                tag = "fold-ai",
-                jumpTo = scroll.takeIf { open == "ai" },
-            ) {
-                AiFields(graph, draft) { draft = it; problem = null }
-                Button(onClick = ::save, modifier = Modifier.focusRing().fillMaxWidth()) { Text("Save") }
-            }
             problem?.let { ErrorText(it, Modifier) }
         }
     }
@@ -366,6 +329,7 @@ fun ConnectionsHub(nav: NavController, open: String? = null) {
 
 /** "AI · OpenRouter · google/gemini-2.5-flash", or why it's off. */
 internal fun aiLine(s: AppSettings): String = when {
+    s.beatsPlansReady -> "Done by Siansa Beats' AI"
     !s.aiTitles -> "Titles and sound searches · off"
     s.aiReady -> "${s.aiProvider.label} · ${s.aiModel}"
     else -> "Titles and sound searches · not set up"
@@ -651,7 +615,68 @@ internal fun AudioMuseFields(graph: AppGraph, draft: AppSettings, onChange: (App
 /** Whether Siansa Beats' card shows: in every build now ([app.siansa.data.Offered]). */
 internal val BEATS_OFFERED: Boolean = app.siansa.data.Offered.beats
 
-internal fun beatsLine(ready: Boolean): String = if (ready) "Beats, loudness and genres · set up" else "Beats, loudness and genres · not set up"
+/** The Siansa Beats card's line: how many of the things it can do the app uses ([beatsUses]), or not set up. */
+@Composable
+internal fun beatsCardLine(): String {
+    val s by LocalGraph.current.settings.state.collectAsStateWithLifecycle()
+    BeatsSound.traits.collectAsStateWithLifecycle().value
+    BeatsSound.mixes.collectAsStateWithLifecycle().value
+    if (!s.beatsReady) return "Not set up"
+    val uses = beatsUses(s)
+    return "Set up · ${uses.count { it.on && it.offered }} of ${uses.count { it.offered }} in use"
+}
+
+/**
+ * One thing the app can ask Siansa Beats for, as its card lists it (the owner, 17 Nov: "toggles for everything it
+ * should talk to Beats about"): [offered] when this Siansa Beats has it (else [needs] says which one does); [on]
+ * reads, and [set] writes, the setting its own page uses too, so the two always agree.
+ */
+internal class BeatsUseRow(
+    val tag: String,
+    val label: String,
+    val hint: String,
+    val on: Boolean,
+    val offered: Boolean,
+    val needs: String,
+    val set: (BeatsUseStore, Boolean) -> Unit,
+)
+
+/** Where the switches write: the settings each page reads ([SettingsRepository] in the app). */
+internal interface BeatsUseStore {
+    val current: AppSettings
+    fun scrobbleBeats(on: Boolean)
+    fun loudness(source: LoudnessSource)
+    fun use(id: String, on: Boolean)
+}
+
+internal fun SettingsRepository.beatsUseStore(): BeatsUseStore = object : BeatsUseStore {
+    override val current: AppSettings get() = this@beatsUseStore.current
+    override fun scrobbleBeats(on: Boolean) = save(this@beatsUseStore.current.copy(scrobbleBeats = on))
+    override fun loudness(source: LoudnessSource) = setLoudness(source = source)
+    override fun use(id: String, on: Boolean) = setBeatsUse(id, on)
+}
+
+/** What the app can ask Siansa Beats for, in [s]: the same settings as Scrobbling, Crossfade and the rest. */
+internal fun beatsUses(s: AppSettings): List<BeatsUseRow> {
+    fun use(id: String, label: String, hint: String, offered: Boolean = true, needs: String = "") =
+        BeatsUseRow("beatsUse-$id", label, hint, s.beatsFor(id), offered, needs) { r, on -> r.use(id, on) }
+    return listOf(
+        BeatsUseRow("beatsUse-scrobble", "Scrobbling and history", "Your listens, kept by Siansa Beats: Listening, reports and its mixes.",
+            s.scrobbleBeats, s.beatsTakesListens, "Needs Siansa Beats 0.29") { r, on -> r.scrobbleBeats(on) },
+        BeatsUseRow("beatsUse-loudness", "Loudness and smooth fades", "Each song measured, for even volume and fades that fit.",
+            s.loudnessSource == LoudnessSource.PLUGIN, true, "") { r, on ->
+            r.loudness(if (on) LoudnessSource.PLUGIN else LoudnessSource.TAGS)
+        },
+        use(BeatsUse.DJ, "DJ blends", "Beats and phrases, so DJ mixes blend on the beat."),
+        use(BeatsUse.GENRES, "Genres by sound", "Genres heard in the music. Off: your songs' tags."),
+        use(BeatsUse.SOUND, "Similar music and sound search", "Songs like a song, radios, blends and the search by words.",
+            BeatsSound.available, "Needs Siansa Beats 0.25"),
+        use(BeatsUse.MOODS, "Moods in Flow", "Vocals, a woman's or a man's voice, and how songs feel.",
+            BeatsSound.traits.value, "Needs Siansa Beats 0.51"),
+        use(BeatsUse.MIXES, "Mixes on Home", "Made from your listening, for the time of day. Off: your own carousels.",
+            BeatsSound.mixes.value, "Needs Siansa Beats 0.53"),
+    )
+}
 
 /**
  * Siansa Beats (Siansa Dev, the owner, 10 Nov): its address and API key, and Test. Once set, the app asks it for each
@@ -661,7 +686,7 @@ internal fun beatsLine(ready: Boolean): String = if (ready) "Beats, loudness and
 internal fun BeatsFields(graph: AppGraph, draft: AppSettings, onChange: (AppSettings) -> Unit) {
     val scope = rememberCoroutineScope()
     var result by remember { mutableStateOf<String?>(null) }
-    Hint("Measures each song's beats, loudness and key for DJ blends and smooth fades, and sorts songs into genres. Leave the address empty to use the Siansa plugin on AudioMuse-AI instead, or the songs' tags.")
+    Hint("Siansa's own server: it measures your music, keeps your listening and makes mixes from it. Below, choose what the app asks it for.")
     Field("Server address", draft.beatsUrl, "192.168.1.10:8090") { onChange(draft.copy(beatsUrl = it)) }
     SecretField("API key or password", draft.beatsKey) { onChange(draft.copy(beatsKey = it)) }
     Hint("Only if Siansa Beats asks for one (BEATS_API_KEY or BEATS_PASSWORD).")
@@ -755,5 +780,83 @@ internal fun NewServerButtons(onSave: () -> Unit, onCancel: () -> Unit) {
     Row(Modifier.tvFocusGroup(), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
         Button(onClick = onSave, modifier = Modifier.focusRing().testTag("saveNewServer")) { Text("Save") }
         OutlinedButton(onClick = onCancel, modifier = Modifier.focusRing()) { Text("Cancel") }
+    }
+}
+
+/**
+ * One thing the app asks Siansa Beats for, as a switch on the page that owns it (the owner, 17 Nov: every setting in
+ * one place; the Beats page only connects and links here). Shown only once Siansa Beats is set up; greyed with what it
+ * needs when this Siansa Beats can't do it yet.
+ */
+@Composable
+internal fun BeatsUseSwitch(graph: AppGraph, id: String) {
+    val s by graph.settings.state.collectAsStateWithLifecycle()
+    BeatsSound.traits.collectAsStateWithLifecycle().value
+    BeatsSound.mixes.collectAsStateWithLifecycle().value
+    if (!s.beatsReady) return
+    val row = beatsUses(s).firstOrNull { it.tag == "beatsUse-$id" } ?: return
+    SwitchRow(row.label, if (row.offered) row.hint else row.needs, row.on && row.offered,
+        modifier = if (row.offered) Modifier else Modifier.alpha(0.5f), tag = row.tag) { on -> if (row.offered) row.set(graph.settings.beatsUseStore(), on) }
+}
+
+/** The service pages Settings › Services opens, by the key in their address (`settings/connections/beats`). */
+internal val SERVICE_PAGES = setOf("books", "audiomuse", "beats", "ai")
+
+internal fun serviceOf(key: String): Service? = when (key) {
+    "books" -> Service.BOOKS
+    "audiomuse" -> Service.AUDIOMUSE
+    "beats" -> Service.BEATS
+    "ai" -> Service.AI
+    else -> null
+}
+
+/** What a service is used for, each line opening the page where that job is set (the owner, 17 Nov). */
+internal fun usedFor(service: Service): List<Triple<String, String, String>> = when (service) {
+    Service.BEATS -> listOf(
+        Triple("Loudness and DJ blends", "Sound & playback", "settings/sound"),
+        // Its AI names the phone's playlists too (0.57), when it's set up there: they're on the same page.
+        Triple("Home's mixes, Mix settings and playlist names", "Mixes & radios", "settings/radios"),
+        Triple("Genres, similar music, moods", "Discovery", "settings/discovery"),
+        Triple("Your listens", "Listening", "settings/scrobbling"),
+    )
+    Service.AUDIOMUSE -> listOf(Triple("Similar music and search by words", "Discovery", "settings/discovery"))
+    Service.BOOKS -> listOf(Triple("Book skips", "Sound & playback", "settings/sound"))
+    Service.AI -> listOf(Triple("Today's mix, Flow's words and the mood radios", "Mixes & radios", "settings/radios"))
+    Service.LASTFM, Service.LISTENBRAINZ -> listOf(Triple("Your listens", "Listening", "settings/scrobbling"))
+}
+
+/**
+ * One service's page (the owner, 17 Nov: one page per service, which only connects): on or off, how to reach it and
+ * its Test, and what it's used for, each line opening the page that sets it.
+ */
+@Composable
+private fun ServicePage(graph: AppGraph, service: Service, draft: AppSettings, onChange: (AppSettings) -> Unit, save: () -> Unit, nav: NavController) {
+    val s by graph.settings.state.collectAsStateWithLifecycle()
+    val on = Service.on(s, service)
+    SwitchRow("Use ${service.label}", service.gives, on, tag = "serviceOn-${service.id}") { want ->
+        AppLog.i("Settings", "Services: ${service.label} ${if (want) "on" else "off"}")
+        graph.settings.setServiceOn(service, want)
+    }
+    if (service == Service.AUDIOMUSE && s.beatsReady && Service.on(s, Service.BEATS)) {
+        Hint("Siansa Beats does all of this now, so AudioMuse-AI isn't used while Siansa Beats is on.")
+    }
+    if (service == Service.AI && s.beatsPlansReady) {
+        Hint("Siansa Beats' AI does this now, so the phone's AI isn't used while it's on. It's needed with AudioMuse-AI and no Siansa Beats, or when Siansa Beats has no AI set up.")
+    }
+    if (on) {
+        HorizontalDivider()
+        when (service) {
+            Service.BOOKS -> AudiobookshelfFields(graph, draft, onChange)
+            Service.AUDIOMUSE -> AudioMuseFields(graph, draft, onChange)
+            Service.BEATS -> BeatsFields(graph, draft, onChange)
+            Service.AI -> AiFields(graph, draft, onChange)
+            else -> Unit
+        }
+        Button(onClick = save, modifier = Modifier.focusRing().fillMaxWidth().testTag("serviceSave")) { Text("Save") }
+    }
+    HorizontalDivider()
+    Heading("Used for")
+    usedFor(service).forEach { (what, where, route) ->
+        PageLink(what, where, "usedFor-${route.substringAfterLast('/')}") { nav.navigate(route) }
     }
 }

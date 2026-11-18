@@ -58,6 +58,13 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
+import app.siansa.data.PlaylistDuplicates
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
@@ -105,6 +112,78 @@ fun AddToPlaylistDialog(songs: List<Song>, onDone: (String?) -> Unit) {
             p to PlaylistEditor.takes(owner, songOwners)
         }.sortedBy { (_, ok) -> !ok }
     }
+    // How many of the songs each playlist has already (issue #1235): read after the list shows, a few at a time, from
+    // the playlists kept on the phone when they're unchanged. Another user's playlists aren't read.
+    val already = remember { androidx.compose.runtime.mutableStateMapOf<String, List<String>>() }
+    val loaded = playlists.valueOrNull()
+    LaunchedEffect(loaded) {
+        val list = loaded ?: return@LaunchedEffect
+        val gate = kotlinx.coroutines.sync.Semaphore(4)
+        kotlinx.coroutines.coroutineScope {
+            list.filter { (p, takes) -> takes && p.songCount > 0 && (LocalPlaylists.isLocal(p.id) || graph.guests.ownerOf(p.id) == null) }.forEach { (p, _) ->
+                launch {
+                    gate.acquire()
+                    try {
+                        val ids = withContext(Dispatchers.IO) {
+                            if (LocalPlaylists.isLocal(p.id)) graph.localPlaylists.get(p.id)?.songs?.map { it.id }
+                            else graph.playlistCache.get(p.id).songs.map { it.id }
+                        }
+                        if (ids != null) already[p.id] = ids
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        AppLog.w("Playlist", "Couldn't read \"${p.name}\" to see what's in it already: ${e.message}")
+                    } finally {
+                        gate.release()
+                    }
+                }
+            }
+        }
+        val found = list.mapNotNull { (p, _) -> already[p.id]?.let { ids -> PlaylistDuplicates.count(ids, songs).takeIf { it > 0 }?.let { "${p.name} ×$it" } } }
+        if (found.isNotEmpty()) AppLog.i("Playlist", "Adding ${songs.size} song(s): already in ${found.joinToString()}")
+    }
+    // A playlist that has some of them already asks first: add them again, or only the new ones.
+    var asking by remember { mutableStateOf<Playlist?>(null) }
+    fun addTo(playlist: Playlist, adding: List<Song>) {
+        if (busy) return
+        busy = true
+        scope.launch {
+            val before = already[playlist.id]
+            val result = graph.playlists.add(playlist.id, adding)
+            val failure = result.exceptionOrNull()?.message?.takeIf { it == PlaylistEditor.OFFLINE }
+            // Added again: some servers skip a song the playlist has already (an older Jellyfin), so it's read back and said.
+            val skipped = if (result.isSuccess && before != null && PlaylistDuplicates.count(before, adding) > 0 && !LocalPlaylists.isLocal(playlist.id)) {
+                runCatching { withContext(Dispatchers.IO) { graph.playlistCache.kept(playlist.id)?.songs?.map { it.id } } }.getOrNull()?.let { after ->
+                    PlaylistDuplicates.notAddedAgain(before, after, adding, graph.settings.current.sourceKind.label, playlist.name)
+                }
+            } else null
+            skipped?.let { AppLog.w("Playlist", it) }
+            onDone(skipped ?: if (result.isSuccess) "Added to ${playlist.name}" else failure ?: "Couldn't add it to ${playlist.name}")
+        }
+    }
+    asking?.let { playlist ->
+        val ids = already[playlist.id].orEmpty()
+        val missing = PlaylistDuplicates.missing(ids, songs)
+        AlertDialog(
+            onDismissRequest = { asking = null },
+            title = { Text("Already in ${playlist.name}") },
+            text = { Text(PlaylistDuplicates.question(ids, songs)) },
+            confirmButton = {
+                Row {
+                    TextButton(onClick = {
+                        AppLog.i("Playlist", "Adding to \"${playlist.name}\" again, with ${songs.size - missing.size} already in it")
+                        addTo(playlist, songs)
+                    }, modifier = Modifier.testTag("addAgain")) { Text(if (songs.size == 1) "Add again" else "Add all") }
+                    if (missing.isNotEmpty()) TextButton(onClick = {
+                        AppLog.i("Playlist", "Adding only the ${missing.size} new of ${songs.size} to \"${playlist.name}\"")
+                        addTo(playlist, missing)
+                    }, modifier = Modifier.testTag("addNew")) { Text("Add ${missing.size} new") }
+                }
+            },
+            dismissButton = { TextButton(onClick = { asking = null }) { Text("Cancel") } },
+        )
+        return
+    }
     if (naming) {
         NewPlaylistDialog(
             serverAllowed = serverTakes,
@@ -139,20 +218,16 @@ fun AddToPlaylistDialog(songs: List<Song>, onDone: (String?) -> Unit) {
                     } else {
                         LazyColumn(Modifier.height(320.dp)) {
                             items(list, key = { it.first.id }) { (playlist, takes) ->
+                                val times = already[playlist.id]?.let { PlaylistDuplicates.count(it, songs) } ?: 0
                                 PickerRow(enabled = takes, onClick = {
                                     if (!busy && takes) {
-                                        busy = true
-                                        scope.launch {
-                                            val result = graph.playlists.add(playlist.id, songs)
-                                            val failure = result.exceptionOrNull()?.message?.takeIf { it == PlaylistEditor.OFFLINE }
-                                            onDone(if (result.isSuccess) "Added to ${playlist.name}" else failure ?: "Couldn't add it to ${playlist.name}")
-                                        }
+                                        if (times > 0) asking = playlist else addTo(playlist, songs)
                                     }
                                 }) {
                                     Cover(playlist.coverArt, 150, Modifier.size(40.dp), RoundedCornerShape(4.dp))
                                     Spacer(Modifier.width(Space.Medium))
                                     Column(Modifier.weight(1f)) {
-                                        Text(playlist.name, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        PlaylistNameWithBadge(playlist.name, times)
                                         Text(
                                             when {
                                                 !takes -> "Only for songs from ${playlistOwnerName(playlist)}"
@@ -172,6 +247,37 @@ fun AddToPlaylistDialog(songs: List<Song>, onDone: (String?) -> Unit) {
         confirmButton = {},
         dismissButton = { TextButton(onClick = { onDone(null) }) { Text("Cancel") } },
     )
+}
+
+/** A playlist's name in the picker, with [AlreadyBadge] beside it when the songs are in it [times] times already; a long name gives way to it. */
+@Composable
+internal fun PlaylistNameWithBadge(name: String, times: Int) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(name, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+        if (times > 0) {
+            Spacer(Modifier.width(Space.Small))
+            AlreadyBadge(times)
+        }
+    }
+}
+
+/**
+ * How many times the songs are in a playlist already (issue #1235): a red circle with the number, beside its name.
+ * Said in words for TalkBack.
+ */
+/** The badge's red, the same in light and dark (the dark theme's error colour is a pale pink); white on it is 5 to 1. */
+private val ALREADY_RED = Color(0xFFD32F2F)
+
+@Composable
+private fun AlreadyBadge(times: Int) {
+    val words = if (times == 1) "In it once already" else "In it $times times already"
+    Box(
+        Modifier.defaultMinSize(minWidth = 20.dp, minHeight = 20.dp).clip(CircleShape).background(ALREADY_RED)
+            .padding(horizontal = Space.Tight).testTag("alreadyIn").semantics { contentDescription = words },
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(if (times > 99) "99+" else "$times", style = MaterialTheme.typography.labelSmall, color = Color.White, fontWeight = FontWeight.Bold)
+    }
 }
 
 @Composable

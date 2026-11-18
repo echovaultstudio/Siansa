@@ -51,6 +51,14 @@ data class TrackFeatures(
      * hears far better than [energy], which is a song's loudness.
      */
     val arousal: Double? = null,
+    /** How positive the song feels, about 1 (dark) to 9 (bright): Siansa Beats 0.51 (the same model as [arousal]). */
+    val valence: Double? = null,
+    /**
+     * What the song is like by Siansa Beats' trained models (0.51), each 0 to 1 ([app.siansa.mix.SongTraits]): voice,
+     * female, acoustic, aggressive, electronic, happy, party, relaxed, sad, danceable and MIREX's five moods (mirex_*).
+     * Empty from AudioMuse-AI or an older Siansa Beats.
+     */
+    val traits: Map<String, Double> = emptyMap(),
 ) {
     /** What to order and match songs' energy by: [arousal] where there is one, else [energy]. */
     val drive: Double? get() = arousal ?: energy
@@ -125,10 +133,10 @@ class AudioMuseApi(
     ): JsonElement {
         val s = settings()
         val asked = query.filter { it.second != null }
-        if (beatsOnly && !(beats != null && s.beatsReady && BeatsSound.answers(path))) {
+        if (beatsOnly && !(beats != null && s.beatsSoundReady && BeatsSound.answers(path))) {
             throw ApiException("Siansa Beats doesn't have the songs' sound yet (it needs 0.25)")
         }
-        if (beats != null && s.beatsReady && BeatsSound.answers(path)) {
+        if (beats != null && s.beatsSoundReady && BeatsSound.answers(path)) {
             val pathAndQuery = path + if (asked.isEmpty()) "" else "?" + asked.joinToString("&") { (k, v) ->
                 java.net.URLEncoder.encode(k, "UTF-8") + "=" + java.net.URLEncoder.encode(v, "UTF-8")
             }
@@ -391,7 +399,7 @@ class AudioMuseApi(
         }.toString()
         // Siansa Beats reads the most played songs with its own sign-in to the music server: it gets no login.
         val forBeats = buildJsonObject { put("n", count) }.toString()
-        val root = if (settings().beatsReady && BeatsSound.answers("/api/sonic_fingerprint/generate")) {
+        val root = if (settings().beatsSoundReady && BeatsSound.answers("/api/sonic_fingerprint/generate")) {
             runCatching { sound("/api/sonic_fingerprint/generate", payload = forBeats) }.getOrElse { e ->
                 if (e is kotlinx.coroutines.CancellationException || !settings().audioMuseReady) throw e
                 executeElement { request("/api/sonic_fingerprint/generate").post(serverInBody(payload, server(emptyList())).toRequestBody(JSON_TYPE)).build() }
@@ -538,18 +546,25 @@ class AudioMuseApi(
 
         fun parseFeatures(o: JsonObject): TrackFeatures? {
             val id = o.str("id") ?: return null
+            val traits = (o["traits"] as? JsonObject).orEmpty()
+                .mapNotNull { (k, v) -> (v as? kotlinx.serialization.json.JsonPrimitive)?.content?.toDoubleOrNull()?.takeIf(Double::isFinite)?.let { k to it } }
+                .toMap()
             return TrackFeatures(
                 id = id,
                 artist = o.str("artist").orEmpty(),
                 tempo = o.dbl("tempo"),
                 key = o.str("key"),
                 scale = o.str("scale"),
-                moods = parseScores(o.str("other_features")),
+                // AudioMuse-AI's feelings (how near the song's CLAP vector sits to each word), with Siansa Beats' trained
+                // ones in their place where it has them (0.51): models trained on listeners' labels for each.
+                moods = parseScores(o.str("other_features")) + traits.filterKeys { it in app.siansa.mix.SongTraits.TRAINED_FEELINGS },
                 genres = parseScores(o.str("mood_vector")),
                 energy = o.dbl("energy"),
                 // "converted" (0.35) is an old energy put on today's scale: the same scale as "beats".
                 energySource = o.str("energy_source")?.let { if (it == "converted") "beats" else it },
                 arousal = o.dbl("arousal"),
+                valence = o.dbl("valence"),
+                traits = traits,
             )
         }
 

@@ -5,7 +5,7 @@ few times, then use **Report a problem** there. See [Reporting problems](privacy
 
 ## Can't connect to my server
 
-- Use **Test** in **Settings › Connections**. It shows what the server answered.
+- Use **Test** in **Settings › Your server**. It shows what the server answered.
 - Try the address in the phone's browser. If that doesn't load either, it's the network: are you on the same
   Wi-Fi, or on your VPN when away from home?
 - Include the port (`:4533` for Navidrome, `:8096` for Emby) and `http://` or `https://`.
@@ -26,7 +26,7 @@ The album, artist or song isn't on the server Siansa asked. Common reasons:
 Song radio, similar songs or similar albums say "AudioMuse doesn't know this song".
 
 1. **Has AudioMuse-AI analysed it?** New songs need its analysis first. Check in AudioMuse-AI, or run an analysis.
-2. **Several music servers in AudioMuse-AI?** Each server's name must be set in **Settings › Connections**, in the
+2. **Several music servers in AudioMuse-AI?** Each server's name must be set in **Settings › Your server**, in the
    card of that music server (Server name in AudioMuse-AI), exactly as AudioMuse-AI shows it. See
    [Several music servers](audiomuse.md#several-music-servers-in-one-audiomuse-ai).
 3. **Does AudioMuse-AI know the song on that server?** It links a second server's songs by analysis or by
@@ -71,7 +71,7 @@ Siansa shows the picture your server sends, and keeps it on the phone so it show
 - **A cover you replaced on the server** shows after the next sync. **Sync all** (the music source at the top of
   Home) checks every cover kept on the phone: stand-ins kept by older versions are removed, and a cover that changed
   on Navidrome, Emby or Jellyfin is fetched fresh. Nothing else in the image cache is thrown away.
-- Still wrong? **Settings › Streaming & storage › Covers on the phone › Clear image cache** starts over, and the log (lines marked `Covers`) says
+- Still wrong? **Settings › Storage & downloads › Covers on the phone › Clear image cache** starts over, and the log (lines marked `Covers`) says
   what was removed and replaced.
 
 ## Songs show the wrong length, or the seek bar jumps
@@ -81,7 +81,7 @@ the file's is far off. If it's still wrong, rescan the file on your server and s
 
 ## Plays don't show up on my server, Last.fm or ListenBrainz
 
-- Check **Settings › Scrobbling & history**: is the service on, and is the user switched on under **Users**?
+- Check **Settings › Listening**: is the service on, and is the user switched on under **Users**?
 - A song counts only after the chosen share of it, or four minutes. Songs of 30 seconds or less never count.
 - Offline plays wait and are sent later.
 

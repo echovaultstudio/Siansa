@@ -15,19 +15,15 @@ internal object ServerWords {
         else -> "OpenSubsonic"
     }
 
-    /** Whether Siansa can have the server convert songs (Opus, MP3): Subsonic servers yes, Emby sends the original. */
-    fun converts(kind: SourceKind): Boolean = kind == SourceKind.OPENSUBSONIC
-
-    /** Settings › Streaming & storage, above the streaming quality. */
+    /** Settings › Storage & downloads, above the streaming quality. Every server converts to Opus (Emby and Jellyfin, issue #1204). */
     fun streamingHint(kind: SourceKind): String =
-        if (converts(kind)) {
-            "Opus is converted by your server (on Navidrome, with its \"opus\" transcoding profile). It saves data on mobile; the original file is best on Wi-Fi. Applies from the next song."  // server-name: ok (how Navidrome does it)
+        if (kind.embyLike) {
+            "Opus is converted by ${name(kind)}. It saves data on mobile; the original file is best on Wi-Fi. Applies from the next song."
         } else {
-            "${name(kind)} sends the original file, so the quality chosen here doesn't change anything for your music. It applies to OpenSubsonic servers."
+            "Opus is converted by your server (on Navidrome, with its \"opus\" transcoding profile). It saves data on mobile; the original file is best on Wi-Fi. Applies from the next song."  // server-name: ok (how Navidrome does it)
         }
 
     /** Downloads, under the download quality. */
     fun downloadHint(kind: SourceKind): String =
-        if (converts(kind)) "Opus is converted by your server and takes far less space than the original file. Applies to songs downloaded from now on."
-        else "${name(kind)} sends the original file, so downloads are always in the original quality."
+        "Opus is converted by your server and takes far less space than the original file. Applies to songs downloaded from now on."
 }

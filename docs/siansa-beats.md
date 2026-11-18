@@ -17,7 +17,9 @@ servers, and nothing is ever changed on them.
 | Song path and Flow | A run of songs from one sound to another, or to a mood |
 | Mood radios, vibes, today's mix, cards made from a sound, "Songs that sound like…" in Search | Music found from a description in words |
 | Your sound (the sonic fingerprint) and the mixes made from it | What your most played songs sound like |
+| Flow's **Moods** list, and vibes asked for in words ("female vocals") | Whether each song is sung, by a woman or a man, and how it feels (0.51) |
 | Your listening, Time Machine | Your listens, kept on your own server ("Scrobble to Siansa Beats") |
+| Home's **For now**, **Made for you** and **More of you** | Mixes made from your listening, for the time of day and whether it's dark outside (0.53), with a few words on what's in each, kept 7 days or as long as you set (0.55); what goes into them chosen under **Mix settings** (0.56) |
 
 ## Set it up
 
@@ -27,10 +29,28 @@ servers, and nothing is ever changed on them.
 2. **On its page** (port 8090), the **Get started** card walks through adding your music server and choosing the
    libraries to analyse. A big library takes a while the first time; the app uses what's ready as it comes.
 3. **In Siansa**, connect it: on first setup choose **Add Siansa Beats**, or later
-   **Settings › Connections › Siansa Beats**. Enter its address (for example `http://192.168.1.10:8090`) and, if you
+   **Settings › Services › Siansa Beats**. Enter its address (for example `http://192.168.1.10:8090`) and, if you
    set one on its page, its API key or password. **Test** says what it can do, then **Save**.
 
 **Settings › Services** shows whether it's working, and has a switch to turn it off without removing it.
+
+## Choose what the app asks it for
+
+Its page (**Settings › Services › Siansa Beats**) only connects it; under **Used for**, each thing it does opens the
+page where it's switched:
+
+- **Loudness and DJ blends**: Sound & playback (the loudness source; **DJ blends** under Crossfade & DJ blends).
+- **Home's mixes and Mix settings**: Mixes & radios (**Home's mixes**: Siansa Beats or this phone).
+- **Genres, similar music, moods**: Discovery (**Genres** by sound, off: your songs' tags; **Similar music & search
+  by words**; **Moods in Flow**).
+- **Your listens**: Listening (**Scrobble to Siansa Beats**).
+
+With an AI set up on its page (Setup › **AI**, 0.57 or newer), it also writes the names and sound searches of the app's
+vibes, Today's mix, Flow's words and the mood radios, and the phone's own AI is switched off and left out of Settings ›
+Services. See [AI features](ai.md).
+
+A switch your Siansa Beats is too old for says which version it needs. Everything that worked by itself before
+starts switched on.
 
 ## Several users
 

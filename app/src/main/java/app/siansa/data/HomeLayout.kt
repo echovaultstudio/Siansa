@@ -14,6 +14,8 @@ enum class HomeSection(val id: String, val label: String) {
     BOOKS("books", "Your books"),
     PODCASTS("podcasts", "Your podcasts"),
     MADE_FOR_YOU("made", "Made for you"),
+    /** Siansa Beats' On repeat, Rediscover and New for you (the owner, 17 Nov: its own row); empty without them. */
+    MORE_OF_YOU("more_of_you", "More of you"),
     /** Custom cards pinned to Home (issue #622); each shows in its own look, in the order set in Settings › Home page › Cards. */
     CARDS("cards", "Your cards"),
     REDISCOVER("rediscover", "Rediscover"),
@@ -77,7 +79,9 @@ enum class HomeLook(val id: String, val label: String, val hint: String) {
     BUTTON("button", "Play button", "A slim card: one tap plays it, or opens it"),
     COVER_ROWS("cover_rows", "Cover rows", "Covers with their details beside them, three to a column, to swipe through"),
     // The owner, 10 Nov: any row as the Shortcuts card is, two small tiles a row, 2 to 8 of them.
-    GRID("grid", "Shortcut grid", "Small tiles two to a row, as Shortcuts: 2 to 8 of them");
+    GRID("grid", "Shortcut grid", "Small tiles two to a row, as Shortcuts: 2 to 8 of them"),
+    // The owner, 17 Nov: Siansa Beats' row of mixes for any row ("ideally every card always available").
+    CAROUSEL("carousel", "Carousel", "Big covers to flick through, the one in the middle in focus");
 
     companion object {
         /** Reads the saved looks ("recent:list,added:banner"); unknown sections and looks are dropped. */

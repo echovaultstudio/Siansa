@@ -45,8 +45,8 @@ data class ConnectionState(
     fun aiProblem(settings: AppSettings): String? = when {
         // A Siansa Beats before 0.26 has the songs' sound but doesn't search by words: said as it is, not as a fault.
         !settings.wordsReady && settings.beatsReady && BeatsSound.available ->
-            "Describing music in words needs Siansa Beats 0.26 or newer, or AudioMuse-AI (Settings › Connections)."
-        !settings.wordsReady -> "${app.siansa.data.Offered.soundServices} isn't set up. Add it in Settings › Connections."
+            "Describing music in words needs Siansa Beats 0.26 or newer, or AudioMuse-AI (Settings › Services)."
+        !settings.wordsReady -> "${app.siansa.data.Offered.soundServices} isn't set up. Add it in Settings › Services."
         !network -> "You're offline."
         // Its picks would mostly be songs that aren't on the phone.
         settings.downloadedOnly -> "Only downloaded music is on."

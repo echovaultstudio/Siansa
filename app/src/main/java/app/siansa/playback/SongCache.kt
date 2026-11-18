@@ -38,11 +38,20 @@ fun songCacheKey(uri: Uri): String = songCacheKey(uri.toString())
 fun songCacheKey(url: String): String {
     val id = streamSongId(url) ?: return url
     val query = runCatching { java.net.URI(url).rawQuery }.getOrNull().orEmpty().split('&')
-    fun param(name: String) = query.firstOrNull { it.startsWith("$name=") }?.substringAfter('=')?.takeIf { it.isNotEmpty() }
-    val format = param("format") ?: "raw"
-    val rate = param("maxBitRate") ?: ""
+    fun param(name: String) = query.firstOrNull { it.startsWith("$name=", ignoreCase = true) }?.substringAfter('=')?.takeIf { it.isNotEmpty() }
+    // Navidrome's format and maxBitRate, or Emby's and Jellyfin's AudioCodec and AudioBitRate when they convert (#1204).
+    val emby = param("format") == null && param("AudioCodec") != null && !param("Static").equals("true", ignoreCase = true)
+    val format = if (emby) param("AudioCodec")!!.lowercase() else param("format") ?: "raw"
+    val rate = if (emby) param("AudioBitRate")?.toIntOrNull()?.div(1000)?.toString().orEmpty() else param("maxBitRate") ?: ""
     return "song:$id:$format:$rate"
 }
+
+/** Whether all of the stream cached under [key] ([songCacheKey]) is in the song cache, so it plays without the network. */
+@androidx.annotation.OptIn(UnstableApi::class)
+fun songFullyCached(cache: androidx.media3.datasource.cache.Cache, key: String): Boolean = runCatching {
+    val length = androidx.media3.datasource.cache.ContentMetadata.getContentLength(cache.getContentMetadata(key))
+    length > 0 && cache.isCached(key, 0, length)
+}.getOrDefault(false)
 
 /** Whether songs are kept on the phone as they play: Settings › Streaming & storage › Song cache, where 0 means Off. */
 fun songCacheOn(settings: AppSettings): Boolean = settings.songCacheMb > 0
@@ -86,7 +95,7 @@ class CachingSwitchDataSource(
             active = direct
             return direct.open(dataSpec.withUri(Uri.parse(OutsideMedia.unmarked(url))))
         }
-        val source = if (goesThroughCache(dataSpec.uri.getQueryParameter("format"), useCache())) cached else direct
+        val source = if (goesThroughCache(Streaming.formatOf(dataSpec.uri), useCache())) cached else direct
         active = source
         return source.open(dataSpec)
     }

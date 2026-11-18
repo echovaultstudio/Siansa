@@ -103,7 +103,8 @@ class PinnedCardsTest {
 
     @Test fun homeHasAPlaceForTheCardsAfterMadeForYou() {
         val order = HomeSection.parse("quick,today,made,rediscover")  // saved before the section existed
-        assertEquals(HomeSection.MADE_FOR_YOU, order[order.indexOf(HomeSection.CARDS) - 1])
+        // After Made for you and Siansa Beats' More of you, which follows it (the owner, 17 Nov).
+        assertEquals(listOf(HomeSection.MADE_FOR_YOU, HomeSection.MORE_OF_YOU), order.subList(order.indexOf(HomeSection.CARDS) - 2, order.indexOf(HomeSection.CARDS)))
     }
 
     // ---- Issue #663: rules to include or leave out, and album cards ----
@@ -273,5 +274,34 @@ class PinnedCardsTest {
         val c = card.copy(sort = CardSort.PLAYED, rules = listOf(rule(RuleField.PLAYS, RuleOp.AT_LEAST, "1")))
         val stats = mapOf("a" to PlayStats(plays = 2), "b" to PlayStats(plays = 9))
         assertEquals(listOf("b", "a"), pickRuleSongs(songs, c, Random(1), stats = stats).map { it.id })
+    }
+
+    /** A notice of your own counts what its card shows (the owner, 18 Nov: 491 for 103 albums of 2026). */
+    @Test fun aNoticeCountsWhatItsCardShows() {
+        val albums = (1..103).map { app.siansa.data.Album(id = "al$it", name = "Album $it", year = 2026) }
+        val playSongs = (1..388).map { Song(id = "s$it", title = "Song $it") }
+        assertEquals(103, CardContent(playSongs, albums).shownCount)  // the songs are only what Play plays
+        assertEquals(388, CardContent(playSongs, emptyList()).shownCount)
+        assertEquals(0, CardContent(emptyList(), emptyList()).shownCount)
+    }
+
+    /** A notice's icon (the owner, 18 Nov): the one chosen, else by what it shows; kept with the card. */
+    @Test fun aNoticeKeepsItsIcon() {
+        val songs = PinnedCard.new().copy(notice = true)
+        assertEquals("song", songs.noticeIconKey)
+        assertEquals("album", songs.copy(contents = CardContents.ALBUMS).noticeIconKey)
+        assertEquals("fire", songs.copy(noticeIcon = "fire").noticeIconKey)
+        assertEquals("one no longer offered falls back", "song", songs.copy(noticeIcon = "rocket").noticeIconKey)
+        val chosen = songs.copy(noticeIcon = "moon")
+        assertEquals(chosen, Json.decodeFromString(PinnedCard.serializer(), Json.encodeToString(PinnedCard.serializer(), chosen)))
+        // A card kept before icons could be chosen reads as Auto.
+        val old = Json { ignoreUnknownKeys = true }.decodeFromString(PinnedCard.serializer(), Json.encodeToString(PinnedCard.serializer(), songs).replace(",\"noticeIcon\":\"\"", ""))
+        assertEquals("", old.noticeIcon)
+    }
+
+    @Test fun aNoticeKeepsWhetherItShowsItsNumber() {
+        val card = PinnedCard.new().copy(notice = true, noticeCount = false)
+        assertEquals(card, Json.decodeFromString(PinnedCard.serializer(), Json.encodeToString(PinnedCard.serializer(), card)))
+        assertEquals("shown unless switched off", true, PinnedCard.new().noticeCount)
     }
 }

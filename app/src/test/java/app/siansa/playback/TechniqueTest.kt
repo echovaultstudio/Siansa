@@ -16,8 +16,8 @@ class TechniqueTest {
 
     private fun pick(
         out: BeatEnd = outro, inn: BeatEnd = intro, keys: Double? = 1.0, drops: List<Long> = emptyList(),
-        mix: Boolean = false, sinceSeekMs: Long? = null, last: Technique? = null,
-    ) = TechniquePicker.pick(out, inn, BeatMatch.speed(out, inn) ?: speed, keys, drops, mix, sinceSeekMs, last)
+        mix: Boolean = false, noRoom: Boolean = false, last: Technique? = null,
+    ) = TechniquePicker.pick(out, inn, BeatMatch.speed(out, inn) ?: speed, keys, drops, mix, noRoom, last)
 
     @Test fun theUsualIsTheBassSwapOverSixteenBars() {
         val usual = pick()
@@ -35,12 +35,24 @@ class TechniqueTest {
         assertEquals(Technique.BASS_SWAP, pick(inn = intro.copy(bassBars = 16, rhythm = 0.92f)).technique)
     }
 
-    @Test fun quickWhenTheKeysClashTheBeatIsUnsureOrTheListenerJustMoved() {
+    @Test fun quickWhenTheKeysClashTheBeatIsUnsureOrThereIsNoRoom() {
         assertEquals(Technique.QUICK_SWAP, pick(keys = 0.1).technique)
         assertEquals(4, pick(keys = 0.1).bars)
         assertEquals(Technique.QUICK_SWAP, pick(inn = intro.copy(rhythm = 0.85f)).technique)
-        assertEquals(Technique.QUICK_SWAP, pick(sinceSeekMs = 5_000).technique)
-        assertEquals(Technique.BASS_SWAP, pick(sinceSeekMs = 60_000).technique)
+        assertEquals(Technique.QUICK_SWAP, pick(noRoom = true).technique)
+        assertEquals("no room left for a longer blend", pick(noRoom = true).why)
+        assertEquals(Technique.BASS_SWAP, pick().technique)
+    }
+
+    /**
+     * The owner's sessions, 12 Nov: a jump into the last minute forced a 4-bar quick swap whatever room there was, so
+     * every blend was one. Now the blend picked is kept: a long blend stays a long blend, a drop swap a drop swap.
+     */
+    @Test fun movingInTheSongKeepsTheBlendPicked() {
+        assertEquals(Technique.LONG_BLEND, pick(inn = intro.copy(bassBars = 16)).technique)
+        assertEquals(Technique.LONG_BLEND, pick(inn = intro.copy(bassBars = 16), last = Technique.BASS_SWAP).technique)
+        // Only when no room is left is it cut to 4 bars.
+        assertEquals(Technique.QUICK_SWAP, pick(inn = intro.copy(bassBars = 16), noRoom = true).technique)
     }
 
     @Test fun aMixTrackIsShortWhateverElse() {
@@ -84,9 +96,20 @@ class TechniqueTest {
     private fun profile(id: String, outro: BeatEnd?, intro: BeatEnd?, drops: List<Long> = emptyList()) =
         TrackProfile(id, -10.0, listOf(RampPoint(-18, 2_000)), listOf(RampPoint(-18, 3_000)), 310_000, intro = intro, outro = outro, dropsMs = drops)
 
-    private fun plan(out: BeatEnd?, inn: BeatEnd?, drops: List<Long> = emptyList(), maxMs: Long = Blending.SMART_MAX_MS, last: Technique? = null) =
+    private fun plan(out: BeatEnd?, inn: BeatEnd?, drops: List<Long> = emptyList(), maxMs: Long = Blending.SMART_MAX_MS, last: Technique? = null, noRoom: Boolean = false) =
         Crossfade.plan(CrossfadeMode.SMART, maxMs, song, next, 310_000, 300_000, profile("a", out, null), profile("b", null, inn, drops),
-            beatMatch = true, blendBars = Blending.SMART_BARS, lastTechnique = last)
+            beatMatch = true, blendBars = Blending.SMART_BARS, noRoom = noRoom, lastTechnique = last)
+
+    /** The plan after a jump: the long blend picked stays 32 bars; only with no room is it cut to a 4-bar quick swap. */
+    @Test fun aJumpKeepsTheFullBlendAndOnlyNoRoomMakesItQuick() {
+        val long = plan(outro, intro.copy(bassBars = 16))!!
+        assertEquals(Technique.LONG_BLEND, long.technique)
+        val quick = plan(outro, intro.copy(bassBars = 16), noRoom = true)!!
+        assertEquals(Technique.QUICK_SWAP, quick.technique)
+        assertEquals(4, quick.beat!!.bars)
+        assertTrue(quick.why, quick.why.startsWith("smart: quick swap (no room left for a longer blend)"))
+        assertTrue("the quick swap is far shorter", quick.overlapMs < long.overlapMs / 4)
+    }
 
     @Test fun theBlendIsMadeAsPicked() {
         val usual = plan(outro, intro)!!

@@ -162,8 +162,6 @@ fun CollectionPage(
     // With [playAs]: what stands left of its radio button, in the same row (a genre's song count, then its heart beside
     // the radio: the owner, 10 Nov, the radio no longer on the cover).
     radioRow: @Composable RowScope.() -> Unit = { Spacer(Modifier.weight(1f)) },
-    // Shown in the title bar once the page's buttons have scrolled away (a radio's heart, the owner, 10 Nov).
-    barExtras: @Composable () -> Unit = {},
     // An album's bar: what stands beside Download (its heart, the owner, 14 Nov: no longer at the top right).
     rowExtras: @Composable () -> Unit = {},
 ) {
@@ -178,6 +176,7 @@ fun CollectionPage(
     fun notePlayed() {
         val r = route ?: return
         val cover = if (shortcutCover) songs?.firstOrNull()?.cover else null
+        graph.playingFrom.note(r, title)
         graph.scope.launch { graph.recentPlays.note(r, title, cover) }
     }
     val listState = rememberLazyListState()
@@ -196,8 +195,8 @@ fun CollectionPage(
     // worked out once the last row is in view, from the rows alone, so it never changes because of itself.
     var roomPx by remember { mutableFloatStateOf(0f) }
     val loaded = songs != null
-    // The title's glide takes this much scrolling past the cover's (DOCK_SPAN times its last stretch into the bar).
-    val glideRoomPx = with(density) { (DOCK_START_GAP + 56.dp).toPx() } * DOCK_SPAN
+    // On a short page, room enough past the cover to bring the title under the bar.
+    val glideRoomPx = with(density) { GlassBar.TITLE_ROOM.toPx() }
     LaunchedEffect(listState, coverPx, loaded) {
         snapshotFlow {
             val info = listState.layoutInfo
@@ -216,29 +215,26 @@ fun CollectionPage(
         }.filterNotNull().collect { roomPx = it }
     }
     val progress = (scrolled / coverPx).coerceIn(0f, 1f)
-    // The title's glide into the bar (glideFrame): where it is on the page while the header is in view, and from there
-    // its way into the bar's title place, shrinking to the bar's size.
+    // The glass bar (GlassBar): it comes in as the page's title goes under it, in one step.
     val statusPx = WindowInsets.statusBars.getTop(density).toFloat()
-    val barPx = with(density) { 56.dp.toPx() }  // spacing: exact (the title bar's height)
+    val barPx = with(density) { GlassBar.HEIGHT.toPx() }
     val measurer = rememberTextMeasurer()
     val baseTitleStyle = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.ExtraBold)
     val titleWidthPx = with(density) { (LocalConfiguration.current.screenWidthDp.dp - Space.Page * 2).toPx() }
     val titleStyle = remember(title, baseTitleStyle, titleWidthPx) { fitOneLine(measurer, title, baseTitleStyle, titleWidthPx) }
-    val barTitleStyle = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black)
-    val dockScale = barTitleStyle.fontSize.value / titleStyle.fontSize.value
-    val titleLinePx = with(density) { titleStyle.lineHeight.toPx() }
-    val gapPx = with(density) { DOCK_START_GAP.toPx() }
-    val dockTop = statusPx + barPx / 2f - titleLinePx * dockScale / 2f
     var pageTop by remember { mutableFloatStateOf(0f) }
+    // Where the page's own title is on the screen (its top, from the page's top) and how tall, as it scrolls.
     var titleTop by remember { mutableStateOf<Float?>(null) }
+    var titleHeight by remember { mutableIntStateOf(0) }
     val headerInView = listState.firstVisibleItemIndex == 0
-    val titleFrame = when {
-        !showTitle -> null
-        !headerInView -> HeroNameFrame(dockTop, 1f)
-        else -> titleTop?.let { glideFrame(it, startTop = statusPx + barPx + gapPx, dockTop = dockTop) }
+    val barStep = when {
+        !headerInView -> 1f
+        // A page without a title of its own under the cover: as the cover scrolls away.
+        !showTitle -> ((scrolled - coverPx * 0.8f) / (coverPx * 0.3f)).coerceIn(0f, 1f)
+        else -> titleTop?.let { GlassBar.step(it, titleHeight.toFloat(), statusPx + barPx, with(density) { GlassBar.LEAD.toPx() }) } ?: 0f
     }
-    val titleBar = titleFrame?.let { smooth(((statusPx + barPx + 2 * gapPx - it.top) / (2 * gapPx)).coerceIn(0f, 1f)) } ?: 0f
-    val barAlpha = maxOf(((scrolled - coverPx * 0.8f) / (coverPx * 0.3f)).coerceIn(0f, 1f), titleBar)
+    val washPx = statusPx + barPx + with(density) { GlassBar.TAIL.toPx() }
+    val solidPx = statusPx + barPx - with(density) { GlassBar.SOFT.toPx() }
     val surface = MaterialTheme.colorScheme.surface
     // Albums with several discs get a heading above each disc (its title, or "Disc 2").
     val discs = remember(songs, numbered, discTitles) { if (numbered && songs != null) discHeaders(songs, discTitles) else emptyMap() }
@@ -269,14 +265,19 @@ fun CollectionPage(
         }
         notePlayed()
     }
-    var buttonsBottom by remember { mutableStateOf<Float?>(null) }
     CompositionLocalProvider(LocalPlayColours provides playColours) {
     Box(Modifier.fillMaxSize().background(surface).onGloballyPositioned { pageTop = it.positionInRoot().y }) {
         if (showCovers && songs != null) {
             val covers = remember(songs) { songs.map { it.cover } }
             PrefetchCovers(listState.firstVisibleItemIndex, listState.layoutInfo.visibleItemsInfo.size, covers, 150)
         }
-        LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomBarPadding(Space.Large))) {
+        // The page's colour behind what scrolls, which dissolves into it under the bar.
+        GlassWash(color, with(density) { washPx.toDp() }, amount = { barStep })
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize().dissolveUnderBar({ washPx }, { solidPx }, { barStep }),
+            contentPadding = PaddingValues(bottom = bottomBarPadding(Space.Large)),
+        ) {
             item {
                 Column(
                     Modifier
@@ -309,22 +310,23 @@ fun CollectionPage(
                     Spacer(Modifier.height(Space.Page))
                     Column(Modifier.alpha(slideDim)) {
                         if (showTitle) {
-                            // Its place: the title itself is drawn over the page (below), gliding into the bar from here.
+                            // It scrolls with the page, and fades out as it goes under the bar, whose own comes in.
                             Text(
                                 title,
                                 style = titleStyle,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier
-                                    .alpha(0f)
-                                    .onGloballyPositioned { titleTop = it.positionInRoot().y - pageTop },
+                                    .graphicsLayer { alpha = GlassBar.pageTitle(barStep) }
+                                    .onGloballyPositioned { titleTop = it.positionInRoot().y - pageTop; titleHeight = it.size.height }
+                                    .testTag("collectionTitle"),
                             )
                             Spacer(Modifier.height(Space.Small))
                         }
                         header()
                     }
                     Spacer(Modifier.height(Space.Tight))
-                    Box(Modifier.onGloballyPositioned { buttonsBottom = it.positionInRoot().y + it.size.height - pageTop }) {
+                    Box {
                     ActionRow(
                         songs.orEmpty(), offline, onSimilar, onPlayed = ::notePlayed, saveAs = title.takeIf { saveAsPlaylist && playAs == null },
                         playAs = playAs,
@@ -407,73 +409,8 @@ fun CollectionPage(
             }
         }
 
-        // Once the page's Play (or radio) has scrolled under the bar, the bar has it (the owner, 10 Nov).
-        val buttonsGone = !headerInView || (buttonsBottom?.let { it < statusPx + barPx } ?: false)
-        val barActions: @Composable () -> Unit = {
-            BarReveal(buttonsGone) {
-                barExtras()
-                if (!songs.isNullOrEmpty()) {
-                    BarPlayButton(
-                        radio = playAs != null,
-                        colour = if (playAs != null) radioColour ?: Accent else playColours?.controls ?: Accent,
-                        onColour = if (playAs != null) Color.White else playColours?.onControls ?: MaterialTheme.colorScheme.onPrimary,
-                        playing = playAs == null && pagePlayback.playing,
-                        onClick = ::playPage,
-                    )
-                }
-            }
-            actions()
-        }
-        // How wide the bar's buttons are, so a long title fades out before them (the owner, 14 Nov: an album's long
-        // title ran under Play, as an artist's long name did under the heart).
-        var barActionsPx by remember { mutableIntStateOf(0) }
-        val screenWidthPx = with(density) { LocalConfiguration.current.screenWidthDp.dp.toPx() }
-        val fadeEndPx = screenWidthPx - with(density) { (Space.Tight + Space.Small).toPx() } - barActionsPx
-        val fadePx = with(density) { TITLE_FADE.toPx() }
-        FadingTitleBar(nav, title, color, barAlpha, barActions, showTitle = !showTitle, onActionsWidth = { barActionsPx = it })
-        // The title, one all the way: under the cover, then up into the bar, shrinking, as an artist's name.
-        if (titleFrame != null) {
-            val restColour = MaterialTheme.colorScheme.onSurface
-            Text(
-                title,
-                style = titleStyle,
-                color = lerp(restColour, Color.White, smooth(titleFrame.t)),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier
-                    .padding(start = Space.Page, end = Space.Page)
-                    .graphicsLayer {
-                        transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
-                        val e = smooth((titleFrame.t * SIDEWAYS_LEAD).coerceAtMost(1f))
-                        val restLeft = Space.Page.toPx()
-                        translationX = ((Space.Tight + BACK_BUTTON + Space.Small).toPx() - restLeft) * e
-                        translationY = titleFrame.top
-                        val sc = 1f + (dockScale - 1f) * smooth(titleFrame.t)
-                        scaleX = sc
-                        scaleY = sc
-                        alpha = if (titleFrame.t > 0f) 1f else slideDim
-                        compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen
-                    }
-                    .drawWithContent {
-                        drawContent()
-                        if (barActionsPx > 0 && titleFrame.t > 0f) {
-                            val restLeft = Space.Page.toPx()
-                            val shift = nameShift((Space.Tight + BACK_BUTTON + Space.Small).toPx() - restLeft, titleFrame.t)
-                            val sc = nameScale(dockScale, titleFrame.t)
-                            // Where the bar's buttons start, in the title's own (unmoved, unscaled) place.
-                            val end = titleFadeEnd(nameFadeEnd(fadeEndPx, restLeft, shift, sc), size.width + fadePx / sc, titleFrame.t)
-                            val start = end - fadePx / sc
-                            if (start < size.width) {
-                                drawRect(
-                                    Brush.horizontalGradient(0f to Color.Black, 1f to Color.Transparent, startX = start, endX = end),
-                                    blendMode = androidx.compose.ui.graphics.BlendMode.DstIn,
-                                )
-                            }
-                        }
-                    }
-                    .testTag("collectionTitle"),
-            )
-        }
+        // No Play and no heart up here (the owner, 15 Nov): only what a page gives it (a playlist's menu).
+        GlassTitleBar(title, onBack = { nav.popBackStack() }, titleAmount = { GlassBar.barTitle(barStep) }, tag = "fadingTitleBar", actions = { actions() })
     }
     }
 }
@@ -495,59 +432,6 @@ internal const val FULL_FADE = 1.1f
  * scroll ([rowsPastScreen], below zero when they don't fill the screen); a page that scrolls far enough gets none.
  */
 internal fun roomBelow(maxScrollPx: Float, coverPx: Float): Float = (coverPx * FULL_FADE - maxScrollPx).coerceAtLeast(0f)
-
-/**
- * The title bar over a page tinted with its cover's colour (albums, playlists, books): just a back button over the
- * colour until the page scrolls, then a solid bar in that colour with the title.
- */
-@Composable
-internal fun FadingTitleBar(
-    nav: NavController,
-    title: String,
-    color: Color,
-    barAlpha: Float,
-    actions: @Composable () -> Unit = {},
-    showTitle: Boolean = true,
-    // How wide the bar's buttons are, in px, for a page that fades its own gliding title out before them.
-    onActionsWidth: (Int) -> Unit = {},
-) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .background(color.copy(alpha = barAlpha))
-            .statusBarsPadding()
-            .padding(horizontal = Space.Tight, vertical = Space.Tight)
-            .testTag("fadingTitleBar"),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        // No shading behind the arrow (issue #228).
-        IconButton(onClick = { nav.popBackStack() }) {
-            Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back", tint = Color.White)
-        }
-        Spacer(Modifier.width(Space.Small))
-        Text(
-            title,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = Color.White,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f).graphicsLayer { alpha = if (showTitle) barAlpha else 0f },
-        )
-        Row(Modifier.onSizeChanged { onActionsWidth(it.width) }, verticalAlignment = Alignment.CenterVertically) { actions() }
-    }
-}
-
-/**
- * Where a page's long title has faded out on its way into the title bar, [t] of the way (0–1): not at all under the
- * cover ([whole], past the title's end), and before the bar's buttons once it's in the bar ([docked]), so the fade
- * comes in as the title does and never cuts a title still on the page.
- */
-internal fun titleFadeEnd(docked: Float, whole: Float, t: Float): Float =
-    if (docked >= whole) whole else whole + (docked - whole) * smooth(t.coerceIn(0f, 1f))
-
-/** How long a title's fade-out before the bar's buttons is, as an artist's name's. */
-private val TITLE_FADE = Space.Large
 
 /** The colours of a disc heading's band: [start] on the left, fading out to the right, with [text] on it. */
 internal data class DiscBand(val start: Color, val text: Color)
@@ -802,17 +686,6 @@ fun PlayButtonRow(
 }
 
 /**
- * How a page's own buttons arrive in its title bar once they've scrolled under it, and leave again: growing in as
- * they fade in, the same on every page (albums, playlists, radios, genres, artists, books: the owner, 10 Nov).
- */
-@Composable
-internal fun BarReveal(visible: Boolean, content: @Composable RowScope.() -> Unit) {
-    AnimatedVisibility(visible = visible, enter = fadeIn() + scaleIn(initialScale = 0.6f), exit = fadeOut() + scaleOut(targetScale = 0.6f)) {
-        Row(verticalAlignment = Alignment.CenterVertically, content = content)
-    }
-}
-
-/**
  * A page's details on the left and, on the right, what it can do with them: [extra] (a radio's heart), then New picks
  * when the page can pick again. One row for every page that picks songs (radios, mood playlists, cards: the owner,
  * 10 Nov; they had "New picks", "Again" and an arrow in the title bar).
@@ -831,41 +704,6 @@ internal fun PicksRow(details: String, onNewPicks: (() -> Unit)?, extra: @Compos
         }
     }
 }
-
-/**
- * The page's Play in the title bar once its own has scrolled away (the owner, 10 Nov): small and round, in the page's
- * Play colour; a radio's is the radio icon alone, in white like the bar's other icons.
- */
-@Composable
-internal fun BarPlayButton(radio: Boolean, colour: Color, onColour: Color, playing: Boolean, onClick: () -> Unit) {
-    // A radio's is the icon alone, as the bar's other icons (the owner, 10 Nov: no coloured ring round it).
-    if (radio) {
-        IconButton(onClick = onClick, modifier = Modifier.testTag("barPlayButton")) {
-            Icon(Icons.Rounded.Radio, "Start the radio", tint = Color.White)
-        }
-        return
-    }
-    Box(
-        Modifier
-            .padding(horizontal = Space.Tight)
-            .size(BAR_PLAY_SIZE)
-            .clip(CircleShape)
-            .background(colour)
-            .clickable(onClick = onClick)
-            .testTag("barPlayButton"),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            if (radio) Icons.Rounded.Radio else if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-            if (radio) "Start the radio" else if (playing) "Pause" else "Play",
-            tint = onColour,
-            modifier = Modifier.size(if (radio) 20.dp else 24.dp),
-        )
-    }
-}
-
-/** The title bar's Play: as big as an icon button's touch area. */
-internal val BAR_PLAY_SIZE = 40.dp
 
 /** A genre page's one button (the owner, 10 Nov): its radio, round as Play, in the genre's [colour]. */
 @Composable

@@ -6,7 +6,13 @@ pick for mix titles and sound searches, and only if you set one up.
 
 ## Mix titles and sound searches
 
-**Settings › Connections › AI**: pick the service, then its key and a model. Picking a service fills in its usual
+**With Siansa Beats:** set the AI up once, on Siansa Beats' page (Setup › **AI**, Siansa Beats 0.57 or newer). It then
+names Siansa Beats' own mixes and also writes the title and sound search of the app's vibes, Today's mix, Flow's words
+and the mood radios. The phone's AI is switched off by itself and isn't listed under Settings › Services; it comes
+back if Siansa Beats is switched off or its AI is turned off. What's sent is the same as below, from Siansa Beats.
+
+**Without Siansa Beats** (with AudioMuse-AI), or with a Siansa Beats that has no AI set up, the phone asks its own:
+**Settings › Services › AI**: pick the service, then its key and a model. Picking a service fills in its usual
 model; any model it offers works. **AI titles and sound searches** turns it on or off, and **Test** asks it to say
 hello.
 
@@ -39,7 +45,7 @@ plainer.
 
 ## Situation
 
-The **Use the moment** panel (in **Settings › Radios & mixes › Today's mix and vibes**) lets today's mixes suit what's going on
+The **Use the moment** panel (in **Settings › Mixes & radios › Today's mix and vibes**) lets today's mixes suit what's going on
 around you. Each part is switched on by itself, and is read once when a mix is made, never in the background:
 
 | Part | How it's read |

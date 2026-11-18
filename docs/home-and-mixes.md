@@ -60,6 +60,7 @@ The **cog** on a section changes its look, to any of the custom cards' looks:
 | **Play button** | A slim card: its ▶ plays the section; a tap anywhere else on the card opens it. |
 | **Cover rows** | Covers with their details beside them, three to a column, to swipe through: the same look as a custom card's. The cover plays that album or opens that item; the row opens it. Books and podcasts show how far you are along the cover. A radio or genre shows its colours instead of a cover. |
 | **Shortcut grid** | Small tiles two to a row, like Shortcuts. Pick **2, 4, 6 or 8 tiles** under it in the same dialog. A tile opens its item; the title opens the rest. Shortcuts itself has no such choice: it's the grid already, and its count is under Settings › Home page › Top of Home. |
+| **Carousel** | Big covers to flick through, the one in the middle in focus and the ones beside it blurred, with its name and what it is underneath. Tap the middle one to open it. |
 
 A section in another look says which under its name. **Play** in a banner or the ▶ of a play button card plays the section:
 today's mix or the carousel's first mix where they left off, or the albums of Rediscover, Recently played, Recently
@@ -99,6 +100,7 @@ their own: a finished book, albums older than three days or last month's report 
 | **Your October** | The first week of a month: last month's listening. | The month's report |
 | **4 artists for you** | New artists to try were found today. | Artists for you |
 | **Liked songs** | Always, once you add it: it's **Off** until you set it to Automatic or Pinned. | Liked songs |
+| **12 new releases** (your own) | A notice of your own finds songs or albums by your rules. | What it found |
 
 At most five show. By default they're ordered for you: what needs you first, then what you're in the middle of, then
 what's new; among the new ones, the kinds you tap most come first. In **Settings › Home page › Top of Home** you can hide the
@@ -106,10 +108,17 @@ row, or set each kind to **Pinned**, **Automatic** or **Off**. Pinned kinds alwa
 pin them, and are never pushed out by other notices; the automatic ones fill the places left. The notices are
 always at the top of Home, so they're not in Arrange Home.
 
+**Notices of your own**: under **Your own notices** in Settings › Home page › Top of Home, **Add a notice**. Choose
+songs or albums, then rules on their details to keep or leave out: a genre, an artist, an album, a record label, a
+release type, the year, the length, when it was added or last played, play and skip counts, favourites, compilations.
+Give it the words to show after the number ("new releases"), and an **Icon** for its pill (**Auto**: an album for
+albums, a note for songs). **Show the number** off shows only the words ("New releases"). It shows while its rules find any, and a tap opens what
+it found. The switch beside each one turns it off without removing it.
+
 ## Vibes and today's mix
 
 A **vibe** covers part of the day. Siansa starts with Morning, Daytime, Evening and Night. When you open the app,
-the vibe for the current hour builds **today's mix**. **Settings › Radios & mixes › Today's mix and vibes** lets you change them:
+the vibe for the current hour builds **today's mix**. **Settings › Mixes & radios › Today's mix and vibes** lets you change them:
 
 - **Name**, **Days** (or every day), and **hours** (0–23; a vibe from 22 to 5 runs past midnight). When several
   vibes fit, the most specific wins: one set for a day before an everyday one, one for some hours before an
@@ -125,7 +134,7 @@ the vibe for the current hour builds **today's mix**. **Settings › Radios & mi
 
 How the songs are picked is explained in [How it works](how-it-works.md#todays-mix-and-vibes).
 
-**Today's mix** has settings of its own at the top of **Settings › Radios & mixes › Today's mix and vibes**, which apply to it whichever
+**Today's mix** has settings of its own at the top of **Settings › Mixes & radios › Today's mix and vibes**, which apply to it whichever
 vibe makes it:
 
 - **Auto update** (on by default): the mix follows the time of day. A new one is made as the day or the hour's vibe
@@ -152,6 +161,42 @@ Every mix, radio and Made for you card has a **Save as playlist** button next to
 circle with a plus; a song's own "Add to playlist" is an outlined one). Name it (the mix's name to start with) and
 choose **On your server**, so it syncs with your other apps, or **On this phone only**. You can save the play queue
 the same way, from the button next to **Up next** in now playing.
+
+## Mixes from Siansa Beats
+
+With Siansa Beats 0.53 or newer, Home's mixes can come from it instead: made from your own listening, for this part
+of the day on weekdays or at the weekend, and with whether it's dark outside (worked out from the date and your time
+zone). Three shelves, the same as on Siansa Beats' page:
+
+- **For now**: this part of the day, as you listen in it.
+- **Made for you**: the kinds of music you play most, each with more like it.
+- **More of you**: On repeat, Rediscover and New for you.
+
+Each shelf is a row of mixes: the one in the middle is sharp, the ones beside it smaller and blurred. Swipe to flick through,
+and tap the front one to open it and play it from there. Under it is its name and a few words on what's in it ("Wiry guitars and
+restless drums"); the artists it's like are on its own page. Siansa Beats makes the next part of the day's mixes a few
+minutes before it starts, so they're there when the hour turns. With an AI service set up on Siansa Beats' page, the
+mixes get their name and words from it; without one, from their sound ("Calm Indie Rock", "Calm ambient, mostly
+instrumental").
+
+A mix you open stays on the phone, and once played it's in your shortcuts on Home, for as long as Siansa Beats keeps its mixes:
+7 days, or what **Keep mixes for** on its Mixes page says (Siansa Beats 0.55).
+
+They're on while **Home's mixes** is set to **Siansa Beats** (Settings › Mixes & radios). While they are, the phone
+makes none of its own: no hourly Today's mix and no mixes in the background. Set it to **This phone** for your own
+carousels, Today's mix and Made for you, which stay as you set them.
+
+In **Arrange Home**, For now takes the place of **Your mixes carousel**, Made for you the place of **Made for you**, and
+More of you has a row of its own, **More of you** (listed only while Siansa Beats' mixes are on). Each row says so under
+its name. Move or hide them as any other; their cog picks one of two looks: **Carousel** (big covers to flick through)
+or **Tiles** (a row of tiles, each with four of the mix's covers).
+
+**Mix settings** (Settings › Mixes & radios, under **Home's mixes**; Siansa Beats 0.56 or newer) choose
+what goes into them: which mixes are made and how many, songs in a mix, how many of them you know, songs by one artist,
+how long a song you played stays out, genres and artists to leave out, whether the part of the day, weekends, the dark
+and this time of year count, how far back your listening counts, On repeat's and Rediscover's spans, names from the AI
+service, and how long a mix is kept. Siansa Beats keeps them, and its own Mixes page changes the same. **As they come**
+puts every one back.
 
 ## Your mixes carousel
 
@@ -245,10 +290,11 @@ Home with its switch in Settings.
 - **Favourite radios**: the heart on a radio's page (a mood radio, a genre, "More like" a playlist) keeps it in Your
   Library under **Favourites**. Right after you heart one, **Make a Home card** makes a custom card of it, or pick it
   later under **Comes from › A favourite radio** in a card.
-- **On every page of songs**, once the cover and buttons have scrolled away, the title bar has its **Play** (a radio's
-  **radio**, and its heart; an album's heart, before Play as on an artist's page). They grow into the bar the same
-  way on every page: albums, playlists, radios, genres, artists, books and podcasts. A title too long for the bar
-  fades out before them.
+- **On every page with a cover or a picture** (albums, playlists, mixes, radios, genres, liked songs, artists, books
+  and podcasts), the title bar comes in as the page's title scrolls under it, in one step: a wash of the cover's
+  colour, strongest at the top and running out below the bar with no edge, that the songs dissolve into as they pass,
+  with the title small in the middle. The page's own title fades out as the bar's fades in. Play and the heart stay
+  on the page; the bar has only the back arrow, the title and, on a few pages, their own button (a playlist's menu).
 - **Genres** open a page with every song of the genre on your phone, to look
   through. With Siansa Beats (0.19 or later), it says what the genre is, with a little of its history: the opening of
   its Wikipedia article, linked under it. Under that, one line: how many songs it has on the left, and on the right

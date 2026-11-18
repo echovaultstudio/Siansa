@@ -88,6 +88,9 @@ internal class MixedCrossfader(
     private var baseSpeed = 1f
     private var plannedWithNext = true
     private var stepStats = BeatMatch.StepStats()
+    /** The kicks heard in each song during the blend (ms of the song), for the grid check. */
+    private val outKicks = ArrayList<Double>()
+    private val inKicks = ArrayList<Double>()
     private var loggedStage = 0
     private var lateLogged = false
     private var easingFrom = 0f
@@ -186,7 +189,6 @@ internal class MixedCrossfader(
                 nextProfile = profiles.cached(next.id),
                 beatMatch = beatMatch,
                 blendBars = blending.blendBars,
-                sinceSeekMs = if (userSeekIn == current.id && userSeekAt > 0) SystemClock.elapsedRealtime() - userSeekAt else null,
                 lastTechnique = lastTechnique,
             )
             if (planned == null) {
@@ -206,20 +208,20 @@ internal class MixedCrossfader(
                     mode = s.crossfade, maxMs = maxMs, current = current, next = next, currentDurationMs = duration,
                     nextDurationMs = next.durationSec * 1000L, currentProfile = profiles.cached(current.id),
                     nextProfile = profiles.cached(next.id), beatMatch = beatMatch, blendBars = blending.blendBars,
-                    sinceSeekMs = 0, lastTechnique = lastTechnique,
+                    noRoom = true, lastTechnique = lastTechnique,
                 )
                 var quickAt = quick?.let { duration - it.cutMs - it.overlapMs }
                 var quickHandover = quickAt?.let { EngineFade.handoverAt(it, position) }
                 var chosen = quick
-                if (quick != null && quickHandover != null && quickHandover - position < MIN_PREPARE_MS && quick.beat == null && !quick.coldEnd) {
+                if (quickHandover == null || quickHandover - position < MIN_PREPARE_MS) {
                     // Not even that fits (the owner's log, 12 Nov: moved to the last half minute, the songs changed with
-                    // no blend at all): a plain blend of what's left, however short, never none.
-                    val left = duration - quick.cutMs - position - MIN_PREPARE_MS - EngineFade.LEAD_MS
-                    if (left >= SHORTEST_LEFT_MS) {
-                        chosen = quick.copy(overlapMs = left, fadeInMs = minOf(quick.fadeInMs, left).coerceAtLeast(Crossfade.MIN_FADE_IN_MS),
-                            why = "smart: a blend of what's left (%.1f s) after moving near the end · ${quick.why}".format(java.util.Locale.ROOT, left / 1000.0))
-                        quickAt = duration - chosen.cutMs - chosen.overlapMs
-                        quickHandover = EngineFade.handoverAt(quickAt, position)
+                    // no blend at all): a plain blend of what's left, however short, never none. Also when the quick
+                    // one is beat-matched (it can't be laid on the bar any more) or couldn't be planned (siansa-dev
+                    // #63, "no silence, ever"); only a cold end, which is meant to have none, stays as it is.
+                    EngineFade.whatsLeft(quick ?: fade, duration, position, MIN_PREPARE_MS, SHORTEST_LEFT_MS)?.let { left ->
+                        chosen = left
+                        quickAt = duration - left.cutMs - left.overlapMs
+                        quickHandover = EngineFade.handoverAt(quickAt!!, position)
                     }
                 }
                 if (chosen == null || quickAt == null || quickHandover == null || quickHandover - position < MIN_PREPARE_MS) {
@@ -231,6 +233,12 @@ internal class MixedCrossfader(
                 fade = chosen
                 at = quickAt
                 handover = quickHandover
+            }
+            // Moved in the song lately, and the blend picked still fits: it's kept (#63 of the owner's plan, 16 Nov), no
+            // quick swap only because of the move. Said in the log, so a session shows the full blends after a jump.
+            if (fade === planned && userSeekIn == current.id && userSeekAt > 0) {
+                val since = SystemClock.elapsedRealtime() - userSeekAt
+                if (since < MOVED_LATELY_MS) AppLog.i("Crossfade", "Moved in ${current.id} %.0f s ago, and the blend picked still fits: kept (${planned.technique?.label ?: "blend"})".format(java.util.Locale.ROOT, since / 1000.0))
             }
             plannedWithNext = profiles.cached(next.id) != null
             arm(item, fade, at, handover)
@@ -266,6 +274,8 @@ internal class MixedCrossfader(
                 (length?.let { " · starts at ${clock(at)} of ${clock(it)}, handed over at ${clock(handover)}" }.orEmpty()) +
                 (planned.beatNote?.let { " · $it" } ?: ""),
         )
+        // Which points of the two songs meet, and why: a blend on the wrong phrase is seen here.
+        planned.beat?.let { AppLog.i("Crossfade", "Lined up ${item.mediaId} with the next song: ${it.aligned}") }
     }
 
     /**
@@ -351,6 +361,13 @@ internal class MixedCrossfader(
         stepStats = BeatMatch.StepStats()
         loggedStage = 0
         lateLogged = false
+        outKicks.clear()
+        inKicks.clear()
+        // The grid check (the owner's DJ plan, #63): both songs' kicks are listened for while they're laid beat on beat.
+        if (planned.beat != null) {
+            tMix.kicks = app.siansa.playback.engine.KickListener(engine.outRate)
+            mainMix.kicks = app.siansa.playback.engine.KickListener(engine.outRate)
+        }
         stopEasing()
         phase = Phase.FADING
         level = 0f
@@ -433,6 +450,7 @@ internal class MixedCrossfader(
                 return
             }
             if (beat != null && onNext && heardMix >= incomingMix && !tailDone) check(beat, tMix, heardMix)
+            if (beat != null) hearKicks(tMix, onNext)
             if (onNext && !lateLogged && heardMix >= incomingMix) {
                 lateLogged = true
                 if (mainMix.current?.cueGivenUp == true) AppLog.w("Crossfade", "The next song's cue was given up (seconds of its sound came before the point it was cued to); it plays from where it is")
@@ -486,6 +504,34 @@ internal class MixedCrossfader(
                 handler.postDelayed(this, TICK_MS)
             }
         })
+    }
+
+    /**
+     * The kicks heard since the last tick, at their time in each song: the old song's while it plays, the next one's
+     * from when it came in. Read at once, while each deck can still say where its song was at that moment.
+     */
+    private fun hearKicks(tMix: MixCore.Deck, onNext: Boolean) {
+        tMix.kicks?.take()?.forEach { f -> tMix.mediaUsAt(f.toDouble())?.let { outKicks += it / 1000.0 - GridCheck.HEARD_LATE_MS } }
+        val heard = mainMix.kicks?.take() ?: return
+        if (!onNext) return
+        heard.forEach { f -> if (f >= incomingMix) mainMix.mediaUsAt(f.toDouble())?.let { inKicks += it / 1000.0 - GridCheck.HEARD_LATE_MS } }
+    }
+
+    /** The grid check's line in the log, once the blend is over, and the listening stops. */
+    private fun reportGrids(beat: BeatMatch.Plan?) {
+        val tMix = tailMix
+        if (beat != null && (outKicks.isNotEmpty() || inKicks.isNotEmpty())) {
+            val from = GridCheck.side(outKicks, beat.outgoing)
+            val to = GridCheck.side(inKicks, beat.incoming)
+            val line = GridCheck.describe(outgoing ?: "?", from, incomingId ?: "?", to)
+            if (from.off || to.off) AppLog.w("Crossfade", line, event = "crossfade.grid_off", fields = mapOf("from_off_ms" to from.offMs, "to_off_ms" to to.offMs))
+            else AppLog.i("Crossfade", line)
+            LastBlend.gridChecked(from, to)
+        }
+        tMix?.kicks = null
+        mainMix.kicks = null
+        outKicks.clear()
+        inKicks.clear()
     }
 
     /** How far apart the two songs' beats are, from where each is on the one clock: it should be under a ms. */
@@ -666,6 +712,8 @@ internal class MixedCrossfader(
     private fun finish() {
         handler.removeCallbacks(fadeTick)
         val beat = plan?.beat
+        tailMix?.let { if (beat != null && phase == Phase.FADING) hearKicks(it, main.currentMediaItemIndex == incomingIndex) }
+        reportGrids(beat)
         if (phase == Phase.FADING) {
             if (beat != null && main.currentMediaItemIndex == incomingIndex) {
                 startEasing(beat)
@@ -807,6 +855,8 @@ internal class MixedCrossfader(
         /** The tail is made ready this long before the handover. */
         const val PREPARE_MS = 10_000L
         const val MIN_PREPARE_MS = 2_500L
+        /** A move in the song this recent is noted when the blend after it is planned. */
+        const val MOVED_LATELY_MS = 30_000L
         /** A blend of what's left after moving near a song's end is at least this long; less, and the songs just change. */
         const val SHORTEST_LEFT_MS = 1_500L
         /** The handover is this long before the blend: the next song's start loads meanwhile. */
@@ -859,6 +909,22 @@ internal object EngineFade {
     const val LEAD_MS = 2_500L
     /** And never sooner than this from now. */
     const val MIN_LEAD_MS = 1_500L
+
+    /**
+     * A plain blend of what's left of the song before its end (ms), for [base] that no longer fits: never laid on the
+     * beat (it can't be put on the bar any more), its whole length what's left once the next song is ready. Null when
+     * that's under [shortestMs], or for a cold end, which is meant to play the two back to back.
+     */
+    fun whatsLeft(base: FadePlan, durationMs: Long, positionMs: Long, prepareMs: Long, shortestMs: Long): FadePlan? {
+        if (base.coldEnd) return null
+        val left = durationMs - base.cutMs - positionMs - prepareMs - LEAD_MS
+        if (left < shortestMs) return null
+        return base.copy(
+            overlapMs = left, fadeInMs = minOf(base.fadeInMs, left).coerceAtLeast(Crossfade.MIN_FADE_IN_MS),
+            beat = null, technique = null, filterHz = 0.0, echoBeatMs = null, buildUp = false,
+            why = "smart: a blend of what's left (%.1f s) after moving near the end · ${base.why}".format(java.util.Locale.ROOT, left / 1000.0),
+        )
+    }
 
     /** Where (ms of the old song) the tail takes the old song over, for a fade starting at [startAtMs] heard at [positionMs]. */
     fun handoverAt(startAtMs: Long, positionMs: Long): Long =

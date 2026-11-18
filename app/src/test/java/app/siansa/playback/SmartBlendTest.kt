@@ -109,6 +109,23 @@ class SmartBlendTest {
         assertTrue(json, json.contains("\"from_id\":\"a\"") && json.contains("\"to_lock_ms\":1000.0") && json.contains("\"at_ms\":294000"))
         assertEquals("fade", LastBlend.of("a", "b", 0, FadePlan(8_000, 8_000, "smart"), dj = true, now = 0).technique)
         assertEquals("short blend", LastBlend.of("a", "b", 0, FadePlan(1_500, 1_500, "smart"), dj = true, now = 0).technique)
+        // The grid check's result goes to Siansa Beats with it (siansa-dev #63), only when it was sure.
+        val checked = report.copy(fromGridOffMs = 3, toGridOffMs = -27).toJson().toString()
+        assertTrue(checked, checked.contains("\"from_grid_off_ms\":3") && checked.contains("\"to_grid_off_ms\":-27"))
+        assertFalse(json.contains("grid_off"))
+    }
+
+    @Test fun theGridCheckIsKeptWithTheBlendJustOver() {
+        LastBlend.enabled = true
+        try {
+            LastBlend.record("a", "b", 0, FadePlan(10_000, 10_000, "smart"), dj = true, now = 0)
+            LastBlend.gridChecked(GridCheck.Side(24, 2), GridCheck.Side(3, 40))
+            val report = LastBlend.report.value!!
+            assertEquals(2L, report.fromGridOffMs)
+            assertNull("too few kicks: not said", report.toGridOffMs)
+        } finally {
+            LastBlend.enabled = false
+        }
     }
 
     @Test fun theButtonIsOffByDefaultOutsideSiansaDev() {

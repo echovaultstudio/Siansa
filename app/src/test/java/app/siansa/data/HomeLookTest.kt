@@ -32,7 +32,39 @@ class HomeLookTest {
     }
 
     @Test fun theLooksAreTheCustomCardsLooks() {
-        assertEquals(listOf("As it is", "Tiles", "Banner", "List", "Play button", "Cover rows", "Shortcut grid"), HomeLook.entries.map { it.label })
+        assertEquals(listOf("As it is", "Tiles", "Banner", "List", "Play button", "Cover rows", "Shortcut grid", "Carousel"), HomeLook.entries.map { it.label })
+    }
+
+    @Test fun moreOfYouIsARowOfItsOwnAfterMadeForYou() {
+        // The owner, 17 Nov: Made for you and More of you apart. A saved order from before gets it after Made for you.
+        val order = HomeSection.parse("quick,made,radios")
+        assertEquals(order.indexOf(HomeSection.MADE_FOR_YOU) + 1, order.indexOf(HomeSection.MORE_OF_YOU))
+        assertTrue(HomeSection.MORE_OF_YOU.lookable)
+        // Rearranged while it isn't listed (Siansa Beats' mixes off): it keeps its place.
+        val before = listOf(HomeSection.QUICK, HomeSection.RADIOS, HomeSection.MORE_OF_YOU, HomeSection.MADE_FOR_YOU)
+        assertEquals(listOf(HomeSection.RADIOS, HomeSection.MORE_OF_YOU, HomeSection.QUICK, HomeSection.MADE_FOR_YOU),
+            app.siansa.ui.keepUnlisted(listOf(HomeSection.RADIOS, HomeSection.QUICK, HomeSection.MADE_FOR_YOU), before))
+    }
+
+    @Test fun siansaBeatsRowsAreACarouselOrTiles() {
+        assertEquals(listOf(HomeLook.CAROUSEL, HomeLook.TILES), app.siansa.ui.BEATS_LOOKS)
+        assertEquals(HomeLook.TILES, app.siansa.ui.beatsLook(HomeLook.TILES))
+        listOf(null, HomeLook.AS_IS, HomeLook.BANNER, HomeLook.COVER_ROWS, HomeLook.CAROUSEL).forEach {
+            assertEquals("$it", HomeLook.CAROUSEL, app.siansa.ui.beatsLook(it))
+        }
+        assertEquals(setOf(HomeSection.CAROUSEL, HomeSection.MADE_FOR_YOU, HomeSection.MORE_OF_YOU), app.siansa.ui.beatsRows(true).keys)
+    }
+
+    @Test fun anyRowCanBeACarousel() {
+        // The owner, 17 Nov: every look for every row, the carousel too.
+        val looks = mapOf(HomeSection.RECENT to HomeLook.CAROUSEL, HomeSection.CAROUSEL to HomeLook.CAROUSEL)
+        assertEquals("carousel:carousel,recent:carousel", HomeLook.format(looks))
+        assertEquals(looks, HomeLook.parse(HomeLook.format(looks)))
+        val item = app.siansa.ui.HomeItem("al-1", "Hell Is Just a Halfway House", subtitle = "", coverArt = "al-1", meta = "11 songs · 2024", open = {})
+        val sleeve = app.siansa.ui.crateRecordOf(item)
+        assertEquals(listOf("al-1"), sleeve.covers)
+        assertEquals("11 songs · 2024", sleeve.caption)  // no small line: the third
+        assertEquals("Radio", app.siansa.ui.crateRecordOf(item.copy(subtitle = "Radio")).caption)
     }
 
     @Test fun theSlimCardSaysWhatATapDoes() {

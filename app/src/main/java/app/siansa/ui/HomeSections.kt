@@ -18,6 +18,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.testTag
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -85,14 +88,34 @@ fun HomeSectionScreen(nav: NavController, id: String) {
     // as a list; the rest as a grid.
     var grid by rememberGridMode("section-${section.id}", default = section != HomeSection.Playlists)
     val gridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
+    // The page of all genres is a list to look one up in (the owner, 15 Nov): a box to find one by name, and A to Z
+    // down the right edge.
+    val finds = section == HomeSection.Genres
+    var find by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf("") }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
     Screen(section.title, nav) { padding ->
         Box(Modifier.padding(padding)) {
-            LoadBox(items) { list ->
+            LoadBox(items) { all ->
+                val list = androidx.compose.runtime.remember(all, find) { if (finds) foundByName(all, find) { it.name } else all }
+                val starts = androidx.compose.runtime.remember(list, find) {
+                    if (!finds || find.isNotBlank()) null
+                    else AlphabetIndex.starts(list.map { it.name }).takeIf { AlphabetIndex.shouldShow(list.size, it) }
+                }
+                androidx.compose.foundation.layout.Column(Modifier.fillMaxSize()) {
+                if (finds && all.isNotEmpty()) {
+                    FindField(find, "Find a genre…", "genreFind", Modifier.padding(horizontal = Space.Page, vertical = Space.Small)) {
+                        find = it
+                        scope.launch { gridState.scrollToItem(0) }
+                    }
+                }
                 if (list.isEmpty()) {
-                    Text("Nothing here yet.", Modifier.padding(Space.Page))
+                    Text(
+                        if (find.isNotBlank()) "No genre found for “${find.trim()}”." else "Nothing here yet.",
+                        Modifier.padding(Space.Page).testTag("sectionEmpty"),
+                    )
                 } else {
                     // Long lists get a handle on the right to move through them quickly (beta testers #24).
-                    val fast = showFastScroll(list.size)
+                    val fast = starts == null && showFastScroll(list.size)
                     Box(Modifier.fillMaxSize()) {
                         LazyVerticalGrid(
                             columns = gridCells(grid),
@@ -100,7 +123,7 @@ fun HomeSectionScreen(nav: NavController, id: String) {
                             modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(
                                 start = if (grid) Space.Small else 0.dp,
-                                end = (if (grid) Space.Small else 0.dp) + (if (fast) AlphabetBarWidth else 0.dp),
+                                end = (if (grid) Space.Small else 0.dp) + (if (fast || starts != null) AlphabetBarWidth else 0.dp),
                                 bottom = Space.Section,
                             ),
                         ) {
@@ -108,7 +131,21 @@ fun HomeSectionScreen(nav: NavController, id: String) {
                             items(list, key = { it.key }) { item -> if (grid) SectionTile(item, nav, launch, graph) else SectionRow(item, nav, launch, graph) }
                         }
                         if (fast) GridFastScroll(gridState, list.size) { i -> FastScroll.positionLabel(i, list.size) }
+                        if (starts != null) {
+                            // The grid's first item is the count and the grid or list switch, so positions are one more.
+                            val letterAt = androidx.compose.runtime.remember(starts) { starts.entries.sortedBy { it.value }.map { it.value to it.key } }
+                            val current by androidx.compose.runtime.remember(letterAt) {
+                                androidx.compose.runtime.derivedStateOf { letterAt.lastOrNull { it.first <= gridState.firstVisibleItemIndex - 1 }?.second }
+                            }
+                            AlphabetBar(
+                                present = starts.keys,
+                                current = current,
+                                onPick = { letter -> AlphabetIndex.target(letter, starts)?.let { scope.launch { gridState.scrollToItem(if (it == 0) 0 else it + 1) } } },
+                                modifier = Modifier.align(Alignment.TopEnd).padding(bottom = Space.Small),
+                            )
+                        }
                     }
+                }
                 }
             }
         }
@@ -133,12 +170,12 @@ private fun SectionRow(item: SectionItem, nav: NavController, launch: PlayLaunch
 }
 
 /** One entry in a full list, whatever the row holds. */
-private sealed class SectionItem(val key: String) {
+private sealed class SectionItem(val key: String, val name: String = "") {
     class AlbumItem(val album: Album, val subtitle: String) : SectionItem("album:${album.id}")
     class PlaylistItem(val playlist: app.siansa.data.Playlist) : SectionItem("playlist:${playlist.id}")
     class ArtistItem(val artist: app.siansa.data.Artist) : SectionItem("artist:${artist.id}")
     class Radio(val radio: app.siansa.mix.MoodRadio) : SectionItem("radio:${radio.id}")
-    class GenreItem(val genre: app.siansa.data.Genre) : SectionItem("genre:${genre.name}")
+    class GenreItem(val genre: app.siansa.data.Genre) : SectionItem("genre:${genre.name}", genre.name)
 }
 
 private suspend fun loadSection(graph: AppGraph, section: HomeSection): List<SectionItem> {
@@ -157,8 +194,9 @@ private suspend fun loadSection(graph: AppGraph, section: HomeSection): List<Sec
             ).map { SectionItem.AlbumItem(it, it.artist) }
         // The genres Siansa Beats hears, as last saved, or the songs' tags: every one (Search's All genres opens this).
         // A to Z (the owner, 10 Nov): the row on Home and Search's tiles are most songs first, the page of all is a list to look up.
-        HomeSection.Genres -> (if (synced) graph.browseGenres(ALL_GENRES) else emptyList())
-            .sortedBy { app.siansa.data.normalizeKey(it.name) }.map { SectionItem.GenreItem(it) }
+        // In the A to Z bar's own order (numbers and signs under #, accents with their letter), so each letter is in one run.
+        HomeSection.Genres -> AlphabetIndex.sort(if (synced) graph.browseGenres(ALL_GENRES) else emptyList(), { it.name })
+            .map { SectionItem.GenreItem(it) }
         HomeSection.RandomPicks -> (
             if (synced) graph.library.randomAlbums(100)
             else graph.source.albums("random", 100, 0).distinctBy { it.name + "|" + it.artist }
@@ -211,4 +249,14 @@ private fun SectionTile(item: SectionItem, nav: NavController, launch: PlayLaunc
             )
         }
     }
+}
+
+/**
+ * The [items] whose name has what's typed ([find]) in it, in the order they came: every word typed, in any order,
+ * whatever the capitals, accents or punctuation ("hip hop" finds "Hip-Hop"). Nothing typed: all of them.
+ */
+internal fun <T> foundByName(items: List<T>, find: String, name: (T) -> String): List<T> {
+    val terms = app.siansa.data.normalizeKey(find).split(' ').filter { it.isNotEmpty() }
+    if (terms.isEmpty()) return items
+    return items.filter { app.siansa.data.searchMatches(app.siansa.data.normalizeKey(name(it)), terms) }
 }

@@ -46,14 +46,17 @@ class ServerWordingTest {
         }
     }
 
-    @Test fun embyIsCalledEmbyAndToldItsQualityDoesntApply() {
+    /** Emby and Jellyfin convert to Opus too (issue #1204): the quality applies there, and the hint says who converts. */
+    @Test fun embyAndJellyfinAreNamedAsConvertingToOpus() {
         assertEquals("Emby", ServerWords.name(SourceKind.EMBY))
         assertEquals("OpenSubsonic", ServerWords.name(SourceKind.OPENSUBSONIC))
-        assertFalse(ServerWords.converts(SourceKind.EMBY))
-        assertTrue("Emby" in ServerWords.streamingHint(SourceKind.EMBY))
-        assertFalse(ServerWords.streamingHint(SourceKind.EMBY).contains("converted by"))
+        assertTrue(ServerWords.streamingHint(SourceKind.EMBY).startsWith("Opus is converted by Emby."))
+        assertTrue(ServerWords.streamingHint(SourceKind.JELLYFIN).startsWith("Opus is converted by Jellyfin."))
         assertTrue(ServerWords.streamingHint(SourceKind.OPENSUBSONIC).contains("opus"))
-        assertTrue(ServerWords.downloadHint(SourceKind.EMBY).startsWith("Emby"))
+        SourceKind.entries.forEach { kind ->
+            assertFalse("$kind", ServerWords.streamingHint(kind).contains("doesn't change anything"))
+            assertTrue("$kind", ServerWords.downloadHint(kind).startsWith("Opus is converted by your server"))
+        }
     }
 }
 

@@ -63,6 +63,8 @@ class ActiveSource(
     override suspend fun addToPlaylist(playlistId: String, songIds: List<String>) = of(playlistId).addToPlaylist(playlistId, songIds)
     override suspend fun star(id: String) = of(id).star(id)
     override suspend fun unstar(id: String) = of(id).unstar(id)
+    override val keepsRatings: Boolean get() = pick().keepsRatings
+    override suspend fun setRating(id: String, stars: Int) = of(id).setRating(id, stars)
     override suspend fun starAlbum(albumId: String) = of(albumId).starAlbum(albumId)
     override suspend fun unstarAlbum(albumId: String) = of(albumId).unstarAlbum(albumId)
     override suspend fun starredAlbums(): List<Album> = pick().starredAlbums()

@@ -25,7 +25,7 @@ object ThemeTones {
     )
 
     /** Light or dark colours from [seed]; [mono] makes a grey theme; [black] gives dark a pure black background. */
-    fun scheme(seed: Int, dark: Boolean, mono: Boolean = false, black: Boolean = false): Roles {
+    fun scheme(seed: Int, dark: Boolean, mono: Boolean = false, black: Boolean = false, ink: Boolean = false): Roles {
         val (_, c, h) = lch(seed)
         // The seed's opacity (issue #181) sets how strongly its colour shows: every role keeps its tone (so
         // text stays as readable) and loses colour towards grey, like the colour laid thinly over grey.
@@ -41,7 +41,7 @@ object ThemeTones {
         fun te(t: Int) = tone(th, tc, t)
         fun n(t: Int) = tone(h, nc, t)
         fun nv(t: Int) = tone(h, nvc, t)
-        return if (!dark) Roles(
+        val roles = if (!dark) Roles(
             primary = p(40), onPrimary = p(100), primaryContainer = p(90), onPrimaryContainer = p(10),
             secondary = s(40), onSecondary = s(100), secondaryContainer = s(90), onSecondaryContainer = s(10),
             tertiary = te(40), onTertiary = te(100), tertiaryContainer = te(90), onTertiaryContainer = te(10),
@@ -60,6 +60,36 @@ object ThemeTones {
             containerHighest = if (black) n(17) else n(22),
             outline = nv(60), outlineVariant = nv(30), inverseSurface = n(90), inverseOnSurface = n(20), inversePrimary = p(40),
         )
+        if (!ink) return roles
+        // A white, a black or a grey picked (the owner, 17 Nov: "possible to get whites or blacks but not possible to
+        // make a colour that buttons can no longer be seen"): the buttons take the picked lightness, as near to it as
+        // keeps them standing out from the page (3:1, what buttons need), and their text whichever of black or white
+        // reads on them.
+        val button = inkTone(lch(seed).first, roles.surface, roles.containerHighest)
+        val on = if (contrast(BLACK, button) >= contrast(WHITE, button)) BLACK else WHITE
+        return roles.copy(primary = button, onPrimary = on, inversePrimary = inkTone(lch(seed).first, roles.inverseSurface, roles.inverseSurface))
+    }
+
+    const val WHITE = 0xFFFFFFFF.toInt()
+
+    /** The button stands out this much from the page at least (WCAG's 3:1 for parts of a page that are pressed). */
+    const val BUTTON_CONTRAST = 3.0
+
+    /**
+     * The grey nearest to [lightness] (0 black … 100 white) that stands out [BUTTON_CONTRAST] from [page] and from the
+     * [card] buttons also sit on.
+     */
+    fun inkTone(lightness: Double, page: Int, card: Int): Int {
+        val wanted = lightness.roundToInt().coerceIn(0, 100)
+        // From the picked lightness outwards, the nearest one that's seen.
+        for (step in 0..100) {
+            for (t in listOf(wanted - step, wanted + step)) {
+                if (t !in 0..100) continue
+                val g = tone(0.0, 0.0, t)
+                if (contrast(g, page) >= BUTTON_CONTRAST && contrast(g, card) >= BUTTON_CONTRAST) return g
+            }
+        }
+        return if (contrast(BLACK, page) > contrast(WHITE, page)) BLACK else WHITE
     }
 
     const val BLACK = 0xFF000000.toInt()

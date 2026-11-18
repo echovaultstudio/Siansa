@@ -2,21 +2,25 @@
 
 ## Streaming quality
 
-**Settings › Streaming & storage › Streaming quality**, set separately **On Wi-Fi** and **On mobile data**:
+**Settings › Storage & downloads › Streaming quality**, set separately **On Wi-Fi** and **On mobile data**:
 
 - **Original**: the file as it is on your server. Best on Wi-Fi.
-- **Opus 96–320 kbit/s**: converted by your server (Navidrome's "opus" transcoding profile), to save data.
-- **On Emby** the original file is always played and downloaded: Siansa can only have Navidrome and other
-  Subsonic servers convert songs, so the quality choices don't change anything there.
+- **Opus 96–320 kbit/s**: converted by your server, to save data. Navidrome uses its "opus" transcoding profile;
+  Emby and Jellyfin convert with their own ffmpeg (your user there must be allowed audio transcoding, which is the
+  default).
+- A file that is Opus already is played as it is, whatever you choose: it's small, and the servers don't convert it
+  again.
+
+Moving to another spot in a converted song has the server start a new conversion from there, so it takes a moment.
 
 Siansa always plays the quality you chose; it never switches by itself. Changes apply from the next song.
 
 ## Song cache and loading ahead
 
-- **Song cache** (**Settings › Streaming & storage**, 2 GB by default): songs are kept on the phone as they play, so replays
+- **Song cache** (**Settings › Storage & downloads**, 2 GB by default): songs are kept on the phone as they play, so replays
   and skips start at once and survive a bad connection. Only original-quality streams are cached. **Off** keeps
   no song once it has played (the songs already cached are removed); it applies from the next song.
-- **Load songs ahead** (**Settings › Streaming & storage**): while a song plays, Siansa loads the next ones, one at a time, so
+- **Load songs ahead** (**Settings › Storage & downloads**): while a song plays, Siansa loads the next ones, one at a time, so
   they start at once and keep playing if the connection drops. 2 on Wi-Fi and 1 on mobile data by default, up to
   5. Only original files are loaded ahead. This works with the song cache off too, for up to 3 songs: each is held
   only until it has played.
@@ -25,7 +29,7 @@ Siansa always plays the quality you chose; it never switches by itself. Changes 
 
 ## Downloads
 
-**Settings › Streaming & storage › Downloads** (or the download button on an album or playlist): music you download stays on the phone
+**Settings › Storage & downloads › Downloads** (or the download button on an album or playlist): music you download stays on the phone
 and plays without a connection. It isn't part of the song cache and is never removed by itself.
 
 - **Download on Wi-Fi only** (on by default).
@@ -42,7 +46,7 @@ size, so they stay gapless too.
 
 ## Levelling (even loudness)
 
-**Settings › Sound**:
+**Settings › Sound & playback**:
 
 - **Levelling**: **Track** plays every song at the same level. **Album** keeps an album's loud and quiet songs
   apart. **Off** plays songs as they are.
@@ -135,8 +139,8 @@ blend them the way a DJ mixes:
     goes; the old song keeps its bass until then. Not when the energy goes down.
   - **Filter fade**, 16 bars: the old song is swept out with a rising high-pass filter, when the next song starts 3 dB
     or more quieter, or the keys only half mix.
-  - **Quick swap**, 4 bars: when the keys clash, a beat is under 90 % sure, or you moved in the song in the last
-    20 seconds.
+  - **Quick swap**, 4 bars: when the keys clash, a beat is under 90 % sure, or you moved so near the end that the
+    blend picked no longer fits. Moving in the song keeps the blend picked whenever it still fits.
   - **Echo out**: when the tempos are too far apart to match, the two never play together. The old song's last bar
     echoes out and it stops on the bar line; the next song drops in at full level on its first downbeat as it stops,
     under the last faint repeats. Only into a song whose beat starts right away: one with an intro without a beat
@@ -146,7 +150,8 @@ blend them the way a DJ mixes:
 - **Siansa Beats**: each end of a song is read from where its beat locks onto its grid (the first and
   last 4 bars it all keeps to). A blend stays inside that, and an end needs 80 % of its beats on the grid there to be
   beat-matched, and 80 % of them sitting on the grid. A track cut from a mixed CD carries the DJ's own changeovers at
-  its ends: its blends are laid inside its lock and kept to 8 bars, and without a lock it gets a short blend.
+  its ends: its blends are laid inside its lock and kept to 16 bars at most (fewer when there isn't room), and without
+  a lock it gets a short blend.
   - Two songs are beat-matched only when Siansa Beats has a grid for both (or, without Siansa Beats, the plugin's
     readings for both): one with a grid and one without gets a short blend, never the two readings laid on each other.
   - A song whose beat comes in more than 8 seconds into it (an ambient intro) isn't beat-matched from there, which
@@ -206,7 +211,7 @@ one, or while the sleep timer lets a song finish.
 
 ## Equaliser
 
-**Settings › Sound › Equaliser**: ten bands, presets, and a pre-amp. Songs stay as loud as with the equaliser
+**Settings › Sound & playback › Equaliser**: ten bands, presets, and a pre-amp. Songs stay as loud as with the equaliser
 off; the pre-amp makes everything louder or quieter on top, and peaks that would distort are smoothed. Moving a
 band saves it as your Custom preset. Not used while casting.
 
@@ -216,6 +221,10 @@ Tap the mini player, or swipe up on it, to open now playing; swipe down on now p
 Both follow your finger, and let go wherever you like: a hard swipe finishes quickly, a gentle one settles, and
 a short pull springs back. The mini player fades away as the player rises and comes back as it goes. The book
 player opens and closes the same way.
+
+At the top, now playing says what you're playing from: **Playing from mix** and the mix's name (a Siansa Beats mix or
+one made on the phone), **Playing from playlist**, **Playing from radio**, **Playing from artist**, or **Playing from
+album** and the song's album. Tap the name to open its page.
 
 A **DJ mix** (from the play button, the DJ mix bar, Start a mix, an album's or playlist's Shuffle, or Keep playing in DJ
 mode) is only offered when **Siansa Beats** answers with everything it needs: the beat grids its blends follow, and
@@ -248,7 +257,8 @@ the cover shows its name, what it does and "Let go to start", "Let go to stop" o
 to change your mind. An album's or playlist's DJ mix plays its own songs, so its bar has only **Stop**. Put the places
 in your own order under **Settings › Now playing › DJ mix bar**.
 
-Swipe the mini player left for the next song or right for the one before; the phone gives a short buzz as the song
+Swipe the mini player left for the next song or right for the one before: the title and artist follow your finger
+while the cover stays, and changes with the song. The phone gives a short buzz as the song
 changes, and when you press **Repeat** or **Add to playlist** in now playing (if touch vibration is on in your
 phone's settings). With no song after this one, a swipe left springs back and the song plays on; with none before
 it, a swipe right starts it again.
@@ -267,6 +277,30 @@ colours of the cover, and the cards take a deep shade of the cover's colour too 
 cover). Scroll back up for the controls. A small slip of the thumb doesn't leave the cards
 peeking in: now playing glides back unless you swipe up or scroll a quarter of the way down.
 
+## How the song is playing
+
+**About this song**, in the lower part of now playing, shows **File → Playing**: the file as it is on your server (its
+format and bit rate) and, beside it, what is really playing and where it comes from:
+
+- **Same as the file**, streamed as it is (on Wi-Fi or mobile data), from the song cache, or from its download.
+- **Opus** with its bit rate when your server converts the song for the connection you're on, or when the song was
+  downloaded as Opus. It's written in the accent colour then, so a converted song shows at a glance.
+- **On** a TV or speaker's name while you cast.
+
+Offline, a downloaded song still shows how it plays, with the file type the library knows. Turn it off in **Settings ›
+Now playing › About this song**.
+
+## Star ratings
+
+Turn on **Settings › Now playing › Star ratings** to rate songs from one to five stars. Tap a star to give that many;
+tap the rating again to take it off. The stars show in **About this song**, in the lower part of now playing, and
+under the title as well if you switch that on. A song's **⋮** menu has **Rate** too, in now playing and in every list.
+
+Ratings are kept on your server with `setRating`, so other apps see them, and Siansa shows what the server has (a copy
+on the phone shows at once and offline). A rating needs the connection: if the server can't be reached, the stars go
+back and Siansa says so. Stars are separate from the heart: a song can have both. Navidrome and other Subsonic servers
+keep ratings; Emby and Jellyfin have no five-star rating, so stars aren't offered there.
+
 ## Lyrics
 
 Lyrics come from your server (Navidrome's lyrics, or the lyrics file or tags it reads). Synced lyrics light up line
@@ -279,7 +313,7 @@ same corner: tap it to close the lyrics again.
 
 From now playing. Pick a time, or let the current song finish. **Wind down** swaps everything after the current
 song for a path from that song to calmer music, long enough to fill the timer, so the music gets calmer and quieter
-as you fall asleep. Without a timer, Wind down queues a number of calm songs (**Settings › Radios & mixes › Wind down**:
+as you fall asleep. Without a timer, Wind down queues a number of calm songs (**Settings › Mixes & radios › Wind down**:
 10, 20 or 30) and the music ends with them.
 
 ## Casting (Chromecast and DLNA)
@@ -329,7 +363,8 @@ Chromecast:
 It applies to music you start playing after you change it. Siansa asks your server for each song's file type just
 before the songs go to the TV (the library doesn't keep it), which can take a moment for a long queue. Converting to
 FLAC needs Navidrome (or another Subsonic server) with a **flac** transcoding, and Opus its **opus** transcoding (both
-come with Navidrome); with Jellyfin and Emby, those files go as MP3 320.
+come with Navidrome). Jellyfin and Emby convert to FLAC, Opus and MP3 with their own ffmpeg, nothing to set up. A file
+that is in the format already (an MP3 as MP3, say) is sent as it is.
 
 **Adding the FLAC conversion to Navidrome.** Recent Navidrome versions come with it (**Settings › Transcodings**
 lists **flac audio**). If yours doesn't, ALAC songs fall back to MP3 320 on the TV. To add it, sign in to Navidrome as

@@ -89,7 +89,22 @@ data class PinnedCard(
     val radioTitle: String = "",
     /** Tiles of a [CardLook.GRID] card: 2 to [GRID_MOST], two to a row. */
     val gridSize: Int = GRID_MOST,
+    /**
+     * A notice of your own (issue #1234; the owner, 17 Nov): a pill at the top of Home saying how many songs or albums
+     * its rules find ("12 new releases"), opening them, instead of a card in Your cards. Shown while it finds any.
+     */
+    val notice: Boolean = false,
+    /**
+     * A notice's icon (the owner, 18 Nov: "allow users choose an icon for a custom notice"), one of [NOTICE_ICONS] by
+     * its key; empty: by what it shows ([noticeIconKey]).
+     */
+    val noticeIcon: String = "",
+    /** Whether a notice says how many it found before its words (the owner, 18 Nov: "so only the title is shown" when off). */
+    val noticeCount: Boolean = true,
 ) {
+    /** The icon a notice of this card shows: the one chosen, else an album for albums and a note for songs. */
+    val noticeIconKey: String
+        get() = noticeIcon.takeIf { it in NOTICE_ICONS } ?: if (contents == CardContents.ALBUMS) "album" else "song"
     /** Every rule: [rules], and the single fields of a card made before rules, as rules. */
     val allRules: List<CardRule>
         get() = rules + buildList {
@@ -147,13 +162,14 @@ val BOOK_SORTS = listOf(CardSort.ADDED, CardSort.NAME, CardSort.RANDOM)
 
 /** What a card needs before it can be saved, or null when it's fine. */
 fun pinnedCardProblem(card: PinnedCard, audioMuseReady: Boolean, thisYear: Int = LocalDate.now().year, booksReady: Boolean = true): String? = when {
+    card.notice && card.title.isBlank() -> "Give the notice its words, like \"new releases\"."
     card.title.isBlank() -> "Give the card a name."
     // Books and episodes come from Audiobookshelf, in their own look, without rules (issue #782).
-    card.contents.fromBooks && !booksReady -> "Set up Audiobookshelf in Settings › Connections first."
+    card.contents.fromBooks && !booksReady -> "Set up Audiobookshelf in Settings › Services first."
     card.contents.fromBooks && card.look != CardLook.COVER_ROWS -> "Books and episodes show as Cover rows."
     card.contents.fromBooks -> if (card.size !in 1..MAX_SIZE) "A card holds 1 to $MAX_SIZE." else null
     card.contents == CardContents.ALBUMS && card.source == CardSource.SOUND -> "Albums come from your library: pick From your library."
-    card.source == CardSource.SOUND && !audioMuseReady -> "Set up Siansa Beats or AudioMuse-AI in Settings › Connections to make a card by sound."
+    card.source == CardSource.SOUND && !audioMuseReady -> "Set up Siansa Beats or AudioMuse-AI in Settings › Services to make a card by sound."
     card.source == CardSource.SOUND && card.sound.isBlank() -> "Describe the sound."
     card.contents == CardContents.ALBUMS && card.source == CardSource.RADIO -> "Albums come from your library: pick From your library."
     card.source == CardSource.RADIO && card.radio.isBlank() -> "Pick one of your favourite radios."
@@ -257,6 +273,17 @@ data class CardContent(
     val episodeProgress: Map<String, BookProgress> = emptyMap(),
 ) {
     val isEmpty: Boolean get() = songs.isEmpty() && albums.isEmpty() && books.isEmpty() && episodes.isEmpty()
+
+    /**
+     * How many things the card shows, as its page counts them (the owner, 18 Nov: a notice of 2026's albums said 491 for
+     * 103 albums, its albums and the songs of the first ten added together): its albums when it has any (the songs are
+     * only what Play plays), else its songs; books and episodes for a card of them.
+     */
+    val shownCount: Int get() = when {
+        books.isNotEmpty() || episodes.isNotEmpty() -> books.size + episodes.size
+        albums.isNotEmpty() -> albums.size
+        else -> songs.size
+    }
 }
 
 /** Custom cards kept per user, and the songs of each (made once a day, kept while the app runs). */
@@ -327,7 +354,7 @@ class PinnedCards(private val graph: AppGraph, context: Context) {
                 val found = graph.generator.soundSearch(card.sound.trim(), card.size.coerceAtMost(PinnedCard.SIZE))
                 found to if (card.look == CardLook.ALBUMS) albumIdsOf(found).take(ALBUMS).mapNotNull { graph.library.album(it) } else emptyList()
             }
-            !graph.library.isSynced -> throw IllegalStateException("Sync your library first (Settings › Connections, under your server)")
+            !graph.library.isSynced -> throw IllegalStateException("Sync your library first (Settings › Your server, under your server)")
             card.contents == CardContents.ALBUMS -> {
                 val needsFavourites = card.allRules.any { it.field == RuleField.FAVOURITE }
                 val favourites = if (needsFavourites) graph.library.starredSongs().mapNotNullTo(HashSet()) { it.albumId } else emptySet()
@@ -360,7 +387,7 @@ class PinnedCards(private val graph: AppGraph, context: Context) {
      */
     /** The content, and whether every request for it worked (a partial one isn't kept for the day). */
     private suspend fun bookContent(card: PinnedCard, random: Random): Pair<CardContent, Boolean> {
-        if (!graph.settings.current.booksReady) throw IllegalStateException("Set up Audiobookshelf in Settings › Connections first")
+        if (!graph.settings.current.booksReady) throw IllegalStateException("Set up Audiobookshelf in Settings › Services first")
         val size = card.size.coerceIn(1, MAX_SIZE)
         var whole = true
         /** One podcast's episodes; a failure leaves it out and marks the content partial. A cancel goes on up. */
@@ -476,3 +503,9 @@ fun keepListening(
     @Suppress("UNCHECKED_CAST")
     return merged.filterIsInstance<Book>() to merged.filterIsInstance<Pair<*, *>>().map { it as Pair<Book, Episode> }
 }
+
+/** The icons a notice of your own can have, by key, in the order they're offered (the owner, 18 Nov). */
+val NOTICE_ICONS = listOf(
+    "album", "song", "new", "star", "heart", "fire", "bolt", "headphones",
+    "mic", "piano", "calendar", "history", "explore", "party", "moon", "list",
+)

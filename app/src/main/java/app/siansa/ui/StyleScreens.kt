@@ -1,5 +1,6 @@
 package app.siansa.ui
 
+import app.siansa.data.StarRatings
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.animation.core.tween
@@ -133,6 +134,28 @@ fun NowPlayingStyleScreen(nav: NavController) {
                     tag = "lyricsButtonSwitch",
                 ) { setLyricsButton(graph, it) }
             }
+            // Star ratings (issue #1043): only where the server keeps them (Emby and Jellyfin have no five-star rating).
+            if (graph.ratings.kept) {
+                HorizontalDivider()
+                FoldSection("Star ratings", settings.stars.summary) {
+                    StarRatingSettings(settings.stars) { stars ->
+                        AppLog.i("Style", "Star ratings: ${stars.summary}")
+                        graph.settings.setStars(stars)
+                    }
+                }
+            }
+            HorizontalDivider()
+            FoldSection("About this song", if (settings.nowPlayingStreamInfo) "Shows how the song is playing" else "The file's details only") {
+                SwitchRow(
+                    "How the song is playing",
+                    "The file and what plays, side by side: the original, converted to Opus, downloaded, or from the song cache",
+                    settings.nowPlayingStreamInfo,
+                    tag = "streamInfoSwitch",
+                ) {
+                    AppLog.i("Style", "Now playing: stream info ${if (it) "on" else "off"}")
+                    graph.settings.setNowPlayingStreamInfo(it)
+                }
+            }
             HorizontalDivider()
             FoldSection("Play button", "Slides ${if (settings.playSlides.on) "on" else "off"} · grooves ${if (settings.playSlides.grooves) "on" else "off"}") {
                 PlaySlidesSettings(settings.playSlides, heading = false) { slides ->
@@ -180,6 +203,21 @@ fun NowPlayingStyleScreen(nav: NavController) {
                 )
                 if (settings.miniButtons != MiniButton.default) TextButton(onClick = { graph.settings.setMiniButtons(MiniButton.default) }) { Text("Reset") }
             }
+        }
+    }
+}
+
+/**
+ * Star ratings (issue #1043): whether songs can be rated, and where the stars show on Now Playing: under the title, in
+ * About this song (the lower part), or both. One place always stays on.
+ */
+@Composable
+internal fun StarRatingSettings(stars: StarRatings, onChange: (StarRatings) -> Unit) {
+    Column {
+        StyleSwitchRow("Star ratings", "Rate songs from one to five stars. Kept on your server.", stars.on, "starsSwitch") { onChange(stars.copy(on = it)) }
+        if (stars.on) {
+            StyleSwitchRow("Stars under the title", "Small stars under the artist, always in view", stars.underTitle, "starsUnderTitleSwitch") { onChange(stars.withUnderTitle(it)) }
+            StyleSwitchRow("Stars in About this song", "In the lower part of Now Playing", stars.inAbout, "starsInAboutSwitch") { onChange(stars.withInAbout(it)) }
         }
     }
 }

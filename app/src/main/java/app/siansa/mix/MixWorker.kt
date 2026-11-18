@@ -20,6 +20,8 @@ class MixWorker(context: Context, params: WorkerParameters) : CoroutineWorker(co
         val settings = graph.settings.current
         // Without AudioMuse the vibe's mix comes from the library (beta #25).
         if (!settings.navidromeReady) return Result.success()
+        // While Siansa Beats makes Home's mixes, the phone makes none of its own (the owner, 17 Nov).
+        if (settings.beatsReady && settings.beatsFor(app.siansa.data.BeatsUse.MIXES) && app.siansa.net.BeatsSound.mixes.value) return Result.success()
         // The vibe's mix is an AI mix: only with AudioMuse (issue #486).
         // Only the day's first mix: a new vibe for the hour doesn't replace the one you have (beta testers #37).
         if (MixRules.showsAiMixes(settings.wordsReady)) runCatching { graph.generator.ensureToday() }

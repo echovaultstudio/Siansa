@@ -35,7 +35,6 @@ import app.siansa.ui.DayChips
 import app.siansa.ui.PathMoodPicker
 import app.siansa.ui.SiansaTheme
 import app.siansa.ui.Space
-import app.siansa.ui.VibeSliders
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -366,27 +365,45 @@ class SpacingHomeTest : SpacingCheck() {
         assertTrue("Save as playlist right next to Queue all (${(save.left - queue.right).value} dp)", save.left - queue.right <= app.siansa.ui.Space.Small + 0.5.dp)
     }
 
-    /** Shape your sound (issue #339; the pad, 11 Nov): the same gap between the pad, each pill and the sounds' title. */
-    @Test fun vibeSlidersAreEvenlySpaced() {
+    /** Flow's mood pad (15 Nov): the same gap between the pad, the mood's name, each heading and what's under it. */
+    @Test fun theMoodShaperIsEvenlySpaced() {
         compose.setContent {
             SiansaTheme {
-                VibeSliders(
-                    VibeTuning(sounds = listOf(SoundDial("piano", 2), SoundDial("Drone", 0, genre = true))),
-                    onChange = { },
-                    more = listOf(app.siansa.mix.MixSound("Strings", 4)),
+                app.siansa.ui.MoodShaper(
+                    VibeTuning(energy = 1, sounds = listOf(SoundDial("piano", 3), SoundDial("Drone", -3, genre = true))),
+                    app.siansa.ui.MoodLook(0.5f, 0f), app.siansa.ui.MoodHold(), onChange = { }, traits = false, picker = { },
                 )
             }
         }
-        val pad = compose.onNodeWithTag("soundPadBlock").getBoundsInRoot()
-        val familiar = compose.onNodeWithTag("sliderFamiliar").getBoundsInRoot()
-        val title = compose.onNodeWithTag("soundsTitle").getBoundsInRoot()
-        val sounds = compose.onAllNodesWithTag("sliderSound")
-        val first = sounds[0].getBoundsInRoot()
-        val second = sounds[1].getBoundsInRoot()
-        val more = compose.onNodeWithTag("soundsToAdd").getBoundsInRoot()
-        assertEven("Pad to Niche and Familiar", familiar.top - pad.bottom, title.top - familiar.bottom, 1.dp)
-        assertEven("Sound dials", first.top - title.bottom, second.top - first.bottom, 1.dp)
-        assertEven("Dials to the sounds to add", second.top - first.bottom, more.top - second.bottom, 1.dp)
+        val pad = compose.onNodeWithTag("soundPad").getBoundsInRoot()
+        val words = compose.onNodeWithTag("moodWords").getBoundsInRoot()
+        val labels = compose.onAllNodesWithTag("moodLabel")
+        val sounds = labels[0].getBoundsInRoot()
+        val artists = labels[1].getBoundsInRoot()
+        val picks = compose.onNodeWithTag("moodPicks").getBoundsInRoot()
+        val choice = compose.onNodeWithTag("moodArtists").getBoundsInRoot()
+        assertEven("Pad to the mood's name, and the picks to Artists", words.top - pad.bottom, choice.top - artists.bottom, 1.dp)
+        assertEven("Each heading to what's under it", picks.top - sounds.bottom, choice.top - artists.bottom, 1.dp)
+        assertEven("Above each heading", sounds.top - words.bottom, artists.top - picks.bottom, 1.dp)
+        val chips = compose.onAllNodesWithTag("moodPick")
+        val add = compose.onNodeWithTag("moodAdd").getBoundsInRoot()
+        assertEven("Picks and Add are as tall", chips[0].getBoundsInRoot().let { it.bottom - it.top }, add.bottom - add.top, 0.5.dp)
+        assertEven("Between the picks, and before Add", chips[1].getBoundsInRoot().left - chips[0].getBoundsInRoot().right, add.left - chips[1].getBoundsInRoot().right, 1.dp)
+    }
+
+    /** Flow's line under the pad (the owner, 15 Nov): right under it, in the middle, and the mood's name as far below it as below the pad without it. */
+    @Test fun thePadsNoteIsCentredRightUnderIt() {
+        compose.setContent {
+            SiansaTheme {
+                app.siansa.ui.MoodShaper(VibeTuning(), app.siansa.ui.MoodLook(0f, 0f), app.siansa.ui.MoodHold(), onChange = { }, padNote = app.siansa.ui.FLOW_PAD_NOTE, traits = false, picker = { })
+            }
+        }
+        val pad = compose.onNodeWithTag("soundPad").getBoundsInRoot()
+        val note = compose.onNodeWithTag("padNote").getBoundsInRoot()
+        val words = compose.onNodeWithTag("moodWords").getBoundsInRoot()
+        assertEven("The note right under the pad", note.top - pad.bottom, app.siansa.ui.Space.Tight, 1.dp)
+        assertEven("The note as wide as the pad, its words in the middle", note.left + note.right, pad.left + pad.right, 1.dp)
+        assertEven("The mood's name under the note", words.top - note.bottom, app.siansa.ui.Space.Medium, 1.dp)
     }
 
     /** Vibes panel (issue #247): the "Use the moment" switch rows are the same distance apart. */
