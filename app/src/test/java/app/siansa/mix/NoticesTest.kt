@@ -186,4 +186,13 @@ class NoticesTest {
         assertEquals("fire", Notices.custom("pin-1", "new releases", 3, "fire")!!.icon)
         assertEquals("", Notices.custom("pin-1", "new releases", 3)!!.icon)
     }
+
+    /** Only the words, without the number (the owner, 18 Nov): still shown only while it finds any. */
+    @Test fun aNoticeCanHideItsNumber() {
+        assertEquals("12 new releases", Notices.custom("pin-1", "new releases", 12)!!.text)
+        assertEquals("New releases", Notices.custom("pin-1", " new releases ", 12, showCount = false)!!.text)
+        assertEquals(null, Notices.custom("pin-1", "new releases", 0, showCount = false))
+        assertEquals("a new count is still a new notice", false,
+            Notices.custom("pin-1", "x", 12, showCount = false)!!.key == Notices.custom("pin-1", "x", 13, showCount = false)!!.key)
+    }
 }

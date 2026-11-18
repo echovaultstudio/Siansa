@@ -99,6 +99,8 @@ data class PinnedCard(
      * its key; empty: by what it shows ([noticeIconKey]).
      */
     val noticeIcon: String = "",
+    /** Whether a notice says how many it found before its words (the owner, 18 Nov: "so only the title is shown" when off). */
+    val noticeCount: Boolean = true,
 ) {
     /** The icon a notice of this card shows: the one chosen, else an album for albums and a note for songs. */
     val noticeIconKey: String
