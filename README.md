@@ -6,7 +6,7 @@ A music player for your own music server (**Navidrome** or another **OpenSubsoni
 
 Siansa is **open source** under the GNU GPL, version 3 or later ([LICENSE](LICENSE)): the code is here to read, build and improve. Website: [siansa.app](https://siansa.app). Docs: [docs.siansa.app](https://docs.siansa.app) (the [docs folder](docs/README.md) until then).
 
-<p align="center"><img src="docs/screenshots/hero.png" alt="Siansa: Your year, Home and now playing" width="900"></p>
+<p align="center"><img src="docs/screenshots/hero.png" alt="Siansa: Your year, Home with For now, and now playing" width="900"></p>
 
 > ⭐ **Like Siansa? Give it a star.** Navidrome lists open-source apps on its website once they have 15 stars on
 > GitHub, so every star helps more people find Siansa. It takes one click, at the top of this page. Thank you!
@@ -60,8 +60,8 @@ More in the [install guide](docs/testing.md).
 
 <table align="center">
 <tr>
-<td align="center" width="33%"><img src="docs/screenshots/home.png" alt="Home in the morning: shortcuts and Today's mix" width="240"><br><sub><b>Home</b>: a mix for each part of the day</sub></td>
-<td align="center" width="33%"><img src="docs/screenshots/flow.png" alt="Flow: rainy jazz piano described, with the energy and tempo dials" width="240"><br><sub><b>Flow</b>: describe a sound, set the dials</sub></td>
+<td align="center" width="33%"><img src="docs/screenshots/home.png" alt="Home: shortcuts, and For now, mixes made from your listening" width="240"><br><sub><b>Home</b>: mixes from your listening</sub></td>
+<td align="center" width="33%"><img src="docs/screenshots/flow.png" alt="Flow: rainy jazz piano typed, with the mood pad's dot on Wind down" width="240"><br><sub><b>Flow</b>: words and the mood pad</sub></td>
 <td align="center" width="33%"><img src="docs/screenshots/vibe.png" alt="The vibe made from it, named by the AI" width="240"><br><sub><b>The vibe</b> it makes, named by AI</sub></td>
 </tr>
 <tr>
