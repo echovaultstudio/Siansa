@@ -1067,6 +1067,14 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                 }
             },
             // Custom card editor: a rule (issue #663).
+            // Add to playlist (issue #1235): a red number beside a playlist that has the song already; a long name gives way.
+            Scene("playlist_already_in") {
+                Column(Modifier.width(300.dp).padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
+                    app.siansa.ui.PlaylistNameWithBadge("Acoustic Relax Radio", 1)
+                    app.siansa.ui.PlaylistNameWithBadge("An unbelievably long playlist name for a long evening", 12)
+                    app.siansa.ui.PlaylistNameWithBadge("Core Radio", 0)
+                }
+            },
             Scene("card_rule") {
                 Column(Modifier.padding(Space.Page)) {
                     RuleCard(CardRule(RuleField.LABEL, RuleOp.CONTAINS, "Ninja Tune"), suggestions = listOf("Ninja Tune", "Warp", "Hospital Records"), onChange = {}, onRemove = {})
