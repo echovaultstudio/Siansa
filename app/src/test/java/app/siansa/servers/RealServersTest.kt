@@ -263,6 +263,20 @@ class RealServersTest(private val server: String) {
         assertEquals("$server: renamed", "CI renamed", name)
     }
 
+    /** Issue #1235: a song added again is in the playlist twice, and the app counts it so from the server's answer. */
+    @Test fun aSongAddedAgainIsCounted() = runBlocking {
+        val a = song("Morning Tone")
+        val made = source().createPlaylist("CI twice", listOf(a.id))
+        val id = made?.id ?: source().playlists().first { it.name == "CI twice" }.id
+        val adding = listOf(a)
+        assertEquals("$server: in it once", 1, app.siansa.data.PlaylistDuplicates.count(source().playlist(id).songs.map { it.id }, adding))
+        source().addToPlaylist(id, listOf(a.id))
+        val after = source().playlist(id).songs.map { it.id }
+        println("$server: after adding the song again, the playlist holds $after")
+        assertEquals("$server: added again", listOf(a.id, a.id), after)
+        assertEquals("$server: counted twice", 2, app.siansa.data.PlaylistDuplicates.count(after, adding))
+    }
+
     @Test fun playsAreReported() = runBlocking {
         val s = song("Landing")
         source().scrobble(s.id, submission = false)
