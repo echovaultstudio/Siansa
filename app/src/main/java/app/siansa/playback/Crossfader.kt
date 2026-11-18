@@ -221,6 +221,7 @@ internal class Crossfader(
                 nextProfile = profiles.cached(next.id),
                 beatMatch = beatMatch,
                 blendBars = blending.blendBars,
+                profilesUsed = profiles.active,
             )
             if (planned == null || planned.coldEnd) {
                 // A cold end's pause needs the new audio engine (issue #826): here the two songs play back to back.
