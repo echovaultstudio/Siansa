@@ -3,6 +3,81 @@
 Every version of Siansa, newest first. Each section is also shown as the notes on its GitHub release.
 Changes add a note in `changelog.d/` instead of editing this file; the release adds the section here.
 
+## 1.6.0 — 2026-11-18
+
+### Fixed
+- **Artist page: the releases and songs line stays with the name.** It stayed on the picture and went behind the page as you scrolled; now it moves up with the name and fades out with it.
+- Smart crossfade: a song Siansa Beats hasn't analysed, or couldn't be asked about, no longer blends blind for 20
+  seconds (two beats clashed, as in a Flow mix of drum and bass): it blends quickly. After Siansa Beats couldn't be
+  reached, it's asked again after half a minute, not five minutes.
+- With shuffle on, moving to another spot in a song converted to Opus sometimes started the song again from its beginning. It now plays from the spot you picked, and the shuffled order stays as it was.
+- Moving to another spot in a song that is an Opus file, with Opus chosen as the quality, started the song again from its beginning. Opus files now play as they are. The same on a TV or speaker with an MP3 file.
+- Lyrics: a hard swipe down on the lyrics now closes only the lyrics. It used to close the whole player with them.
+- After two songs played straight on from each other, the first one's sound stream stayed open in the background, so
+  the sound output never rested.
+- Playing a mix (from Siansa Beats or made on the phone) shows "Playing from mix" and its name at the top of now
+  playing, not the song's album. Playlists, radios and artists are named the same way; tap the name to open its page.
+- Tapping a service on Settings (Siansa Beats, Audiobookshelf, AudioMuse-AI, AI) now opens right at that service's settings: no scrolling down to find it.
+- **TV: going right along Today's mixes on Home jumped to the top of the page.** Left and right now stay in the row you're on and bring in the cards that are off the screen.
+- **TV: the buttons on Show the log couldn't be pressed with the remote, and the page froze at each press.** The log has the TV's own page now: Clear the log, Everything or Problems, and Refresh, with the log below in blocks the remote steps through. The copy buttons are gone from the TV: its log goes with a report.
+- **TV: moving along a row could throw the focus back to the first button at the top of the page.** Where the remote starts on a page is now set once, when the page opens.
+
+### Added
+- **Mixes made from your listening, on Home.** With Siansa Beats 0.53 or newer, Home has **For now** (this part of the
+  day, and whether it's dark outside), **Made for you** and **More of you**, each a row to move or hide in Arrange Home,
+  as a Carousel or as Tiles of four covers, with a few words on what's in each mix. They're kept on the phone, so
+  they're there at once after a restart, and a mix you play stays in your shortcuts for as long as Siansa Beats keeps
+  its mixes (7 days unless you change it there).
+- **Mix settings** (Settings › Mixes & radios, under Home's mixes): which mixes are made and how many, how long they
+  are, how many songs you know, genres and artists to leave out, whether the time of day and the dark count, and more.
+  Needs Siansa Beats 0.56.
+- **Vocals, a woman's or a man's voice, and how songs feel, in your vibes.** With Siansa Beats 0.51 or newer, Flow's **Add a sound, genre or mood** has a third list, **Moods**: vocals or instrumental, female or male vocals, happy, sad, relaxed, party and more. Typed words ask for them too: "sad female vocals" finds sad songs sung by women first.
+- **Carousel**, a new look for any row of Home (Arrange Home, the row's cog): big covers to flick through, the one in
+  the middle in focus with one on each side, gently blurred, and its name underneath.
+- **Notices of your own** at the top of Home: in Settings › Home page › Top of Home, Add a notice, pick songs or albums
+  and rules on their details (genre, artist, record label, year, when it was added…). It shows how many it finds, like
+  "12 new releases", with an icon you choose (or only its words), and a tap opens them.
+- Flow's Moods has AudioMuse-AI's mood words too: Beautiful, Chill, Mellow, Easy listening, Catchy and Sexy. With
+  AudioMuse-AI and no Siansa Beats, Flow now has a Moods list of its own (Happy, Sad, Party and these).
+- All genres: a box at the top finds a genre as you type, and A to Z down the right edge jumps to a letter.
+- About this song, in the lower part of now playing, now shows how the song is playing: the file beside what really plays (the original, converted to Opus with its bit rate, downloaded, or from the song cache). What plays is written in the accent colour when the song is converted. Switch it off in Settings › Now playing › About this song.
+- Star ratings: rate songs from one to five stars, kept on your server (Navidrome and other Subsonic servers). Turn them on in Settings › Now playing › Star ratings and pick where they show: in About this song, under the title, or both. A song's menu has Rate too.
+- Emby and Jellyfin can now convert songs to Opus, as Navidrome does: the streaming quality for Wi-Fi and mobile data applies there too, downloads can be saved as Opus, and files the phone can't open are played as Opus.
+- Playing from Emby or Jellyfin on a TV or speaker (Chromecast, DLNA) now sends a real Opus, MP3 or FLAC stream that the device can play, and moving to another spot works there.
+- Adding songs to a playlist shows a red number beside each playlist that has them already: for one song, how many
+  times it's there. Picking such a playlist asks first: add them again, or only the new ones.
+
+### Changed
+- With Siansa Beats 0.57 or newer and an AI set up on its page, Siansa Beats names Today's mix, your vibes, Flow's
+  words and the mood radios too. The phone's own AI then switches off by itself and isn't listed under Settings ›
+  Services; it comes back if Siansa Beats is switched off or has no AI. With AudioMuse-AI and no Siansa Beats, the
+  phone's AI works as before.
+- With Siansa Beats 0.51 or newer, a song's happy, sad, relaxed, party, aggressive and danceable come from models trained for each, which hear them more reliably. DJ mixes and your listening profile use them.
+- Your colour can be white or black (two new quick picks, or any grey by its code): the buttons take it, as near to it
+  as can still be seen on each page, so they never disappear into the background.
+- DJ mixes: during each beat-matched blend, the app now listens for both songs' kick drums and notes in the log (and in "Mark the last blend") when a song's beats land off its beat grid, so a song that Siansa Beats analysed wrong can be found and analysed again.
+- DJ mixes: moving in a song no longer forces a short 4-bar swap into the next one. The blend picked (a long blend, a drop swap…) is kept whenever it still fits before the end; only a move too close to the end gets the quick swap.
+- DJ mixes: a track from a mixed CD can now blend over up to 16 bars, not 8, when there's room inside its own beat.
+- DJ mixes: moving in a song close to its end now always gives a short blend into the next song, even when the planned blend was laid on the beat. Only a song that ends cold still changes straight over.
+- **Flow is new.** Drag one dot on the mood pad for calmer or livelier, slower or faster, and the page takes the mood's
+  colour and name. Add sounds, genres (as Siansa Beats hears them, or your songs' genre tags) and moods with + (more of
+  it, less of it, or off again), choose favourites or artists new to you, and press play: it starts straight away, and
+  you stay on Flow.
+- **Steer a Flow mix while it plays**: move the dot or change a pick, and the songs that come next change. Now playing
+  and the queue show its name, and + saves the whole mix as a playlist.
+- **A new title bar on every page with a cover or a picture**: albums, playlists, mixes, radios, genres, liked songs, artists, books and podcasts. Nothing slides into it any more. As the page's title scrolls under the bar, the bar comes in in one step: a wash of the cover's colour, strongest at the top and running out below the bar with no edge, that the songs dissolve into, with the title small in the middle.
+- **Play and the heart stay on the page**: they no longer appear in the title bar once you scroll.
+- **Swiping the mini player keeps its cover in place.** Only the title and artist slide with your finger, and the cover changes when the song does. The whole line slid away before and the bar looked empty.
+- Settings are grouped by what they do, and each setting is in one place. Playing: Sound & playback, Mixes & radios,
+  Discovery (new) and Listening; On your phone: Storage & downloads and Backup & restore; Look: Home page, Theme, Now
+  playing and Bottom bar; Help: Help & feedback and About.
+- Services is one list, and each service opens its own page: switch it on or off, connect it, and see what it's used
+  for, each opening the page where that's set. AudioMuse-AI isn't listed while Siansa Beats is on.
+- Mixes & radios says who makes Home's mixes, Siansa Beats or this phone. While Siansa Beats makes them, the phone
+  makes none of its own (no hourly Today's mix, no mixes in the background).
+- Sound & playback has DJ blends and the book skips; Home page has Arrange Home as a page of its own; Help & feedback
+  has Debug logs once, under Debugging.
+
 ## 1.5.6 — 2026-11-15
 
 ### Fixed
