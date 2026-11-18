@@ -275,4 +275,13 @@ class PinnedCardsTest {
         val stats = mapOf("a" to PlayStats(plays = 2), "b" to PlayStats(plays = 9))
         assertEquals(listOf("b", "a"), pickRuleSongs(songs, c, Random(1), stats = stats).map { it.id })
     }
+
+    /** A notice of your own counts what its card shows (the owner, 18 Nov: 491 for 103 albums of 2026). */
+    @Test fun aNoticeCountsWhatItsCardShows() {
+        val albums = (1..103).map { app.siansa.data.Album(id = "al$it", name = "Album $it", year = 2026) }
+        val playSongs = (1..388).map { Song(id = "s$it", title = "Song $it") }
+        assertEquals(103, CardContent(playSongs, albums).shownCount)  // the songs are only what Play plays
+        assertEquals(388, CardContent(playSongs, emptyList()).shownCount)
+        assertEquals(0, CardContent(emptyList(), emptyList()).shownCount)
+    }
 }
