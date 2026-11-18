@@ -26,5 +26,18 @@ object PlaylistDuplicates {
         return if (there == adding.size) "All ${adding.size} songs are in it already." else "$there of ${adding.size} songs are in it already."
     }
 
+    /**
+     * What to say after adding [adding] again to a playlist that held [before] and now holds [after] (both its songs'
+     * ids): null when they went in, else that the server keeps each song once (some servers, such as an older
+     * Jellyfin, skip a song a playlist has already), with how many new ones went in.
+     */
+    fun notAddedAgain(before: List<String>, after: List<String>, adding: List<Song>, server: String, playlist: String): String? {
+        val wanted = count(before, adding) + adding.size - missing(before, adding).size
+        if (count(after, adding) >= wanted) return null
+        val added = (after.size - before.size).coerceAtLeast(0)
+        return if (added > 0) "Added $added new to $playlist: $server keeps each song once in a playlist"
+        else "$server keeps each song once in a playlist: nothing was added again to $playlist"
+    }
+
     private fun timesWord(n: Int) = when (n) { 1 -> "once"; 2 -> "twice"; else -> "$n times" }
 }

@@ -26,4 +26,17 @@ class PlaylistDuplicatesTest {
         assertEquals("All 2 songs are in it already.", PlaylistDuplicates.question(listOf("a", "b"), listOf(song("a"), song("b"))))
         assertEquals(emptyList<Song>(), PlaylistDuplicates.missing(listOf("a", "b"), listOf(song("a"), song("b"))))
     }
+
+    /** A server that keeps each song once (an older Jellyfin) is said so after Add again; one that takes it says nothing. */
+    @Test fun aSongTheServerDidntAddAgainIsSaid() {
+        val one = listOf(song("b"))
+        assertEquals(null, PlaylistDuplicates.notAddedAgain(listOf("a", "b"), listOf("a", "b", "b"), one, "Jellyfin", "Mine"))
+        assertEquals("Jellyfin keeps each song once in a playlist: nothing was added again to Mine",
+            PlaylistDuplicates.notAddedAgain(listOf("a", "b"), listOf("a", "b"), one, "Jellyfin", "Mine"))
+        // Add all of three, one new: only the new one went in.
+        val three = listOf(song("a"), song("b"), song("c"))
+        assertEquals("Added 1 new to Mine: Jellyfin keeps each song once in a playlist",
+            PlaylistDuplicates.notAddedAgain(listOf("a", "b"), listOf("a", "b", "c"), three, "Jellyfin", "Mine"))
+        assertEquals(null, PlaylistDuplicates.notAddedAgain(listOf("a", "b"), listOf("a", "b", "a", "b", "c"), three, "Jellyfin", "Mine"))
+    }
 }

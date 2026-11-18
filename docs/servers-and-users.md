@@ -85,7 +85,8 @@ rewrites every hour) show as soon as the answer comes. No library sync is needed
 **Songs already in a playlist.** When you add songs to a playlist, a red number beside each playlist says it has them
 already: for one song, how many times it's there. Picking one of those asks first: **Add again** (**Add all** for
 several songs) or, when some are new, **Add N new**. This works the same on Navidrome, Emby, Jellyfin and on playlists
-kept on this phone. Another user's playlists aren't checked.
+kept on this phone. Another user's playlists aren't checked. Some servers (an older Jellyfin) keep each song only
+once in a playlist; Siansa then says nothing was added again.
 
 ## Library sync
 

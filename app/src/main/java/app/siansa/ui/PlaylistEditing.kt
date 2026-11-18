@@ -148,9 +148,17 @@ fun AddToPlaylistDialog(songs: List<Song>, onDone: (String?) -> Unit) {
         if (busy) return
         busy = true
         scope.launch {
+            val before = already[playlist.id]
             val result = graph.playlists.add(playlist.id, adding)
             val failure = result.exceptionOrNull()?.message?.takeIf { it == PlaylistEditor.OFFLINE }
-            onDone(if (result.isSuccess) "Added to ${playlist.name}" else failure ?: "Couldn't add it to ${playlist.name}")
+            // Added again: some servers skip a song the playlist has already (an older Jellyfin), so it's read back and said.
+            val skipped = if (result.isSuccess && before != null && PlaylistDuplicates.count(before, adding) > 0 && !LocalPlaylists.isLocal(playlist.id)) {
+                runCatching { withContext(Dispatchers.IO) { graph.playlistCache.kept(playlist.id)?.songs?.map { it.id } } }.getOrNull()?.let { after ->
+                    PlaylistDuplicates.notAddedAgain(before, after, adding, graph.settings.current.sourceKind.label, playlist.name)
+                }
+            } else null
+            skipped?.let { AppLog.w("Playlist", it) }
+            onDone(skipped ?: if (result.isSuccess) "Added to ${playlist.name}" else failure ?: "Couldn't add it to ${playlist.name}")
         }
     }
     asking?.let { playlist ->
