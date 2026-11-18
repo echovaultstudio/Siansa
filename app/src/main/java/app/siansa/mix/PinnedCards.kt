@@ -263,6 +263,17 @@ data class CardContent(
     val episodeProgress: Map<String, BookProgress> = emptyMap(),
 ) {
     val isEmpty: Boolean get() = songs.isEmpty() && albums.isEmpty() && books.isEmpty() && episodes.isEmpty()
+
+    /**
+     * How many things the card shows, as its page counts them (the owner, 18 Nov: a notice of 2026's albums said 491 for
+     * 103 albums, its albums and the songs of the first ten added together): its albums when it has any (the songs are
+     * only what Play plays), else its songs; books and episodes for a card of them.
+     */
+    val shownCount: Int get() = when {
+        books.isNotEmpty() || episodes.isNotEmpty() -> books.size + episodes.size
+        albums.isNotEmpty() -> albums.size
+        else -> songs.size
+    }
 }
 
 /** Custom cards kept per user, and the songs of each (made once a day, kept while the app runs). */

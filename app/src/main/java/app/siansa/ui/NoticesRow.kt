@@ -235,12 +235,12 @@ private suspend fun noticeCandidates(graph: AppGraph, settings: AppSettings, syn
     Notices.yourMonth(today)?.let(::add)
     Notices.newArtists(graph.suggestions.savedToday().size, today)?.let(::add)
     if (settings.notices.modeOf(NoticeKind.LIKED) != app.siansa.mix.NoticeMode.OFF) add(Notices.liked())
-    // Your own notices (issue #1234): each one's count, from the songs or albums its rules find.
+    // Your own notices (issue #1234): each one's count, of what its card shows (its albums, songs, or books).
     if (settings.notices.modeOf(NoticeKind.CUSTOM) != app.siansa.mix.NoticeMode.OFF && graph.library.isSynced) {
         graph.pinnedCards.all().filter { it.notice && it.shown }.forEach { card ->
             try {
                 val found = graph.pinnedCards.content(card)
-                Notices.custom(card.id, card.title, found.songs.size + found.albums.size)?.let(::add)
+                Notices.custom(card.id, card.title, found.shownCount)?.let(::add)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
