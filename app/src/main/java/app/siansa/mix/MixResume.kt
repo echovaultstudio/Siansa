@@ -61,6 +61,8 @@ class MixResume(private val graph: AppGraph, context: Context) {
             AppLog.i("Mix", "Carrying on \"${mix.title}\" at song ${start.first + 1} of ${mix.songs.size}, ${start.second / 1000}s in")
         }
         graph.player.play(mix.songs, start?.first ?: 0, startMs = start?.second ?: 0L)
+        // Named at the top of now playing, a Siansa Beats mix as the phone's own (the owner, 18 Nov).
+        graph.playingFrom.note("mix/${mix.id}", mix.title)
     }
 
     /** Starts noting where a playing mix is; once, when the app starts. */

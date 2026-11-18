@@ -99,6 +99,7 @@ import app.siansa.offline.Downloads
 import app.siansa.offline.OfflineItem
 import app.siansa.offline.OfflineKind
 import app.siansa.offline.offlineItem
+import app.siansa.playback.PlayingFrom
 import app.siansa.playback.ActivePlayer
 import app.siansa.playback.BookPlayer
 import app.siansa.playback.MiniFor
@@ -379,6 +380,8 @@ class AppGraph(val app: Application) {
     val history = HistoryStore(app)
     /** What was last played as a whole, for Home's shortcuts (issue #271). */
     val recentPlays = RecentPlays(app)
+    /** What the queue was played from, for now playing's top (the owner, 18 Nov). */
+    val playingFrom = PlayingFrom { player.queueGeneration }
     /** How Liked songs and playlists are sorted (issue #257). */
     val listSort = ListSortStore(app)
     val library = LibraryRepository(app)
