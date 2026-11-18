@@ -1,5 +1,6 @@
 package app.siansa.ui
 
+import app.siansa.net.beatsPlansReady
 import androidx.compose.material3.HorizontalDivider
 import app.siansa.data.Service
 import androidx.compose.animation.AnimatedVisibility
@@ -328,6 +329,7 @@ fun ConnectionsHub(nav: NavController, open: String? = null, only: String? = nul
 
 /** "AI · OpenRouter · google/gemini-2.5-flash", or why it's off. */
 internal fun aiLine(s: AppSettings): String = when {
+    s.beatsPlansReady -> "Done by Siansa Beats' AI"
     !s.aiTitles -> "Titles and sound searches · off"
     s.aiReady -> "${s.aiProvider.label} · ${s.aiModel}"
     else -> "Titles and sound searches · not set up"
@@ -812,7 +814,8 @@ internal fun serviceOf(key: String): Service? = when (key) {
 internal fun usedFor(service: Service): List<Triple<String, String, String>> = when (service) {
     Service.BEATS -> listOf(
         Triple("Loudness and DJ blends", "Sound & playback", "settings/sound"),
-        Triple("Home's mixes and Mix settings", "Mixes & radios", "settings/radios"),
+        // Its AI names the phone's playlists too (0.57), when it's set up there: they're on the same page.
+        Triple("Home's mixes, Mix settings and playlist names", "Mixes & radios", "settings/radios"),
         Triple("Genres, similar music, moods", "Discovery", "settings/discovery"),
         Triple("Your listens", "Listening", "settings/scrobbling"),
     )
@@ -836,6 +839,9 @@ private fun ServicePage(graph: AppGraph, service: Service, draft: AppSettings, o
     }
     if (service == Service.AUDIOMUSE && s.beatsReady && Service.on(s, Service.BEATS)) {
         Hint("Siansa Beats does all of this now, so AudioMuse-AI isn't used while Siansa Beats is on.")
+    }
+    if (service == Service.AI && s.beatsPlansReady) {
+        Hint("Siansa Beats' AI does this now, so the phone's AI isn't used while it's on. It's needed with AudioMuse-AI and no Siansa Beats, or when Siansa Beats has no AI set up.")
     }
     if (on) {
         HorizontalDivider()

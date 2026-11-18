@@ -91,6 +91,26 @@ object BeatsSound {
         hasMixes.value = has
     }
 
+    /**
+     * Whether Siansa Beats plans the app's playlists with its own AI (0.57, `POST /api/v1/plan`: the owner, 18 Nov), as
+     * its capabilities last said; kept as [traits] is. While it does, the phone's own AI isn't used ([beatsPlansReady]).
+     */
+    private val hasPlans = MutableStateFlow(false)
+    val plans: StateFlow<Boolean> = hasPlans.asStateFlow()
+
+    @Volatile
+    var onPlans: ((Boolean) -> Unit)? = null
+
+    fun plans(has: Boolean) {
+        if (hasPlans.value == has) return
+        hasPlans.value = has
+        onPlans?.invoke(has)
+    }
+
+    fun restorePlans(has: Boolean) {
+        hasPlans.value = has
+    }
+
     fun restore(paths: Set<String>, own: Map<String, String> = emptyMap()) {
         answers = paths
         where = own
@@ -116,3 +136,16 @@ val AppSettings.soundReady: Boolean get() = audioMuseReady || (beatsSoundReady &
  * same models, once it has the songs' vectors for it.
  */
 val AppSettings.wordsReady: Boolean get() = audioMuseReady || (beatsSoundReady && BeatsSound.answers(BeatsSound.WORDS))
+
+/**
+ * Whether the playlists' plans (the title and sound search of a vibe, Today's mix, Flow's words and the mood radios)
+ * come from Siansa Beats' AI (0.57, the owner, 18 Nov: "if beats is selected and configured then AI on the phone can be
+ * auto disabled"). While they do, the phone's AI is switched off by itself and not listed.
+ */
+val AppSettings.beatsPlansReady: Boolean get() = beatsReady && BeatsSound.plans.value
+
+/**
+ * Whether a playlist can be planned by an AI: Siansa Beats' when it plans them, else the phone's own (for AudioMuse-AI
+ * without Siansa Beats, or a Siansa Beats without an AI set up).
+ */
+val AppSettings.plansReady: Boolean get() = beatsPlansReady || aiReady

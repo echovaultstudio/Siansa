@@ -51,7 +51,8 @@ its own page. A service's page has its switch (off: left alone and shown nowhere
   [Audiobooks and podcasts](books.md).
 - **Last.fm** and **ListenBrainz / Koito**: set on [Listening](#listening).
 - **AI** (optional): which service writes Today's mix, Flow's words and the mood radios (OpenRouter, OpenAI,
-  Anthropic, Google Gemini, Mistral, Groq, Ollama or another), its key and its model. See [AI features](ai.md).
+  Anthropic, Google Gemini, Mistral, Groq, Ollama or another), its key and its model. Not listed while Siansa Beats'
+  own AI does this (Siansa Beats 0.57 or newer, with AI set up on its page). See [AI features](ai.md).
 
 **For the best Siansa**, under the list: a line per service, ✓ when it's on and answers, ✕ when it doesn't (with
 what the check said), – when it's not needed, ○ when it's off or optional.

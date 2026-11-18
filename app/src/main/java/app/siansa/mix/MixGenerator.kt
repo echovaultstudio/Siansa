@@ -18,6 +18,8 @@ import app.siansa.net.ClapHit
 import app.siansa.net.Steer
 import app.siansa.net.soundReady
 import app.siansa.net.str
+import app.siansa.net.beatsPlansReady
+import app.siansa.net.plansReady
 import app.siansa.net.wordsReady
 import app.siansa.situation.Situation
 import java.time.LocalDate
@@ -154,7 +156,7 @@ class MixGenerator(private val graph: AppGraph) {
 
         // The moment the mix is made in, as far as the Vibes panel allows (issue #247): read once, here.
         val situation = graph.situation.read(settings.situation)
-        val plan = if (selector.useAi && settings.aiReady) {
+        val plan = if (selector.useAi && settings.plansReady) {
             runCatching { aiPlan(selector, situation) }
                 .onFailure { AppLog.w("Mix", "AI plan rejected, using the vibe's own search: ${it.message}") }
                 .getOrNull() ?: fallbackPlan(selector, situation)
@@ -343,7 +345,15 @@ class MixGenerator(private val graph: AppGraph) {
         return Plan(title, query, description.ifBlank { selector.guidance }, ai = true, steering = steeringOf(obj, concepts))
     }
 
+    /**
+     * A plan for [user] (the brief): from Siansa Beats' AI when it plans them (0.57, the owner, 18 Nov), so the phone
+     * needs no AI of its own; otherwise from the phone's AI. Both answer `{"title", "query", "description", "steer"}`.
+     */
     private suspend fun askPlan(user: String): kotlinx.serialization.json.JsonObject {
+        if (graph.settings.current.beatsPlansReady) {
+            AppLog.d("Mix", "Plan asked of Siansa Beats' AI")
+            return graph.beats.plan(user)
+        }
         val raw = graph.ai.complete(SYSTEM_PROMPT, user)
         val start = raw.indexOf('{')
         val end = raw.lastIndexOf('}')
@@ -479,7 +489,7 @@ class MixGenerator(private val graph: AppGraph) {
         if (text.length < 3) throw MixException("Describe your mood in a few words")
         if (!graph.settings.current.wordsReady) throw MixException("Set up AudioMuse-AI in Settings first")
         var plan = Plan(text.replaceFirstChar { it.uppercase() }, text, "From your description", ai = false)
-        if (graph.settings.current.aiReady) {
+        if (graph.settings.current.plansReady) {
             runCatching { aiMoodPlan(text) }
                 .onSuccess { plan = it }
                 .onFailure { AppLog.w("Mood", "AI couldn't interpret the mood, searching the words directly: ${it.message}") }
@@ -518,7 +528,7 @@ class MixGenerator(private val graph: AppGraph) {
         }
         if (words.length < 3) throw MixException("Describe your aura in a few words")
         var plan = Plan(words.replaceFirstChar { it.uppercase() }, words, "From your description", ai = false)
-        if (graph.settings.current.aiReady) {
+        if (graph.settings.current.plansReady) {
             runCatching { aiMoodPlan(words) }
                 .onSuccess { plan = it }
                 .onFailure { AppLog.w("Vibe", "AI couldn't interpret the vibe, searching the words directly: ${it.message}") }
@@ -687,11 +697,7 @@ class MixGenerator(private val graph: AppGraph) {
             if (recent.isNotEmpty()) appendLine("Recently played: ${recent.joinToString("; ")}")
             if (concepts.isNotEmpty()) appendLine("Sound concepts the search understands well: ${concepts.joinToString(", ")}")
         }
-        val raw = graph.ai.complete(SYSTEM_PROMPT, user)
-        val start = raw.indexOf('{')
-        val end = raw.lastIndexOf('}')
-        if (start < 0 || end <= start) throw MixException("The AI didn't answer with JSON")
-        val obj = AppJson.parseToJsonElement(raw.substring(start, end + 1)).jsonObject
+        val obj = askPlan(user)
         val title = obj.str("title")?.trim()?.trim('"')?.take(60).orEmpty()
         val query = obj.str("query")?.trim()?.take(300).orEmpty()
         val description = obj.str("description")?.trim()?.take(200).orEmpty()

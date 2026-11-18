@@ -572,6 +572,11 @@ class AppGraph(val app: Application) {
         BeatsSound.onTraits = { has -> QuietWrites.save(prefs) { putBoolean("traits", has) } }
         BeatsSound.restoreMixes(prefs.getBoolean("mixes", false))
         BeatsSound.onMixes = { has -> QuietWrites.save(prefs) { putBoolean("mixes", has) } }
+        BeatsSound.restorePlans(prefs.getBoolean("plans", false))
+        BeatsSound.onPlans = { has ->
+            AppLog.i("Beats", if (has) "Siansa Beats plans the playlists with its AI: the phone's AI is off" else "Siansa Beats doesn't plan the playlists: the phone's AI is used, if set up")
+            QuietWrites.save(prefs) { putBoolean("plans", has) }
+        }
         BeatsSound.onChanged = { paths, where ->
             AppLog.i("Beats", if (paths.isEmpty()) "Siansa Beats doesn't answer what songs sound like (yet)"
             else "Siansa Beats answers what songs sound like: ${paths.joinToString { it.removePrefix("/api/") }}" +

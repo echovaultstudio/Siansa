@@ -1,5 +1,6 @@
 package app.siansa.ui
 
+import app.siansa.net.beatsPlansReady
 import androidx.compose.material3.Icon
 import androidx.compose.material.icons.Icons
 import androidx.compose.foundation.clickable
@@ -148,7 +149,12 @@ internal fun bestLines(s: AppSettings, health: Map<String, ServiceCheck>): List<
     out += line(Service.BOOKS, "audiobooks and podcasts")
     out += line(Service.LASTFM, "scrobbling")
     out += line(Service.LISTENBRAINZ, "sending listens")
-    out += line(Service.AI, "mix titles and sound searches in your own words")
+    val aiOn = Service.on(s, Service.AI) && Service.setUp(s, Service.AI)
+    out += when {
+        s.beatsPlansReady && aiOn -> BestLine("warn", "AI · not needed: Siansa Beats' AI plans the playlists, so this one isn't used. You can turn it off.", Service.AI)
+        s.beatsPlansReady -> BestLine("dash", "AI · not needed: Siansa Beats' AI plans the playlists")
+        else -> line(Service.AI, "mix titles and sound searches in your own words")
+    }
     return out
 }
 
@@ -167,8 +173,12 @@ internal fun ServiceDot(ok: Boolean?, modifier: Modifier = Modifier) {
 }
 
 /** AudioMuse-AI isn't listed while Siansa Beats is on and set up: Beats does everything it did (the owner, 17 Nov). */
-internal fun hiddenByBeats(s: AppSettings, service: Service): Boolean =
-    service == Service.AUDIOMUSE && s.beatsReady && Service.on(s, Service.BEATS)
+internal fun hiddenByBeats(s: AppSettings, service: Service): Boolean = when (service) {
+    Service.AUDIOMUSE -> s.beatsReady && Service.on(s, Service.BEATS)
+    // The phone's AI, while Siansa Beats' plans the playlists (0.57, the owner, 18 Nov): it's off by itself then.
+    Service.AI -> s.beatsPlansReady
+    else -> false
+}
 
 /**
  * Settings › Services (the owner, 13 Nov; one list, one page per service, the owner, 17 Nov): every service with its dot
@@ -198,6 +208,7 @@ fun ServicesScreen(nav: NavController) {
                 SettingsCard(tag = "doneByBeats") {
                     HubGroupLabel("DONE BY SIANSA BEATS")
                     Hint("AudioMuse-AI isn't listed while Siansa Beats is on: Beats does all it did. Switch Siansa Beats off and it comes back here.")
+                    if (settings.beatsPlansReady) Hint("AI isn't listed either: Siansa Beats' AI names Today's mix, the vibes, Flow's words and the mood radios, so the phone's AI is off. Turn AI off on Siansa Beats and the phone's comes back.")
                 }
             }
             SettingsCard(tag = "bestSiansa") {
