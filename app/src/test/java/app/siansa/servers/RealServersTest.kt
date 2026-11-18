@@ -269,11 +269,12 @@ class RealServersTest(private val server: String) {
         val made = source().createPlaylist("CI twice", listOf(a.id))
         val id = made?.id ?: source().playlists().first { it.name == "CI twice" }.id
         val adding = listOf(a)
-        assertEquals("$server: in it once", 1, app.siansa.data.PlaylistDuplicates.count(source().playlist(id).songs.map { it.id }, adding))
+        val before = source().playlist(id).songs.map { it.id }
+        assertEquals("$server: in it once, but it holds $before", 1, app.siansa.data.PlaylistDuplicates.count(before, adding))
         source().addToPlaylist(id, listOf(a.id))
         val after = source().playlist(id).songs.map { it.id }
         println("$server: after adding the song again, the playlist holds $after")
-        assertEquals("$server: added again", listOf(a.id, a.id), after)
+        assertEquals("$server: added again, but it holds $after", listOf(a.id, a.id), after)
         assertEquals("$server: counted twice", 2, app.siansa.data.PlaylistDuplicates.count(after, adding))
     }
 
