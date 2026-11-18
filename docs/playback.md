@@ -222,6 +222,10 @@ Both follow your finger, and let go wherever you like: a hard swipe finishes qui
 a short pull springs back. The mini player fades away as the player rises and comes back as it goes. The book
 player opens and closes the same way.
 
+At the top, now playing says what you're playing from: **Playing from mix** and the mix's name (a Siansa Beats mix or
+one made on the phone), **Playing from playlist**, **Playing from radio**, **Playing from artist**, or **Playing from
+album** and the song's album. Tap the name to open its page.
+
 A **DJ mix** (from the play button, the DJ mix bar, Start a mix, an album's or playlist's Shuffle, or Keep playing in DJ
 mode) is only offered when **Siansa Beats** answers with everything it needs: the beat grids its blends follow, and
 each song's tempo, key and energy to put the songs in order (Siansa Beats 0.25 or newer, with the songs' sound taken

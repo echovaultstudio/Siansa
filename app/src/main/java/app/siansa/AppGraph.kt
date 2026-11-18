@@ -379,6 +379,8 @@ class AppGraph(val app: Application) {
     val history = HistoryStore(app)
     /** What was last played as a whole, for Home's shortcuts (issue #271). */
     val recentPlays = RecentPlays(app)
+    /** What the queue was played from, for now playing's top (the owner, 18 Nov). */
+    val playingFrom = app.siansa.playback.PlayingFrom { player.queueGeneration }
     /** How Liked songs and playlists are sorted (issue #257). */
     val listSort = ListSortStore(app)
     val library = LibraryRepository(app)
