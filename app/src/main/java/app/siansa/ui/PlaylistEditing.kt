@@ -219,14 +219,7 @@ fun AddToPlaylistDialog(songs: List<Song>, onDone: (String?) -> Unit) {
                                     Cover(playlist.coverArt, 150, Modifier.size(40.dp), RoundedCornerShape(4.dp))
                                     Spacer(Modifier.width(Space.Medium))
                                     Column(Modifier.weight(1f)) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Text(playlist.name, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                                                modifier = Modifier.weight(1f, fill = false))
-                                            if (times > 0) {
-                                                Spacer(Modifier.width(Space.Small))
-                                                AlreadyBadge(times)
-                                            }
-                                        }
+                                        PlaylistNameWithBadge(playlist.name, times)
                                         Text(
                                             when {
                                                 !takes -> "Only for songs from ${playlistOwnerName(playlist)}"
@@ -246,6 +239,18 @@ fun AddToPlaylistDialog(songs: List<Song>, onDone: (String?) -> Unit) {
         confirmButton = {},
         dismissButton = { TextButton(onClick = { onDone(null) }) { Text("Cancel") } },
     )
+}
+
+/** A playlist's name in the picker, with [AlreadyBadge] beside it when the songs are in it [times] times already; a long name gives way to it. */
+@Composable
+internal fun PlaylistNameWithBadge(name: String, times: Int) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(name, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+        if (times > 0) {
+            Spacer(Modifier.width(Space.Small))
+            AlreadyBadge(times)
+        }
+    }
 }
 
 /**
