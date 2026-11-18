@@ -176,13 +176,13 @@ private fun NoticePill(notice: Notice, onOpen: () -> Unit) {
         contentColor = MaterialTheme.colorScheme.onSurface,
         modifier = Modifier.widthIn(max = NOTICE_MAX_WIDTH).testTag("notice-${notice.kind.id}"),
     ) {
-        NoticePillContent(noticeIcon(notice.kind), notice.text)
+        NoticePillContent(noticeIcon(notice), notice.text)
     }
 }
 
 /** What's inside a notice pill; also measured, never shown, for the height of Home's menu button. */
 @Composable
-private fun NoticePillContent(icon: ImageVector, text: String) {
+internal fun NoticePillContent(icon: ImageVector, text: String) {
     Row(
         Modifier.padding(horizontal = Space.Medium, vertical = Space.Small),
         verticalAlignment = Alignment.CenterVertically,
@@ -192,6 +192,10 @@ private fun NoticePillContent(icon: ImageVector, text: String) {
         Text(text, style = MaterialTheme.typography.labelLarge, fontSize = PILL_FONT, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
     }
 }
+
+/** A notice's icon: a notice of your own's chosen one (the filter icon only when none can be read), else its kind's. */
+internal fun noticeIcon(notice: Notice): ImageVector =
+    (if (notice.kind == NoticeKind.CUSTOM) NoticeIcons.of(notice.icon) else null) ?: noticeIcon(notice.kind)
 
 internal fun noticeIcon(kind: NoticeKind): ImageVector = when (kind) {
     NoticeKind.NEEDS_YOU -> Icons.Rounded.Warning
@@ -240,7 +244,7 @@ private suspend fun noticeCandidates(graph: AppGraph, settings: AppSettings, syn
         graph.pinnedCards.all().filter { it.notice && it.shown }.forEach { card ->
             try {
                 val found = graph.pinnedCards.content(card)
-                Notices.custom(card.id, card.title, found.shownCount)?.let(::add)
+                Notices.custom(card.id, card.title, found.shownCount, card.noticeIconKey)?.let(::add)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

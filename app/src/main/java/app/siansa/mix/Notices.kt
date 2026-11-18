@@ -79,7 +79,8 @@ data class NoticePrefs(val modes: Map<NoticeKind, NoticeMode> = emptyMap(), val 
 }
 
 /** One chip. [key] names what it's about ("carry_on:book-12", "month:2026-10"), so the row can tell two apart. */
-data class Notice(val kind: NoticeKind, val key: String, val text: String, val route: String)
+/** [icon]: a notice of your own's icon, by its key ([NOTICE_ICONS]); the others' come from their [kind]. */
+data class Notice(val kind: NoticeKind, val key: String, val text: String, val route: String, val icon: String = "")
 
 object Notices {
     /** At most this many chips. */
@@ -161,8 +162,8 @@ object Notices {
     fun liked(): Notice = Notice(NoticeKind.LIKED, "liked", "Liked songs", "liked")
 
     /** A notice of your own: how many its rules found and its name ("12 new releases"); none while it finds none. */
-    fun custom(id: String, name: String, found: Int): Notice? = if (found <= 0) null else
-        Notice(NoticeKind.CUSTOM, "custom:$id:$found", "$found ${name.trim()}", "pinned/$id")
+    fun custom(id: String, name: String, found: Int, icon: String = ""): Notice? = if (found <= 0) null else
+        Notice(NoticeKind.CUSTOM, "custom:$id:$found", "$found ${name.trim()}", "pinned/$id", icon)
 
     fun newArtists(count: Int, today: LocalDate): Notice? = if (count <= 0) null else
         Notice(NoticeKind.NEW_ARTISTS, "artists:$today", if (count == 1) "1 artist for you" else "$count artists for you", "discover/artists")

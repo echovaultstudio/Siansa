@@ -94,7 +94,15 @@ data class PinnedCard(
      * its rules find ("12 new releases"), opening them, instead of a card in Your cards. Shown while it finds any.
      */
     val notice: Boolean = false,
+    /**
+     * A notice's icon (the owner, 18 Nov: "allow users choose an icon for a custom notice"), one of [NOTICE_ICONS] by
+     * its key; empty: by what it shows ([noticeIconKey]).
+     */
+    val noticeIcon: String = "",
 ) {
+    /** The icon a notice of this card shows: the one chosen, else an album for albums and a note for songs. */
+    val noticeIconKey: String
+        get() = noticeIcon.takeIf { it in NOTICE_ICONS } ?: if (contents == CardContents.ALBUMS) "album" else "song"
     /** Every rule: [rules], and the single fields of a card made before rules, as rules. */
     val allRules: List<CardRule>
         get() = rules + buildList {
@@ -493,3 +501,9 @@ fun keepListening(
     @Suppress("UNCHECKED_CAST")
     return merged.filterIsInstance<Book>() to merged.filterIsInstance<Pair<*, *>>().map { it as Pair<Book, Episode> }
 }
+
+/** The icons a notice of your own can have, by key, in the order they're offered (the owner, 18 Nov). */
+val NOTICE_ICONS = listOf(
+    "album", "song", "new", "star", "heart", "fire", "bolt", "headphones",
+    "mic", "piano", "calendar", "history", "explore", "party", "moon", "list",
+)

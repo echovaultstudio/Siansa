@@ -135,6 +135,11 @@ fun CardEditorScreen(nav: NavController, id: String) {
                 placeholder = { if (c.notice) Text("new releases") },
                 modifier = Modifier.fillMaxWidth().testTag("pinnedTitle"))
             if (c.notice) Hint("The pill says how many songs or albums the rules find, then these words: \"12 new releases\". It shows while it finds any, and a tap opens them.")
+            if (c.notice) {
+                // Its icon on the pill (the owner, 18 Nov): Auto is an album for albums and a note for songs.
+                EditorHeading("Icon")
+                NoticeIconPicker(c.noticeIcon) { change(c.copy(noticeIcon = it)) }
+            }
 
             EditorHeading("Shows")
             // A notice counts songs or albums from the library: not books, a sound or a radio.
@@ -270,6 +275,19 @@ private fun EditorHeading(text: String) {
 }
 
 @OptIn(ExperimentalLayoutApi::class)
+/** The icons a notice can have, as chips ([NoticeIcons]); [chosen] "" is Auto. */
+@Composable
+internal fun NoticeIconPicker(chosen: String, onPick: (String) -> Unit) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.Small), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
+        FilterChip(selected = chosen.isBlank() || NoticeIcons.of(chosen) == null, onClick = { onPick("") }, label = { Text("Auto") },
+            modifier = Modifier.testTag("noticeIcon-auto"))
+        NoticeIcons.all.forEach { (key, icon, name) ->
+            FilterChip(selected = chosen == key, onClick = { onPick(key) }, label = { Icon(icon, name, Modifier.size(20.dp)) },
+                modifier = Modifier.testTag("noticeIcon-$key"))
+        }
+    }
+}
+
 @Composable
 private fun <T> ChipRow(items: List<T>, selected: T, label: (T) -> String, tag: String, onPick: (T) -> Unit) {
     FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.Small), verticalArrangement = Arrangement.spacedBy(Space.Small)) {

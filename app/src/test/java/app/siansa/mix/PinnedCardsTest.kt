@@ -284,4 +284,18 @@ class PinnedCardsTest {
         assertEquals(388, CardContent(playSongs, emptyList()).shownCount)
         assertEquals(0, CardContent(emptyList(), emptyList()).shownCount)
     }
+
+    /** A notice's icon (the owner, 18 Nov): the one chosen, else by what it shows; kept with the card. */
+    @Test fun aNoticeKeepsItsIcon() {
+        val songs = PinnedCard.new().copy(notice = true)
+        assertEquals("song", songs.noticeIconKey)
+        assertEquals("album", songs.copy(contents = CardContents.ALBUMS).noticeIconKey)
+        assertEquals("fire", songs.copy(noticeIcon = "fire").noticeIconKey)
+        assertEquals("one no longer offered falls back", "song", songs.copy(noticeIcon = "rocket").noticeIconKey)
+        val chosen = songs.copy(noticeIcon = "moon")
+        assertEquals(chosen, Json.decodeFromString(PinnedCard.serializer(), Json.encodeToString(PinnedCard.serializer(), chosen)))
+        // A card kept before icons could be chosen reads as Auto.
+        val old = Json { ignoreUnknownKeys = true }.decodeFromString(PinnedCard.serializer(), Json.encodeToString(PinnedCard.serializer(), songs).replace(",\"noticeIcon\":\"\"", ""))
+        assertEquals("", old.noticeIcon)
+    }
 }
