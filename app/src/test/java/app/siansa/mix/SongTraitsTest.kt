@@ -54,8 +54,8 @@ class SongTraitsTest {
         assertNull(SongTraits.named("Sad")!!.share(emptyMap()))
         assertEquals(SongTraits.ALL.size, SongTraits.ALL.map { it.label.lowercase() }.toSet().size)
         // The picker's headings, each group's traits together: the voice, then moods, then the style.
-        assertEquals(listOf("Voice", "Mood", "Style"), SongTraits.ALL.map { it.group }.distinct())
-        assertEquals(2, SongTraits.ALL.map { it.group }.zipWithNext().count { (a, b) -> a != b })
+        assertEquals(listOf("Voice", "Mood", "Style", "Tags"), SongTraits.ALL.map { it.group }.distinct())
+        assertEquals(3, SongTraits.ALL.map { it.group }.zipWithNext().count { (a, b) -> a != b })
         assertEquals(listOf("Vocals", "Instrumental", "Female vocals", "Male vocals"), SongTraits.ALL.filter { it.group == SongTraits.VOICE }.map { it.label })
     }
 
@@ -110,5 +110,41 @@ class SongTraitsTest {
         val t = FlowMood.pick(VibeTuning(), "Female vocals", genre = false, trait = true)
         assertEquals(listOf(SoundDial("Female vocals", FlowMood.MORE, trait = true)), t.sounds)
         assertTrue(FlowMood.picked(t, "female vocals"))
+    }
+
+    private fun song(id: String, traits: Map<String, Double> = emptyMap(), tags: Map<String, Double> = emptyMap()) =
+        app.siansa.net.TrackFeatures(id = id, artist = "A", tempo = null, key = null, scale = null, moods = emptyMap(), genres = tags, traits = traits)
+
+    /** AudioMuse-AI's mood words (the owner, 18 Nov): from a song's five strongest tags, the trained model where it has one. */
+    @Test fun moodsFromTagsOrTheTrainedModels() {
+        val chill = SongTraits.named("Chill")!!
+        assertEquals(1.0, chill.shareOf(song("a", tags = mapOf("chillout" to 0.71, "electronic" to 0.69)))!!, 0.0)
+        assertEquals(0.0, chill.shareOf(song("b", tags = mapOf("rock" to 0.7)))!!, 0.0)
+        assertNull(chill.shareOf(song("c")))
+        assertNull(chill.shareOf(null))
+        assertEquals(1.0, SongTraits.named("Mellow")!!.shareOf(song("d", tags = mapOf("Mellow" to 0.7)))!!, 0.0) // AudioMuse-AI's capital
+        // Happy: the trained model where the song has it, else its tags.
+        val happy = SongTraits.named("Happy")!!
+        assertEquals(0.2, happy.shareOf(song("e", traits = mapOf("happy" to 0.2), tags = mapOf("happy" to 0.7)))!!, 1e-9)
+        assertEquals(1.0, happy.shareOf(song("f", tags = mapOf("happy" to 0.7)))!!, 0.0)
+        // Vocals has no tag: nothing without the trained models.
+        assertNull(SongTraits.named("Vocals")!!.shareOf(song("g", tags = mapOf("female vocalists" to 0.7))))
+    }
+
+    @Test fun whatsOfferedFollowsWhoAnswers() {
+        val all = SongTraits.offered(trained = true, tags = true).map { it.label }
+        assertEquals(SongTraits.ALL.map { it.label }, all)
+        val tagsOnly = SongTraits.offered(trained = false, tags = true).map { it.label }
+        assertEquals(listOf("Happy", "Sad", "Party", "Beautiful", "Chill", "Mellow", "Easy listening", "Catchy", "Sexy"), tagsOnly)
+        assertEquals(emptyList<String>(), SongTraits.offered(trained = false, tags = false))
+        // A typed "chill" asks for no line by itself: only the trained ones are read from words.
+        assertEquals(emptyList<String>(), SongTraits.askedIn("something chill and mellow").map { it.label })
+    }
+
+    @Test fun aTagLinePutsItsSongsFirst() {
+        val hits = listOf("a", "b", "c").map { app.siansa.net.ClapHit(it, "Song $it", "A", null, 0.9) }
+        val features = mapOf("a" to song("a", tags = mapOf("rock" to 0.7)), "b" to song("b", tags = mapOf("chill" to 0.7)))
+        val tuning = VibeTuning(sounds = listOf(SoundDial("Chill", 1, trait = true)))
+        assertEquals(listOf("b", "a", "c"), traitsFirst(hits, features, tuning).map { it.id })
     }
 }

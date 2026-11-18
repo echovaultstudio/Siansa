@@ -12,13 +12,39 @@ object SongTraits {
      * when picked as "more", the [group] it's listed under, and a song's [share] of it from its traits (null when
      * it hasn't them).
      */
-    class Trait(val label: String, val words: String, val group: String, val share: (Map<String, Double>) -> Double?)
+    class Trait(
+        val label: String,
+        val words: String,
+        val group: String,
+        val share: (Map<String, Double>) -> Double?,
+        /**
+         * AudioMuse-AI's words for it among a song's five strongest tags (MusiCNN's, `mood_vector`: the owner, 18 Nov),
+         * from whichever service answers about songs' sound: Siansa Beats when it's on, else AudioMuse-AI, never both.
+         */
+        val tags: List<String> = emptyList(),
+        /** Whether Siansa Beats' trained models give it ([share]); a line of tags only has none. */
+        val trained: Boolean = true,
+    ) {
+        /**
+         * The song's share of it: its trained trait where it has one, else 1 when one of [tags] is among its strongest
+         * tags and 0 when not; null when it has neither.
+         */
+        fun shareOf(features: app.siansa.net.TrackFeatures?): Double? {
+            features ?: return null
+            if (trained && features.traits.isNotEmpty()) share(features.traits)?.let { return it }
+            if (tags.isEmpty() || features.genres.isEmpty()) return null
+            val strongest = features.genres.keys.mapTo(HashSet()) { it.lowercase() }
+            return if (tags.any { it.lowercase() in strongest }) 1.0 else 0.0
+        }
+    }
 
     /** The picker's headings, in its order. */
     const val VOICE = "Voice"
     const val MOOD = "Mood"
     // "Style", not "Sound": the picker has a Sounds tab of its own (the owner, 17 Nov).
     const val STYLE = "Style"
+    /** AudioMuse-AI's own mood words, from its tags (the owner, 18 Nov). */
+    const val TAGS = "Tags"
 
     private fun of(key: String): (Map<String, Double>) -> Double? = { it[key] }
 
@@ -32,10 +58,10 @@ object SongTraits {
         // Whose voice: of the voice, so an instrumental song is neither.
         Trait("Female vocals", "female vocals", VOICE, { t -> t["voice"]?.let { v -> t["female"]?.let { v * it } } }),
         Trait("Male vocals", "male vocals", VOICE, { t -> t["voice"]?.let { v -> t["female"]?.let { v * (1 - it) } } }),
-        Trait("Happy", "happy", MOOD, of("happy")),
-        Trait("Sad", "sad", MOOD, of("sad")),
+        Trait("Happy", "happy", MOOD, of("happy"), tags = listOf("happy")),
+        Trait("Sad", "sad", MOOD, of("sad"), tags = listOf("sad")),
         Trait("Relaxed", "relaxed", MOOD, of("relaxed")),
-        Trait("Party", "party", MOOD, of("party")),
+        Trait("Party", "party", MOOD, of("party"), tags = listOf("party")),
         Trait("Aggressive", "aggressive", MOOD, of("aggressive")),
         Trait("Cheerful", "cheerful fun", MOOD, of("mirex_cheerful")),
         Trait("Bittersweet", "wistful bittersweet", MOOD, of("mirex_bittersweet")),
@@ -45,7 +71,23 @@ object SongTraits {
         Trait("Danceable", "danceable", STYLE, of("danceable")),
         Trait("Acoustic", "acoustic", STYLE, of("acoustic")),
         Trait("Electronic", "electronic", STYLE, of("electronic")),
+        // AudioMuse-AI's mood words from its tags, which no trained model gives.
+        tagged("Beautiful", "beautiful", "beautiful"),
+        tagged("Chill", "chill chillout", "chill", "chillout"),
+        tagged("Mellow", "mellow", "mellow"),
+        tagged("Easy listening", "easy listening", "easy listening"),
+        tagged("Catchy", "catchy", "catchy"),
+        tagged("Sexy", "sexy sensual", "sexy"),
     )
+
+    private fun tagged(label: String, words: String, vararg tags: String) =
+        Trait(label, words, TAGS, { null }, tags = tags.toList(), trained = false)
+
+    /**
+     * The lines Flow's Moods offers: with Siansa Beats' trained models ([trained]) all of them; with only tags
+     * ([tags]: AudioMuse-AI's, or a Siansa Beats without traits) those its tags can say.
+     */
+    fun offered(trained: Boolean, tags: Boolean): List<Trait> = ALL.filter { (trained && it.trained) || (tags && it.tags.isNotEmpty()) }
 
     fun named(label: String): Trait? = ALL.firstOrNull { it.label.equals(label.trim(), ignoreCase = true) }
 
@@ -78,7 +120,7 @@ object SongTraits {
             }
         }
         val words = Regex("""[a-z]+""").findAll(rest).map { it.value }.toSet()
-        for (t in ALL.drop(4)) if (t.label.lowercase() in words && t !in found) found += t
+        for (t in ALL.drop(4)) if (t.trained && t.label.lowercase() in words && t !in found) found += t
         return found
     }
 }
