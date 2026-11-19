@@ -143,7 +143,8 @@ private fun CoverGridCell(item: HomeItem, named: Boolean, modifier: Modifier) {
             mosaic.size >= 4 -> CoverMosaic(mosaic, square)
             item.coverArt != null -> Cover(item.coverArt, 300, square, shape)
             else -> Box(square.background(Brush.linearGradient(listOf(item.colors.first, item.colors.second))), contentAlignment = Alignment.BottomStart) {
-                if (!named) return@Box
+                // Its name on its colours only when it isn't under it, and not on a round one, where it would be cut.
+                if (named || item.round) return@Box
                 Text(item.title, color = Color.White, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold,
                     maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(Space.Small))
             }
