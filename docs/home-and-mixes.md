@@ -35,8 +35,8 @@ Their order is yours: **Settings › Home page › Home menu**, hold a row and d
 Arrange is a sheet of its own (the Sources sheet is another), in three parts: **Cards**, **Spacing** and **Sections**.
 
 **Cards** is how every coloured card on Home is painted — Today's mix, the book and podcast cards, Made for you,
-Radios and the other generated tiles; never the shortcut grid, whose tiles are plain already. Four small cards show
-the choice:
+Radios and the other generated tiles. Shortcut tiles stay plain unless their section has a colour of its own (under
+its cog). Four small cards show the choice:
 
 | Look | What it does |
 |---|---|
@@ -59,17 +59,19 @@ The **cog** on a section changes its look, to any of the custom cards' looks:
 | **List** | The first five, listed; the title opens the rest. |
 | **Play button** | A slim card: its ▶ plays the section; a tap anywhere else on the card opens it. |
 | **Cover rows** | Covers with their details beside them, three to a column, to swipe through: the same look as a custom card's. The cover plays that album or opens that item; the row opens it. Books and podcasts show how far you are along the cover. A radio or genre shows its colours instead of a cover. |
-| **Shortcut grid** | Small tiles two to a row, like Shortcuts. Pick **2, 4, 6 or 8 tiles** under it in the same dialog. A tile opens its item; the title opens the rest. Shortcuts itself has no such choice: it's the grid already, and its count is under Settings › Home page › Top of Home. |
+| **Shortcut grid** | Small tiles two to a row, like Shortcuts. Pick **2, 4, 6 or 8 tiles** under it in the same dialog. A tile opens its item; the title opens the rest. Shortcuts is the grid already as it is (its count is under Settings › Home page › Top of Home); picked here, it takes the count chosen here. |
 | **Carousel** | Big covers to flick through, the one in the middle in focus and the ones beside it blurred. Its name and what it is show **Under the covers** (the middle one's, under the row) or **On the cover** (each one's, over a soft fade at its foot): pick it under **Name and details** when Carousel is chosen. Tap the middle one to open it. |
 
 A section in another look says which under its name. **Play** in a banner or the ▶ of a play button card plays the section:
 today's mix or the carousel's first mix where they left off, or the albums of Rediscover, Recently played, Recently
-added and Random picks in order. Sections of radios, playlists, genres, books and Made for you open instead. **Your
-cards** keep their own looks: their cog opens **Settings › Home page › Cards**.
+added and Random picks in order. Sections of radios, playlists, genres, books and Made for you open instead. Every section's cog has the same
+choices, Shortcuts and Siansa Beats' rows too. **Your cards** keep their own looks, set with each card: their cog has
+the title and colour, and **Your cards in Settings** opens **Settings › Home page › Cards**.
 
 The same cog has **Show its title**: turn it off and the section shows without the heading above it ("Your evening",
 "Recently played"), keeping the gap where it was. And its **Colour**: a card shows the section's cards in the chosen
-look, and **As Home** follows the choice made under Cards, or pick one for this section alone (Shortcuts has none).
+look, and **As Home** follows the choice made under Cards, or pick one for this section alone. For Shortcuts, As Home
+keeps its tiles plain; a colour of its own paints them, as it does a Shortcut grid in any section.
 
 | Section | What it shows |
 |---|---|
@@ -188,8 +190,9 @@ carousels, Today's mix and Made for you, which stay as you set them.
 
 In **Arrange Home**, For now takes the place of **Your mixes carousel**, Made for you the place of **Made for you**, and
 More of you has a row of its own, **More of you** (listed only while Siansa Beats' mixes are on). Each row says so under
-its name. Move or hide them as any other; their cog picks one of two looks: **Carousel** (big covers to flick through)
-or **Tiles** (a row of tiles, each with four of the mix's covers).
+its name. Move or hide them as any other; their cog picks any look: **As it is** is the **Carousel** (big covers to
+flick through), **Tiles** is a row of tiles each with four of the mix's covers, and the others are as for any section
+(Play in a banner or the play button card plays the first mix).
 
 **Mix settings** (Settings › Mixes & radios, under **Home's mixes**; Siansa Beats 0.56 or newer) choose
 what goes into them: which mixes are made and how many, songs in a mix, how many of them you know, songs by one artist,

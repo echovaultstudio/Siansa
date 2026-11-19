@@ -198,8 +198,9 @@ fun ArrangeHomeSheet(
             onTitleShown = { onTitleShownChange(section, it) },
             // The grid stays open, so how many tiles it has can be picked there.
             onPick = { onLookChange(section, it); if (it != HomeLook.GRID && it != HomeLook.CAROUSEL) picking = null },
-            only = if (section in holds) BEATS_LOOKS else null,
             onDismiss = { picking = null },
+            // Your cards each have their own look, chosen in Settings › Home page › Cards: a way there.
+            onOpenSettings = if (section.lookable) null else { { picking = null; onOpenSettings(section) } },
             gridSize = gridSizes[section] ?: HomeLook.GRID_MOST,
             onGridSize = { onGridSizeChange(section, it) },
             namesOnCover = section in carouselOnCover,
@@ -367,6 +368,7 @@ fun ArrangeHomeSheet(
                                 )
                                 // A row in another look says which (issue #655), and its cards' own colour; a hidden one says so.
                                 val shownLook = if (section in holds) beatsLook(looks[section]).label else looks[section]?.label
+                                    ?: if (section == HomeSection.CARDS) "Each its own look" else null
                                 val line = if (isHidden) "Hidden" else listOfNotNull(holds[section], shownLook, cardLooks[section]?.label).joinToString(" · ").ifEmpty { null }
                                 if (line != null) Text(line, style = MaterialTheme.typography.bodySmall, color = if (isHidden) MaterialTheme.colorScheme.onSurfaceVariant else Accent, modifier = Modifier.testTag("homeLookLabel"))
                             }
@@ -381,16 +383,13 @@ fun ArrangeHomeSheet(
                                 )
                             }
                             IconButton(
-                                onClick = { if (section.lookable) picking = section else onOpenSettings(section) },
+                                // Every row's cog opens the same choices (#1261), Your cards' too.
+                                onClick = { if (section != HomeSection.NOTICES) picking = section else onOpenSettings(section) },
                                 modifier = Modifier.testTag("homeLookCog"),
                             ) {
                                 Icon(
                                     Icons.Rounded.Settings,
-                                    contentDescription = when {
-                                        section.lookable -> "Look of ${section.label}"
-                                        section == HomeSection.NOTICES -> "Notices in Settings"
-                                        else -> "Your cards in Settings"
-                                    },
+                                    contentDescription = if (section == HomeSection.NOTICES) "Notices in Settings" else "Look of ${section.label}",
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
@@ -417,15 +416,15 @@ private fun HomeLookDialog(
     cardLook: CardLook = CardLook.AS_HOME,
     homeCardLook: CardLook = CardLook.DEFAULT,
     onCardLook: (CardLook) -> Unit = {},
-    // The only looks offered (a row of Siansa Beats' mixes: Carousel and Tiles); null: every look.
-    only: List<HomeLook>? = null,
+    // Your cards: each card's look is its own, chosen in Settings; this opens it (null: the row's looks are listed).
+    onOpenSettings: (() -> Unit)? = null,
     // As a carousel, each name and its details on the cover or under the row (the owner, 19 Nov).
     namesOnCover: Boolean = false,
     onNamesOnCover: (Boolean) -> Unit = {},
 ) {
     // The switch shows its change at once: the dialog stays open for the look.
     var shown by remember(section) { mutableStateOf(titleShown) }
-    var look by remember(section) { mutableStateOf(if (only != null) beatsLook(current) else current) }
+    var look by remember(section) { mutableStateOf(current) }
     var tiles by remember(section) { mutableStateOf(gridSize) }
     var onCover by remember(section) { mutableStateOf(namesOnCover) }
     var colour by remember(section) { mutableStateOf(cardLook) }
@@ -434,32 +433,41 @@ private fun HomeLookDialog(
         title = { Text(section.label) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()).testTag("homeLookDialog")) {
-                if (section != HomeSection.QUICK) {
-                    // One card in the chosen colour, then the choice: As Home follows Arrange Home's.
-                    CardLookSample(if (colour == CardLook.AS_HOME) homeCardLook else colour, Modifier.fillMaxWidth(), big = true)
-                    Spacer(Modifier.height(Space.Medium))
-                    Text("Colour", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.Small), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
-                        CardLook.entries.forEach { option ->
-                            FilterChip(
-                                selected = option == colour,
-                                onClick = { colour = option; onCardLook(option) },
-                                label = { Text(if (option == CardLook.AS_HOME) "As Home (${homeCardLook.label})" else option.label) },
-                                modifier = Modifier.testTag("cardLook-${option.id}"),
-                            )
-                        }
+                // Every row has a colour (#1261), Shortcuts too: its tiles stay plain until it has one of its own.
+                val asHome = asHomeCardLook(section, homeCardLook)
+                // One card in the chosen colour, then the choice: As Home follows Arrange Home's.
+                CardLookSample(if (colour == CardLook.AS_HOME) asHome else colour, Modifier.fillMaxWidth(), big = true)
+                Spacer(Modifier.height(Space.Medium))
+                Text("Colour", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.Small), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
+                    CardLook.entries.forEach { option ->
+                        FilterChip(
+                            selected = option == colour,
+                            onClick = { colour = option; onCardLook(option) },
+                            label = { Text(if (option == CardLook.AS_HOME) "As Home (${asHome.label})" else option.label) },
+                            modifier = Modifier.testTag("cardLook-${option.id}"),
+                        )
                     }
-                    Text("Just this card. As Home follows the choice in Arrange Home.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    HorizontalDivider(Modifier.padding(vertical = Space.Small))
                 }
+                Text(
+                    if (section == HomeSection.QUICK) "Just these tiles. As Home keeps them plain." else "Just this card. As Home follows the choice in Arrange Home.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                HorizontalDivider(Modifier.padding(vertical = Space.Small))
                 // Its title on Home (issue #961): off leaves only the gap above the section.
                 SectionTitleSwitch(shown) {
                     shown = it
                     onTitleShown(it)
                 }
                 HorizontalDivider(Modifier.padding(vertical = Space.Small))
-                // Shortcuts is the grid already: its size is set in Settings › Home page.
-                (only ?: HomeLook.entries.filter { it != HomeLook.GRID || section != HomeSection.QUICK }).forEach { option ->
+                if (onOpenSettings != null) {
+                    // Your cards: each is its own row in its own look, set where the card is made.
+                    Text("Look", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Each of your cards has its own look, set with the card.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    TextButton(onClick = onOpenSettings, modifier = Modifier.testTag("homeLookCardsSettings")) { Text("Your cards in Settings") }
+                }
+                // Every look for every row (#1261): Siansa Beats' rows and Shortcuts too.
+                if (onOpenSettings == null) HomeLook.entries.forEach { option ->
                     Row(
                         Modifier.fillMaxWidth().clickable { look = option; onPick(option) }.padding(vertical = Space.Small).testTag("homeLook-${option.id}"),
                         verticalAlignment = Alignment.CenterVertically,
@@ -612,11 +620,15 @@ internal fun GridSizeChips(size: Int, modifier: Modifier = Modifier, onPick: (In
  * The rows of Arrange Home that show Siansa Beats' mixes while they're on (the owner, 17 Nov: their look is the row's),
  * and which of them: said under each row, so it's clear which cog changes them.
  */
-/** The looks a row of Siansa Beats' mixes can have (the owner, 17 Nov: "only 2 types of cards, the big carousel and tiles"). */
-internal val BEATS_LOOKS = listOf(HomeLook.CAROUSEL, HomeLook.TILES)
+/**
+ * The look a row of Siansa Beats' mixes shows for [saved]: the carousel as its own look, else the one chosen. Every look
+ * (#1261, the owner, 19 Nov: every row gets every option; it was the carousel and Tiles only, 17 Nov).
+ */
+internal fun beatsLook(saved: HomeLook?): HomeLook = if (saved == null || saved == HomeLook.AS_IS) HomeLook.CAROUSEL else saved
 
-/** The look a row of Siansa Beats' mixes shows for [saved]: Tiles when it's Tiles, else the carousel. */
-internal fun beatsLook(saved: HomeLook?): HomeLook = if (saved == HomeLook.TILES) HomeLook.TILES else HomeLook.CAROUSEL
+/** What "As Home" means for [section]'s colour: Home's choice, but Shortcuts' tiles are plain unless given their own. */
+internal fun asHomeCardLook(section: HomeSection, homeCardLook: CardLook): CardLook =
+    if (section == HomeSection.QUICK) CardLook.PLAIN else homeCardLook
 
 internal fun beatsRows(on: Boolean): Map<HomeSection, String> =
     if (!on) emptyMap() else mapOf(
