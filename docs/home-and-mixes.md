@@ -61,6 +61,7 @@ The **cog** on a section changes its look, to any of the custom cards' looks:
 | **Cover rows** | Covers with their details beside them, three to a column, to swipe through: the same look as a custom card's. The cover plays that album or opens that item; the row opens it. Books and podcasts show how far you are along the cover. A radio or genre shows its colours instead of a cover. |
 | **Shortcut grid** | Small tiles two to a row, like Shortcuts. Pick **2, 4, 6 or 8 tiles** under it in the same dialog. A tile opens its item; the title opens the rest. Shortcuts is the grid already as it is (its count is under Settings › Home page › Top of Home); picked here, it takes the count chosen here. |
 | **Carousel** | Big covers to flick through, the one in the middle in focus and the ones beside it blurred. Its name and what it is show **Under the covers** (the middle one's, under the row) or **On the cover** (each one's, over a soft fade at its foot): pick it under **Name and details** when Carousel is chosen. Tap the middle one to open it. |
+| **Cover grid** | The cards in a grid across the screen, each with its own picture: an album its cover, a mix four of its covers, an artist its round photo. Pick its **Columns** (2 to 6) and **Rows** (1 to 6) under it in the same dialog: the squares grow or shrink to fill the width, and cards beyond columns × rows are left out (the title opens the rest). Names show under the pictures up to 3 columns. |
 
 A section in another look says which under its name. **Play** in a banner or the ▶ of a play button card plays the section:
 today's mix or the carousel's first mix where they left off, or the albums of Rediscover, Recently played, Recently
@@ -72,15 +73,6 @@ The same cog has **Show its title**: turn it off and the section shows without t
 "Recently played"), keeping the gap where it was. And its **Colour**: a card shows the section's cards in the chosen
 look, and **As Home** follows the choice made under Cards, or pick one for this section alone. For Shortcuts, As Home
 keeps its tiles plain; a colour of its own paints them, as it does a Shortcut grid in any section.
-
-The same cog has a **Cover grid**: **Off** (each card its own picture, the default), **2×2**, **3×3**, **2×4** or
-**3×6**. Each card then shows a grid of covers in place of its picture: an album its own cover first, then its artist's
-other albums; an artist radio the albums it plays from (the artist's, then those of artists like them); a mix, a vibe or
-Today's mix its songs' covers; a playlist its songs'; a genre its albums'; a shortcut what it opens. 2×4 and 3×6 make
-the cards twice as wide, so every cover stays square and whole; in a carousel they're a band across the sleeve. With
-fewer covers than the grid holds, they go round again; a card with only one keeps its picture. Tiles, the carousel, the
-Shortcut grid, Shortcuts and Today's mix show it; the List, Banner, Play button and Cover rows looks keep their small
-pictures, and the Radios (sound radios) and books keep theirs, as they have no album covers.
 
 | Section | What it shows |
 |---|---|

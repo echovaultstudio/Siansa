@@ -115,9 +115,8 @@ fun BeatsMixesHome(nav: NavController, shelves: Set<String>, look: HomeLook) {
 /** A mix as a tile: four of its covers two by two, its name, and what's in it. */
 @Composable
 internal fun MixMosaicTile(record: CrateRecord) {
-    // With the row's cover grid (#1263), its rows and columns, twice as wide for 2×4 and 3×6.
-    Column(Modifier.width(gridWidth(MOSAIC_TILE)).clickable(onClickLabel = "Open ${record.name}", onClick = record.onOpen).padding(LocalTileInset.current).testTag("mixMosaicTile")) {
-        val square = Modifier.fillMaxWidth().aspectRatio(LocalCoverGrid.current?.aspect ?: 1f).clip(RoundedCornerShape(8.dp))
+    Column(Modifier.width(MOSAIC_TILE).clickable(onClickLabel = "Open ${record.name}", onClick = record.onOpen).padding(LocalTileInset.current).testTag("mixMosaicTile")) {
+        val square = Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(8.dp))
         if (record.covers.any { it != null }) CoverMosaic(record.covers, square)
         else {
             // No cover known yet: its colours, as the sleeve has.
@@ -156,13 +155,13 @@ private fun homeMix(mix: BeatsMixes.BeatsMix, songs: List<Song>, keepDays: Int, 
     }
     // Each album's cover once: four different ones for the tile's square.
     val covers = songs.mapNotNull { it.cover }.distinct().take(4)
-    return CrateRecord(key = id, name = mix.name, caption = mix.caption, covers = covers, songs = songs, onOpen = open, grid = GridSubject.OfSongs(songs))
+    return CrateRecord(key = id, name = mix.name, caption = mix.caption, covers = covers, songs = songs, onOpen = open)
 }
 
 /** A Siansa Beats mix as an item any of Home's looks can draw: its name, what's in it, its first cover. */
 internal fun homeItemOf(record: CrateRecord): HomeItem = HomeItem(
     key = record.key, title = record.name, subtitle = record.caption, coverArt = record.covers.firstOrNull { it != null },
-    colors = record.colors ?: tileColors(record.key), open = record.onOpen, grid = record.grid,
+    colors = record.colors ?: tileColors(record.key), open = record.onOpen, mosaic = record.covers,
     meta = app.siansa.mix.CoverRows.songCount(record.songs.size).orEmpty(),
 )
 

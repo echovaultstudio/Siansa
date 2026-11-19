@@ -1,3 +1,3 @@
 ### Added
 
-- Home: any row's cards can show a grid of album covers instead of one picture: 2×2, 3×3, 2×4 or 3×6, chosen under the row's cog in Arrange Home. An album shows its artist's other albums with it, an artist radio the albums it plays from, a mix its songs' covers. 2×4 and 3×6 make the cards wider so the covers stay square.
+- Home: a new Cover grid look for any row, under its cog in Arrange Home: its cards in a grid across the screen, with as many columns (2 to 6) and rows (1 to 6) as you like. Each keeps its own picture (an album's cover, a mix's four covers, an artist's round photo), with the names under them up to 3 columns.

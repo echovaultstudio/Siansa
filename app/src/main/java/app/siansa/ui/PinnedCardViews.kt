@@ -139,18 +139,17 @@ private fun PinnedCardLook(card: PinnedCard, content: CardContent, open: () -> U
             }
         } else {
             Shelf(card.title, content.albums.take(TILES), key = { it.id }, onOpenAll = open) { album ->
-                AlbumTile(album.name, album.artist, album.coverArt, onClick = { nav.navigate("album/${album.id}") }, modifier = Modifier.width(gridWidth(140.dp)), grid = GridSubject.OfAlbum(album))
+                AlbumTile(album.name, album.artist, album.coverArt, onClick = { nav.navigate("album/${album.id}") }, modifier = Modifier.width(140.dp))
             }
         }
         return
     }
     when (card.look) {
         CardLook.TILES -> Shelf(card.title, songs.take(TILES), key = { it.id }, onOpenAll = open) { song ->
-            AlbumTile(song.title, song.artist, song.cover, onClick = { play(songs, songs.indexOf(song), false) }, modifier = Modifier.width(gridWidth(140.dp)),
-                grid = song.albumId?.let { GridSubject.OfRoute("album/$it") })
+            AlbumTile(song.title, song.artist, song.cover, onClick = { play(songs, songs.indexOf(song), false) }, modifier = Modifier.width(140.dp))
         }
         CardLook.ALBUMS -> Shelf(card.title, content.albums, key = { it.id }, onOpenAll = open) { album ->
-            AlbumTile(album.name, album.artist, album.coverArt, onClick = { nav.navigate("album/${album.id}") }, modifier = Modifier.width(gridWidth(140.dp)), grid = GridSubject.OfAlbum(album))
+            AlbumTile(album.name, album.artist, album.coverArt, onClick = { nav.navigate("album/${album.id}") }, modifier = Modifier.width(140.dp))
         }
         CardLook.BANNER -> PinnedBanner(card, songs, open, play, rememberListPlayback(songs))
         CardLook.LIST -> Column {

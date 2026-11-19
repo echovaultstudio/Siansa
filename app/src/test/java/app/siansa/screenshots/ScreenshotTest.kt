@@ -414,26 +414,18 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     cardLooks = mapOf(app.siansa.data.HomeSection.QUICK to app.siansa.data.CardLook.SOFT),
                 )
             },
-            // A row's cover grid (#1263): an album tile and a mix tile in each grid, 2×4 and 3×6 twice as wide, a long name.
-            Scene("home_cover_grids") {
-                val covers = app.siansa.ui.GridSubject.OfCovers((1..18).map { "al-$it" })
-                Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
-                    for (g in app.siansa.data.CoverGrid.entries) {
-                        // No covers in the screenshots: each cell a colour of its own, so the grid's shape shows.
-                        androidx.compose.runtime.CompositionLocalProvider(
-                            app.siansa.ui.LocalCoverGrid provides g,
-                            app.siansa.ui.LocalGridCell provides { cover, m -> Box(m.background(app.siansa.ui.tileColors(cover.orEmpty()).first)) },
-                        ) {
-                            Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
-                                app.siansa.ui.AlbumTile("An Extraordinarily Long Album Name", "Artist", "al-1", {}, Modifier.width(app.siansa.ui.gridWidth(80.dp)), grid = covers)
-                                app.siansa.ui.GradientTile("Evening", Color(0xFF2E8B9A) to Color(0xFF143A52), {}, size = 80.dp, grid = covers)
-                            }
-                        }
-                    }
+            // A row as a cover grid (#1263): 3 columns with names (round artists among them, a long name), then 5 without.
+            Scene("home_cover_grid") {
+                val items = (1..15).map { i ->
+                    app.siansa.ui.HomeItem("k$i", if (i == 2) "An Extraordinarily Long Album Name" else "Album $i", round = i % 3 == 0, open = {})
+                }
+                Column {
+                    app.siansa.ui.HomeCoverGrid("Recently added", items, app.siansa.data.CoverGridSize(3, 2))
+                    app.siansa.ui.HomeCoverGrid("Favourite artists", items, app.siansa.data.CoverGridSize(5, 3))
                 }
             },
-            Scene("cover_grid_choice") {
-                Column(Modifier.padding(Space.Page)) { app.siansa.ui.CoverGridChips(app.siansa.data.CoverGrid.TWO_WIDE) {} }
+            Scene("cover_grid_size") {
+                Column(Modifier.padding(Space.Page)) { app.siansa.ui.CoverGridSteppers(app.siansa.data.CoverGridSize(5, 3)) {} }
             },
             // Shortcut tiles in their row's own colour (#1261), a long name among them; plain without one.
             Scene("shortcut_tiles_coloured") {

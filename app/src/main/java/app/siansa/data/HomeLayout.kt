@@ -81,7 +81,10 @@ enum class HomeLook(val id: String, val label: String, val hint: String) {
     // The owner, 10 Nov: any row as the Shortcuts card is, two small tiles a row, 2 to 8 of them.
     GRID("grid", "Shortcut grid", "Small tiles two to a row, as Shortcuts: 2 to 8 of them"),
     // The owner, 17 Nov: Siansa Beats' row of mixes for any row ("ideally every card always available").
-    CAROUSEL("carousel", "Carousel", "Big covers to flick through, the one in the middle in focus");
+    CAROUSEL("carousel", "Carousel", "Big covers to flick through, the one in the middle in focus"),
+    // The owner, 19 Nov (#1263): the cards in a grid across the screen, each with its own picture, as many columns and
+    // rows as chosen, the squares as big as the width allows.
+    COVER_GRID("cover_grid", "Cover grid", "Covers in a grid across the screen: choose its columns and rows");
 
     companion object {
         /** Reads the saved looks ("recent:list,added:banner"); unknown sections and looks are dropped. */
@@ -167,49 +170,36 @@ enum class CardLook(val id: String, val label: String, val hint: String) {
 }
 
 /**
- * A cover grid for the cards of one of Home's rows (#1263, the owner, 19 Nov: "an album cover grid card possibility for
- * all card types, 2x2 or 3x3 or 2x4 3x6"): [rows] by [cols] covers in place of a card's one picture. 2×4 and 3×6 are
- * twice as wide as they're tall, and the card with them, so every cover stays square and whole.
+ * A [HomeLook.COVER_GRID] row's size (#1263): [columns] across the screen, [rows] down; each card a square as wide as a
+ * column, with its own picture (an album's cover, a mix's four covers, an artist's round photo).
  */
-enum class CoverGrid(val id: String, val rows: Int, val cols: Int) {
-    TWO("2x2", 2, 2),
-    THREE("3x3", 3, 3),
-    TWO_WIDE("2x4", 2, 4),
-    THREE_WIDE("3x6", 3, 6);
+data class CoverGridSize(val columns: Int, val rows: Int) {
+    /** How many cards it shows. */
+    val count: Int get() = columns * rows
 
-    /** How many covers it holds. */
-    val count: Int get() = rows * cols
+    /** Names show under the pictures up to [NAMED_COLUMNS] columns; more make the squares too small for them. */
+    val named: Boolean get() = columns <= NAMED_COLUMNS
 
-    /** How many times wider than tall a card with it is (1 for the square ones). */
-    val aspect: Float get() = cols.toFloat() / rows
-
-    val label: String get() = "$rows×$cols"
+    val label: String get() = "$columns×$rows"
 
     companion object {
-        fun of(id: String?): CoverGrid? = entries.firstOrNull { it.id == id }
+        val COLUMNS = 2..6
+        val ROWS = 1..6
+        const val NAMED_COLUMNS = 3
+        val DEFAULT = CoverGridSize(3, 2)
 
-        /** Reads the saved grids ("recent:3x3,radios:2x4"); unknown sections and grids are dropped. */
-        fun parse(saved: String?): Map<HomeSection, CoverGrid> {
+        /** Reads the saved sizes ("recent:3x2,radios:5x3", columns by rows); unknown sections and sizes are dropped. */
+        fun parse(saved: String?): Map<HomeSection, CoverGridSize> {
             if (saved.isNullOrBlank()) return emptyMap()
             return saved.split(',').mapNotNull { pair ->
-                val (section, grid) = pair.split(':').takeIf { it.size == 2 } ?: return@mapNotNull null
+                val (section, size) = pair.split(':').takeIf { it.size == 2 } ?: return@mapNotNull null
                 val s = HomeSection.entries.firstOrNull { it.id == section.trim() } ?: return@mapNotNull null
-                val g = of(grid.trim()) ?: return@mapNotNull null
-                s to g
+                val (c, r) = size.trim().split('x').mapNotNull { it.toIntOrNull() }.takeIf { it.size == 2 } ?: return@mapNotNull null
+                if (c in COLUMNS && r in ROWS) s to CoverGridSize(c, r) else null
             }.toMap()
         }
 
-        fun format(grids: Map<HomeSection, CoverGrid>): String =
-            HomeSection.entries.mapNotNull { s -> grids[s]?.let { "${s.id}:${it.id}" } }.joinToString(",")
-
-        /**
-         * The covers a grid of [count] shows from [covers] (each picture once, in order): all of them when there are
-         * enough; fewer than [count] go round again to fill it; one or none is no grid (the card's own picture then).
-         */
-        fun cells(covers: List<String?>, count: Int): List<String> {
-            val distinct = covers.filterNotNull().distinct()
-            if (distinct.size < 2) return emptyList()
-            return List(count) { distinct[it % distinct.size] }
-        }
+        fun format(sizes: Map<HomeSection, CoverGridSize>): String =
+            HomeSection.entries.mapNotNull { s -> sizes[s]?.let { "${s.id}:${it.columns}x${it.rows}" } }.joinToString(",")
     }
 }
