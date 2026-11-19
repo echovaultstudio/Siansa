@@ -122,27 +122,41 @@ class ServerSeekQueueTest {
         .build()
 
     /**
-     * Issue #1238: an album started at its fifth song, with songs Keep playing added after it. Shuffle turned on in
-     * the player plays the song playing, then the album's other nine in some order, then the added songs in theirs;
-     * songs Keep playing adds later, while shuffled, come after those.
+     * Issue #1238: an album started at its fifth song, with songs Keep playing added after it. Shuffle turned on in the
+     * player reorders the queue itself (the owner: the queue showed the album in order): the song playing first and
+     * still playing, the album's other nine in some order, then the added songs in theirs; songs added later come after.
+     * Turned off, the album is back in its order. A new list while shuffle is on is shuffled at once.
      */
-    @Test fun shuffleShufflesTheAlbumAndKeepsTheAddedSongsAfterIt() {
+    @Test fun shuffleReordersTheQueueAndPutsItBack() {
         repeat(5) {
             exo.setMediaItems(List(10) { song("a$it") } + List(3) { added("k$it") })
             exo.seekTo(4, 0)
             idle()
             player.shuffleModeEnabled = true
             idle()
-            val order = shuffledIds()
-            assertEquals("a4", order.first())
-            assertEquals((0 until 10).map { "a$it" }.toSet() - "a4", order.subList(1, 10).toSet())
-            assertEquals(listOf("k0", "k1", "k2"), order.subList(10, 13))
+            val queue = ids()
+            assertEquals("a4", queue.first())
+            assertEquals((0 until 10).map { "a$it" }.toSet() - "a4", queue.subList(1, 10).toSet())
+            assertEquals(listOf("k0", "k1", "k2"), queue.subList(10, 13))
+            assertEquals(0, exo.currentMediaItemIndex)
             assertEquals("a4", exo.currentMediaItem?.mediaId)
+            assertEquals(queue, shuffledIds())  // played as the queue stands
             player.addMediaItems(mutableListOf(added("k3"), added("k4")))
             idle()
-            assertEquals(order + listOf("k3", "k4"), shuffledIds())
+            assertEquals(queue + listOf("k3", "k4"), ids())
+            assertEquals(ids(), shuffledIds())
             player.shuffleModeEnabled = false
             idle()
+            assertEquals(List(10) { "a$it" } + List(5) { "k$it" }, ids())
+            assertEquals("a4", exo.currentMediaItem?.mediaId)
         }
+        player.shuffleModeEnabled = true
+        player.setMediaItems(mutableListOf(song("b0"), song("b1"), song("b2"), song("b3")), 2, 0L)
+        idle()
+        assertEquals("b2", ids().first())
+        assertEquals(setOf("b0", "b1", "b3"), ids().drop(1).toSet())
+        player.shuffleModeEnabled = false
+        idle()
+        assertEquals(listOf("b0", "b1", "b2", "b3"), ids())
     }
 }

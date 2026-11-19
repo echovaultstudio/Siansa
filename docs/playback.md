@@ -281,7 +281,9 @@ it, a swipe right starts it again.
 
 Pull up from now playing, or tap the queue button, for the queue. Tapping a song in an album, a playlist or any list
 plays the whole list from that song: the songs before it are queued above it, in order, so **Shuffle** in now playing
-shuffles the whole album or playlist. Songs that Keep playing adds come after all of the list, shuffled or not. Tap a
+shuffles the whole album or playlist. Shuffle reorders the queue itself: the song playing stays first and plays on, the
+rest of the list follows in a random order, and the queue and Up next show that order. Turning Shuffle off puts the
+list back in its order. Songs that Keep playing adds come after all of the list, shuffled or not. Tap a
 song in the queue to jump to it. Swipe a song to the
 left to take it out of the queue, behind a red strip whose bin gives a little shake; swipe it to the right to play it
 next, straight after the song playing, behind an amber strip. Each gives a buzz. Its ⋮ menu has **Remove from queue**
