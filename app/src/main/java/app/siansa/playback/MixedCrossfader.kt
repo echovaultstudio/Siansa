@@ -386,6 +386,11 @@ internal class MixedCrossfader(
             if (Blending.of(settings()).bassSwap) {
                 mainMix.filter.shelfDb = DeckFilter.SHELF_START_DB
                 AppLog.d("Crossfade", "Bass swap over the first ${SWAP_FRACTION_PERCENT} % of the blend: next song's bass held back ${-DeckFilter.SHELF_START_DB.toInt()} dB, old song's cut up to ${DeckFilter.LOW_CUT_HZ.toInt()} Hz")
+                // The three-band EQ: the next song comes in with its mids gone and its highs down ([BlendEq]).
+                planned.eq?.let { eq ->
+                    eq.apply(0f, null, mainMix.filter)
+                    AppLog.d("Crossfade", "EQ: ${eq.describe()}")
+                }
             }
             if (planned.filterHz > 0) AppLog.d("Crossfade", "Filter fade: the old song's high-pass sweeps up to ${planned.filterHz.toInt()} Hz over the blend")
             if (planned.swapFrom > 0f) AppLog.d("Crossfade", "Bass swap from ${(planned.swapFrom * 100).toInt()} % to ${(planned.swapTo * 100).toInt()} % of the blend")
@@ -436,7 +441,10 @@ internal class MixedCrossfader(
             val outLevel = if (planned.technique == Technique.ECHO_OUT) 1f else Crossfade.fadeOut(out)
             t.volume = if (tailDone) 0f else tailBase * sleepLevel() * outLevel
             val beat = planned.beat
-            if (beat != null && Blending.of(settings()).bassSwap) swapBass(out, tMix, planned)
+            if (beat != null && Blending.of(settings()).bassSwap) {
+                swapBass(out, tMix, planned)
+                planned.eq?.apply(out, tMix.filter, mainMix.filter)
+            }
             else if (planned.filterHz > 0) tMix.filter.lowCutHz = DeckFilter.filterAt(out.toDouble(), planned.filterHz)
             echoBeatMs(planned)?.let { beatMs -> tMix.echo?.let { echoOut(it, planned, beatMs, tailMs, tailDone) } }
             val onNext = main.currentMediaItemIndex == incomingIndex

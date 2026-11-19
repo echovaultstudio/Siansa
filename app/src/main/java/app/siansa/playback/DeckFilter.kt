@@ -14,6 +14,12 @@ import kotlin.math.sqrt
  * [SHELF_START_DB] to nothing). Two kick drums a few ms apart are what a blend out of step is heard as; one at a
  * time, the join is a mix and not a flam.
  *
+ * A DJ's three-band EQ on top (the owner, 19 Nov: "make the 3 way eq change over blend"): [shelfDb] is the low band,
+ * [midDb] the mids (where a voice is) and [highDb] the highs, each from [KILL_DB] (as good as gone) to 0. The mids
+ * are cut the way an isolator does it with two shelves: the whole deck turned down by the mids' cut, the lows and
+ * highs lifted back by as much (a low shelf below [SHELF_HZ], a high shelf above [HIGH_HZ]), so everything between is
+ * cut evenly, without a peak's narrow notch. All three at 0 are no filter at all.
+ *
  * One of these sits in each player's audio path ([EqualiserProcessor]), after the equaliser and before the
  * limiter. [Crossfader] sets [lowCutHz] and [shelfDb] from the fade's ticks; the player thread reads them with each
  * buffer and moves its filters there in small steps ([SLEW]), so a step can't click. At rest both are off and the
@@ -22,29 +28,45 @@ import kotlin.math.sqrt
 class DeckFilter {
     /** High-pass cut-off in Hz; 0 (or less) is off. */
     @Volatile var lowCutHz: Double = 0.0
-    /** Low-shelf gain in dB at [SHELF_HZ]; 0 is off, negative holds the bass back. */
+    /** The low band: low-shelf gain in dB at [SHELF_HZ]; 0 is off, negative holds the bass back. */
     @Volatile var shelfDb: Double = 0.0
+    /** The mids (a voice, the leads): 0 untouched, [KILL_DB] as good as gone. */
+    @Volatile var midDb: Double = 0.0
+    /** The highs above [HIGH_HZ] (hats, a voice's air): 0 untouched, [KILL_DB] as good as gone. */
+    @Volatile var highDb: Double = 0.0
 
     /** Where the player thread's filters are now, gliding towards the targets above. */
     private var cutNow = 0.0
     private var shelfNow = 0.0
+    private var midNow = 0.0
+    private var highNow = 0.0
     private var cutFilter: Biquad? = null
     private var shelfFilter: Biquad? = null
+    private var highFilter: Biquad? = null
+    /** The whole deck's gain for the mids' cut (1 with the mids untouched). */
+    private var midGain = 1.0
     private var sampleRate = 0
     private var channels = 0
     // Filter memory, one pair per filter per channel (transposed direct form II).
     private var z = DoubleArray(0)
 
     /** Both at rest: the sound passes untouched, as before a blend. */
-    val idle: Boolean get() = lowCutHz <= 0.0 && shelfDb == 0.0 && cutNow <= 0.0 && shelfNow == 0.0
+    val idle: Boolean get() = lowCutHz <= 0.0 && shelfDb == 0.0 && midDb == 0.0 && highDb == 0.0 &&
+        cutNow <= 0.0 && shelfNow == 0.0 && midNow == 0.0 && highNow == 0.0
 
     fun reset() {
         lowCutHz = 0.0
         shelfDb = 0.0
+        midDb = 0.0
+        highDb = 0.0
         cutNow = 0.0
         shelfNow = 0.0
+        midNow = 0.0
+        highNow = 0.0
+        midGain = 1.0
         cutFilter = null
         shelfFilter = null
+        highFilter = null
         z.fill(0.0)
     }
 
@@ -56,21 +78,29 @@ class DeckFilter {
         if (this.sampleRate != sampleRate || this.channels != channels) {
             this.sampleRate = sampleRate
             this.channels = channels
-            z = DoubleArray(4 * channels)
+            z = DoubleArray(6 * channels)
             cutFilter = null
             shelfFilter = null
+            highFilter = null
         }
         val cutTarget = lowCutHz.coerceIn(0.0, MAX_CUT_HZ)
-        val shelfTarget = shelfDb.coerceIn(SHELF_START_DB, 0.0)
-        val cutBefore = cutNow
-        val shelfBefore = shelfNow
+        val before = doubleArrayOf(cutNow, shelfNow, midNow, highNow)
         cutNow = slew(cutNow, cutTarget, LOW_CUT_HZ * SLEW)
-        shelfNow = slew(shelfNow, shelfTarget, -SHELF_START_DB * SLEW)
-        if (cutNow != cutBefore || cutFilter == null) cutFilter = if (cutNow >= MIN_CUT_HZ) Biquad.highPass(cutNow, sampleRate) else null
-        if (shelfNow != shelfBefore || shelfFilter == null) shelfFilter = if (abs(shelfNow) >= 0.1) Biquad.lowShelf(SHELF_HZ, shelfNow, sampleRate) else null
+        shelfNow = slew(shelfNow, shelfDb.coerceIn(KILL_DB, 0.0), -KILL_DB * SLEW)
+        midNow = slew(midNow, midDb.coerceIn(KILL_DB, 0.0), -KILL_DB * SLEW)
+        highNow = slew(highNow, highDb.coerceIn(KILL_DB, 0.0), -KILL_DB * SLEW)
+        val bandsMoved = shelfNow != before[1] || midNow != before[2] || highNow != before[3]
+        if (cutNow != before[0] || cutFilter == null) cutFilter = if (cutNow >= MIN_CUT_HZ) Biquad.highPass(cutNow, sampleRate) else null
+        // The mids' cut: the deck down by it, the lows and highs lifted back (each shelf the band's own gain less the mids').
+        val low = shelfNow - midNow
+        val high = highNow - midNow
+        if (bandsMoved || shelfFilter == null) shelfFilter = if (abs(low) >= 0.1) Biquad.lowShelf(SHELF_HZ, low, sampleRate) else null
+        if (bandsMoved || highFilter == null) highFilter = if (abs(high) >= 0.1) Biquad.highShelf(HIGH_HZ, high, sampleRate) else null
+        midGain = if (abs(midNow) >= 0.1) 10.0.pow(midNow / 20) else 1.0
         if (cutFilter == null) z.fill(0.0, 0, 2 * channels)
         if (shelfFilter == null) z.fill(0.0, 2 * channels, 4 * channels)
-        return cutFilter != null || shelfFilter != null
+        if (highFilter == null) z.fill(0.0, 4 * channels, 6 * channels)
+        return cutFilter != null || shelfFilter != null || highFilter != null || midGain != 1.0
     }
 
     private fun slew(now: Double, target: Double, step: Double): Double =
@@ -81,7 +111,8 @@ class DeckFilter {
         var x = sample
         cutFilter?.let { x = run(it, x, channel) }
         shelfFilter?.let { x = run(it, x, 2 * channels + channel) }
-        return x
+        highFilter?.let { x = run(it, x, 4 * channels + channel) }
+        return x * midGain
     }
 
     private fun run(f: Biquad, x: Double, state: Int): Double {
@@ -92,7 +123,8 @@ class DeckFilter {
     }
 
     /** For the log: "low cut 180 Hz, bass -9 dB". */
-    fun describe(): String = "low cut %.0f Hz, bass %+.0f dB".format(java.util.Locale.ROOT, cutNow, shelfNow)
+    fun describe(): String = "low cut %.0f Hz, bass %+.0f dB".format(java.util.Locale.ROOT, cutNow, shelfNow) +
+        (if (midNow != 0.0 || highNow != 0.0) ", mids %+.0f dB, highs %+.0f dB".format(java.util.Locale.ROOT, midNow, highNow) else "")
 
     companion object {
         /** Where the high-pass ends up at the end of the sweep: the kick and bass gone, the rest kept. */
@@ -103,7 +135,14 @@ class DeckFilter {
         const val MIN_CUT_HZ = 20.0
         /** The low shelf's turnover, and how far the next song's bass starts held back. */
         const val SHELF_HZ = 150.0
-        const val SHELF_START_DB = -12.0
+        /**
+         * As good as gone: a DJ mixer's kill (−26 dB). The next song's bass starts here (it was −12 before the three-band
+         * EQ, so both basslines were faintly heard together).
+         */
+        const val KILL_DB = -26.0
+        const val SHELF_START_DB = KILL_DB
+        /** Where the highs start: above a voice's body, its air and the hats. */
+        const val HIGH_HZ = 2_500.0
         /** How much of the whole range a filter may move per buffer (buffers are 5–20 ms): a sweep of the whole
          *  range takes at least 25 buffers, so the fade's own ticks set the pace. */
         const val SLEW = 0.04
@@ -154,5 +193,22 @@ fun Biquad.Companion.lowShelf(hz: Double, gainDb: Double, sampleRate: Int): Biqu
         b2 = (a * ((a + 1) - (a - 1) * c - s)) / a0,
         a1 = (-2 * ((a - 1) + (a + 1) * c)) / a0,
         a2 = ((a + 1) + (a - 1) * c - s) / a0,
+    )
+}
+
+/** A high shelf (Audio EQ Cookbook) of [gainDb] above [hz], normalised so a0 = 1. */
+fun Biquad.Companion.highShelf(hz: Double, gainDb: Double, sampleRate: Int): Biquad {
+    val a = 10.0.pow(gainDb / 40)
+    val w0 = 2 * PI * hz / sampleRate
+    val c = cos(w0)
+    val alpha = sin(w0) / 2 * sqrt(2.0)  // shelf slope 1
+    val s = 2 * sqrt(a) * alpha
+    val a0 = (a + 1) - (a - 1) * c + s
+    return Biquad(
+        b0 = (a * ((a + 1) + (a - 1) * c + s)) / a0,
+        b1 = (-2 * a * ((a - 1) + (a + 1) * c)) / a0,
+        b2 = (a * ((a + 1) + (a - 1) * c - s)) / a0,
+        a1 = (2 * ((a - 1) - (a + 1) * c)) / a0,
+        a2 = ((a + 1) - (a - 1) * c - s) / a0,
     )
 }

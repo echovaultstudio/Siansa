@@ -58,6 +58,8 @@ data class FadePlan(
     val buildUp: Boolean = false,
     /** Where the next song starts (its own ms) when it comes in after the old song ([coldEnd]): an echo out's downbeat. */
     val incomingFromMs: Long = 0L,
+    /** A beat-matched blend's three-band EQ: how the mids and highs move, and where the voices swap ([VocalRule]). */
+    val eq: BlendEq? = null,
 )
 
 /**
@@ -382,7 +384,8 @@ object Crossfade {
         val fromBeats = outro?.lockMs != null && intro?.lockMs != null
         val choice = if (mode == CrossfadeMode.SMART && matchable && beatMatch && speed != null && fromBeats) {
             TechniquePicker.pick(outro!!, intro!!, speed, TechniquePicker.keys(currentProfile, nextProfile), nextProfile?.dropsMs.orEmpty(),
-                mix = currentMix || nextMix, noRoom = noRoom, last = lastTechnique)
+                mix = currentMix || nextMix, noRoom = noRoom, last = lastTechnique,
+                vocals = TechniquePicker.vocalRoom(currentProfile?.vocals, nextProfile?.vocals))
         } else null
         val matched = if (matchable && beatMatch && currentDurationMs > 0) {
             val bars = BeatMatch.barsFor(outro!!, intro!!, choice?.bars ?: blendBars).let { if (currentMix || nextMix) minOf(it, BeatMatch.MIX_TRACK_BARS) else it }
@@ -445,9 +448,12 @@ object Crossfade {
             val lockCut = songEnd - endMs
             val how = if (choice != null) "smart: ${technique!!.label} (${if (technique == choice.technique) choice.why else "the drop didn't fit"}) · " else ""
             val (swapFrom, swapTo) = swapSpan(technique!!)
-            FadePlan(matched.overlapMs, matched.overlapMs, how + matched.why + (if (lockCut > 0) ", let go where its beat stops locking (%.1f s before its end)".format(java.util.Locale.ROOT, (lockCut + cut) / 1000.0) else ""),
+            // The three-band EQ (the owner, 19 Nov): never two voices at once, from where Siansa Beats heard them.
+            val eq = VocalRule.eq(currentProfile?.vocals, nextProfile?.vocals, matched.startMs, matched.incomingStartMs, matched.overlapMs, matched.speed, matched.bars)
+            FadePlan(matched.overlapMs, matched.overlapMs, how + matched.why + (if (lockCut > 0) ", let go where its beat stops locking (%.1f s before its end)".format(java.util.Locale.ROOT, (lockCut + cut) / 1000.0) else "") +
+                " · EQ: " + eq.describe(),
                 cut + lockCut + matched.cutMs, matched, technique = technique, swapFrom = swapFrom, swapTo = swapTo,
-                filterHz = if (technique == Technique.FILTER_FADE) FILTER_FADE_HZ else 0.0)
+                filterHz = if (technique == Technique.FILTER_FADE) FILTER_FADE_HZ else 0.0, eq = eq)
         } else if (mode == CrossfadeMode.SMART && currentProfile != null && nextProfile != null) run {
             val tail = ((currentProfile.quietForLastMs(QUIET_DB) ?: 0L) - cut).coerceAtLeast(0L)
             val head = nextProfile.reachesAfterMs(QUIET_DB) ?: 0L

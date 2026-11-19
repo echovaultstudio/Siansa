@@ -137,13 +137,14 @@ blend them the way a DJ mixes:
   length, so the song is back at its own speed sooner.
 - **Smart picks how to blend (with Siansa Beats' readings at both ends, and the keys from AudioMuse-AI):**
   - **Long blend**, 32 bars with the bass swapped in the middle: tempos within 2 %, keys that mix, both ends sure of
-    their beat, and 8 bars or more without bass at one end.
+    their beat, and 8 bars or more without bass at one end. With Siansa Beats 0.60 or newer, only where the two
+    songs' vocals won't meet in it.
   - **Drop swap**: the next song comes in 16 (or 8) bars before its first drop, so the drop lands where the old song
     goes; the old song keeps its bass until then. Not when the energy goes down.
   - **Filter fade**, 16 bars: the old song is swept out with a rising high-pass filter, when the next song starts 3 dB
     or more quieter, or the keys only half mix.
-  - **Quick swap**, 4 bars: when the keys clash, a beat is under 90 % sure, or you moved so near the end that the
-    blend picked no longer fits. Moving in the song keeps the blend picked whenever it still fits.
+  - **Quick swap**, 4 bars: when the keys clash, a beat is under 90 % sure, both songs sing right up to the change
+    (fewer than 4 bars without a voice between them), or you moved so near the end that the blend picked no longer fits. Moving in the song keeps the blend picked whenever it still fits.
   - **Echo out**: when the tempos are too far apart to match, the two never play together. The old song's last bar
     echoes out and it stops on the bar line; the next song drops in at full level on its first downbeat as it stops,
     under the last faint repeats. Only into a song whose beat starts right away: one with an intro without a beat
@@ -179,9 +180,21 @@ is about 15 seconds at 128 BPM, 16 bars about 30. A blend starts on a bar, so it
 longer, and it never takes more than a third of a song: into a short song it's laid over fewer bars, still beat
 on beat.
 
-**Bass swap** (always on, with no setting): over the first half of a blend the old song's bass is taken away (a filter sweeping
-up to about 200 Hz) while the new song's, held back at first, is let in, as a DJ does with the EQ: two kick drums
-never play at once, so a blend a few ms out of step is heard as a mix, not a flam.
+**Three-band EQ** (always on, with no setting): each beat-matched blend rides the lows, mids and highs of both songs
+separately, the way a DJ uses a mixer's EQ.
+- **Lows:** the old song's bass is taken away (a filter sweeping up to about 200 Hz) while the new song's, fully cut
+  at first, is let in, over the first half of the blend (the middle in a long blend, the end in a drop swap). Two
+  kick drums or basslines never play at once, so a blend a few ms out of step is heard as a mix, not a flam.
+- **Highs:** the new song's hats come in first, from 12 dB down to full over the first quarter; the old song's go down
+  as much over the last quarter.
+- **Mids** (where a voice is): the new song's come in over the first half and the old song's go over the second.
+- **Never two vocals at once** (with Siansa Beats 0.60 or newer, which finds where each song sings): when both songs
+  would sing at the same moment of the blend, the mids and highs are swapped on a bar line instead. The old song's
+  voice is cut over the bar before it and the new song's let in over the bar after it, so one voice is heard at a time.
+  The bar is chosen to cut off the least singing, weighing each song by how loud it is then in the blend, a phrase
+  line winning a near tie. Two vocal songs still blend; their voices just never overlap. Without the vocals known
+  for both (a song not separated yet, or a blend outside the ends Siansa Beats separated), the EQ crosses over as
+  above. The log says which it did ("EQ: mids swapped at bar 9 of 16 (both sing for 5.2 bars of it)").
 
 Echo at the end and Keep the key are off for now and not shown in Settings: the blends play plain, and the next
 song's pitch moves with its speed (by at most two thirds of a semitone at 4 %, like a DJ's pitch fader), then glides
