@@ -58,6 +58,8 @@ data class HomeItem(
     val meta: String = "",
     /** How far through, 0..1, for a book or an episode: a bar along the cover in Cover rows. */
     val progress: Float? = null,
+    /** What it is, for the row's cover grid (#1263): Tiles, the carousel and the Shortcut grid show it. */
+    val grid: GridSubject? = null,
 )
 
 /**
@@ -89,7 +91,7 @@ fun HomeLookRow(
         HomeLook.LIST -> HomeList(title, items, open)
         HomeLook.BUTTON -> HomeButton(id, title, items, open, play, songs)
         HomeLook.COVER_ROWS -> HomeCoverRows(title, items, open)
-        HomeLook.GRID -> TileGrid(title, items.map { GridTile(it.key, it.title, it.coverArt, it.colors, onClick = it.open) }, gridSize, openAll)
+        HomeLook.GRID -> TileGrid(title, items.map { GridTile(it.key, it.title, it.coverArt, it.colors, onClick = it.open, grid = it.grid) }, gridSize, openAll)
         HomeLook.CAROUSEL -> HomeCarouselLook(title, items)
     }
 }
@@ -113,6 +115,7 @@ internal fun crateRecordOf(item: HomeItem): CrateRecord = CrateRecord(
     songs = emptyList(),
     onOpen = item.open,
     colors = item.colors,
+    grid = item.grid,
 )
 
 /**
@@ -143,9 +146,9 @@ private fun argb(c: Color): Long = c.toArgb().toLong() and 0xFFFFFFFFL
 @Composable
 private fun HomeItemTile(item: HomeItem) {
     if (item.coverArt != null) {
-        AlbumTile(item.title, item.subtitle, item.coverArt, item.open, Modifier.width(TILE).testTag("homeLookTile"), round = item.round)
+        AlbumTile(item.title, item.subtitle, item.coverArt, item.open, Modifier.width(gridWidth(TILE)).testTag("homeLookTile"), round = item.round, grid = item.grid)
     } else {
-        GradientTile(title = item.title, colors = item.colors, onClick = item.open, size = TILE, modifier = Modifier.testTag("homeLookTile"))
+        GradientTile(title = item.title, colors = item.colors, onClick = item.open, size = TILE, modifier = Modifier.testTag("homeLookTile"), grid = item.grid)
     }
 }
 
@@ -289,6 +292,8 @@ data class GridTile(
     val colors: Pair<Color, Color>? = null,
     val icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
     val onClick: () -> Unit,
+    /** What it opens, for the row's cover grid (#1263). */
+    val grid: GridSubject? = null,
 )
 
 /**
@@ -307,7 +312,7 @@ fun TileGrid(title: String, tiles: List<GridTile>, most: Int, onOpenAll: (() -> 
             shown.chunked(2).forEach { row ->
                 Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
                     row.forEach { t ->
-                        QuickTile(t.title, t.coverArt, t.colors, t.onClick, Modifier.weight(1f).testTag("tileGridTile"), icon = t.icon)
+                        QuickTile(t.title, t.coverArt, t.colors, t.onClick, Modifier.weight(1f).testTag("tileGridTile"), icon = t.icon, grid = t.grid)
                     }
                     if (row.size == 1) Spacer(Modifier.weight(1f))
                 }
