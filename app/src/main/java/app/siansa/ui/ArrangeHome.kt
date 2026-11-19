@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Arrangement
 import app.siansa.data.CardLook
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.FilterChip
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -116,6 +117,11 @@ fun HomeSettingsSheet(nav: androidx.navigation.NavController, startOnSources: Bo
             graph.settings.setHomeLook(section, look)
         },
         gridSizes = s.homeGridSizes,
+        carouselOnCover = s.homeCarouselOnCover,
+        onCarouselOnCoverChange = { section, onCover ->
+            AppLog.i("Home", "${section.id} carousel: names ${if (onCover) "on the cover" else "under the row"}")
+            graph.settings.setHomeCarouselOnCover(section, onCover)
+        },
         onGridSizeChange = { section, size ->
             AppLog.i("Home", "${section.label}: $size tiles in its grid")
             graph.settings.setHomeGridSize(section, size)
@@ -172,6 +178,8 @@ fun ArrangeHomeSheet(
     onResetLooks: () -> Unit = {},
     // Tiles of a row shown as the shortcut grid (the owner, 10 Nov), picked in its look's dialog.
     gridSizes: Map<HomeSection, Int> = emptyMap(),
+    carouselOnCover: Set<HomeSection> = emptySet(),
+    onCarouselOnCoverChange: (HomeSection, Boolean) -> Unit = { _, _ -> },
     onGridSizeChange: (HomeSection, Int) -> Unit = { _, _ -> },
     onOpenSettings: (HomeSection) -> Unit = {},
     // The sections listed here, in Reset's order: all but the notices, which are the top of Home (issue #872).
@@ -189,11 +197,13 @@ fun ArrangeHomeSheet(
             titleShown = section !in untitled,
             onTitleShown = { onTitleShownChange(section, it) },
             // The grid stays open, so how many tiles it has can be picked there.
-            onPick = { onLookChange(section, it); if (it != HomeLook.GRID) picking = null },
+            onPick = { onLookChange(section, it); if (it != HomeLook.GRID && it != HomeLook.CAROUSEL) picking = null },
             only = if (section in holds) BEATS_LOOKS else null,
             onDismiss = { picking = null },
             gridSize = gridSizes[section] ?: HomeLook.GRID_MOST,
             onGridSize = { onGridSizeChange(section, it) },
+            namesOnCover = section in carouselOnCover,
+            onNamesOnCover = { onCarouselOnCoverChange(section, it) },
             cardLook = cardLooks[section] ?: CardLook.AS_HOME,
             homeCardLook = cardLook,
             onCardLook = { onSectionCardLookChange(section, it) },
@@ -329,7 +339,8 @@ fun ArrangeHomeSheet(
                                 )
                             },
                     ) {
-                        Row(Modifier.height(52.dp).padding(start = Space.Small).then(if (!lifted && section != items.first()) Modifier.hairlineAbove() else Modifier), verticalAlignment = Alignment.CenterVertically) {
+                        // At least a row's height, taller when the line under the name wraps (the owner, 19 Nov: it was cut off).
+                        Row(Modifier.heightIn(min = 52.dp).padding(start = Space.Small).then(if (!lifted && section != items.first()) Modifier.hairlineAbove() else Modifier), verticalAlignment = Alignment.CenterVertically) {
                             // The handle moves straight away, without the hold.
                             Icon(
                                 Icons.Rounded.DragIndicator,
@@ -348,7 +359,7 @@ fun ArrangeHomeSheet(
                                     .size(24.dp),
                             )
                             // Hidden rows stay in the list, dimmed, so they keep their place and can come back.
-                            Column(Modifier.weight(1f).padding(start = Space.Tight).alpha(if (isHidden) 0.6f else 1f)) {
+                            Column(Modifier.weight(1f).padding(start = Space.Tight, top = Space.Small, bottom = Space.Small).alpha(if (isHidden) 0.6f else 1f)) {
                                 Text(
                                     section.label,
                                     style = MaterialTheme.typography.bodyLarge,
@@ -408,11 +419,15 @@ private fun HomeLookDialog(
     onCardLook: (CardLook) -> Unit = {},
     // The only looks offered (a row of Siansa Beats' mixes: Carousel and Tiles); null: every look.
     only: List<HomeLook>? = null,
+    // As a carousel, each name and its details on the cover or under the row (the owner, 19 Nov).
+    namesOnCover: Boolean = false,
+    onNamesOnCover: (Boolean) -> Unit = {},
 ) {
     // The switch shows its change at once: the dialog stays open for the look.
     var shown by remember(section) { mutableStateOf(titleShown) }
     var look by remember(section) { mutableStateOf(if (only != null) beatsLook(current) else current) }
     var tiles by remember(section) { mutableStateOf(gridSize) }
+    var onCover by remember(section) { mutableStateOf(namesOnCover) }
     var colour by remember(section) { mutableStateOf(cardLook) }
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -458,6 +473,9 @@ private fun HomeLookDialog(
                     }
                     if (option == HomeLook.GRID && look == HomeLook.GRID) {
                         GridSizeChips(tiles, Modifier.padding(start = Space.Section, bottom = Space.Small)) { tiles = it; onGridSize(it) }
+                    }
+                    if (option == HomeLook.CAROUSEL && look == HomeLook.CAROUSEL) {
+                        CrateNamesChoice(onCover, Modifier.padding(start = Space.Section, bottom = Space.Small)) { onCover = it; onNamesOnCover(it) }
                     }
                 }
             }
@@ -552,6 +570,25 @@ internal fun SectionTitleSwitch(shown: Boolean, onChange: (Boolean) -> Unit) {
         }
         Spacer(Modifier.width(Space.Medium))
         androidx.compose.material3.Switch(checked = shown, onCheckedChange = onChange, modifier = Modifier.testTag("homeTitleSwitch"))
+    }
+}
+
+/** Where a carousel shows each name and its details (the owner, 19 Nov): under the row, or on the cover. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+internal fun CrateNamesChoice(onCover: Boolean, modifier: Modifier = Modifier, onPick: (Boolean) -> Unit) {
+    Column(modifier.testTag("crateNames"), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
+        Text("Name and details", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+            for ((value, label) in listOf(false to "Under the covers", true to "On the cover")) {
+                FilterChip(
+                    selected = onCover == value,
+                    onClick = { onPick(value) },
+                    label = { Text(label) },
+                    modifier = Modifier.testTag(if (value) "crateNames-cover" else "crateNames-under"),
+                )
+            }
+        }
     }
 }
 

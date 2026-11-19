@@ -375,6 +375,35 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     )
                 }
             },
+            // The carousel with each name and its line on the cover (the owner, 19 Nov): long names keep whole words,
+            // a long line ends with "…", all over a soft fade at the sleeve's foot.
+            Scene("record_crate_on_cover") {
+                fun record(key: String, name: String, caption: String) = app.siansa.ui.CrateRecord(key, name, caption, emptyList(), emptyList(), {})
+                Column(Modifier.padding(vertical = Space.Page)) {
+                    app.siansa.ui.SectionTitle("Made for you", top = 0.dp)
+                    app.siansa.ui.RecordCrate(
+                        listOf(
+                            record("made-1", "Velvet Undertow", "Slow synths and hazy voices"),
+                            record("made-2", "Neo-Classical Downtempo With Field Recordings", "Strings, soft beats and field recordings drifting by on a rainy afternoon"),
+                            record("made-3", "Driving Post-Punk", "Wiry guitars and restless drums"),
+                        ),
+                        namesOnCover = true,
+                    )
+                }
+            },
+            // Under the row's cog: where the carousel's names go (the owner, 19 Nov).
+            Scene("crate_names_choice") {
+                Column(Modifier.padding(Space.Page)) { app.siansa.ui.CrateNamesChoice(onCover = true) {} }
+            },
+            // Arrange Home with Siansa Beats' rows: the line under a name wraps instead of being cut (the owner, 19 Nov).
+            Scene("arrange_home_beats_rows") {
+                app.siansa.ui.ArrangeHomeSheet(
+                    order = listOf(app.siansa.data.HomeSection.CAROUSEL, app.siansa.data.HomeSection.MADE_FOR_YOU, app.siansa.data.HomeSection.MORE_OF_YOU, app.siansa.data.HomeSection.PODCASTS),
+                    hidden = emptySet(), onChange = {}, onHiddenChange = {}, onDismiss = {}, asPage = true,
+                    holds = app.siansa.ui.beatsRows(true),
+                    looks = mapOf(app.siansa.data.HomeSection.MORE_OF_YOU to app.siansa.data.HomeLook.TILES, app.siansa.data.HomeSection.PODCASTS to app.siansa.data.HomeLook.COVER_ROWS),
+                )
+            },
             // With Siansa Beats' moods: the picks' heading and the + name them too (the owner, 17 Nov).
             Scene("mood_shaper_moods") {
                 Column(Modifier.padding(Space.Page)) {

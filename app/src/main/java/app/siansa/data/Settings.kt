@@ -219,6 +219,8 @@ data class AppSettings(
     val homeGridSizes: Map<HomeSection, Int> = emptyMap(),
     /** Home's sections shown without their title (issue #961). */
     val homeUntitled: Set<HomeSection> = emptySet(),
+    /** Rows shown as a carousel with each mix's name and details on its cover, not under the row (the owner, 19 Nov). */
+    val homeCarouselOnCover: Set<HomeSection> = emptySet(),
     /** How Home's coloured cards are painted (the owner, 13 Nov), and the cards with a look of their own. */
     val homeCardLook: CardLook = CardLook.DEFAULT,
     val homeCardLooks: Map<HomeSection, CardLook> = emptyMap(),
@@ -536,6 +538,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         homeCardLooks = CardLook.parse(prefs.getString("home_card_looks", null)),
         homeGridSizes = HomeLook.parseGridSizes(prefs.getString("home_grid_sizes", null)),
         homeUntitled = HomeSection.parseHidden(prefs.getString("home_untitled", null)),
+        homeCarouselOnCover = HomeSection.parseHidden(prefs.getString("home_carousel_on_cover", null)),
         homeGap = prefs.getInt("home_gap", AppSettings.HOME_GAP_DEFAULT).coerceIn(0, AppSettings.HOME_GAP_MAX),
         downloadedOnly = prefs.getBoolean("downloaded_only", false),
         timeMachineMissing = prefs.getBoolean("time_machine_missing", true),
@@ -803,6 +806,13 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         _state.value = _state.value.copy(homeUntitled = untitled)
     }
 
+    /** Whether [section]'s carousel shows each name and its details on the cover, or under the row (the owner, 19 Nov). */
+    fun setHomeCarouselOnCover(section: HomeSection, onCover: Boolean) {
+        val set = if (onCover) _state.value.homeCarouselOnCover + section else _state.value.homeCarouselOnCover - section
+        prefs.edit().putString("home_carousel_on_cover", HomeSection.formatHidden(set)).apply()
+        _state.value = _state.value.copy(homeCarouselOnCover = set)
+    }
+
     fun setNavTabs(tabs: List<NavTab>) {
         val kept = NavTab.parse(NavTab.format(tabs))
         prefs.edit().putString("nav_tabs", NavTab.format(kept)).apply()
@@ -872,8 +882,8 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
 
     /** Every row back in its own look, and every card in Home's colour. */
     fun resetHomeLooks() {
-        prefs.edit().remove("home_looks").remove("home_grid_sizes").remove("home_card_look").remove("home_card_looks").apply()
-        _state.value = _state.value.copy(homeLooks = emptyMap(), homeGridSizes = emptyMap(), homeCardLook = CardLook.DEFAULT, homeCardLooks = emptyMap())
+        prefs.edit().remove("home_looks").remove("home_grid_sizes").remove("home_card_look").remove("home_card_looks").remove("home_carousel_on_cover").apply()
+        _state.value = _state.value.copy(homeLooks = emptyMap(), homeGridSizes = emptyMap(), homeCardLook = CardLook.DEFAULT, homeCardLooks = emptyMap(), homeCarouselOnCover = emptySet())
     }
 
     /** How every coloured card on Home is painted (the owner, 13 Nov). */
