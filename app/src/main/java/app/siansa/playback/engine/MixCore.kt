@@ -219,7 +219,9 @@ class MixCore(val outRate: Int) {
         var started: MutableList<DeckStream>? = null
         if (echoIn.size < frames * 2) echoIn = FloatArray(frames * 2)
         for (deck in decks) {
-            val filtering = deck.filter.prepare(outRate, 2)
+            var filtering = deck.filter.prepare(outRate, 2)
+            // A blend laid on the bars ([app.siansa.playback.EqStyle]): its bands follow the mixer's own frames.
+            val booked = deck.filter.isBooked
             val echo = deck.echo?.takeIf { it.ringing }
             if (echo != null) java.util.Arrays.fill(echoIn, 0, frames * 2, 0f)
             for (stream in deck.streams) {
@@ -248,6 +250,10 @@ class MixCore(val outRate: Int) {
                     val g = g0 + (g1 - g0) * (i + 1).toFloat() / frames
                     var l = (scratch[i * 2] * g).toDouble()
                     var r = (scratch[i * 2 + 1] * g).toDouble()
+                    if (booked && i % app.siansa.playback.DeckFilter.FOLLOW_FRAMES == 0) {
+                        deck.filter.follow(mixStart + i)
+                        filtering = true
+                    }
                     if (filtering) {
                         l = deck.filter.process(l, 0)
                         r = deck.filter.process(r, 1)

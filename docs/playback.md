@@ -196,6 +196,21 @@ separately, the way a DJ uses a mixer's EQ.
   for both (a song not separated yet, or a blend outside the ends Siansa Beats separated), the EQ crosses over as
   above. The log says which it did ("EQ: mids swapped at bar 9 of 16 (both sing for 5.2 bars of it)").
 
+**Each blend mixed a little differently:** a long blend, a bass swap or a quick swap that's on the bars, with its
+phrases known, picks one of four ways to ride the EQ, never the same one twice in a row:
+- **Glide:** as above, everything crossed over smoothly.
+- **Bass swap on the bar:** both basslines swapped at once on the phrase line halfway, the new song's hats coming up
+  over the 4 bars before it.
+- **Tease, then swap:** the new song comes in on its hats alone, its mids later, and its bass at once on the last
+  phrase line.
+- **Bass, then mids, on the bar:** the basslines swapped at once on one phrase line and the mids (the voices) on the
+  next.
+
+A swap "at once" lands on the old song's own bar line to within a millisecond, over 8 ms so it doesn't click. Where
+both songs would sing at once, the mids still swap where only one voice is heard. A filter fade, a drop swap and an
+echo out keep their own way out, and a blend that isn't sure of its bars or phrases glides. The log names the style
+("EQ: tease, then swap: …"), and **Mark the last blend** keeps it, so a style that doesn't suit your music shows up.
+
 Echo at the end and Keep the key are off for now and not shown in Settings: the blends play plain, and the next
 song's pitch moves with its speed (by at most two thirds of a semitone at 4 %, like a DJ's pitch fader), then glides
 back as it eases to its own speed.
