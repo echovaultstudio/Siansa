@@ -116,4 +116,33 @@ class ServerSeekQueueTest {
         val removed = ServerSeekPlayer.withCopyAfter(intArrayOf(3, 0, 4, 1, 2), 1).filter { it != 1 }.map { if (it > 1) it - 1 else it }
         assertEquals(listOf(3, 0, 4, 1, 2), removed)
     }
+
+    private fun added(id: String) = song(id).buildUpon()
+        .setMediaMetadata(androidx.media3.common.MediaMetadata.Builder().setExtras(android.os.Bundle().apply { putBoolean("siansa.auto", true) }).build())
+        .build()
+
+    /**
+     * Issue #1238: an album started at its fifth song, with songs Keep playing added after it. Shuffle turned on in
+     * the player plays the song playing, then the album's other nine in some order, then the added songs in theirs;
+     * songs Keep playing adds later, while shuffled, come after those.
+     */
+    @Test fun shuffleShufflesTheAlbumAndKeepsTheAddedSongsAfterIt() {
+        repeat(5) {
+            exo.setMediaItems(List(10) { song("a$it") } + List(3) { added("k$it") })
+            exo.seekTo(4, 0)
+            idle()
+            player.shuffleModeEnabled = true
+            idle()
+            val order = shuffledIds()
+            assertEquals("a4", order.first())
+            assertEquals((0 until 10).map { "a$it" }.toSet() - "a4", order.subList(1, 10).toSet())
+            assertEquals(listOf("k0", "k1", "k2"), order.subList(10, 13))
+            assertEquals("a4", exo.currentMediaItem?.mediaId)
+            player.addMediaItems(mutableListOf(added("k3"), added("k4")))
+            idle()
+            assertEquals(order + listOf("k3", "k4"), shuffledIds())
+            player.shuffleModeEnabled = false
+            idle()
+        }
+    }
 }
