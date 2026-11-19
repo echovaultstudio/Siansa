@@ -46,6 +46,12 @@ import app.siansa.data.CardLook
 /** The look of the cards in the section being drawn; Home's choice where nothing narrower is given. */
 val LocalCardLook = compositionLocalOf { CardLook.VIVID }
 
+/**
+ * The colour of the shortcut tiles in the section being drawn (#1261): null keeps them plain, as they always were; a
+ * row's own colour (chosen under its cog) paints them in it.
+ */
+val LocalShortcutLook = compositionLocalOf<CardLook?> { null }
+
 /** How to fill a card: a solid under a wash (either may be all there is), and what its words are drawn in. */
 class CardPaint(val base: Color, val wash: Brush?, val text: Color, val faint: Color)
 
@@ -61,8 +67,7 @@ internal const val ARTWORK_TO = 0.22f
  * [picture] is the card's artwork, for the look that takes its colour from it; a card with none is painted soft then.
  */
 @Composable
-fun cardPaint(colors: Pair<Color, Color>, picture: String? = null, label: String = "card"): CardPaint {
-    val look = LocalCardLook.current
+fun cardPaint(colors: Pair<Color, Color>, picture: String? = null, label: String = "card", look: CardLook = LocalCardLook.current): CardPaint {
     val scheme = MaterialTheme.colorScheme
     val quiet = CardPaint(scheme.surfaceContainerHigh, null, scheme.onSurface, scheme.onSurfaceVariant)
     return when (look) {

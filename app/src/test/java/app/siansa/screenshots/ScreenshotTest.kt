@@ -404,6 +404,29 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     looks = mapOf(app.siansa.data.HomeSection.MORE_OF_YOU to app.siansa.data.HomeLook.TILES, app.siansa.data.HomeSection.PODCASTS to app.siansa.data.HomeLook.COVER_ROWS),
                 )
             },
+            // Every row has the same cog (#1261): Your cards say their looks are their own; Shortcuts has a colour.
+            Scene("arrange_home_every_row") {
+                app.siansa.ui.ArrangeHomeSheet(
+                    order = listOf(app.siansa.data.HomeSection.QUICK, app.siansa.data.HomeSection.CARDS, app.siansa.data.HomeSection.MORE_OF_YOU),
+                    hidden = emptySet(), onChange = {}, onHiddenChange = {}, onDismiss = {}, asPage = true,
+                    holds = app.siansa.ui.beatsRows(true),
+                    looks = mapOf(app.siansa.data.HomeSection.MORE_OF_YOU to app.siansa.data.HomeLook.COVER_ROWS),
+                    cardLooks = mapOf(app.siansa.data.HomeSection.QUICK to app.siansa.data.CardLook.SOFT),
+                )
+            },
+            // Shortcut tiles in their row's own colour (#1261), a long name among them; plain without one.
+            Scene("shortcut_tiles_coloured") {
+                Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
+                    for (look in listOf(null, app.siansa.data.CardLook.VIVID, app.siansa.data.CardLook.SOFT)) {
+                        androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalShortcutLook provides look) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+                                app.siansa.ui.QuickTile("Liked songs", null, Color(0xFF4B2BD6) to Color(0xFF8FD3C8), {}, Modifier.weight(1f))
+                                app.siansa.ui.QuickTile("Extraordinarily Long Playlist Name", null, null, {}, Modifier.weight(1f))
+                            }
+                        }
+                    }
+                }
+            },
             // With Siansa Beats' moods: the picks' heading and the + name them too (the owner, 17 Nov).
             Scene("mood_shaper_moods") {
                 Column(Modifier.padding(Space.Page)) {

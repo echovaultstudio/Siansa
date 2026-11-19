@@ -934,11 +934,13 @@ fun QuickTile(
     modifier: Modifier = Modifier,
     icon: ImageVector? = null,
 ) {
+    // Plain, unless its row has a colour of its own (#1261).
+    val paint = LocalShortcutLook.current?.let { look -> cardPaint(colors ?: tileColors(title), coverArt, title, look) }
     Row(
         modifier
             .height(QUICK_TILE_HEIGHT)
             .clip(RoundedCornerShape(QUICK_TILE_CORNER))
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .then(if (paint != null) Modifier.cardFill(paint, RoundedCornerShape(QUICK_TILE_CORNER)) else Modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh))
             .clickable(onClick = onClick),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -960,6 +962,7 @@ fun QuickTile(
             fontWeight = FontWeight.SemiBold,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
+            color = paint?.text ?: androidx.compose.ui.graphics.Color.Unspecified,
             modifier = Modifier.padding(horizontal = Space.Medium),
         )
     }

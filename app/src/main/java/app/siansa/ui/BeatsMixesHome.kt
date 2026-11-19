@@ -89,13 +89,17 @@ fun BeatsMixesHome(nav: NavController, shelves: Set<String>, look: HomeLook) {
             val mixes = shelf.mixes.mapNotNull { mix -> homeMix(mix, songs[mix.id].orEmpty(), answer.keepDays, nav, graph) }
             if (mixes.isEmpty()) return@forEachIndexed
             val title = BeatsMixes.title(shelf)
-            // Two looks only (the owner, 17 Nov): Tiles, each with four of its covers; else the carousel.
-            if (beatsLook(look) == HomeLook.TILES) {
-                Shelf(title, mixes, key = { it.key }) { m -> MixMosaicTile(m) }
-            } else {
-                // Just the title: the mixes say the rest (the owner, 17 Nov: no line under it).
-                SectionTitle(title, top = if (i == 0) LocalSectionGap.current else Space.Section)
-                RecordCrate(mixes)
+            // Its own look is the carousel; Tiles has four of each mix's covers; every other look as any row has it
+            // (#1261, the owner, 19 Nov: every row gets every option).
+            when (val shownLook = beatsLook(look)) {
+                HomeLook.TILES -> Shelf(title, mixes, key = { it.key }) { m -> MixMosaicTile(m) }
+                HomeLook.CAROUSEL -> {
+                    // Just the title: the mixes say the rest (the owner, 17 Nov: no line under it).
+                    SectionTitle(title, top = if (i == 0) LocalSectionGap.current else Space.Section)
+                    RecordCrate(mixes)
+                }
+                else -> HomeLookRow(shownLook, "beats-${shelf.key}", title, mixes.map(::homeItemOf),
+                    play = { graph.player.play(mixes.first().songs) }, songs = mixes.first().songs)
             }
         }
     }
@@ -153,6 +157,13 @@ private fun homeMix(mix: BeatsMixes.BeatsMix, songs: List<Song>, keepDays: Int, 
     val covers = songs.mapNotNull { it.cover }.distinct().take(4)
     return CrateRecord(key = id, name = mix.name, caption = mix.caption, covers = covers, songs = songs, onOpen = open)
 }
+
+/** A Siansa Beats mix as an item any of Home's looks can draw: its name, what's in it, its first cover. */
+internal fun homeItemOf(record: CrateRecord): HomeItem = HomeItem(
+    key = record.key, title = record.name, subtitle = record.caption, coverArt = record.covers.firstOrNull { it != null },
+    colors = record.colors ?: tileColors(record.key), open = record.onOpen,
+    meta = app.siansa.mix.CoverRows.songCount(record.songs.size).orEmpty(),
+)
 
 /** The id a Siansa Beats mix is kept by here: Siansa Beats' own key, which no other mix has (0.55), else the day's. */
 internal fun beatsMixId(mix: BeatsMixes.BeatsMix, today: String): String =
