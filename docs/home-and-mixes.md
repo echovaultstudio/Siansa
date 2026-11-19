@@ -73,6 +73,15 @@ The same cog has **Show its title**: turn it off and the section shows without t
 look, and **As Home** follows the choice made under Cards, or pick one for this section alone. For Shortcuts, As Home
 keeps its tiles plain; a colour of its own paints them, as it does a Shortcut grid in any section.
 
+The same cog has a **Cover grid**: **Off** (each card its own picture, the default), **2×2**, **3×3**, **2×4** or
+**3×6**. Each card then shows a grid of covers in place of its picture: an album its own cover first, then its artist's
+other albums; an artist radio the albums it plays from (the artist's, then those of artists like them); a mix, a vibe or
+Today's mix its songs' covers; a playlist its songs'; a genre its albums'; a shortcut what it opens. 2×4 and 3×6 make
+the cards twice as wide, so every cover stays square and whole; in a carousel they're a band across the sleeve. With
+fewer covers than the grid holds, they go round again; a card with only one keeps its picture. Tiles, the carousel, the
+Shortcut grid, Shortcuts and Today's mix show it; the List, Banner, Play button and Cover rows looks keep their small
+pictures, and the Radios (sound radios) and books keep theirs, as they have no album covers.
+
 | Section | What it shows |
 |---|---|
 | **Shortcuts** | The albums, playlists, mixes and Liked songs you played from last, newest first: 8 of them, or as many as you pick from 2 to 8 under **Settings › Home page › Top of Home**. Until there's enough of that, today's mixes, your playlists and recent albums. |
