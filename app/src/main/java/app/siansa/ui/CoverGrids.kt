@@ -119,11 +119,13 @@ private suspend fun artistGridCovers(graph: AppGraph, artist: Artist, count: Int
     val own = graph.library.albumsOf(artist).map { it.coverArt }
     if (own.filterNotNull().distinct().size >= count) return own
     val like = runCatching { graph.similar.artists(artist.name) }.getOrDefault(emptyList())
-    val theirs = like.asSequence()
-        .mapNotNull { s -> s.id?.let { graph.library.artist(it) } ?: graph.library.artistByName(s.name) }
-        .filter { normalizeKey(it.name) != normalizeKey(artist.name) }
-        .take(SIMILAR_ARTISTS)
-        .toList()
+    // A list, not a sequence: looking an artist up suspends.
+    val theirs = mutableListOf<Artist>()
+    for (s in like) {
+        if (theirs.size >= SIMILAR_ARTISTS) break
+        val found = s.id?.let { graph.library.artist(it) } ?: graph.library.artistByName(s.name) ?: continue
+        if (normalizeKey(found.name) != normalizeKey(artist.name)) theirs += found
+    }
     return own + theirs.flatMap { graph.library.albumsOf(it).take(ALBUMS_EACH).map { a -> a.coverArt } }
 }
 
