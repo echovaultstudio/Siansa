@@ -161,7 +161,7 @@ private fun homeMix(mix: BeatsMixes.BeatsMix, songs: List<Song>, keepDays: Int, 
 /** A Siansa Beats mix as an item any of Home's looks can draw: its name, what's in it, its first cover. */
 internal fun homeItemOf(record: CrateRecord): HomeItem = HomeItem(
     key = record.key, title = record.name, subtitle = record.caption, coverArt = record.covers.firstOrNull { it != null },
-    colors = record.colors ?: tileColors(record.key), open = record.onOpen,
+    colors = record.colors ?: tileColors(record.key), open = record.onOpen, mosaic = record.covers,
     meta = app.siansa.mix.CoverRows.songCount(record.songs.size).orEmpty(),
 )
 

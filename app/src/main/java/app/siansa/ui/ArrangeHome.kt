@@ -1,5 +1,7 @@
 package app.siansa.ui
 
+import androidx.compose.material.icons.rounded.Remove
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Box
@@ -126,6 +128,11 @@ fun HomeSettingsSheet(nav: androidx.navigation.NavController, startOnSources: Bo
             AppLog.i("Home", "${section.label}: $size tiles in its grid")
             graph.settings.setHomeGridSize(section, size)
         },
+        coverGrids = s.homeCoverGrids,
+        onCoverGridChange = { section, size ->
+            AppLog.i("Home", "${section.label}: a cover grid of ${size.columns} columns and ${size.rows} rows")
+            graph.settings.setHomeCoverGrid(section, size)
+        },
         onResetLooks = {
             AppLog.i("Home", "Every row back in its own look, every card in Home's colour")
             graph.settings.resetHomeLooks()
@@ -181,6 +188,9 @@ fun ArrangeHomeSheet(
     carouselOnCover: Set<HomeSection> = emptySet(),
     onCarouselOnCoverChange: (HomeSection, Boolean) -> Unit = { _, _ -> },
     onGridSizeChange: (HomeSection, Int) -> Unit = { _, _ -> },
+    // Each cover grid's columns and rows (#1263).
+    coverGrids: Map<HomeSection, app.siansa.data.CoverGridSize> = emptyMap(),
+    onCoverGridChange: (HomeSection, app.siansa.data.CoverGridSize) -> Unit = { _, _ -> },
     onOpenSettings: (HomeSection) -> Unit = {},
     // The sections listed here, in Reset's order: all but the notices, which are the top of Home (issue #872).
     sections: List<HomeSection> = HomeSection.default - HomeSection.NOTICES,
@@ -197,12 +207,14 @@ fun ArrangeHomeSheet(
             titleShown = section !in untitled,
             onTitleShown = { onTitleShownChange(section, it) },
             // The grid stays open, so how many tiles it has can be picked there.
-            onPick = { onLookChange(section, it); if (it != HomeLook.GRID && it != HomeLook.CAROUSEL) picking = null },
+            onPick = { onLookChange(section, it); if (it != HomeLook.GRID && it != HomeLook.CAROUSEL && it != HomeLook.COVER_GRID) picking = null },
             onDismiss = { picking = null },
             // Your cards each have their own look, chosen in Settings › Home page › Cards: a way there.
             onOpenSettings = if (section.lookable) null else { { picking = null; onOpenSettings(section) } },
             gridSize = gridSizes[section] ?: HomeLook.GRID_MOST,
             onGridSize = { onGridSizeChange(section, it) },
+            coverGrid = coverGrids[section] ?: app.siansa.data.CoverGridSize.DEFAULT,
+            onCoverGrid = { onCoverGridChange(section, it) },
             namesOnCover = section in carouselOnCover,
             onNamesOnCover = { onCarouselOnCoverChange(section, it) },
             cardLook = cardLooks[section] ?: CardLook.AS_HOME,
@@ -367,7 +379,9 @@ fun ArrangeHomeSheet(
                                     color = if (isHidden) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
                                 )
                                 // A row in another look says which (issue #655), and its cards' own colour; a hidden one says so.
-                                val shownLook = if (section in holds) beatsLook(looks[section]).label else looks[section]?.label
+                                val shownLook = (if (section in holds) beatsLook(looks[section]) else looks[section])?.let { l ->
+                                    if (l == HomeLook.COVER_GRID) "${l.label} ${(coverGrids[section] ?: app.siansa.data.CoverGridSize.DEFAULT).label}" else l.label
+                                }
                                     ?: if (section == HomeSection.CARDS) "Each its own look" else null
                                 val line = if (isHidden) "Hidden" else listOfNotNull(holds[section], shownLook, cardLooks[section]?.label).joinToString(" · ").ifEmpty { null }
                                 if (line != null) Text(line, style = MaterialTheme.typography.bodySmall, color = if (isHidden) MaterialTheme.colorScheme.onSurfaceVariant else Accent, modifier = Modifier.testTag("homeLookLabel"))
@@ -412,6 +426,8 @@ private fun HomeLookDialog(
     onDismiss: () -> Unit,
     gridSize: Int = HomeLook.GRID_MOST,
     onGridSize: (Int) -> Unit = {},
+    coverGrid: app.siansa.data.CoverGridSize = app.siansa.data.CoverGridSize.DEFAULT,
+    onCoverGrid: (app.siansa.data.CoverGridSize) -> Unit = {},
     // Its cards' colour (the owner, 13 Nov): its own, or [CardLook.AS_HOME], which is [homeCardLook].
     cardLook: CardLook = CardLook.AS_HOME,
     homeCardLook: CardLook = CardLook.DEFAULT,
@@ -426,6 +442,7 @@ private fun HomeLookDialog(
     var shown by remember(section) { mutableStateOf(titleShown) }
     var look by remember(section) { mutableStateOf(current) }
     var tiles by remember(section) { mutableStateOf(gridSize) }
+    var coverGridSize by remember(section) { mutableStateOf(coverGrid) }
     var onCover by remember(section) { mutableStateOf(namesOnCover) }
     var colour by remember(section) { mutableStateOf(cardLook) }
     AlertDialog(
@@ -482,6 +499,9 @@ private fun HomeLookDialog(
                     if (option == HomeLook.GRID && look == HomeLook.GRID) {
                         GridSizeChips(tiles, Modifier.padding(start = Space.Section, bottom = Space.Small)) { tiles = it; onGridSize(it) }
                     }
+                    if (option == HomeLook.COVER_GRID && look == HomeLook.COVER_GRID) {
+                        CoverGridSteppers(coverGridSize, Modifier.padding(start = Space.Section, bottom = Space.Small)) { coverGridSize = it; onCoverGrid(it) }
+                    }
                     if (option == HomeLook.CAROUSEL && look == HomeLook.CAROUSEL) {
                         CrateNamesChoice(onCover, Modifier.padding(start = Space.Section, bottom = Space.Small)) { onCover = it; onNamesOnCover(it) }
                     }
@@ -490,6 +510,36 @@ private fun HomeLookDialog(
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
     )
+}
+
+/**
+ * A cover grid's columns and rows (#1263): each with − and +, columns 2 to 6, rows 1 to 6. Names show under the
+ * pictures up to three columns.
+ */
+@Composable
+internal fun CoverGridSteppers(size: app.siansa.data.CoverGridSize, modifier: Modifier = Modifier, onChange: (app.siansa.data.CoverGridSize) -> Unit) {
+    Column(modifier.testTag("coverGridSize")) {
+        GridStepper("Columns", size.columns, app.siansa.data.CoverGridSize.COLUMNS, "coverGridColumns") { onChange(size.copy(columns = it)) }
+        GridStepper("Rows", size.rows, app.siansa.data.CoverGridSize.ROWS, "coverGridRows") { onChange(size.copy(rows = it)) }
+        Text(
+            if (size.named) "${size.count} covers, with their names." else "${size.count} covers; names show up to ${app.siansa.data.CoverGridSize.NAMED_COLUMNS} columns.",
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun GridStepper(label: String, value: Int, range: IntRange, tag: String, onChange: (Int) -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        IconButton(onClick = { onChange(value - 1) }, enabled = value > range.first, modifier = Modifier.testTag("$tag-less")) {
+            Icon(androidx.compose.material.icons.Icons.Rounded.Remove, contentDescription = "Fewer ${label.lowercase()}")
+        }
+        Text("$value", style = MaterialTheme.typography.titleMedium, modifier = Modifier.testTag(tag))
+        IconButton(onClick = { onChange(value + 1) }, enabled = value < range.last, modifier = Modifier.testTag("$tag-more")) {
+            Icon(androidx.compose.material.icons.Icons.Rounded.Add, contentDescription = "More ${label.lowercase()}")
+        }
+    }
 }
 
 /** A small capital label over a part of the sheet ("CARDS"), with a quiet note after it when given. */

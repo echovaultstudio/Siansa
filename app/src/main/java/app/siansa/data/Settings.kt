@@ -224,6 +224,8 @@ data class AppSettings(
     /** How Home's coloured cards are painted (the owner, 13 Nov), and the cards with a look of their own. */
     val homeCardLook: CardLook = CardLook.DEFAULT,
     val homeCardLooks: Map<HomeSection, CardLook> = emptyMap(),
+    /** The columns and rows of each row shown as a cover grid (#1263); a row not in it has [CoverGridSize.DEFAULT]. */
+    val homeCoverGrids: Map<HomeSection, CoverGridSize> = emptyMap(),
     /** The gap between Home's sections (#554), as a step of the spacing scale: 0 tight … 4 airy. 2 is the default. */
     val homeGap: Int = HOME_GAP_DEFAULT,
     /** Show only music on the phone, across the whole app (issue #141). */
@@ -536,6 +538,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         homeLooks = HomeLook.parse(prefs.getString("home_looks", null)),
         homeCardLook = CardLook.of(prefs.getString("home_card_look", null))?.takeIf { it != CardLook.AS_HOME } ?: CardLook.DEFAULT,
         homeCardLooks = CardLook.parse(prefs.getString("home_card_looks", null)),
+        homeCoverGrids = CoverGridSize.parse(prefs.getString("home_cover_grid_sizes", null)),
         homeGridSizes = HomeLook.parseGridSizes(prefs.getString("home_grid_sizes", null)),
         homeUntitled = HomeSection.parseHidden(prefs.getString("home_untitled", null)),
         homeCarouselOnCover = HomeSection.parseHidden(prefs.getString("home_carousel_on_cover", null)),
@@ -880,10 +883,17 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         _state.value = _state.value.copy(homeGridSizes = sizes)
     }
 
+    /** The columns and rows of [section] as a cover grid (#1263). */
+    fun setHomeCoverGrid(section: HomeSection, size: CoverGridSize) {
+        val sizes = _state.value.homeCoverGrids + (section to size)
+        prefs.edit().putString("home_cover_grid_sizes", CoverGridSize.format(sizes)).apply()
+        _state.value = _state.value.copy(homeCoverGrids = sizes)
+    }
+
     /** Every row back in its own look, and every card in Home's colour. */
     fun resetHomeLooks() {
-        prefs.edit().remove("home_looks").remove("home_grid_sizes").remove("home_card_look").remove("home_card_looks").remove("home_carousel_on_cover").apply()
-        _state.value = _state.value.copy(homeLooks = emptyMap(), homeGridSizes = emptyMap(), homeCardLook = CardLook.DEFAULT, homeCardLooks = emptyMap(), homeCarouselOnCover = emptySet())
+        prefs.edit().remove("home_looks").remove("home_grid_sizes").remove("home_card_look").remove("home_card_looks").remove("home_carousel_on_cover").remove("home_cover_grid_sizes").apply()
+        _state.value = _state.value.copy(homeLooks = emptyMap(), homeGridSizes = emptyMap(), homeCardLook = CardLook.DEFAULT, homeCardLooks = emptyMap(), homeCarouselOnCover = emptySet(), homeCoverGrids = emptyMap())
     }
 
     /** How every coloured card on Home is painted (the owner, 13 Nov). */

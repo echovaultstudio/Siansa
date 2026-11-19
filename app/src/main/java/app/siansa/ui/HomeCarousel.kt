@@ -1,5 +1,6 @@
 package app.siansa.ui
 
+import app.siansa.data.cover
 import app.siansa.data.Song
 import app.siansa.data.SavedVibe
 import app.siansa.data.pinnedVibes
@@ -158,8 +159,9 @@ fun HomeCarousel(nav: NavController, aiDown: String?, look: app.siansa.data.Home
                 },
                 mix?.songs?.firstOrNull()?.coverArt, tileColors(selector.id.substringBeforeLast("-v") + i),
                 open = { if (mix != null) nav.navigate("mix/${mix.id}") else make(i, open = true) },
+                mosaic = mix?.songs?.map { it.cover }.orEmpty(),
             )
-        } + pinned.map { vibe -> HomeItem(vibe.id, vibe.shownTitle, "${vibe.songs.size} tracks", vibe.songs.firstOrNull()?.coverArt, open = { nav.navigate("vibe/${vibe.id}") }) }
+        } + pinned.map { vibe -> HomeItem(vibe.id, vibe.shownTitle, "${vibe.songs.size} tracks", vibe.songs.firstOrNull()?.coverArt, open = { nav.navigate("vibe/${vibe.id}") }, mosaic = vibe.songs.map { it.cover }) }
         val first = made.firstOrNull()
         HomeLookRow(look, "carousel", carousel.title, items, play = first?.let { { graph.mixResume.play(it) } }, songs = first?.songs.orEmpty())
         return

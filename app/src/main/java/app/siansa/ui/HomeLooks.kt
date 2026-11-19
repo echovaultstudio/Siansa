@@ -1,5 +1,8 @@
 package app.siansa.ui
 
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -58,6 +61,8 @@ data class HomeItem(
     val meta: String = "",
     /** How far through, 0..1, for a book or an episode: a bar along the cover in Cover rows. */
     val progress: Float? = null,
+    /** A mix's covers: in a cover grid it shows four of them, two by two, as its own tiles do (#1263). */
+    val mosaic: List<String?> = emptyList(),
 )
 
 /**
@@ -91,6 +96,63 @@ fun HomeLookRow(
         HomeLook.COVER_ROWS -> HomeCoverRows(title, items, open)
         HomeLook.GRID -> TileGrid(title, items.map { GridTile(it.key, it.title, it.coverArt, it.colors, onClick = it.open) }, gridSize, openAll)
         HomeLook.CAROUSEL -> HomeCarouselLook(title, items)
+        HomeLook.COVER_GRID -> HomeCoverGrid(title, items, LocalCoverGridSize.current, openAll)
+    }
+}
+
+/** The columns and rows of the row being drawn as a cover grid (#1263): Arrange Home's choice for it. */
+val LocalCoverGridSize = androidx.compose.runtime.compositionLocalOf { app.siansa.data.CoverGridSize.DEFAULT }
+
+/**
+ * Any row as a cover grid (#1263, the owner, 19 Nov): its first [size] cards in [CoverGridSize.columns] columns and
+ * [CoverGridSize.rows] rows across the screen, each a square as wide as a column, with its own picture: an album its
+ * cover, a mix four of its covers, an artist its round photo, one without a cover its colours. Names under them up to
+ * three columns; more make the squares too small, and the picture says it ([contentDescription]).
+ */
+@Composable
+fun HomeCoverGrid(title: String, items: List<HomeItem>, size: app.siansa.data.CoverGridSize, onOpenAll: (() -> Unit)? = null) {
+    val shown = items.take(size.count)
+    if (shown.isEmpty()) return
+    Column(Modifier.testTag("homeCoverGrid")) {
+        if (onOpenAll != null && LocalSectionTitleShown.current) {
+            SectionTitle(title, Modifier.clickable(onClickLabel = "Show all", onClick = onOpenAll))
+        } else SectionTitle(title)
+        Column(Modifier.padding(horizontal = Space.Page), verticalArrangement = Arrangement.spacedBy(if (size.named) Space.Medium else Space.Small)) {
+            shown.chunked(size.columns).forEach { row ->
+                Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+                    row.forEach { item -> CoverGridCell(item, size.named, Modifier.weight(1f)) }
+                    repeat(size.columns - row.size) { Spacer(Modifier.weight(1f)) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CoverGridCell(item: HomeItem, named: Boolean, modifier: Modifier) {
+    val shape = if (item.round) androidx.compose.foundation.shape.CircleShape else RoundedCornerShape(8.dp)
+    Column(
+        modifier
+            .clickable(onClickLabel = "Open ${item.title}", onClick = item.open)
+            .semantics(mergeDescendants = true) { if (!named) contentDescription = item.title }
+            .testTag("homeCoverGridCell"),
+    ) {
+        val square = Modifier.fillMaxWidth().aspectRatio(1f).clip(shape)
+        val mosaic = item.mosaic.filterNotNull().distinct()
+        when {
+            mosaic.size >= 4 -> CoverMosaic(mosaic, square)
+            item.coverArt != null -> Cover(item.coverArt, 300, square, shape)
+            else -> Box(square.background(Brush.linearGradient(listOf(item.colors.first, item.colors.second))), contentAlignment = Alignment.BottomStart) {
+                if (!named) return@Box
+                Text(item.title, color = Color.White, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold,
+                    maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(Space.Small))
+            }
+        }
+        if (named) {
+            Text(item.title, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                textAlign = if (item.round) androidx.compose.ui.text.style.TextAlign.Center else null,
+                modifier = Modifier.fillMaxWidth().padding(top = Space.Tight))
+        }
     }
 }
 

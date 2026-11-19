@@ -414,6 +414,19 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     cardLooks = mapOf(app.siansa.data.HomeSection.QUICK to app.siansa.data.CardLook.SOFT),
                 )
             },
+            // A row as a cover grid (#1263): 3 columns with names (round artists among them, a long name), then 5 without.
+            Scene("home_cover_grid") {
+                val items = (1..15).map { i ->
+                    app.siansa.ui.HomeItem("k$i", if (i == 2) "An Extraordinarily Long Album Name" else "Album $i", round = i % 3 == 0, open = {})
+                }
+                Column {
+                    app.siansa.ui.HomeCoverGrid("Recently added", items, app.siansa.data.CoverGridSize(3, 2))
+                    app.siansa.ui.HomeCoverGrid("Favourite artists", items, app.siansa.data.CoverGridSize(5, 3))
+                }
+            },
+            Scene("cover_grid_size") {
+                Column(Modifier.padding(Space.Page)) { app.siansa.ui.CoverGridSteppers(app.siansa.data.CoverGridSize(5, 3)) {} }
+            },
             // Shortcut tiles in their row's own colour (#1261), a long name among them; plain without one.
             Scene("shortcut_tiles_coloured") {
                 Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Small)) {

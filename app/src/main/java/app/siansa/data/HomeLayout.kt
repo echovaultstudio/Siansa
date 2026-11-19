@@ -81,7 +81,10 @@ enum class HomeLook(val id: String, val label: String, val hint: String) {
     // The owner, 10 Nov: any row as the Shortcuts card is, two small tiles a row, 2 to 8 of them.
     GRID("grid", "Shortcut grid", "Small tiles two to a row, as Shortcuts: 2 to 8 of them"),
     // The owner, 17 Nov: Siansa Beats' row of mixes for any row ("ideally every card always available").
-    CAROUSEL("carousel", "Carousel", "Big covers to flick through, the one in the middle in focus");
+    CAROUSEL("carousel", "Carousel", "Big covers to flick through, the one in the middle in focus"),
+    // The owner, 19 Nov (#1263): the cards in a grid across the screen, each with its own picture, as many columns and
+    // rows as chosen, the squares as big as the width allows.
+    COVER_GRID("cover_grid", "Cover grid", "Covers in a grid across the screen: choose its columns and rows");
 
     companion object {
         /** Reads the saved looks ("recent:list,added:banner"); unknown sections and looks are dropped. */
@@ -163,5 +166,40 @@ enum class CardLook(val id: String, val label: String, val hint: String) {
 
         fun format(looks: Map<HomeSection, CardLook>): String =
             HomeSection.entries.mapNotNull { s -> looks[s]?.let { "${s.id}:${it.id}" } }.joinToString(",")
+    }
+}
+
+/**
+ * A [HomeLook.COVER_GRID] row's size (#1263): [columns] across the screen, [rows] down; each card a square as wide as a
+ * column, with its own picture (an album's cover, a mix's four covers, an artist's round photo).
+ */
+data class CoverGridSize(val columns: Int, val rows: Int) {
+    /** How many cards it shows. */
+    val count: Int get() = columns * rows
+
+    /** Names show under the pictures up to [NAMED_COLUMNS] columns; more make the squares too small for them. */
+    val named: Boolean get() = columns <= NAMED_COLUMNS
+
+    val label: String get() = "$columns×$rows"
+
+    companion object {
+        val COLUMNS = 2..6
+        val ROWS = 1..6
+        const val NAMED_COLUMNS = 3
+        val DEFAULT = CoverGridSize(3, 2)
+
+        /** Reads the saved sizes ("recent:3x2,radios:5x3", columns by rows); unknown sections and sizes are dropped. */
+        fun parse(saved: String?): Map<HomeSection, CoverGridSize> {
+            if (saved.isNullOrBlank()) return emptyMap()
+            return saved.split(',').mapNotNull { pair ->
+                val (section, size) = pair.split(':').takeIf { it.size == 2 } ?: return@mapNotNull null
+                val s = HomeSection.entries.firstOrNull { it.id == section.trim() } ?: return@mapNotNull null
+                val (c, r) = size.trim().split('x').mapNotNull { it.toIntOrNull() }.takeIf { it.size == 2 } ?: return@mapNotNull null
+                if (c in COLUMNS && r in ROWS) s to CoverGridSize(c, r) else null
+            }.toMap()
+        }
+
+        fun format(sizes: Map<HomeSection, CoverGridSize>): String =
+            HomeSection.entries.mapNotNull { s -> sizes[s]?.let { "${s.id}:${it.columns}x${it.rows}" } }.joinToString(",")
     }
 }
