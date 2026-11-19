@@ -112,6 +112,32 @@ class ServerSeekPlayer(
         swap(index, mediaItem)
     }
 
+    /**
+     * Shuffle turned on shuffles the list (an album, a playlist) after the song playing, with the songs Keep playing
+     * added still after it (issue #1238): the player's own order mixed them in, and could put songs of the album
+     * before the one playing, where they count as played.
+     */
+    override fun setShuffleModeEnabled(shuffleModeEnabled: Boolean) {
+        if (shuffleModeEnabled && !exo.shuffleModeEnabled && exo.mediaItemCount > 1) {
+            val order = QueueRules.listFirstShuffle(exo.mediaItemCount, exo.currentMediaItemIndex, { exo.getMediaItemAt(it).isAuto() })
+            exo.setShuffleOrder(ShuffleOrder.DefaultShuffleOrder(order, System.nanoTime()))
+            AppLog.d("Player", "Shuffle on: ${order.count { !exo.getMediaItemAt(it).isAuto() }} songs of the list shuffled, the songs Keep playing added after them")
+        }
+        exo.shuffleModeEnabled = shuffleModeEnabled
+    }
+
+    // Songs added at the end while shuffled (Keep playing's) play after the rest, in their order, instead of at
+    // random places among the songs still to come (issue #1238).
+    override fun addMediaItems(mediaItems: MutableList<MediaItem>) = addMediaItems(exo.mediaItemCount, mediaItems)
+
+    override fun addMediaItems(index: Int, mediaItems: MutableList<MediaItem>) {
+        val count = exo.mediaItemCount
+        if (!exo.shuffleModeEnabled || index != count || count == 0 || mediaItems.isEmpty()) return exo.addMediaItems(index, mediaItems)
+        val shuffled = shuffledOf(exo.shuffleOrder)
+        exo.addMediaItems(index, mediaItems)
+        exo.setShuffleOrder(ShuffleOrder.DefaultShuffleOrder(QueueRules.withAppended(shuffled, count, mediaItems.size), System.nanoTime()))
+    }
+
     override fun seekTo(positionMs: Long) = seekTo(exo.currentMediaItemIndex, positionMs)
 
     override fun seekTo(mediaItemIndex: Int, positionMs: Long) {

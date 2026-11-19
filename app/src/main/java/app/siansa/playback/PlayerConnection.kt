@@ -21,7 +21,6 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlin.random.Random
 
 data class PlayerState(
     val current: Song? = null,
@@ -163,12 +162,13 @@ class PlayerConnection(
         queueGeneration++
         onPlayStarted()
         onNewQueue?.invoke()
-        // A new list starts at the song picked: the ones before it aren't queued (the owner, 12 Nov).
-        val songs = QueueRules.fromStart(all, startIndex, shuffle)
-        if (songs.size < all.size) AppLog.d("Player", "New list from song ${startIndex + 1} of ${all.size}: ${songs.size} songs queued")
+        // The whole list is queued in order, from the song picked, so shuffle in the player shuffles all of it
+        // (an album started at its fifth song has its first four above it: issue #1238).
+        val songs = all
         SongRegistry.register(songs)
         val items = songs.map { it.toMediaItem(api, auto = it.id in picked) }
-        val start = if (shuffle) Random.nextInt(songs.size) else 0
+        val start = QueueRules.startOf(songs.size, startIndex, shuffle)
+        if (!shuffle && start > 0) AppLog.d("Player", "New list of ${songs.size} songs, from song ${start + 1}")
         withController { c ->
             c.shuffleModeEnabled = shuffle
             // Repeat belongs to the list it was set on: a new list starts with it off, like shuffle. The player
