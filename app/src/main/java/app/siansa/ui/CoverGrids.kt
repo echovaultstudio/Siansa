@@ -73,16 +73,26 @@ fun CoverGridArt(cells: List<String>, grid: CoverGrid, modifier: Modifier, shape
             Row(Modifier.weight(1f)) {
                 for (col in 0 until grid.cols) {
                     // The small size: a cell is a third of a card or less.
-                    Cover(cells.getOrNull(row * grid.cols + col), 150, Modifier.weight(1f).fillMaxSize(), androidx.compose.ui.graphics.RectangleShape)
+                    LocalGridCell.current(cells.getOrNull(row * grid.cols + col), Modifier.weight(1f).fillMaxSize())
                 }
             }
         }
     }
 }
 
+/**
+ * How one cell of a grid is drawn: its cover, at the small size. The screenshot tests, which have no app to load covers
+ * from, draw a colour instead.
+ */
+val LocalGridCell = compositionLocalOf<@Composable (String?, Modifier) -> Unit> {
+    { cover, modifier -> Cover(cover, 150, modifier, androidx.compose.ui.graphics.RectangleShape) }
+}
+
 /** The covers for [subject]'s grid, at least [count] when there are, looked up once per subject. */
 @Composable
 fun rememberGridCovers(subject: GridSubject, count: Int): List<String?> {
+    // A mix's or a list's covers are known already: nothing to look up.
+    if (subject is GridSubject.OfSongs || subject is GridSubject.OfCovers) return initialCovers(subject)
     val graph = LocalGraph.current
     val covers by produceState(initialCovers(subject), subject, count) {
         value = runCatching { gridCovers(graph, subject, count) }
