@@ -817,14 +817,16 @@ fun AlbumTile(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     round: Boolean = false,
-    // On Home, what the card is, for its row's cover grid (#1263): a grid replaces the one cover, and a round one too.
-    grid: GridSubject? = null,
 ) {
     // The name sits a step under the cover, and the subtitle straight under the name, as one block (issue #338):
     // an even gap between all three left the artist floating away from the album name.
     Column(modifier.clickable(onClick = onClick).padding(LocalTileInset.current)) {
-        val shape = if (round && (grid == null || LocalCoverGrid.current == null)) androidx.compose.foundation.shape.CircleShape else RoundedCornerShape(8.dp)
-        GridOrPicture(grid, Modifier.fillMaxWidth().testTag("albumTileCover"), shape) { m -> Cover(coverArt, 300, m, shape) }
+        Cover(
+            coverArt,
+            300,
+            Modifier.fillMaxWidth().aspectRatio(1f).testTag("albumTileCover"),
+            if (round) androidx.compose.foundation.shape.CircleShape else RoundedCornerShape(8.dp),
+        )
         Spacer(Modifier.height(Space.Small))
         Text(name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
         if (subtitle.isNotBlank()) {
@@ -866,27 +868,18 @@ fun GradientTile(
     coverArt: String? = null,
     size: Dp = 160.dp,
     busy: Boolean = false,
-    // On Home, what the tile holds, for its row's cover grid (#1263): the covers fill the tile, its name over them.
-    grid: GridSubject? = null,
 ) {
     // In the look chosen for Home's cards (the owner, 13 Nov): its own colours, softened, plain, or its cover's.
     val paint = cardPaint(colors, coverArt, "tile-$title")
-    val coverGrid = LocalCoverGrid.current?.takeIf { grid != null }
-    val cells = if (coverGrid != null && grid != null) app.siansa.data.CoverGrid.cells(rememberGridCovers(grid, coverGrid.count), coverGrid.count) else emptyList()
-    val width = if (coverGrid != null) size * coverGrid.aspect else size
-    Column(modifier.width(width).clickable(onClick = onClick)) {
+    Column(modifier.width(size).clickable(onClick = onClick)) {
         Box(
             Modifier
-                .size(width, size)
+                .size(size)
                 .testTag("gradientTileArt")
                 .clip(RoundedCornerShape(10.dp))
                 .cardFill(paint, RoundedCornerShape(10.dp)),
         ) {
-            if (coverGrid != null && cells.isNotEmpty()) {
-                CoverGridArt(cells, coverGrid, Modifier.matchParentSize(), androidx.compose.ui.graphics.RectangleShape)
-                // A shade from the top, so the name stays readable over the covers.
-                Box(Modifier.matchParentSize().background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.6f), Color.Transparent))))
-            } else if (coverArt != null) {
+            if (coverArt != null) {
                 Cover(
                     coverArt,
                     300,
@@ -898,7 +891,7 @@ fun GradientTile(
             WholeWordsText(
                 title,
                 style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.ExtraBold),
-                color = if (cells.isNotEmpty()) Color.White else paint.text,
+                color = paint.text,
                 maxLines = 3,
                 modifier = Modifier.align(Alignment.TopStart).padding(Space.Medium).testTag("gradientTileTitle"),
             )
@@ -940,8 +933,6 @@ fun QuickTile(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     icon: ImageVector? = null,
-    // On Home, what it opens, for its row's cover grid (#1263): the grid in place of the small cover, as tall as the tile.
-    grid: GridSubject? = null,
 ) {
     // Plain, unless its row has a colour of its own (#1261).
     val paint = LocalShortcutLook.current?.let { look -> cardPaint(colors ?: tileColors(title), coverArt, title, look) }
@@ -953,11 +944,7 @@ fun QuickTile(
             .clickable(onClick = onClick),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        val coverGrid = LocalCoverGrid.current?.takeIf { grid != null }
-        val cells = if (coverGrid != null && grid != null) app.siansa.data.CoverGrid.cells(rememberGridCovers(grid, coverGrid.count), coverGrid.count) else emptyList()
-        if (coverGrid != null && cells.isNotEmpty()) {
-            CoverGridArt(cells, coverGrid, Modifier.size(56.dp * coverGrid.aspect, 56.dp), RoundedCornerShape(topStart = 6.dp, bottomStart = 6.dp))
-        } else if (coverArt != null) {
+        if (coverArt != null) {
             Cover(coverArt, 150, Modifier.size(56.dp), RoundedCornerShape(topStart = 6.dp, bottomStart = 6.dp))
         } else {
             Box(

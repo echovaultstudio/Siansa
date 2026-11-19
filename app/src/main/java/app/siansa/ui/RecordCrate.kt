@@ -1,6 +1,5 @@
 package app.siansa.ui
 
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -62,8 +61,6 @@ data class CrateRecord(
     val onOpen: () -> Unit,
     /** The sleeve's colours where there's no cover; the key's own when not given. */
     val colors: Pair<Color, Color>? = null,
-    /** What it is, for the row's cover grid (#1263); without one, its [covers] fill the grid. */
-    val grid: GridSubject? = null,
 )
 
 /**
@@ -173,13 +170,7 @@ private fun Sleeve(record: CrateRecord, nameOnIt: Boolean, modifier: Modifier) {
             .testTag("crateSleeve"),
     ) {
         val covers = record.covers.filterNotNull().distinct()
-        // The row's cover grid (#1263): across the sleeve, 2×4 and 3×6 a band across its middle with the colours above
-        // and below, so every cover stays square.
-        val coverGrid = LocalCoverGrid.current
-        val cells = if (coverGrid != null) app.siansa.data.CoverGrid.cells(if (record.grid != null) rememberGridCovers(record.grid, coverGrid.count) else record.covers, coverGrid.count) else emptyList()
         when {
-            coverGrid != null && cells.isNotEmpty() ->
-                CoverGridArt(cells, coverGrid, Modifier.align(Alignment.Center).fillMaxWidth().aspectRatio(coverGrid.aspect), androidx.compose.ui.graphics.RectangleShape)
             covers.size >= 4 -> Column(Modifier.fillMaxSize()) {
                 for (row in 0..1) Row(Modifier.weight(1f).fillMaxWidth()) {
                     for (col in 0..1) Cover(covers[row * 2 + col], 300, Modifier.weight(1f).fillMaxSize(), RoundedCornerShape(0.dp))

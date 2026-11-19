@@ -1,6 +1,5 @@
 package app.siansa.ui
 
-import app.siansa.data.cover
 import app.siansa.data.Song
 import app.siansa.data.SavedVibe
 import app.siansa.data.pinnedVibes
@@ -159,9 +158,8 @@ fun HomeCarousel(nav: NavController, aiDown: String?, look: app.siansa.data.Home
                 },
                 mix?.songs?.firstOrNull()?.coverArt, tileColors(selector.id.substringBeforeLast("-v") + i),
                 open = { if (mix != null) nav.navigate("mix/${mix.id}") else make(i, open = true) },
-                grid = mix?.let { GridSubject.OfSongs(it.songs) },
             )
-        } + pinned.map { vibe -> HomeItem(vibe.id, vibe.shownTitle, "${vibe.songs.size} tracks", vibe.songs.firstOrNull()?.coverArt, open = { nav.navigate("vibe/${vibe.id}") }, grid = GridSubject.OfSongs(vibe.songs)) }
+        } + pinned.map { vibe -> HomeItem(vibe.id, vibe.shownTitle, "${vibe.songs.size} tracks", vibe.songs.firstOrNull()?.coverArt, open = { nav.navigate("vibe/${vibe.id}") }) }
         val first = made.firstOrNull()
         HomeLookRow(look, "carousel", carousel.title, items, play = first?.let { { graph.mixResume.play(it) } }, songs = first?.songs.orEmpty())
         return
@@ -258,12 +256,7 @@ private fun CarouselCard(
             .clickable(onClick = onOpen)
             .testTag("carouselCard"),
     ) {
-        // The row's cover grid (#1263): the mix's covers in its place, as tall as the cover was.
-        val coverGrid = LocalCoverGrid.current
-        val cells = if (coverGrid != null) app.siansa.data.CoverGrid.cells(songs.map { it.cover }, coverGrid.count) else emptyList()
-        if (coverGrid != null && cells.isNotEmpty()) {
-            CoverGridArt(cells, coverGrid, Modifier.align(Alignment.TopEnd).padding(Space.Page).size(80.dp * coverGrid.aspect, 80.dp), RoundedCornerShape(8.dp))
-        } else if (coverArt != null) {
+        if (coverArt != null) {
             Cover(coverArt, 300, Modifier.size(96.dp).align(Alignment.TopEnd).padding(Space.Page), RoundedCornerShape(8.dp))
         }
         Column(Modifier.align(Alignment.BottomStart).padding(Space.Page).fillMaxWidth(0.7f), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {

@@ -140,11 +140,6 @@ fun HomeSettingsSheet(nav: androidx.navigation.NavController, startOnSources: Bo
             AppLog.i("Home", "${section.label}'s cards: ${look.label}")
             graph.settings.setHomeCardLook(section, look)
         },
-        coverGrids = s.homeCoverGrids,
-        onCoverGridChange = { section, grid ->
-            AppLog.i("Home", "${section.label}'s cards: ${grid?.let { "a ${it.label} cover grid" } ?: "their own pictures"}")
-            graph.settings.setHomeCoverGrid(section, grid)
-        },
         onOpenSettings = { section ->
             onDismiss()
             nav.navigate(if (section == HomeSection.NOTICES) "settings/home" else "settings/cards")
@@ -194,9 +189,6 @@ fun ArrangeHomeSheet(
     cardLooks: Map<HomeSection, CardLook> = emptyMap(),
     onCardLookChange: (CardLook) -> Unit = {},
     onSectionCardLookChange: (HomeSection, CardLook) -> Unit = { _, _ -> },
-    // Each row's cover grid (#1263), chosen under its cog.
-    coverGrids: Map<HomeSection, app.siansa.data.CoverGrid> = emptyMap(),
-    onCoverGridChange: (HomeSection, app.siansa.data.CoverGrid?) -> Unit = { _, _ -> },
 ) {
     var picking by remember { mutableStateOf<HomeSection?>(null) }
     picking?.let { section ->
@@ -216,8 +208,6 @@ fun ArrangeHomeSheet(
             cardLook = cardLooks[section] ?: CardLook.AS_HOME,
             homeCardLook = cardLook,
             onCardLook = { onSectionCardLookChange(section, it) },
-            coverGrid = coverGrids[section],
-            onCoverGrid = { onCoverGridChange(section, it) },
         )
     }
     var items by remember { mutableStateOf(order) }
@@ -303,10 +293,10 @@ fun ArrangeHomeSheet(
                             onHiddenChange(hiddenItems)
                         }
                         if (gap != AppSettings.HOME_GAP_DEFAULT) onGapChange(AppSettings.HOME_GAP_DEFAULT)
-                        if (looks.isNotEmpty() || cardLook != CardLook.DEFAULT || cardLooks.isNotEmpty() || coverGrids.isNotEmpty()) onResetLooks()
+                        if (looks.isNotEmpty() || cardLook != CardLook.DEFAULT || cardLooks.isNotEmpty()) onResetLooks()
                     },
                     enabled = items != sections || hiddenItems.any { it in sections } || gap != AppSettings.HOME_GAP_DEFAULT || looks.isNotEmpty() ||
-                        cardLook != CardLook.DEFAULT || cardLooks.isNotEmpty() || coverGrids.isNotEmpty(),
+                        cardLook != CardLook.DEFAULT || cardLooks.isNotEmpty(),
                 ) { Text("Reset") }
             }
             // The cards' colour (the owner, 13 Nov): four small cards to pick by eye; never the shortcut grid.
@@ -379,7 +369,7 @@ fun ArrangeHomeSheet(
                                 // A row in another look says which (issue #655), and its cards' own colour; a hidden one says so.
                                 val shownLook = if (section in holds) beatsLook(looks[section]).label else looks[section]?.label
                                     ?: if (section == HomeSection.CARDS) "Each its own look" else null
-                                val line = if (isHidden) "Hidden" else listOfNotNull(holds[section], shownLook, cardLooks[section]?.label, coverGrids[section]?.let { "${it.label} covers" }).joinToString(" · ").ifEmpty { null }
+                                val line = if (isHidden) "Hidden" else listOfNotNull(holds[section], shownLook, cardLooks[section]?.label).joinToString(" · ").ifEmpty { null }
                                 if (line != null) Text(line, style = MaterialTheme.typography.bodySmall, color = if (isHidden) MaterialTheme.colorScheme.onSurfaceVariant else Accent, modifier = Modifier.testTag("homeLookLabel"))
                             }
                             IconButton(onClick = {
@@ -431,9 +421,6 @@ private fun HomeLookDialog(
     // As a carousel, each name and its details on the cover or under the row (the owner, 19 Nov).
     namesOnCover: Boolean = false,
     onNamesOnCover: (Boolean) -> Unit = {},
-    // A grid of covers for its cards (#1263), null for each card's own picture.
-    coverGrid: app.siansa.data.CoverGrid? = null,
-    onCoverGrid: (app.siansa.data.CoverGrid?) -> Unit = {},
 ) {
     // The switch shows its change at once: the dialog stays open for the look.
     var shown by remember(section) { mutableStateOf(titleShown) }
@@ -441,7 +428,6 @@ private fun HomeLookDialog(
     var tiles by remember(section) { mutableStateOf(gridSize) }
     var onCover by remember(section) { mutableStateOf(namesOnCover) }
     var colour by remember(section) { mutableStateOf(cardLook) }
-    var covers by remember(section) { mutableStateOf(coverGrid) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(section.label) },
@@ -467,9 +453,6 @@ private fun HomeLookDialog(
                     if (section == HomeSection.QUICK) "Just these tiles. As Home keeps them plain." else "Just this card. As Home follows the choice in Arrange Home.",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                HorizontalDivider(Modifier.padding(vertical = Space.Small))
-                // Its cards' cover grid (#1263): every row has it.
-                CoverGridChips(covers) { covers = it; onCoverGrid(it) }
                 HorizontalDivider(Modifier.padding(vertical = Space.Small))
                 // Its title on Home (issue #961): off leaves only the gap above the section.
                 SectionTitleSwitch(shown) {
@@ -614,32 +597,6 @@ internal fun CrateNamesChoice(onCover: Boolean, modifier: Modifier = Modifier, o
                 )
             }
         }
-    }
-}
-
-/**
- * A row's cover grid (#1263, the owner, 19 Nov): each card's own picture, or 2×2, 3×3, 2×4 or 3×6 covers. 2×4 and 3×6
- * make the cards twice as wide, so every cover stays square.
- */
-@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
-@Composable
-internal fun CoverGridChips(grid: app.siansa.data.CoverGrid?, modifier: Modifier = Modifier, onPick: (app.siansa.data.CoverGrid?) -> Unit) {
-    Column(modifier.testTag("coverGridChoice"), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
-        Text("Cover grid", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.Small), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
-            (listOf<app.siansa.data.CoverGrid?>(null) + app.siansa.data.CoverGrid.entries).forEach { option ->
-                FilterChip(
-                    selected = option == grid,
-                    onClick = { onPick(option) },
-                    label = { Text(option?.label ?: "Off") },
-                    modifier = Modifier.testTag("coverGrid-${option?.id ?: "off"}"),
-                )
-            }
-        }
-        Text(
-            "Covers in a grid on each card: an album's with its artist's other albums, a radio's from what it plays. 2×4 and 3×6 make the cards wider.",
-            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 }
 
