@@ -158,7 +158,8 @@ fun CardLookChooser(chosen: CardLook, options: List<CardLook>, modifier: Modifie
                     look.label, style = MaterialTheme.typography.labelMedium,
                     fontWeight = if (look == chosen) FontWeight.SemiBold else FontWeight.Normal,
                     color = if (look == chosen) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1, textAlign = TextAlign.Center,
+                    // Two lines, so "From the artwork" is never cut to "From the" (the owner, 19 Nov).
+                    maxLines = 2, textAlign = TextAlign.Center,
                 )
             }
         }
