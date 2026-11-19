@@ -40,7 +40,22 @@ class QueueRulesTest {
         assertEquals((0..11).toList(), late.subList(0, 12))
         assertEquals(listOf(12), late.subList(12, 13))
         assertEquals(emptyList<Int>(), QueueRules.listFirstShuffle(0, 0, auto).toList())
-        assertEquals(listOf(2, 0, 1, 3, 4), QueueRules.withAppended(intArrayOf(2, 0, 1), 3, 2).toList())
+    }
+
+    /** The moves that reorder a queue, and the order that puts a shuffled one back (issue #1238). */
+    @Test fun aQueueIsReorderedAndPutBack() {
+        fun apply(ids: List<String>, moves: List<Pair<Int, Int>>) = ids.toMutableList().also { q -> moves.forEach { (f, t) -> q.add(t, q.removeAt(f)) } }
+        val album = (0 until 10).map { "s$it" }
+        repeat(20) { seed ->
+            val order = QueueRules.listFirstShuffle(10, 4, { false }, kotlin.random.Random(seed))
+            val shuffled = apply(album, QueueRules.moves(order))
+            assertEquals(order.map { album[it] }, shuffled)
+            assertEquals("s4", shuffled.first())
+            assertEquals(album, apply(shuffled, QueueRules.moves(QueueRules.unshuffledOrder(shuffled, album))))
+        }
+        assertEquals(emptyList<Pair<Int, Int>>(), QueueRules.moves(intArrayOf(0, 1, 2)))
+        // Songs added while shuffled go after the list; a song twice keeps both places.
+        assertEquals(listOf(1, 0, 3, 2), QueueRules.unshuffledOrder(listOf("b", "a", "new", "a"), listOf("a", "b", "a")).toList())
     }
 
     @Test

@@ -47,6 +47,33 @@ object QueueRules {
         return (listOf(now) + list + added).toIntArray()
     }
 
-    /** [shuffled] (an order of [oldCount] songs) with [added] songs appended to the queue, played after all of them, in their order. */
-    fun withAppended(shuffled: IntArray, oldCount: Int, added: Int): IntArray = shuffled + IntArray(added) { oldCount + it }
+    /**
+     * The moves (from, to), one after another, that turn a queue into [order] (its places, in their new order): each
+     * place filled in turn with the song meant for it.
+     */
+    fun moves(order: IntArray): List<Pair<Int, Int>> {
+        val slots = MutableList(order.size) { it }
+        val out = ArrayList<Pair<Int, Int>>()
+        for (to in order.indices) {
+            val from = slots.indexOf(order[to])
+            if (from != to) {
+                out += from to to
+                slots.add(to, slots.removeAt(from))
+            }
+        }
+        return out
+    }
+
+    /**
+     * The order (the queue's places) that puts a shuffled queue ([now], its songs' ids) back as it was before ([before]):
+     * the songs that were there in their old order, then any added since, in theirs. A song twice keeps both places.
+     */
+    fun unshuffledOrder(now: List<String>, before: List<String>): IntArray {
+        val wanted = HashMap<String, ArrayDeque<Int>>()
+        before.forEachIndexed { i, id -> wanted.getOrPut(id) { ArrayDeque() }.addLast(i) }
+        val placed = now.indices.map { i -> i to (wanted[now[i]]?.removeFirstOrNull()) }
+        val known = placed.filter { it.second != null }.sortedBy { it.second }.map { it.first }
+        val added = placed.filter { it.second == null }.map { it.first }
+        return (known + added).toIntArray()
+    }
 }
