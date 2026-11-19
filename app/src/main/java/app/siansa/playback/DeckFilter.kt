@@ -35,6 +35,25 @@ class DeckFilter {
     /** The highs above [HIGH_HZ] (hats, a voice's air): 0 untouched, [KILL_DB] as good as gone. */
     @Volatile var highDb: Double = 0.0
 
+    /**
+     * The lanes booked on the mixer's own clock ([book]), for a blend laid on the bars ([EqStyle]): while set, the lows,
+     * mids and highs follow them to the frame ([follow]) and not the targets above. The high-pass still glides.
+     */
+    @Volatile private var booked: Booked? = null
+
+    /** A deck's three bands from mix frame [startFrame], [barFrames] a bar, a move "at once" taking [instantFrames]. */
+    class Booked(val low: Lane, val mid: Lane, val high: Lane, val startFrame: Double, val barFrames: Double, val instantFrames: Double) {
+        fun barAt(frame: Long): Float = ((frame - startFrame) / barFrames).toFloat()
+        val instantBars: Float get() = (instantFrames / barFrames).toFloat()
+    }
+
+    /** Lays [lanes] (low, mid, high) on the mixer from [startFrame], or none (null): the bands go back to their targets. */
+    fun book(lanes: Booked?) {
+        booked = lanes
+    }
+
+    val isBooked: Boolean get() = booked != null
+
     /** Where the player thread's filters are now, gliding towards the targets above. */
     private var cutNow = 0.0
     private var shelfNow = 0.0
@@ -51,10 +70,11 @@ class DeckFilter {
     private var z = DoubleArray(0)
 
     /** Both at rest: the sound passes untouched, as before a blend. */
-    val idle: Boolean get() = lowCutHz <= 0.0 && shelfDb == 0.0 && midDb == 0.0 && highDb == 0.0 &&
+    val idle: Boolean get() = booked == null && lowCutHz <= 0.0 && shelfDb == 0.0 && midDb == 0.0 && highDb == 0.0 &&
         cutNow <= 0.0 && shelfNow == 0.0 && midNow == 0.0 && highNow == 0.0
 
     fun reset() {
+        booked = null
         lowCutHz = 0.0
         shelfDb = 0.0
         midDb = 0.0
@@ -86,11 +106,38 @@ class DeckFilter {
         val cutTarget = lowCutHz.coerceIn(0.0, MAX_CUT_HZ)
         val before = doubleArrayOf(cutNow, shelfNow, midNow, highNow)
         cutNow = slew(cutNow, cutTarget, LOW_CUT_HZ * SLEW)
-        shelfNow = slew(shelfNow, shelfDb.coerceIn(KILL_DB, 0.0), -KILL_DB * SLEW)
-        midNow = slew(midNow, midDb.coerceIn(KILL_DB, 0.0), -KILL_DB * SLEW)
-        highNow = slew(highNow, highDb.coerceIn(KILL_DB, 0.0), -KILL_DB * SLEW)
-        val bandsMoved = shelfNow != before[1] || midNow != before[2] || highNow != before[3]
+        if (booked == null) {
+            shelfNow = slew(shelfNow, shelfDb.coerceIn(KILL_DB, 0.0), -KILL_DB * SLEW)
+            midNow = slew(midNow, midDb.coerceIn(KILL_DB, 0.0), -KILL_DB * SLEW)
+            highNow = slew(highNow, highDb.coerceIn(KILL_DB, 0.0), -KILL_DB * SLEW)
+        }
         if (cutNow != before[0] || cutFilter == null) cutFilter = if (cutNow >= MIN_CUT_HZ) Biquad.highPass(cutNow, sampleRate) else null
+        return build(shelfNow != before[1] || midNow != before[2] || highNow != before[3])
+    }
+
+    /**
+     * Sets the lows, mids and highs to where the booked lanes have them at mix frame [frame] and rebuilds what moved:
+     * called on the mixer's thread every [FOLLOW_FRAMES] frames while a blend is booked. False when nothing is booked.
+     */
+    fun follow(frame: Long): Boolean {
+        val b = booked ?: return false
+        if (sampleRate == 0) return false
+        val bar = b.barAt(frame)
+        val instant = b.instantBars
+        val low = b.low.at(bar, instant)
+        val mid = b.mid.at(bar, instant)
+        val high = b.high.at(bar, instant)
+        val moved = abs(low - shelfNow) >= FOLLOW_DB || abs(mid - midNow) >= FOLLOW_DB || abs(high - highNow) >= FOLLOW_DB
+        if (!moved) return true
+        shelfNow = low
+        midNow = mid
+        highNow = high
+        build(true)
+        return true
+    }
+
+    /** The shelves and the mids' gain from where the bands are now; true when there's anything to apply. */
+    private fun build(bandsMoved: Boolean): Boolean {
         // The mids' cut: the deck down by it, the lows and highs lifted back (each shelf the band's own gain less the mids').
         val low = shelfNow - midNow
         val high = highNow - midNow
@@ -143,6 +190,13 @@ class DeckFilter {
         const val SHELF_START_DB = KILL_DB
         /** Where the highs start: above a voice's body, its air and the hats. */
         const val HIGH_HZ = 2_500.0
+        /** How often (mix frames) the booked lanes are followed: under a millisecond at 48 kHz. */
+        const val FOLLOW_FRAMES = 32
+        /** A booked band moving less than this (dB) isn't worth rebuilding its filter for. */
+        const val FOLLOW_DB = 0.05
+        /** A move "at once" on the bar: short enough to land on the kick, long enough not to click. */
+        const val INSTANT_MS = 8.0
+
         /** How much of the whole range a filter may move per buffer (buffers are 5–20 ms): a sweep of the whole
          *  range takes at least 25 buffers, so the fade's own ticks set the pace. */
         const val SLEW = 0.04
