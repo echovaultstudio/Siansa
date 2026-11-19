@@ -51,6 +51,8 @@ object LastBlend {
         /** The grid check (siansa-dev #63): how far each song's kicks landed off its grid (ms), when enough were heard. */
         val fromGridOffMs: Long? = null,
         val toGridOffMs: Long? = null,
+        /** How the blend rode the EQ ([EqStyle]): "glide", "bass swap on the bar"… */
+        val eqStyle: String? = null,
     ) {
         /** What goes to Siansa Beats: the plugin's `POST /api/bad-blends` body. */
         fun toJson(): JsonObject = buildJsonObject {
@@ -61,6 +63,7 @@ object LastBlend {
                 put("at_ms", atMs)
                 put("overlap_ms", overlapMs)
                 put("why", why)
+                eqStyle?.let { put("eq_style", it) }
                 bars?.let { put("bars", it) }
                 fromBpm?.let { put("from_bpm", JsonPrimitive(Math.round(it * 10) / 10.0)) }
                 toBpm?.let { put("to_bpm", JsonPrimitive(Math.round(it * 10) / 10.0)) }
@@ -85,6 +88,12 @@ object LastBlend {
     }
 
     /** The grid check of the blend just over ([GridCheck]): kept with it, so a bad blend marked says it. */
+    /** The EQ style the blend just over was mixed with: kept with its report. */
+    fun eqStyle(label: String) {
+        val now = last.value ?: return
+        last.value = now.copy(eqStyle = label)
+    }
+
     fun gridChecked(from: GridCheck.Side, to: GridCheck.Side) {
         val now = last.value ?: return
         last.value = now.copy(fromGridOffMs = from.offMs.takeIf { from.sure }, toGridOffMs = to.offMs.takeIf { to.sure })
