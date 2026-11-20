@@ -9,7 +9,9 @@ enum class HomeSection(val id: String, val label: String) {
     NOTICES("notices", "Notices"),
     QUICK("quick", "Shortcuts"),
     TODAY("today", "Today's mix"),
-    CAROUSEL("carousel", "Your mixes carousel"),
+    // "For now", as Siansa Beats' Mixes page calls its mixes for this part of the day (the owner, 20 Nov: the same
+    // names in both). Its id stays "carousel", so saved orders and looks keep it.
+    CAROUSEL("carousel", "For now"),
     /** Audiobookshelf's books and podcasts (issue #521); only with a server set up. */
     BOOKS("books", "Your books"),
     PODCASTS("podcasts", "Your podcasts"),

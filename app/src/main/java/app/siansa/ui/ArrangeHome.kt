@@ -859,9 +859,10 @@ internal fun asHomeCardLook(section: HomeSection, homeCardLook: CardLook): CardL
 
 internal fun beatsRows(on: Boolean): Map<HomeSection, String> =
     if (!on) emptyMap() else mapOf(
-        HomeSection.CAROUSEL to "Siansa Beats: For now",
-        HomeSection.MADE_FOR_YOU to "Siansa Beats: Made for you",
-        HomeSection.MORE_OF_YOU to "Siansa Beats: On repeat, Rediscover, New for you",
+        // The rows are named as on Siansa Beats' Mixes page (the owner, 20 Nov), so this only says where they come from.
+        HomeSection.CAROUSEL to "From Siansa Beats",
+        HomeSection.MADE_FOR_YOU to "From Siansa Beats",
+        HomeSection.MORE_OF_YOU to "From Siansa Beats: On repeat, Rediscover, New for you",
     )
 
 /**

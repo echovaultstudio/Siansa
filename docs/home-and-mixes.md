@@ -94,7 +94,7 @@ keeps its tiles plain; a colour of its own paints them, as it does a Shortcut gr
 |---|---|
 | **Shortcuts** | The albums, playlists, mixes and Liked songs you played from last, newest first: 8 of them, or as many as you pick from 2 to 8 under **Settings › Home › Top of Home**. Until there's enough of that, today's mixes, your playlists and recent albums. |
 | **Today's mix** | The day's mix, made for the vibe of the hour it's made in (see below). |
-| **Your mixes carousel** | Three or four mixes of your own for each part of the day, side by side. |
+| **For now** | Three or four mixes of your own for each part of the day, side by side. |
 | **Made for you** | Your sound, On repeat, Discover for you, then cards of your own. |
 | **Rediscover** | Albums you used to play a lot and haven't in a while. |
 | **Radios** | Mood radios: Chill, Energy, Focus, Feel good, Party, Melancholy, Workout, Late night, Acoustic, Romance. |
@@ -205,7 +205,7 @@ They're on while **Home's mixes** is set to **Siansa Beats** (Settings › Mixes
 makes none of its own: no hourly Today's mix and no mixes in the background. Set it to **This phone** for your own
 carousels, Today's mix and Made for you, which stay as you set them.
 
-In **Arrange Home**, For now takes the place of **Your mixes carousel**, Made for you the place of **Made for you**, and
+In **Arrange Home**, the rows have the same names as on Siansa Beats' Mixes page: For now is in **For now**, Made for you in **Made for you**, and
 More of you has a row of its own, **More of you** (listed only while Siansa Beats' mixes are on). Each row says so under
 its name. Move or hide them as any other; their cog picks any look: **As it is** is the **Carousel** (big covers to
 flick through), **Tiles** is a row of tiles each with four of the mix's covers, and the others are as for any section
@@ -219,7 +219,7 @@ service, and how long a mix is kept. Siansa Beats keeps them, and its own Mixes 
 puts every one back. Once you've changed one, **Make the mixes again** makes them again now, a new pick from the same
 songs and settings, and puts them on Home; press it again for another (Siansa Beats 0.60.4 or newer).
 
-## Your mixes carousel
+## For now
 
 **Home carousel** (from Arrange Home): three or four mixes for each part of the day. Give each a name and what it
 should sound like, for example "upbeat energetic groove, punchy drums". They never share songs, so make them
