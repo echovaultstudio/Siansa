@@ -71,19 +71,20 @@ the title and colour, and **Your cards in Settings** opens **Settings › Home �
 
 The same cog has **Pictures**: how its cards' pictures show. **Auto** (the default) shows a mix's four covers two by
 two only when they sit well together, and otherwise **Glow**; an album keeps its cover. Or pick one for the row:
-**Mosaic** (four covers), **One cover** (its top album), **Colour** (its colours, with its name where nothing else shows
-it), **Glow** (one cover on a soft light in its colours), **Duotone** (its cover in two tones), **Stack** (three covers
-fanned out), **Stickers** (its covers stuck on at angles, with white edges), **Taped** (its covers taped on paper, its
-name on a label) or **Cut-outs** (circles and squares, like a scrapbook). Where each sticker sits comes from the card
-itself, so no two look the same and one always looks the same. A card without enough covers for its style shows one
-cover, or its colours when it has none. An artist keeps its round photo.
+**Mosaic** (four covers), **One cover** (its top album), **Glow** (one cover on a soft light in its colours), three
+sleek ones, black with its colour as a hint: **Ink** (its colour glowing up from the foot, its name at the top),
+**Frost** (its cover blurred behind dark glass) and **Line** (a thin edge in its colour, its name big), and three made of
+its covers: **Stickers** (stuck on at angles, with white edges), **Taped** (taped on paper, its name on a label) and
+**Cut-outs** (circles and squares, like a scrapbook). Where each sticker sits comes from the card itself, so no two look
+the same and one always looks the same. A card without enough covers for its style shows one cover, or Ink when it has
+none. An artist keeps its round photo.
 
 Under it, **Picture colours**: where those colours come from. **From covers** (the default) takes its covers' own
 colours, made brighter so a dull cover doesn't give a dull card (a grey one turns silver). **By mood** takes them from
 its songs' moods (happy is gold, relaxed teal, sad blue, party pink, intense red…), brighter the more energetic the
 songs are: it needs Siansa Beats or AudioMuse-AI, and a mix whose songs haven't been analysed yet keeps its covers'
-colours. Or a set: **Siansa**, **Sunset**, **Ocean**, **Forest**, **Neon**, **Pastel** or **Mono**, each card taking
-one pair of it. A name over a picture fades into the picture's own deep colour, not black.
+colours until they have. Or **Siansa** (amber and frost) or **Mono** (greys). A card keeps its colours while it's on
+screen. A name over a picture fades into the picture's own deep colour, not black.
 
 The same cog has **Show its title**: turn it off and the section shows without the heading above it ("Your evening",
 "Recently played"), keeping the gap where it was. And its **Colour**: a card shows the section's cards in the chosen

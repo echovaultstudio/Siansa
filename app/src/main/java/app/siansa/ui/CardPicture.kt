@@ -22,12 +22,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
@@ -71,6 +71,8 @@ fun CardPicture(
     shape: Shape = RoundedCornerShape(8.dp),
     px: Int = 300,
     showName: Boolean = false,
+    // The card draws its name over the picture itself ([content]): Ink, Frost and Line then leave theirs out.
+    nameOver: Boolean = false,
     style: PictureStyle = LocalPictureStyle.current,
     songIds: List<String> = emptyList(),
     content: @Composable androidx.compose.foundation.layout.BoxScope.(PicturePaint) -> Unit = {},
@@ -97,32 +99,11 @@ fun CardPicture(
                 }
             }
             PictureStyle.COVER, PictureStyle.AUTO -> draw(top, px, Modifier.fillMaxSize(), RectangleShape, null)
-            PictureStyle.COLOUR -> ColourPicture(paint, title, showName)
+            PictureStyle.INK, PictureStyle.FROST, PictureStyle.LINE -> SleekPicture(shown, paint, top, title, !nameOver, px)
             PictureStyle.GLOW -> {
                 // Its light is its colours, not the cover blurred, so a dull cover glows too.
                 Box(Modifier.fillMaxSize().glowFill(paint))
                 draw(top, px, Modifier.align(Alignment.Center).fillMaxSize(GLOW_COVER).shadow(GLOW_SHADOW, RoundedCornerShape(4.dp)), RoundedCornerShape(4.dp), null)
-            }
-            PictureStyle.DUOTONE -> {
-                val filter = remember(paint) { duotone(paint.deep, lerp(paint.first, Color.White, 0.35f)) }
-                draw(top, px, Modifier.fillMaxSize(), RectangleShape, filter)
-                if (showName) {
-                    Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().background(MaterialTheme.colorScheme.primary).padding(horizontal = Space.Small, vertical = Space.Tight)) {
-                        Text(title.uppercase(), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.ExtraBold,
-                            color = MaterialTheme.colorScheme.onPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
-                }
-            }
-            PictureStyle.STACK -> BoxWithConstraints(Modifier.fillMaxSize().meshFill(paint).background(Color.Black.copy(alpha = 0.35f))) {
-                val step = maxWidth * STACK_STEP
-                val sleeve = RoundedCornerShape(4.dp)
-                val back = distinct.getOrNull(2) ?: distinct.getOrNull(1)
-                val middle = distinct.firstOrNull { it != top } ?: distinct.first()
-                draw(back, px / 2, Modifier.align(Alignment.Center).offset(x = -step, y = step / 3).fillMaxSize(STACK_SLEEVE)
-                    .graphicsLayer { rotationZ = -10f }.shadow(STACK_SHADOW, sleeve), sleeve, null)
-                draw(middle, px / 2, Modifier.align(Alignment.Center).offset(x = step, y = -step / 4).fillMaxSize(STACK_SLEEVE)
-                    .graphicsLayer { rotationZ = 8f }.shadow(STACK_SHADOW, sleeve), sleeve, null)
-                draw(top, px, Modifier.align(Alignment.Center).offset(y = step / 3).fillMaxSize(STACK_SLEEVE).shadow(STACK_SHADOW, sleeve), sleeve, null)
             }
             PictureStyle.PILE, PictureStyle.TAPED, PictureStyle.CUTOUTS -> Stickers(shown, distinct, paint, title, showName, px)
         }
@@ -153,22 +134,45 @@ internal fun nameFade(shade: Color): Brush = Brush.verticalGradient(
     0.66f to shade.copy(alpha = 0.74f), 0.84f to shade.copy(alpha = 0.9f), 1f to shade.copy(alpha = 0.96f),
 )
 
-/** Its colours, soft light on a deep shade, its name big on them. */
+/**
+ * The sleek pictures (the owner, 20 Nov: the colour cards "don't suit the sleek style of the app"): black first, its
+ * colour as a hint. [INK][PictureStyle.INK]: its colour glowing up from the foot, a short bar of it, its name at the top.
+ * [FROST][PictureStyle.FROST]: its cover blurred behind dark glass, the cover small and sharp, its name at the foot.
+ * [LINE][PictureStyle.LINE]: a thin edge in its colour, "MIX" in it, its name big at the foot.
+ */
 @Composable
-private fun ColourPicture(paint: PicturePaint, title: String, showName: Boolean) {
-    BoxWithConstraints(Modifier.fillMaxSize().meshFill(paint), contentAlignment = Alignment.BottomStart) {
-        if (!showName || maxWidth < COLOUR_SMALLEST) return@BoxWithConstraints
-        val type = when {
-            maxWidth >= COLOUR_BIG -> MaterialTheme.typography.headlineSmall
-            maxWidth >= COLOUR_MEDIUM -> MaterialTheme.typography.titleMedium
-            else -> MaterialTheme.typography.labelLarge
+private fun SleekPicture(kind: PictureStyle, paint: PicturePaint, top: String?, title: String, named: Boolean, px: Int) {
+    val draw = LocalCoverDraw.current
+    val accent = paint.first
+    BoxWithConstraints(Modifier.fillMaxSize().background(SLEEK_GROUND)) {
+        val roomy = maxWidth >= COLOUR_MEDIUM
+        val inset = if (roomy) Space.Medium else Space.Small
+        val showName = named && maxWidth >= COLOUR_SMALLEST
+        val type = (if (maxWidth >= COLOUR_BIG) MaterialTheme.typography.titleLarge else if (roomy) MaterialTheme.typography.titleSmall else MaterialTheme.typography.labelMedium)
+            .copy(fontWeight = FontWeight.ExtraBold)
+        when (kind) {
+            PictureStyle.INK -> {
+                // One soft light, wide and low, so there's little to band or shimmer as it moves.
+                Box(Modifier.fillMaxSize().drawBehind {
+                    drawRect(Brush.radialGradient(listOf(accent.copy(alpha = 0.85f), accent.copy(alpha = 0f)), Offset(size.width / 2f, size.height * 1.05f), size.width * 0.72f))
+                })
+                if (showName) WholeWordsText(title, type, Modifier.align(Alignment.TopStart).padding(inset), color = SLEEK_TEXT, maxLines = 3)
+                Box(Modifier.align(Alignment.BottomStart).padding(inset).size(INK_BAR_WIDTH, INK_BAR_HEIGHT).clip(RoundedCornerShape(2.dp)).background(accent))
+            }
+            PictureStyle.FROST -> {
+                draw(top, FROST_LIGHT_PX, Modifier.fillMaxSize().graphicsLayer { scaleX = 1.25f; scaleY = 1.25f; alpha = 0.8f }
+                    .then(if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) Modifier.blur(FROST_BLUR) else Modifier), RectangleShape, null)
+                Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(SLEEK_GROUND.copy(alpha = 0.15f), SLEEK_GROUND.copy(alpha = 0.72f)))))
+                draw(top, px / 2, Modifier.align(Alignment.TopStart).padding(inset).fillMaxSize(FROST_COVER).shadow(FROST_SHADOW, RoundedCornerShape(4.dp)), RoundedCornerShape(4.dp), null)
+                if (showName) WholeWordsText(title, type, Modifier.align(Alignment.BottomStart).padding(inset), color = SLEEK_TEXT, maxLines = 3)
+            }
+            else -> {
+                Box(Modifier.fillMaxSize().border(LINE_EDGE, accent, RoundedCornerShape(8.dp)))
+                if (roomy) Text("MIX", Modifier.align(Alignment.TopStart).padding(inset), style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold, color = accent, letterSpacing = androidx.compose.ui.unit.TextUnit(1f, androidx.compose.ui.unit.TextUnitType.Sp))
+                if (showName) WholeWordsText(title, type.copy(fontWeight = FontWeight.Black), Modifier.align(Alignment.BottomStart).padding(inset), color = SLEEK_TEXT, maxLines = 3)
+            }
         }
-        // Whole words, a size smaller where a long one wouldn't fit, as on a carousel's sleeves.
-        WholeWordsText(
-            title, type.copy(fontWeight = FontWeight.Black),
-            Modifier.padding(if (maxWidth >= COLOUR_MEDIUM) Space.Medium else Space.Small),
-            color = Color.White, maxLines = 3,
-        )
     }
 }
 
@@ -252,18 +256,18 @@ private fun Stickers(kind: PictureStyle, covers: List<String>, paint: PicturePai
  * else Glow (the owner, 20 Nov: one flat cover looked poor).
  */
 internal fun pictureShown(style: PictureStyle, distinct: Int, hasCover: Boolean, mix: Boolean = true, tones: () -> List<Color?>): PictureStyle {
-    val one = if (hasCover) PictureStyle.COVER else PictureStyle.COLOUR
+    val one = if (hasCover) PictureStyle.COVER else PictureStyle.INK
     return when (style) {
         PictureStyle.AUTO -> when {
-            !hasCover -> PictureStyle.COLOUR
+            !hasCover -> PictureStyle.INK
             !mix -> PictureStyle.COVER
             distinct >= 4 && mosaicSitsWell(tones()) -> PictureStyle.MOSAIC
             else -> PictureStyle.GLOW
         }
         PictureStyle.MOSAIC -> if (distinct >= 4) PictureStyle.MOSAIC else one
-        PictureStyle.STACK, PictureStyle.PILE, PictureStyle.TAPED, PictureStyle.CUTOUTS -> if (distinct >= 2) style else one
-        PictureStyle.COVER, PictureStyle.GLOW, PictureStyle.DUOTONE -> if (hasCover) style else PictureStyle.COLOUR
-        PictureStyle.COLOUR -> PictureStyle.COLOUR
+        PictureStyle.PILE, PictureStyle.TAPED, PictureStyle.CUTOUTS -> if (distinct >= 2) style else one
+        PictureStyle.COVER, PictureStyle.GLOW, PictureStyle.FROST -> if (hasCover) style else PictureStyle.INK
+        PictureStyle.INK, PictureStyle.LINE -> style
     }
 }
 
@@ -294,12 +298,6 @@ internal fun pictureColors(top: String?, distinct: List<String>, fallback: Pair<
     return first to (mains.drop(1).firstOrNull { colourDistance(it, first) > 0.15f } ?: lerp(first, fallback.second, 0.5f))
 }
 
-/** Grey picture to two colours: its shadows [dark], its lights [light]. */
-internal fun duotone(dark: Color, light: Color): ColorFilter {
-    fun row(d: Float, l: Float) = floatArrayOf((l - d) * 0.299f, (l - d) * 0.587f, (l - d) * 0.114f, 0f, d * 255f)
-    return ColorFilter.colorMatrix(ColorMatrix(row(dark.red, light.red) + row(dark.green, light.green) + row(dark.blue, light.blue) + floatArrayOf(0f, 0f, 0f, 1f, 0f)))
-}
-
 internal fun chroma(c: Color): Float = max(c.red, max(c.green, c.blue)) - min(c.red, min(c.green, c.blue))
 
 /** [c]'s hue, 0 to 360. */
@@ -328,10 +326,7 @@ private const val MOSAIC_LIGHT_SPREAD = 0.45f
 private const val MOSAIC_COLOURFUL = 0.18f
 private const val MOSAIC_HUE_SPREAD = 110f
 private const val GLOW_COVER = 0.56f
-private const val STACK_SLEEVE = 0.54f
-private const val STACK_STEP = 0.16f
 private val GLOW_SHADOW = 12.dp
-private val STACK_SHADOW = 8.dp
 private val COLOUR_BIG = 160.dp
 private val COLOUR_MEDIUM = 96.dp
 private val COLOUR_SMALLEST = 64.dp
@@ -345,3 +340,12 @@ private val TAPE = Color(0xA6FFECAA)
 private val PAPER_LIGHT = Color(0xFFEFE6D2)
 private val PAPER_DARK = Color(0xFFD9CBAE)
 private val LABEL = Color(0xFF1A1206)
+private val SLEEK_GROUND = Color(0xFF131315)
+private val SLEEK_TEXT = Color(0xFFF2F2F3)
+private val INK_BAR_WIDTH = 18.dp
+private val INK_BAR_HEIGHT = 3.dp
+private val LINE_EDGE = 1.5.dp
+private const val FROST_LIGHT_PX = 64
+private const val FROST_COVER = 0.38f
+private val FROST_BLUR = 18.dp
+private val FROST_SHADOW = 8.dp

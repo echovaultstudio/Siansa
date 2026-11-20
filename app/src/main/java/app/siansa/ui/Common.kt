@@ -335,7 +335,7 @@ fun Cover(
     size: Int?,
     modifier: Modifier = Modifier,
     shape: Shape = RoundedCornerShape(8.dp),
-    // A card picture in two tones (PictureStyle.DUOTONE); null draws it as it is.
+    // A colour filter over the cover; null draws it as it is.
     colorFilter: androidx.compose.ui.graphics.ColorFilter? = null,
 ) {
     val graph = LocalGraph.current

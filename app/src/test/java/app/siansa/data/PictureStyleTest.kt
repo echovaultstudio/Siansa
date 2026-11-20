@@ -19,19 +19,19 @@ import org.robolectric.annotation.Config
 @Config(sdk = [35], application = android.app.Application::class)
 class PictureStyleTest {
     @Test fun keptAndReadBack() {
-        val saved = mapOf(HomeSection.QUICK to PictureStyle.COLOUR, HomeSection.MADE_FOR_YOU to PictureStyle.GLOW)
+        val saved = mapOf(HomeSection.QUICK to PictureStyle.INK, HomeSection.MADE_FOR_YOU to PictureStyle.GLOW)
         assertEquals(saved, PictureStyle.parse(PictureStyle.format(saved)))
-        assertEquals(mapOf(HomeSection.QUICK to PictureStyle.STACK), PictureStyle.parse("quick:stack,nothing:glow,made_for_you:sideways"))
+        assertEquals(mapOf(HomeSection.QUICK to PictureStyle.LINE), PictureStyle.parse("quick:line,nothing:glow,made_for_you:sideways"))
         // Auto is how it is without a choice: not written.
         assertEquals("", PictureStyle.format(mapOf(HomeSection.QUICK to PictureStyle.AUTO)))
     }
 
     @Test fun keptPerRowAndClearedByReset() {
         fun settings() = SettingsRepository(ApplicationProvider.getApplicationContext())
-        settings().setHomePicture(HomeSection.MADE_FOR_YOU, PictureStyle.DUOTONE)
+        settings().setHomePicture(HomeSection.MADE_FOR_YOU, PictureStyle.FROST)
         settings().setHomePicture(HomeSection.QUICK, PictureStyle.COVER)
         settings().setHomePicture(HomeSection.QUICK, PictureStyle.AUTO)
-        assertEquals(mapOf(HomeSection.MADE_FOR_YOU to PictureStyle.DUOTONE), settings().state.value.homePictures)
+        assertEquals(mapOf(HomeSection.MADE_FOR_YOU to PictureStyle.FROST), settings().state.value.homePictures)
         settings().resetHomeLooks()
         assertEquals(emptyMap<HomeSection, PictureStyle>(), settings().state.value.homePictures)
     }
@@ -40,10 +40,11 @@ class PictureStyleTest {
         val none = { emptyList<Color?>() }
         assertEquals(PictureStyle.MOSAIC, pictureShown(PictureStyle.MOSAIC, 4, true, tones = none))
         assertEquals(PictureStyle.COVER, pictureShown(PictureStyle.MOSAIC, 3, true, tones = none))
-        assertEquals(PictureStyle.STACK, pictureShown(PictureStyle.STACK, 2, true, tones = none))
-        assertEquals(PictureStyle.COVER, pictureShown(PictureStyle.STACK, 1, true, tones = none))
-        assertEquals(PictureStyle.COLOUR, pictureShown(PictureStyle.GLOW, 0, false, tones = none))
-        assertEquals(PictureStyle.COLOUR, pictureShown(PictureStyle.COLOUR, 4, true, tones = none))
+        assertEquals(PictureStyle.INK, pictureShown(PictureStyle.GLOW, 0, false, tones = none))
+        assertEquals(PictureStyle.INK, pictureShown(PictureStyle.FROST, 0, false, tones = none))
+        assertEquals(PictureStyle.LINE, pictureShown(PictureStyle.LINE, 0, false, tones = none))
+        // A row set to Colour, or to the styles that went, shows Ink, or Auto (the owner, 20 Nov).
+        assertEquals(mapOf(HomeSection.QUICK to PictureStyle.INK), PictureStyle.parse("quick:colour,made_for_you:duotone,on_repeat:stack"))
         assertEquals(PictureStyle.PILE, pictureShown(PictureStyle.PILE, 2, true, tones = none))
         assertEquals(PictureStyle.COVER, pictureShown(PictureStyle.CUTOUTS, 1, true, tones = none))
     }
@@ -57,7 +58,7 @@ class PictureStyleTest {
         assertEquals(PictureStyle.GLOW, pictureShown(PictureStyle.AUTO, 1, true, tones = blues))
         // An album keeps its cover.
         assertEquals(PictureStyle.COVER, pictureShown(PictureStyle.AUTO, 1, true, mix = false, tones = blues))
-        assertEquals(PictureStyle.COLOUR, pictureShown(PictureStyle.AUTO, 0, false, tones = blues))
+        assertEquals(PictureStyle.INK, pictureShown(PictureStyle.AUTO, 0, false, tones = blues))
     }
 
     @Test fun whatSitsWell() {

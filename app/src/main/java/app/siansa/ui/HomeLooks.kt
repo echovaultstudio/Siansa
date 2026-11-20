@@ -189,7 +189,7 @@ private fun NamedSquare(item: HomeItem, featured: Boolean, modifier: Modifier) {
             .testTag(if (featured) "homeFeatured" else "homeCoverGridCell"),
     ) {
         CardPicture(item.mosaic, item.coverArt, item.colors, item.title, Modifier.fillMaxWidth().aspectRatio(1f), RoundedCornerShape(0.dp), if (featured) 600 else 300,
-            songIds = item.songIds) { paint ->
+            nameOver = true, songIds = item.songIds) { paint ->
             Column(
                 Modifier
                     .align(Alignment.BottomStart)

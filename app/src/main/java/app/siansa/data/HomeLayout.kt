@@ -249,10 +249,12 @@ enum class PictureStyle(val id: String, val label: String, val blurb: String) {
     AUTO("auto", "Auto", "Mosaic when its covers sit well together, else one cover"),
     MOSAIC("mosaic", "Mosaic", "Four covers"),
     COVER("cover", "One cover", "Its top album"),
-    COLOUR("colour", "Colour", "Its colours and name"),
+    // The sleek ones (the owner, 20 Nov: the loud colour cards "don't suit the sleek style of the app"): black first,
+    // its colour as a hint. Ink keeps Colour's id, so a row set to Colour shows Ink.
+    INK("colour", "Ink", "Black, its colour glowing up from the foot"),
+    FROST("frost", "Frost", "Its cover blurred behind dark glass"),
+    LINE("line", "Line", "Black, a thin edge in its colour"),
     GLOW("glow", "Glow", "One cover on its own light"),
-    DUOTONE("duotone", "Duotone", "Its cover in two tones"),
-    STACK("stack", "Stack", "Three covers fanned out"),
     PILE("pile", "Stickers", "Its covers stuck on at angles"),
     TAPED("taped", "Taped", "Its covers taped on paper"),
     CUTOUTS("cutouts", "Cut-outs", "Circles and squares, like a scrapbook");
@@ -282,11 +284,6 @@ enum class PictureColours(val id: String, val label: String) {
     COVERS("covers", "From covers"),
     MOOD("mood", "By mood"),
     SIANSA("siansa", "Siansa"),
-    SUNSET("sunset", "Sunset"),
-    OCEAN("ocean", "Ocean"),
-    FOREST("forest", "Forest"),
-    NEON("neon", "Neon"),
-    PASTEL("pastel", "Pastel"),
     MONO("mono", "Mono");
 
     companion object {
