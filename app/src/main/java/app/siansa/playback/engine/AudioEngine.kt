@@ -28,7 +28,8 @@ import kotlin.concurrent.withLock
 class AudioEngine(context: Context) {
     val outRate = OUTPUT_RATE
     val core = MixCore(outRate)
-    val sessionId: Int = (context.getSystemService(Context.AUDIO_SERVICE) as AudioManager).generateAudioSessionId()
+    private val audio = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+    val sessionId: Int = audio.generateAudioSessionId()
 
     private val wakeLock = ReentrantLock()
     private val woken = wakeLock.newCondition()
@@ -255,12 +256,31 @@ class AudioEngine(context: Context) {
                 it.addOnRoutingChangedListener({ router ->
                     route = deviceName(router.routedDevice)
                     AppLog.i("Engine", "Output now to $route")
+                    logSystemRates(router.routedDevice)
                 }, null)
                 AppLog.i("Engine", "Output open: $outRate Hz float stereo, buffer ${it.bufferSizeInFrames * 1000 / outRate} ms, to $route")
+                logSystemRates(it.routedDevice)
             }
     } catch (e: Exception) {
         AppLog.e("Engine", "Couldn't open the output: ${e.message}")
         null
+    }
+
+    /**
+     * TEMPORARY (siansa-dev #73, remove once read): the rate Android's own mixer runs at, and the rates the device the
+     * sound goes to takes, to see whether our output is converted again after us (on Bluetooth, likely).
+     */
+    private fun logSystemRates(device: android.media.AudioDeviceInfo?) {
+        runCatching {
+            val system = audio.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE) ?: "not said"
+            val native = AudioTrack.getNativeOutputSampleRate(AudioManager.STREAM_MUSIC)
+            val takes = device?.sampleRates?.takeIf { it.isNotEmpty() }?.joinToString("/") ?: "any (not listed)"
+            val mixer = if (android.os.Build.VERSION.SDK_INT >= 34 && device != null) {
+                audio.getSupportedMixerAttributes(device).map { it.format.sampleRate }.distinct().sorted().joinToString("/").ifEmpty { "none" }
+            } else "not asked (Android 13 or older)"
+            AppLog.i("Engine", "#73 rates: Android mixes at $system Hz (native $native Hz); ${deviceName(device)} takes $takes Hz; " +
+                "own-rate output offered: $mixer; ours $outRate Hz")
+        }.onFailure { AppLog.w("Engine", "#73 rates not readable: ${it.message}") }
     }
 
     private fun deviceName(device: android.media.AudioDeviceInfo?): String {
