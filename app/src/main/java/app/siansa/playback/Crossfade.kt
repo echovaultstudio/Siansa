@@ -384,11 +384,16 @@ object Crossfade {
         val fromBeats = outro?.lockMs != null && intro?.lockMs != null
         val choice = if (mode == CrossfadeMode.SMART && matchable && beatMatch && speed != null && fromBeats) {
             TechniquePicker.pick(outro!!, intro!!, speed, TechniquePicker.keys(currentProfile, nextProfile), nextProfile?.dropsMs.orEmpty(),
-                mix = currentMix || nextMix, noRoom = noRoom, last = lastTechnique,
+                mix = currentMix, mixIn = nextMix && !currentMix, noRoom = noRoom, last = lastTechnique,
                 vocals = TechniquePicker.vocalRoom(currentProfile?.vocals, nextProfile?.vocals))
         } else null
-        val matched = if (matchable && beatMatch && currentDurationMs > 0) {
-            val bars = BeatMatch.barsFor(outro!!, intro!!, choice?.bars ?: blendBars).let { if (currentMix || nextMix) minOf(it, BeatMatch.MIX_TRACK_BARS) else it }
+        val matched = if (matchable && beatMatch && currentDurationMs > 0 && currentMix) {
+            // The song going out is a mixed CD's track: its end holds the CD's own blend, so a short swap at its very end,
+            // downbeat on downbeat (the owner, 20 Nov). A CD's track coming in after a normal song is blended from its lock.
+            BeatMatch.mixSwap(outro!!, intro!!, endMs, outBarFound = currentProfile?.outro?.barMs != null,
+                inBarFound = nextProfile?.intro?.barMs != null, incomingMix = nextMix)
+        } else if (matchable && beatMatch && currentDurationMs > 0) {
+            val bars = BeatMatch.barsFor(outro!!, intro!!, choice?.bars ?: blendBars).let { if (nextMix) minOf(it, BeatMatch.MIX_TRACK_BARS) else it }
             // A drop swap: the next song comes in [bars] before its drop, so the drop lands where the blend ends.
             val into = choice?.dropAtMs?.let { drop ->
                 val start = drop - bars * intro.beatLengthMs * BeatMatch.BEATS_PER_BAR

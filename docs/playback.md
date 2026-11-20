@@ -154,8 +154,13 @@ blend them the way a DJ mixes:
 - **Siansa Beats**: each end of a song is read from where its beat locks onto its grid (the first and
   last 4 bars it all keeps to). A blend stays inside that, and an end needs 80 % of its beats on the grid there to be
   beat-matched, and 80 % of them sitting on the grid. A track cut from a mixed CD carries the DJ's own changeovers at
-  its ends: its blends are laid inside its lock and kept to 16 bars at most (fewer when there isn't room), and without
-  a lock it gets a short blend.
+  its ends. Going out of one, the swap is at its very end, in its last 2 bars (1 when 2 don't fit): the next song comes
+  in on its first downbeat on a downbeat of the old one, beat 1 on beat 1, since the CD already did the blending.
+  Without a downbeat to trust at both ends (bars only assumed from a song's first beat), it's a cut on the beat
+  instead: the old song to its last beat and the next on the very next one, so there's no gap and no bars laid on each
+  other out of place. A next song that's a CD's track too starts at its lock, after the CD's last record. Into a CD's
+  track from a normal song, the blend starts at its lock and is kept to 16 bars at most. Without a lock it gets a short
+  blend.
   - Two songs are beat-matched only when Siansa Beats has a grid for both (or, without Siansa Beats, the plugin's
     readings for both): one with a grid and one without gets a short blend, never the two readings laid on each other.
   - A song whose beat comes in more than 8 seconds into it (an ambient intro) isn't beat-matched from there, which

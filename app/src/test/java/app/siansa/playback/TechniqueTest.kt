@@ -16,8 +16,8 @@ class TechniqueTest {
 
     private fun pick(
         out: BeatEnd = outro, inn: BeatEnd = intro, keys: Double? = 1.0, drops: List<Long> = emptyList(),
-        mix: Boolean = false, noRoom: Boolean = false, last: Technique? = null, vocals: Int? = null,
-    ) = TechniquePicker.pick(out, inn, BeatMatch.speed(out, inn) ?: speed, keys, drops, mix, noRoom, last, vocals)
+        mix: Boolean = false, noRoom: Boolean = false, last: Technique? = null, vocals: Int? = null, mixIn: Boolean = false,
+    ) = TechniquePicker.pick(out, inn, BeatMatch.speed(out, inn) ?: speed, keys, drops, mix, mixIn, noRoom, last, vocals)
 
     /** Siansa Beats' vocals (0.60): a long blend only where no two voices meet; both singing to the change, a quick swap. */
     @Test fun theVocalsSteerTheBlend() {
@@ -73,7 +73,10 @@ class TechniqueTest {
     @Test fun aMixTrackIsShortWhateverElse() {
         val mix = pick(inn = intro.copy(bassBars = 16), mix = true)
         assertEquals(Technique.BASS_SWAP, mix.technique)
-        assertEquals(BeatMatch.MIX_TRACK_BARS, mix.bars)
+        assertEquals(BeatMatch.MIX_SWAP_BARS, mix.bars)
+        assertEquals("a track from a mixed CD: swapped at its very end", mix.why)
+        val into = pick(inn = intro.copy(bassBars = 16), mixIn = true)
+        assertEquals(BeatMatch.MIX_TRACK_BARS, into.bars)
     }
 
     @Test fun aDropSixteenBarsOrMoreInLandsWhereTheOldSongGoes() {

@@ -75,11 +75,12 @@ object TechniquePicker {
         keys: Double?,
         incomingDrops: List<Long> = emptyList(),
         mix: Boolean = false,
+        mixIn: Boolean = false,
         noRoom: Boolean = false,
         last: Technique? = null,
         vocals: Int? = null,
     ): TechniqueChoice {
-        val options = options(outgoing, incoming, speed, keys, incomingDrops, mix, noRoom, vocals)
+        val options = options(outgoing, incoming, speed, keys, incomingDrops, mix, mixIn, noRoom, vocals)
         // The first is the best fit; a change of technique only among the ones that fit as well (not a forced one).
         val first = options.first()
         if (first.technique == last && !first.forced) options.drop(1).firstOrNull { !it.forced && it.technique != last }?.let { return it.choice }
@@ -97,6 +98,7 @@ object TechniquePicker {
         keys: Double?,
         drops: List<Long>,
         mix: Boolean,
+        mixIn: Boolean,
         noRoom: Boolean,
         vocals: Int?,
     ): List<Option> {
@@ -107,7 +109,8 @@ object TechniquePicker {
         fun fits(t: Technique, bars: Int, why: String, dropAt: Long? = null) = out.add(Option(TechniqueChoice(t, bars, why, dropAt), forced = false))
         // Cases that leave no choice.
         if (noRoom) forced(Technique.QUICK_SWAP, 4, "no room left for a longer blend")
-        if (mix) forced(Technique.BASS_SWAP, BeatMatch.MIX_TRACK_BARS, "a track from a mixed CD: inside its lock")
+        if (mix) forced(Technique.BASS_SWAP, BeatMatch.MIX_SWAP_BARS, "a track from a mixed CD: swapped at its very end")
+        if (mixIn) forced(Technique.BASS_SWAP, BeatMatch.MIX_TRACK_BARS, "the next song is from a mixed CD: from its lock, kept short")
         if (keys != null && keys < KEYS_CLASH) forced(Technique.QUICK_SWAP, 4, "the keys clash")
         if (sure < UNSURE) forced(Technique.QUICK_SWAP, 4, "the beat is only %.0f %% sure".format(java.util.Locale.ROOT, sure * 100))
         if (out.isNotEmpty()) return out
