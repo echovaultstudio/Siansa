@@ -139,28 +139,28 @@ fun SettingsHub(nav: NavController) {
             // at its top); Manage opens the list.
             ServicesCard(settings, health, onService = { nav.navigate(it.settingsRoute) }) { nav.navigate("settings/services") }
             // Grouped by what they do, each setting in one place (the owner, 17 Nov).
-            HubGroupLabel("Playing", Modifier.padding(top = Space.Small))
+            HubGroupLabel("Music", Modifier.padding(top = Space.Small))
             HubTiles(listOf(
-                HubTile(Icons.Rounded.Equalizer, "Sound & playback", "settings/sound"),
-                HubTile(Icons.Rounded.Schedule, "Mixes & radios", "settings/radios"),
+                HubTile(Icons.Rounded.Equalizer, "Playback", "settings/sound"),
+                HubTile(Icons.Rounded.Schedule, "Mixes", "settings/radios"),
                 HubTile(Icons.Rounded.Explore, "Discovery", "settings/discovery"),
-                HubTile(Icons.Rounded.GraphicEq, "Listening", "settings/scrobbling"),
+                HubTile(Icons.Rounded.GraphicEq, "Scrobbling", "settings/scrobbling"),
             )) { nav.navigate(it) }
-            HubGroupLabel("On your phone", Modifier.padding(top = Space.Small))
+            HubGroupLabel("Phone", Modifier.padding(top = Space.Small))
             HubTiles(listOf(
-                HubTile(Icons.Rounded.SwapVert, "Storage & downloads", "settings/streaming"),
-                HubTile(Icons.Rounded.Backup, "Backup & restore", "settings/backup"),
+                HubTile(Icons.Rounded.SwapVert, "Storage", "settings/streaming"),
+                HubTile(Icons.Rounded.Backup, "Backup", "settings/backup"),
             )) { nav.navigate(it) }
             HubGroupLabel("Look", Modifier.padding(top = Space.Small))
             HubTiles(listOf(
-                HubTile(Icons.Rounded.Home, "Home page", "settings/home"),
+                HubTile(Icons.Rounded.Home, "Home", "settings/home"),
                 HubTile(Icons.Rounded.Palette, "Theme", "settings/themes"),
-                HubTile(Icons.Rounded.PhoneAndroid, "Now playing", "settings/now-playing"),
-                HubTile(Icons.Rounded.Dashboard, "Bottom bar", "settings/bottom-bar"),
+                HubTile(Icons.Rounded.PhoneAndroid, "Player", "settings/now-playing"),
+                HubTile(Icons.Rounded.Dashboard, "Navigation", "settings/bottom-bar"),
             )) { nav.navigate(it) }
-            HubGroupLabel("Help", Modifier.padding(top = Space.Small))
+            HubGroupLabel("Support", Modifier.padding(top = Space.Small))
             HubTiles(listOf(
-                HubTile(Icons.Rounded.BugReport, "Help & feedback", "settings/help"),
+                HubTile(Icons.Rounded.BugReport, "Help", "settings/help"),
                 HubTile(Icons.Rounded.Info, "About", "settings/about"),
             )) { nav.navigate(it) }
         }
@@ -291,7 +291,7 @@ internal fun HubTiles(tiles: List<HubTile>, onOpen: (String) -> Unit) {
 fun HelpScreen(nav: NavController) {
     val graph = LocalGraph.current
     val settings by graph.settings.state.collectAsStateWithLifecycle()
-    Screen(title = "Help & feedback", nav = nav) { padding ->
+    Screen(title = "Help", nav = nav) { padding ->
         Column(
             Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState()).padding(Space.Page),
             verticalArrangement = Arrangement.spacedBy(Space.Medium),
@@ -362,7 +362,7 @@ internal fun formatBytes(bytes: Long): String = when {
 }
 
 /**
- * Settings › Mixes & radios (the owner, 13 Nov; the radio, queue and wind-down parts of Playback before; who makes
+ * Settings › Mixes (the owner, 13 Nov; the radio, queue and wind-down parts of Playback before; who makes
  * Home's mixes, the owner, 17 Nov): who makes Home's mixes and their settings, how far a song radio may wander, what
  * plays when the queue ends, and Wind down.
  */
@@ -373,7 +373,7 @@ fun RadiosScreen(nav: NavController) {
     val beatsMakes by app.siansa.net.BeatsSound.mixes.collectAsStateWithLifecycle()
     // Who makes Home's mixes (the owner, 17 Nov): Siansa Beats, when it can, or the phone; never both.
     val byBeats = settings.beatsReady && beatsMakes
-    Screen(title = "Mixes & radios", nav = nav) { padding ->
+    Screen(title = "Mixes", nav = nav) { padding ->
         Column(
             Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState()).padding(Space.Page),
             verticalArrangement = Arrangement.spacedBy(Space.Medium),
@@ -522,7 +522,7 @@ private data class StorageUsage(val images: Long, val songs: Long, val downloads
 /** Image and song cache sizes and usage, and what else the app keeps on the phone. */
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 /**
- * Settings › Storage & downloads (the owner, 13 Nov; Data before): the streaming quality, how many songs load ahead,
+ * Settings › Storage (the owner, 13 Nov; Data before): the streaming quality, how many songs load ahead,
  * the song cache, the downloads with their settings and the covers kept on the phone: what you hear over the
  * network, what it costs in data, and playing on without a connection.
  */
@@ -546,7 +546,7 @@ fun StreamingDataScreen(nav: NavController) {
         }
     }
 
-    Screen(title = "Storage & downloads", nav = nav) { padding ->
+    Screen(title = "Storage", nav = nav) { padding ->
         Column(
             Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState()).padding(Space.Page),
             verticalArrangement = Arrangement.spacedBy(Space.Medium),
@@ -646,7 +646,7 @@ fun StreamingDataScreen(nav: NavController) {
             DownloadSettings(nav)
 
             HorizontalDivider()
-            // The log is under Help & feedback › Debugging (the owner, 17 Nov).
+            // The log is under Help › Debugging (the owner, 17 Nov).
             FoldSection("Library on the phone", u?.let { formatBytes(it.library) }, tag = "other-data-on-this-phone") {
                 u?.let { Text("Library database: ${formatBytes(it.library)}", style = MaterialTheme.typography.bodyMedium) }
             }
@@ -705,10 +705,10 @@ fun LogsScreen(nav: NavController) {
         ) {
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
-                    // Its switch is in Help & feedback › Debugging, once (the owner, 17 Nov).
+                    // Its switch is in Help › Debugging, once (the owner, 17 Nov).
                     Hint(
-                        if (settings.logging) "Debug logs are on (Help & feedback › Debugging). Passwords, tokens and API keys are removed; nothing leaves the phone unless you share it."
-                        else "Debug logs are off: turn them on in Help & feedback › Debugging. Nothing is recorded while they're off.",
+                        if (settings.logging) "Debug logs are on (Help › Debugging). Passwords, tokens and API keys are removed; nothing leaves the phone unless you share it."
+                        else "Debug logs are off: turn them on in Help › Debugging. Nothing is recorded while they're off.",
                     )
                     androidx.compose.foundation.layout.FlowRow(
                         Modifier.tvFocusGroup(),

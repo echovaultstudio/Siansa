@@ -1002,7 +1002,7 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     }
                 }
             },
-            // Settings › Style › Now playing: the play button slides, each way and what it does.
+            // Settings › Style › Player: the play button slides, each way and what it does.
             Scene("play_slides_settings") {
                 Column(Modifier.padding(Space.Page)) {
                     app.siansa.ui.PlaySlidesSettings(app.siansa.ui.PlaySlides(left = app.siansa.ui.PlaySlide.START_A_MIX)) {}
@@ -1043,12 +1043,12 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                         health[app.siansa.ui.ServiceHealth.SERVER],
                     ) {}
                     app.siansa.ui.ServicesCard(s, health) {}
-                    app.siansa.ui.HubGroupLabel("Playing")
+                    app.siansa.ui.HubGroupLabel("Music")
                     app.siansa.ui.HubTiles(listOf(
-                        app.siansa.ui.HubTile(androidx.compose.material.icons.Icons.Rounded.Equalizer, "Sound & playback", "a"),
-                        app.siansa.ui.HubTile(androidx.compose.material.icons.Icons.Rounded.Schedule, "Mixes & radios", "b"),
+                        app.siansa.ui.HubTile(androidx.compose.material.icons.Icons.Rounded.Equalizer, "Playback", "a"),
+                        app.siansa.ui.HubTile(androidx.compose.material.icons.Icons.Rounded.Schedule, "Mixes", "b"),
                         app.siansa.ui.HubTile(androidx.compose.material.icons.Icons.Rounded.Explore, "Discovery", "c"),
-                        app.siansa.ui.HubTile(androidx.compose.material.icons.Icons.Rounded.GraphicEq, "Listening", "d"),
+                        app.siansa.ui.HubTile(androidx.compose.material.icons.Icons.Rounded.GraphicEq, "Scrobbling", "d"),
                     )) {}
                 }
             },

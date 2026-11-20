@@ -80,8 +80,8 @@ import app.siansa.data.moved
 import app.siansa.data.movesFirstVisible
 
 /**
- * Home's settings panel with the saved settings, from Home's button or Settings › Home page (issue #780): Sources
- * ([startOnSources]) or Arrange. Your cards' cog closes it and opens Settings › Home page › Cards.
+ * Home's settings panel with the saved settings, from Home's button or Settings › Home (issue #780): Sources
+ * ([startOnSources]) or Arrange. Your cards' cog closes it and opens Settings › Home › Cards.
  */
 @Composable
 fun HomeSettingsSheet(nav: androidx.navigation.NavController, startOnSources: Boolean, asPage: Boolean = false, onDismiss: () -> Unit) {
@@ -93,7 +93,7 @@ fun HomeSettingsSheet(nav: androidx.navigation.NavController, startOnSources: Bo
     val graph = LocalGraph.current
     val s by graph.settings.state.collectAsStateWithLifecycle()
     val beatsMakesMixes by app.siansa.net.BeatsSound.mixes.collectAsStateWithLifecycle()
-    // The notices are the top of Home (issue #872), not a section to move: shown or not in Settings › Home page › Top of Home.
+    // The notices are the top of Home (issue #872), not a section to move: shown or not in Settings › Home › Top of Home.
     val beatsRows = beatsRows(beatsMakesMixes && s.beatsFor(app.siansa.data.BeatsUse.MIXES))
     // More of you is Siansa Beats' alone: listed only while its mixes are on.
     val offered = if (HomeSection.MORE_OF_YOU in beatsRows) emptySet() else setOf(HomeSection.NOTICES, HomeSection.MORE_OF_YOU)
@@ -174,15 +174,15 @@ fun ArrangeHomeSheet(
     onChange: (List<HomeSection>) -> Unit,
     onHiddenChange: (Set<HomeSection>) -> Unit,
     onDismiss: () -> Unit,
-    // Drawn as a page of its own (Settings › Home page › Arrange Home) rather than a sheet.
+    // Drawn as a page of its own (Settings › Home › Arrange Home) rather than a sheet.
     asPage: Boolean = false,
     // What another service puts in a row instead of its own (Siansa Beats' mixes, the owner, 17 Nov), said under it.
     holds: Map<HomeSection, String> = emptyMap(),
     // The gap between Home's sections, a step of the spacing scale (#554).
     gap: Int = AppSettings.HOME_GAP_DEFAULT,
     onGapChange: (Int) -> Unit = {},
-    // Each row's look (issue #655), changed with its cog; Your cards' cog opens Settings › Home page › Cards, and
-    // Notices' cog Settings › Home page › Top of Home (issue #784).
+    // Each row's look (issue #655), changed with its cog; Your cards' cog opens Settings › Home › Cards, and
+    // Notices' cog Settings › Home › Top of Home (issue #784).
     looks: Map<HomeSection, HomeLook> = emptyMap(),
     // Each row's title shown or hidden (issue #961), in the same dialog as its look.
     untitled: Set<HomeSection> = emptySet(),
@@ -217,7 +217,7 @@ fun ArrangeHomeSheet(
             // The grid stays open, so how many tiles it has can be picked there.
             onPick = { onLookChange(section, it); if (it != HomeLook.GRID && it != HomeLook.CAROUSEL && it != HomeLook.COVER_GRID) picking = null },
             onDismiss = { picking = null },
-            // Your cards each have their own look, chosen in Settings › Home page › Cards: a way there.
+            // Your cards each have their own look, chosen in Settings › Home › Cards: a way there.
             onOpenSettings = if (section.lookable) null else { { picking = null; onOpenSettings(section) } },
             gridSize = gridSizes[section] ?: HomeLook.GRID_MOST,
             onGridSize = { onGridSizeChange(section, it) },
@@ -739,7 +739,7 @@ private fun SheetOrPage(asPage: Boolean, onDismiss: () -> Unit, content: @Compos
 }
 
 /**
- * Settings › Home page › Arrange Home (the owner, 17 Nov: a page of its own in Home settings, not a link): the same as
+ * Settings › Home › Arrange Home (the owner, 17 Nov: a page of its own in Home settings, not a link): the same as
  * the sheet behind Home's button, the order, what shows, each row's look and title, the cards' colours and the spacing.
  */
 @Composable

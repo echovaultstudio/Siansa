@@ -31,7 +31,7 @@ enum class NoticeKind(
     }
 }
 
-/** How a kind of notice shows (Settings › Home page › Notices): always first, ordered for you, or never. */
+/** How a kind of notice shows (Settings › Home › Notices): always first, ordered for you, or never. */
 enum class NoticeMode(val id: String, val label: String) {
     PINNED("pinned", "Pinned"),
     AUTO("auto", "Automatic"),

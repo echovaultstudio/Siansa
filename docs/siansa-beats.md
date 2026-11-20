@@ -39,11 +39,11 @@ servers, and nothing is ever changed on them.
 Its page (**Settings › Services › Siansa Beats**) only connects it; under **Used for**, each thing it does opens the
 page where it's switched:
 
-- **Loudness and DJ blends**: Sound & playback (the loudness source; **DJ blends** under Crossfade & DJ blends).
-- **Home's mixes and Mix settings**: Mixes & radios (**Home's mixes**: Siansa Beats or this phone).
+- **Loudness and DJ blends**: Playback (the loudness source; **DJ blends** under Crossfade & DJ blends).
+- **Home's mixes and Mix settings**: Mixes (**Home's mixes**: Siansa Beats or this phone).
 - **Genres, similar music, moods**: Discovery (**Genres** by sound, off: your songs' tags; **Similar music & search
   by words**; **Moods in Flow**).
-- **Your listens**: Listening (**Scrobble to Siansa Beats**).
+- **Your listens**: Scrobbling (**Scrobble to Siansa Beats**).
 
 With an AI set up on its page (Setup › **AI**, 0.57 or newer), it also writes the names and sound searches of the app's
 vibes, Today's mix, Flow's words and the mood radios, and the phone's own AI is switched off and left out of Settings ›

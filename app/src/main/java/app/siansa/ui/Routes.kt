@@ -74,7 +74,7 @@ fun NavGraphBuilder.siansaRoutes(nav: NavController, except: Set<String> = empty
     page("settings/equaliser") { EqualiserScreen(nav) }
     page("settings/storage") { StreamingDataScreen(nav) }
     page("settings/streaming") { StreamingDataScreen(nav) }
-    // Book skips are in Sound & playback now (the owner, 17 Nov).
+    // Book skips are in Playback now (the owner, 17 Nov).
     page("settings/books") { CrossfadeScreen(nav) }
     page("settings/discovery") { DiscoveryScreen(nav) }
     page("settings/home/arrange") { ArrangeHomePage(nav) }

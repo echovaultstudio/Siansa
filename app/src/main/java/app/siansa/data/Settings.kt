@@ -194,7 +194,7 @@ data class AppSettings(
     /** Opus kbit/s for downloads, or 0 for the original file. */
     val downloadKbps: Int = 0,
     val homeOrder: List<HomeSection> = HomeSection.default,
-    /** Settings › Now playing and Bottom bar (issue #346): the mini player's buttons, the bottom bar's tabs, and now playing's lyrics button. */
+    /** Settings › Player and Navigation (issue #346): the mini player's buttons, the bottom bar's tabs, and now playing's lyrics button. */
     val miniButtons: List<MiniButton> = MiniButton.default,
     val navTabs: List<NavTab> = NavTab.default,
     /** Home's menu, top to bottom (issue #872). */
@@ -238,7 +238,7 @@ data class AppSettings(
     val timeMachineMissing: Boolean = true,
     /**
      * Now playing shows "Bad blend" during a DJ blend and for a minute after it, to mark a change that sounded wrong
-     * (Settings › Help & feedback; the owner, 12 Nov). On by default in Siansa Dev only.
+     * (Settings › Help; the owner, 12 Nov). On by default in Siansa Dev only.
      */
     val badBlendButton: Boolean = app.siansa.playback.LastBlend.onByDefault,
     /** How each kind of notice on Home shows (issue #784): pinned, automatic (the default) or off. */

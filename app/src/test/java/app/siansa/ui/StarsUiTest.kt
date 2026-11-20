@@ -36,7 +36,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * Star ratings on screen (issue #1043): the stars take taps, the switches in Settings › Now playing do what they say,
+ * Star ratings on screen (issue #1043): the stars take taps, the switches in Settings › Player do what they say,
  * and the stars sit evenly where they show.
  */
 @RunWith(RobolectricTestRunner::class)
@@ -64,7 +64,7 @@ class StarsUiTest {
         assertEquals("1 star", rated("stars"))
     }
 
-    /** Settings › Now playing › Star ratings, with what the switches save. */
+    /** Settings › Player › Star ratings, with what the switches save. */
     @Test fun theSwitchesTurnStarsOnAndPickTheirPlaces() {
         var stars by mutableStateOf(StarRatings())
         compose.setContent { SiansaTheme { Column(Modifier.padding(Space.Page)) { StarRatingSettings(stars) { stars = it } } } }

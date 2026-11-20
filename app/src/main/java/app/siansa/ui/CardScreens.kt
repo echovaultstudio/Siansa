@@ -97,7 +97,7 @@ fun CardScreen(nav: NavController, id: String) {
 }
 
 /**
- * Settings › Home page › Cards: Made for you cards (issue #274) and custom cards pinned to Home (issue #622), each under its
+ * Settings › Home › Cards: Made for you cards (issue #274) and custom cards pinned to Home (issue #622), each under its
  * own heading on one page.
  */
 @Composable
