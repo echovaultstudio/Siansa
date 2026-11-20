@@ -163,6 +163,7 @@ internal fun homeItemOf(record: CrateRecord): HomeItem = HomeItem(
     key = record.key, title = record.name, subtitle = record.caption, coverArt = record.covers.firstOrNull { it != null },
     colors = record.colors ?: tileColors(record.key), open = record.onOpen, mosaic = record.covers,
     meta = app.siansa.mix.CoverRows.songCount(record.songs.size).orEmpty(),
+    songs = record.songs,
 )
 
 /** The id a Siansa Beats mix is kept by here: Siansa Beats' own key, which no other mix has (0.55), else the day's. */
