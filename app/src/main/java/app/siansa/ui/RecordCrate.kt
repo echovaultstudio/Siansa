@@ -75,6 +75,11 @@ data class CrateRecord(
  * row's cog): under the row, fading out as a sleeve leaves the front and in as the next arrives, or [namesOnCover]
  * on each sleeve, over a soft fade at its foot, so the neighbours carry theirs too. Long names keep whole words, a
  * size smaller before a word would be cut; a line that still doesn't fit ends with "…".
+ *
+ * [compact] (the owner, 20 Nov, beside the big one, chosen under the row's cog): the same carousel with smaller
+ * sleeves, three whole in view and the next ones peeking, so a row of mixes takes about half the height. All else is
+ * the same: the curve, the spring, the dimming and blur (a little lighter, as the neighbours are whole), and the name
+ * and details under the row or on each cover, a size smaller to fit.
  */
 @Composable
 fun RecordCrate(
@@ -83,19 +88,21 @@ fun RecordCrate(
     // Where it opens: the second, so there's one on each side (the owner, 17 Nov), unless there are only two.
     startAt: Int = if (records.size >= 3) 1 else 0,
     namesOnCover: Boolean = LocalCrateNamesOnCover.current,
+    compact: Boolean = LocalCrateCompact.current,
 ) {
+    val look = if (compact) CrateLook.COMPACT else CrateLook.BIG
     if (records.isEmpty()) return
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     val pager = rememberPagerState(initialPage = startAt.coerceIn(0, records.lastIndex)) { records.size }
     Column(modifier.fillMaxWidth().testTag("recordCrate"), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             // A sleeve a little over half the width, so the neighbours show on both sides; never huge on a tablet.
-            val sleeve = min(maxWidth.value * CRATE_SLEEVE, CRATE_SLEEVE_MOST).dp
+            val sleeve = min(maxWidth.value * look.sleeve, look.most).dp
             val side = ((maxWidth - sleeve) / 2).coerceAtLeast(0.dp)
             HorizontalPager(
                 state = pager,
                 pageSize = PageSize.Fixed(sleeve),
-                pageSpacing = Space.Medium,
+                pageSpacing = if (compact) Space.Small else Space.Medium,
                 contentPadding = PaddingValues(horizontal = side), // spacing: exact (the front sleeve in the middle)
                 beyondViewportPageCount = 2,
                 // A flick passes a few sleeves at most and settles softly, never with a jolt or a bounce.
@@ -110,18 +117,19 @@ fun RecordCrate(
                 Sleeve(
                     record,
                     namesOnCover,
+                    compact,
                     Modifier
                         .size(sleeve)
                         .graphicsLayer {
                             // How far this sleeve is from the front, eased: 0 in front, 1 beside it and beyond.
                             val off = abs((pager.currentPage - page) + pager.currentPageOffsetFraction).coerceAtMost(1f)
                             val away = FastOutSlowInEasing.transform(off)
-                            val shrink = 1f - CRATE_SHRINK * away
+                            val shrink = 1f - look.shrink * away
                             scaleX = shrink
                             scaleY = shrink
-                            alpha = 1f - CRATE_DIM * away
+                            alpha = 1f - look.dim * away
                             // Blurred beside the front (Android 12 and later; before that they're only dimmed).
-                            val blur = CRATE_BLUR.toPx() * away
+                            val blur = look.blur.toPx() * away
                             renderEffect = if (blur >= 0.5f) BlurEffect(blur, blur, TileMode.Decal) else null
                         }
                         .clickable(onClickLabel = "Open ${record.name}") { if (page == pager.currentPage) record.onOpen() else scope.launch { pager.animateScrollToPage(page) } }
@@ -140,15 +148,25 @@ fun RecordCrate(
                     .padding(horizontal = Space.Page),
                 verticalArrangement = Arrangement.spacedBy(Space.Tight),
             ) {
-                WholeWordsText(record.name, MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.ExtraBold),
+                WholeWordsText(record.name, (if (compact) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge).copy(fontWeight = FontWeight.ExtraBold),
                     Modifier.testTag("crateName"), maxLines = 2)
                 if (record.caption.isNotBlank()) {
-                    Text(record.caption, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    Text(record.caption, style = if (compact) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.testTag("crateCaption"))
                 }
             }
         }
     }
+}
+
+/** Whether the carousel of the row being drawn is the compact one (Arrange Home, the owner 20 Nov). */
+val LocalCrateCompact = androidx.compose.runtime.compositionLocalOf { false }
+
+/** The two carousels' sizes: the front sleeve's part of the width and most, and how its neighbours step back. */
+private enum class CrateLook(val sleeve: Float, val most: Float, val shrink: Float, val dim: Float, val blur: Dp) {
+    BIG(sleeve = 0.62f, most = 280f, shrink = 0.12f, dim = 0.3f, blur = 3.dp),
+    // Three whole in view: the neighbours stay readable, so they step back a little less.
+    COMPACT(sleeve = 0.34f, most = 170f, shrink = 0.14f, dim = 0.2f, blur = 1.5.dp),
 }
 
 /** Whether the carousel of the row being drawn puts each name on its cover (Arrange Home, the owner 19 Nov). */
@@ -160,7 +178,7 @@ val LocalCrateNamesOnCover = androidx.compose.runtime.compositionLocalOf { false
  * they read on any cover and the fade never shows a hard edge.
  */
 @Composable
-private fun Sleeve(record: CrateRecord, nameOnIt: Boolean, modifier: Modifier) {
+private fun Sleeve(record: CrateRecord, nameOnIt: Boolean, compact: Boolean, modifier: Modifier) {
     val colors = remember(record.key, record.colors) { record.colors ?: tileColors(record.key) }
     val shape = RoundedCornerShape(CRATE_CORNER)
     Box(
@@ -184,15 +202,19 @@ private fun Sleeve(record: CrateRecord, nameOnIt: Boolean, modifier: Modifier) {
                     .align(Alignment.BottomStart)
                     .fillMaxWidth()
                     .background(Brush.verticalGradient(0f to Color.Transparent, 0.35f to Color.Black.copy(alpha = 0.45f), 1f to Color.Black.copy(alpha = 0.85f)))
-                    .padding(start = Space.Medium, end = Space.Medium, top = Space.Large, bottom = Space.Medium)
+                    .padding(
+                        start = if (compact) Space.Small else Space.Medium, end = if (compact) Space.Small else Space.Medium,
+                        top = if (compact) Space.Section else Space.Large, bottom = if (compact) Space.Small else Space.Medium,
+                    )
                     .testTag("crateOnCover"),
                 verticalArrangement = Arrangement.spacedBy(Space.Tight),
             ) {
-                WholeWordsText(record.name, MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold, shadow = CRATE_SHADOW),
-                    color = Color.White, maxLines = 2)
+                WholeWordsText(record.name, (if (compact) MaterialTheme.typography.titleSmall else MaterialTheme.typography.titleMedium).copy(fontWeight = FontWeight.ExtraBold, shadow = CRATE_SHADOW),
+                    color = Color.White, maxLines = if (compact) 3 else 2)
                 if (record.caption.isNotBlank()) {
-                    Text(record.caption, style = MaterialTheme.typography.bodySmall.copy(shadow = CRATE_SHADOW), color = Color.White.copy(alpha = 0.82f),
-                        maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Text(record.caption, style = (if (compact) MaterialTheme.typography.labelSmall else MaterialTheme.typography.bodySmall).copy(shadow = CRATE_SHADOW), color = Color.White.copy(alpha = 0.82f),
+                        // One line on a small sleeve, so the name keeps its size above it.
+                        maxLines = if (compact) 1 else 2, overflow = TextOverflow.Ellipsis)
                 }
             }
         }
@@ -202,9 +224,4 @@ private fun Sleeve(record: CrateRecord, nameOnIt: Boolean, modifier: Modifier) {
 // A soft shadow under the words on a cover, for the odd light cover the fade doesn't darken enough.
 private val CRATE_SHADOW = androidx.compose.ui.graphics.Shadow(Color.Black.copy(alpha = 0.6f), blurRadius = 6f)
 
-private const val CRATE_SLEEVE = 0.62f // of the width
-private const val CRATE_SLEEVE_MOST = 280f // dp
-private const val CRATE_SHRINK = 0.12f // how much smaller a sleeve beside the front is
-private const val CRATE_DIM = 0.3f // how much a sleeve beside the front fades
-private val CRATE_BLUR: Dp = 3.dp // how blurred a sleeve beside the front: gently (the owner, 17 Nov)
 private val CRATE_CORNER: Dp = 6.dp

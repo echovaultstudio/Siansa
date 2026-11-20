@@ -19,7 +19,11 @@ class CarouselNamesSettingTest {
         settings().setHomeCarouselOnCover(HomeSection.CAROUSEL, true)
         settings().setHomeCarouselOnCover(HomeSection.CAROUSEL, false)
         assertEquals(setOf(HomeSection.MADE_FOR_YOU), settings().state.value.homeCarouselOnCover)
+        // Big or compact, kept per row the same way (the owner, 20 Nov).
+        settings().setHomeCarouselCompact(HomeSection.CAROUSEL, true)
+        assertEquals(setOf(HomeSection.CAROUSEL), settings().state.value.homeCarouselCompact)
         settings().resetHomeLooks()
         assertEquals(emptySet<HomeSection>(), settings().state.value.homeCarouselOnCover)
+        assertEquals(emptySet<HomeSection>(), settings().state.value.homeCarouselCompact)
     }
 }

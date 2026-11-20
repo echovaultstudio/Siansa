@@ -400,6 +400,24 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     )
                 }
             },
+            // The compact carousel (the owner, 20 Nov): three sleeves whole in view, names under the row or on each cover.
+            Scene("record_crate_compact") {
+                fun record(key: String, name: String, caption: String) = app.siansa.ui.CrateRecord(key, name, caption, emptyList(), emptyList(), {})
+                val records = listOf(
+                    record("compact-1", "Velvet Undertow", "Slow synths and hazy voices"),
+                    record("compact-2", "Neo-Classical Downtempo With Field Recordings", "Strings, soft beats and field recordings drifting by on a rainy afternoon"),
+                    record("compact-3", "Driving Post-Punk", "Wiry guitars and restless drums"),
+                    record("compact-4", "Night Drive", "Synths and long roads"),
+                )
+                Column(Modifier.padding(vertical = Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Section)) {
+                    app.siansa.ui.SectionTitle("For now", top = 0.dp)
+                    app.siansa.ui.RecordCrate(records, compact = true)
+                    app.siansa.ui.RecordCrate(records, compact = true, namesOnCover = true)
+                }
+            },
+            Scene("crate_size_choice") {
+                Column(Modifier.padding(Space.Page)) { app.siansa.ui.CrateSizeChoice(compact = true) {} }
+            },
             // Under the row's cog: where the carousel's names go (the owner, 19 Nov).
             Scene("crate_names_choice") {
                 Column(Modifier.padding(Space.Page)) { app.siansa.ui.CrateNamesChoice(onCover = true) {} }
