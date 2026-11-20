@@ -135,6 +135,11 @@ fun HomeSettingsSheet(nav: androidx.navigation.NavController, startOnSources: Bo
             graph.settings.setHomeGridSize(section, size)
         },
         coverGrids = s.homeCoverGrids,
+        pictures = s.homePictures,
+        onPictureChange = { section, style ->
+            AppLog.i("Home", "${section.label}: pictures as ${style.label}")
+            graph.settings.setHomePicture(section, style)
+        },
         variants = s.homeVariants,
         onVariantChange = { section, variant ->
             AppLog.i("Home", "${section.label}: ${variant.look.label} as ${variant.label}")
@@ -206,6 +211,9 @@ fun ArrangeHomeSheet(
     onCoverGridChange: (HomeSection, app.siansa.data.CoverGridSize) -> Unit = { _, _ -> },
     variants: Map<HomeSection, app.siansa.data.LookVariant> = emptyMap(),
     onVariantChange: (HomeSection, app.siansa.data.LookVariant) -> Unit = { _, _ -> },
+    // How each row's card pictures show (the owner, 20 Nov).
+    pictures: Map<HomeSection, app.siansa.data.PictureStyle> = emptyMap(),
+    onPictureChange: (HomeSection, app.siansa.data.PictureStyle) -> Unit = { _, _ -> },
     onOpenSettings: (HomeSection) -> Unit = {},
     // The sections listed here, in Reset's order: all but the notices, which are the top of Home (issue #872).
     sections: List<HomeSection> = HomeSection.default - HomeSection.NOTICES,
@@ -232,6 +240,8 @@ fun ArrangeHomeSheet(
             onCoverGrid = { onCoverGridChange(section, it) },
             variant = variants[section],
             onVariant = { onVariantChange(section, it) },
+            picture = pictures[section] ?: app.siansa.data.PictureStyle.AUTO,
+            onPicture = { onPictureChange(section, it) },
             namesOnCover = section in carouselOnCover,
             onNamesOnCover = { onCarouselOnCoverChange(section, it) },
             crateSize = carouselSizes[section] ?: app.siansa.data.CrateSize.BIG,
@@ -445,6 +455,9 @@ private fun HomeLookDialog(
     // Its look's own layout (the owner, 20 Nov): shortcut tiles, a featured cover grid, a hero banner.
     variant: app.siansa.data.LookVariant? = null,
     onVariant: (app.siansa.data.LookVariant) -> Unit = {},
+    // How its cards' pictures show (the owner, 20 Nov).
+    picture: app.siansa.data.PictureStyle = app.siansa.data.PictureStyle.AUTO,
+    onPicture: (app.siansa.data.PictureStyle) -> Unit = {},
     // Its cards' colour (the owner, 13 Nov): its own, or [CardLook.AS_HOME], which is [homeCardLook].
     cardLook: CardLook = CardLook.AS_HOME,
     homeCardLook: CardLook = CardLook.DEFAULT,
@@ -464,6 +477,7 @@ private fun HomeLookDialog(
     var tiles by remember(section) { mutableStateOf(gridSize) }
     var coverGridSize by remember(section) { mutableStateOf(coverGrid) }
     var layout by remember(section) { mutableStateOf(variant) }
+    var pictureStyle by remember(section) { mutableStateOf(picture) }
     var onCover by remember(section) { mutableStateOf(namesOnCover) }
     var size by remember(section) { mutableStateOf(crateSize) }
     var colour by remember(section) { mutableStateOf(cardLook) }
@@ -499,6 +513,10 @@ private fun HomeLookDialog(
                     onTitleShown(it)
                 }
                 HorizontalDivider(Modifier.padding(vertical = Space.Small))
+                if (onOpenSettings == null) {
+                    PictureChoice(pictureStyle) { pictureStyle = it; onPicture(it) }
+                    HorizontalDivider(Modifier.padding(vertical = Space.Small))
+                }
                 if (onOpenSettings != null) {
                     // Your cards: each is its own row in its own look, set where the card is made.
                     Text("Look", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -687,6 +705,29 @@ internal fun VariantChips(label: String, look: HomeLook, chosen: app.siansa.data
                 )
             }
         }
+    }
+}
+
+/**
+ * How a row's card pictures show (the owner, 20 Nov: "some do not look good with the cover mosaic"): each choice, and
+ * what the one chosen does.
+ */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+internal fun PictureChoice(style: app.siansa.data.PictureStyle, modifier: Modifier = Modifier, onPick: (app.siansa.data.PictureStyle) -> Unit) {
+    Column(modifier.testTag("pictureStyle"), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
+        Text("Pictures", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+            for (option in app.siansa.data.PictureStyle.entries) {
+                FilterChip(
+                    selected = style == option,
+                    onClick = { onPick(option) },
+                    label = { Text(option.label) },
+                    modifier = Modifier.testTag("pictureStyle-${option.id}"),
+                )
+            }
+        }
+        Text(style.blurb + ".", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
