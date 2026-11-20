@@ -476,6 +476,30 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     }
                 }
             },
+            // Each set of picture colours on a Colour picture and a sticker pile (the owner, 20 Nov).
+            Scene("picture_colours") {
+                val fakes = mapOf("a" to Color(0xFFE8D44D), "b" to Color(0xFF1F6F78), "c" to Color(0xFFF2F2F3), "d" to Color(0xFFC2185B))
+                val draw: app.siansa.ui.CoverDraw = { id, _, modifier, shape, filter ->
+                    val c = fakes[id] ?: Color.DarkGray
+                    Box(modifier.clip(shape).drawBehind { drawRect(Brush.linearGradient(listOf(c, Color.Black)), colorFilter = filter) })
+                }
+                androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalCoverDraw provides draw) {
+                    androidx.compose.foundation.layout.FlowRow(Modifier.padding(Space.Page), horizontalArrangement = Arrangement.spacedBy(Space.Medium), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
+                        for (set in app.siansa.data.PictureColours.entries - app.siansa.data.PictureColours.MOOD) {
+                            androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalPictureColours provides set) {
+                                Column(Modifier.width(104.dp), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
+                                    app.siansa.ui.CardPicture(listOf("b", "a", "c", "d"), null, Color(0xFF6B5E4E) to Color(0xFF3B3328), "Dusty Roads",
+                                        Modifier.size(104.dp), style = app.siansa.data.PictureStyle.COLOUR, showName = true)
+                                    Text(set.label, style = MaterialTheme.typography.labelMedium)
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            Scene("picture_colours_choice") {
+                Column(Modifier.padding(Space.Page)) { app.siansa.ui.PictureColoursChoice(app.siansa.data.PictureColours.MOOD) {} }
+            },
             Scene("picture_choice") {
                 Column(Modifier.padding(Space.Page)) { app.siansa.ui.PictureChoice(app.siansa.data.PictureStyle.DUOTONE) {} }
             },

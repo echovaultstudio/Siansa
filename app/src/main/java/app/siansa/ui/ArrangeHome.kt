@@ -136,6 +136,11 @@ fun HomeSettingsSheet(nav: androidx.navigation.NavController, startOnSources: Bo
         },
         coverGrids = s.homeCoverGrids,
         pictures = s.homePictures,
+        pictureColours = s.homePictureColours,
+        onPictureColoursChange = { section, colours ->
+            AppLog.i("Home", "${section.label}: picture colours ${colours.label}")
+            graph.settings.setHomePictureColours(section, colours)
+        },
         onPictureChange = { section, style ->
             AppLog.i("Home", "${section.label}: pictures as ${style.label}")
             graph.settings.setHomePicture(section, style)
@@ -214,6 +219,8 @@ fun ArrangeHomeSheet(
     // How each row's card pictures show (the owner, 20 Nov).
     pictures: Map<HomeSection, app.siansa.data.PictureStyle> = emptyMap(),
     onPictureChange: (HomeSection, app.siansa.data.PictureStyle) -> Unit = { _, _ -> },
+    pictureColours: Map<HomeSection, app.siansa.data.PictureColours> = emptyMap(),
+    onPictureColoursChange: (HomeSection, app.siansa.data.PictureColours) -> Unit = { _, _ -> },
     onOpenSettings: (HomeSection) -> Unit = {},
     // The sections listed here, in Reset's order: all but the notices, which are the top of Home (issue #872).
     sections: List<HomeSection> = HomeSection.default - HomeSection.NOTICES,
@@ -242,6 +249,8 @@ fun ArrangeHomeSheet(
             onVariant = { onVariantChange(section, it) },
             picture = pictures[section] ?: app.siansa.data.PictureStyle.AUTO,
             onPicture = { onPictureChange(section, it) },
+            pictureColours = pictureColours[section] ?: app.siansa.data.PictureColours.COVERS,
+            onPictureColours = { onPictureColoursChange(section, it) },
             namesOnCover = section in carouselOnCover,
             onNamesOnCover = { onCarouselOnCoverChange(section, it) },
             crateSize = carouselSizes[section] ?: app.siansa.data.CrateSize.BIG,
@@ -458,6 +467,9 @@ private fun HomeLookDialog(
     // How its cards' pictures show (the owner, 20 Nov).
     picture: app.siansa.data.PictureStyle = app.siansa.data.PictureStyle.AUTO,
     onPicture: (app.siansa.data.PictureStyle) -> Unit = {},
+    // Where its pictures' colours come from (the owner, 20 Nov).
+    pictureColours: app.siansa.data.PictureColours = app.siansa.data.PictureColours.COVERS,
+    onPictureColours: (app.siansa.data.PictureColours) -> Unit = {},
     // Its cards' colour (the owner, 13 Nov): its own, or [CardLook.AS_HOME], which is [homeCardLook].
     cardLook: CardLook = CardLook.AS_HOME,
     homeCardLook: CardLook = CardLook.DEFAULT,
@@ -478,6 +490,7 @@ private fun HomeLookDialog(
     var coverGridSize by remember(section) { mutableStateOf(coverGrid) }
     var layout by remember(section) { mutableStateOf(variant) }
     var pictureStyle by remember(section) { mutableStateOf(picture) }
+    var pictureColour by remember(section) { mutableStateOf(pictureColours) }
     var onCover by remember(section) { mutableStateOf(namesOnCover) }
     var size by remember(section) { mutableStateOf(crateSize) }
     var colour by remember(section) { mutableStateOf(cardLook) }
@@ -515,6 +528,8 @@ private fun HomeLookDialog(
                 HorizontalDivider(Modifier.padding(vertical = Space.Small))
                 if (onOpenSettings == null) {
                     PictureChoice(pictureStyle) { pictureStyle = it; onPicture(it) }
+                    Spacer(Modifier.height(Space.Medium))
+                    PictureColoursChoice(pictureColour) { pictureColour = it; onPictureColours(it) }
                     HorizontalDivider(Modifier.padding(vertical = Space.Small))
                 }
                 if (onOpenSettings != null) {
@@ -730,6 +745,49 @@ internal fun PictureChoice(style: app.siansa.data.PictureStyle, modifier: Modifi
         Text(style.blurb + ".", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
+
+/**
+ * Where a row's picture colours come from (the owner, 20 Nov): its covers', its songs' moods, or a set. Each chip
+ * shows its colours.
+ */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+internal fun PictureColoursChoice(colours: app.siansa.data.PictureColours, modifier: Modifier = Modifier, onPick: (app.siansa.data.PictureColours) -> Unit) {
+    Column(modifier.testTag("pictureColours"), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
+        Text("Picture colours", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+            for (option in app.siansa.data.PictureColours.entries) {
+                FilterChip(
+                    selected = colours == option,
+                    onClick = { onPick(option) },
+                    label = { Text(option.label) },
+                    leadingIcon = { ColoursSwatch(option) },
+                    modifier = Modifier.testTag("pictureColours-${option.id}"),
+                )
+            }
+        }
+        Text(
+            when (colours) {
+                app.siansa.data.PictureColours.COVERS -> "Its covers' colours, made brighter."
+                app.siansa.data.PictureColours.MOOD -> "Its songs' moods, from Siansa Beats or AudioMuse-AI. Brighter the more energetic."
+                else -> "Each card takes one pair of the set. None comes out dull."
+            },
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/** A small round swatch of [colours]: a wheel of its colours. */
+@Composable
+private fun ColoursSwatch(colours: app.siansa.data.PictureColours) {
+    val swatch = remember(colours) { swatchOf(colours) }
+    Box(
+        Modifier.size(SWATCH).clip(androidx.compose.foundation.shape.CircleShape)
+            .background(if (swatch.size > 2) androidx.compose.ui.graphics.Brush.sweepGradient(swatch + swatch.first()) else androidx.compose.ui.graphics.Brush.linearGradient(swatch)),
+    )
+}
+
+private val SWATCH = 18.dp
 
 /** How big a carousel's sleeves are (the owner, 20 Nov): big, compact with three in view, or a small strip. */
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
