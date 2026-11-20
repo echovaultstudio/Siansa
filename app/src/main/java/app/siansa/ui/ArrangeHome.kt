@@ -120,6 +120,11 @@ fun HomeSettingsSheet(nav: androidx.navigation.NavController, startOnSources: Bo
         },
         gridSizes = s.homeGridSizes,
         carouselOnCover = s.homeCarouselOnCover,
+        carouselCompact = s.homeCarouselCompact,
+        onCarouselCompactChange = { section, compact ->
+            AppLog.i("Home", "${section.id} carousel: ${if (compact) "compact" else "big"}")
+            graph.settings.setHomeCarouselCompact(section, compact)
+        },
         onCarouselOnCoverChange = { section, onCover ->
             AppLog.i("Home", "${section.id} carousel: names ${if (onCover) "on the cover" else "under the row"}")
             graph.settings.setHomeCarouselOnCover(section, onCover)
@@ -187,6 +192,8 @@ fun ArrangeHomeSheet(
     gridSizes: Map<HomeSection, Int> = emptyMap(),
     carouselOnCover: Set<HomeSection> = emptySet(),
     onCarouselOnCoverChange: (HomeSection, Boolean) -> Unit = { _, _ -> },
+    carouselCompact: Set<HomeSection> = emptySet(),
+    onCarouselCompactChange: (HomeSection, Boolean) -> Unit = { _, _ -> },
     onGridSizeChange: (HomeSection, Int) -> Unit = { _, _ -> },
     // Each cover grid's columns and rows (#1263).
     coverGrids: Map<HomeSection, app.siansa.data.CoverGridSize> = emptyMap(),
@@ -217,6 +224,8 @@ fun ArrangeHomeSheet(
             onCoverGrid = { onCoverGridChange(section, it) },
             namesOnCover = section in carouselOnCover,
             onNamesOnCover = { onCarouselOnCoverChange(section, it) },
+            compactCrate = section in carouselCompact,
+            onCompactCrate = { onCarouselCompactChange(section, it) },
             cardLook = cardLooks[section] ?: CardLook.AS_HOME,
             homeCardLook = cardLook,
             onCardLook = { onSectionCardLookChange(section, it) },
@@ -437,6 +446,9 @@ private fun HomeLookDialog(
     // As a carousel, each name and its details on the cover or under the row (the owner, 19 Nov).
     namesOnCover: Boolean = false,
     onNamesOnCover: (Boolean) -> Unit = {},
+    // As a carousel, big or compact (the owner, 20 Nov).
+    compactCrate: Boolean = false,
+    onCompactCrate: (Boolean) -> Unit = {},
 ) {
     // The switch shows its change at once: the dialog stays open for the look.
     var shown by remember(section) { mutableStateOf(titleShown) }
@@ -444,6 +456,7 @@ private fun HomeLookDialog(
     var tiles by remember(section) { mutableStateOf(gridSize) }
     var coverGridSize by remember(section) { mutableStateOf(coverGrid) }
     var onCover by remember(section) { mutableStateOf(namesOnCover) }
+    var compact by remember(section) { mutableStateOf(compactCrate) }
     var colour by remember(section) { mutableStateOf(cardLook) }
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -503,6 +516,7 @@ private fun HomeLookDialog(
                         CoverGridSteppers(coverGridSize, Modifier.padding(start = Space.Section, bottom = Space.Small)) { coverGridSize = it; onCoverGrid(it) }
                     }
                     if (option == HomeLook.CAROUSEL && look == HomeLook.CAROUSEL) {
+                        CrateSizeChoice(compact, Modifier.padding(start = Space.Section, bottom = Space.Small)) { compact = it; onCompactCrate(it) }
                         CrateNamesChoice(onCover, Modifier.padding(start = Space.Section, bottom = Space.Small)) { onCover = it; onNamesOnCover(it) }
                     }
                 }
@@ -628,6 +642,25 @@ internal fun SectionTitleSwitch(shown: Boolean, onChange: (Boolean) -> Unit) {
         }
         Spacer(Modifier.width(Space.Medium))
         androidx.compose.material3.Switch(checked = shown, onCheckedChange = onChange, modifier = Modifier.testTag("homeTitleSwitch"))
+    }
+}
+
+/** How big a carousel's sleeves are (the owner, 20 Nov): big, or compact with three in view. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+internal fun CrateSizeChoice(compact: Boolean, modifier: Modifier = Modifier, onPick: (Boolean) -> Unit) {
+    Column(modifier.testTag("crateSize"), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
+        Text("Size", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+            for ((value, label) in listOf(false to "Big", true to "Compact")) {
+                FilterChip(
+                    selected = compact == value,
+                    onClick = { onPick(value) },
+                    label = { Text(label) },
+                    modifier = Modifier.testTag(if (value) "crateSize-compact" else "crateSize-big"),
+                )
+            }
+        }
     }
 }
 
