@@ -364,6 +364,13 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                         save = { _, _ -> }, again = {})
                 }
             },
+            // The foot of Mix settings, which the scene above can't reach: after a change, Make the mixes again.
+            Scene("beats_mix_settings_again") {
+                Column(Modifier.padding(Space.Page)) {
+                    app.siansa.ui.MixSettingsBody(app.siansa.net.BeatsMixSettings.Settings("max", emptyList(), emptyMap(), 7), "Saved. Make the mixes again to see them now.", emptyList(),
+                        save = { _, _ -> }, again = {})
+                }
+            },
             Scene("record_crate") {
                 fun record(key: String, name: String, caption: String) = app.siansa.ui.CrateRecord(key, name, caption, emptyList(), emptyList(), {})
                 Column(Modifier.padding(vertical = Space.Page)) {
