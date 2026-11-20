@@ -267,8 +267,9 @@ class AudioEngine(context: Context) {
     }
 
     /**
-     * TEMPORARY (siansa-dev #73, remove once read): the rate Android's own mixer runs at, and the rates the device the
-     * sound goes to takes, to see whether our output is converted again after us (on Bluetooth, likely).
+     * The rate Android's own mixer runs at, and the rates the device the sound goes to takes, next to ours: shows
+     * whether our output is converted again after us (on Bluetooth, likely). Kept for sound-quality reports (the owner,
+     * 20 Nov; first asked in siansa-dev #73).
      */
     private fun logSystemRates(device: android.media.AudioDeviceInfo?) {
         runCatching {
@@ -278,9 +279,9 @@ class AudioEngine(context: Context) {
             val mixer = if (android.os.Build.VERSION.SDK_INT >= 34 && device != null) {
                 audio.getSupportedMixerAttributes(device).map { it.format.sampleRate }.distinct().sorted().joinToString("/").ifEmpty { "none" }
             } else "not asked (Android 13 or older)"
-            AppLog.i("Engine", "#73 rates: Android mixes at $system Hz (native $native Hz); ${deviceName(device)} takes $takes Hz; " +
+            AppLog.i("Engine", "System rates: Android mixes at $system Hz (native $native Hz); ${deviceName(device)} takes $takes Hz; " +
                 "own-rate output offered: $mixer; ours $outRate Hz")
-        }.onFailure { AppLog.w("Engine", "#73 rates not readable: ${it.message}") }
+        }.onFailure { AppLog.w("Engine", "System rates not readable: ${it.message}") }
     }
 
     private fun deviceName(device: android.media.AudioDeviceInfo?): String {
