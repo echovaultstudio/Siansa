@@ -1,5 +1,6 @@
 package app.siansa.net
 
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -56,6 +57,16 @@ class BeatsMixSettings(
         }
         return parse(post("/api/v1/mixes/settings", body.toString()) as? JsonObject
             ?: throw ApiException("Siansa Beats sent an unexpected answer"))
+    }
+
+    /**
+     * [user]'s mixes made again now, a new pick from the same songs and settings (Siansa Beats 0.60.4, the owner, 20 Nov:
+     * a button to make them again after changing how they're made): how many times today.
+     */
+    suspend fun again(user: String, zone: String): Int {
+        val body = buildJsonObject { put("user", user); put("tz", zone) }
+        val o = post("/api/v1/mixes/again", body.toString()) as? JsonObject ?: throw ApiException("Siansa Beats sent an unexpected answer")
+        return o["times"]?.jsonPrimitive?.intOrNull ?: 1
     }
 
     companion object {
