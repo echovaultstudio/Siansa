@@ -359,7 +359,16 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     "ai_names" to app.siansa.net.BeatsMixSettings.Value(on = true),
                 )
                 Column(Modifier.padding(Space.Page)) {
-                    app.siansa.ui.MixSettingsBody(app.siansa.net.BeatsMixSettings.Settings("max", settings, values, 7), "Saved: your mixes are made again", emptyList()) { _, _ -> }
+                    // After a change: Make the mixes again beside As they come, the note under them (the owner, 20 Nov).
+                    app.siansa.ui.MixSettingsBody(app.siansa.net.BeatsMixSettings.Settings("max", settings, values, 7), "Saved. Make the mixes again to see them now.", emptyList(),
+                        save = { _, _ -> }, again = {})
+                }
+            },
+            // The foot of Mix settings, which the scene above can't reach: after a change, Make the mixes again.
+            Scene("beats_mix_settings_again") {
+                Column(Modifier.padding(Space.Page)) {
+                    app.siansa.ui.MixSettingsBody(app.siansa.net.BeatsMixSettings.Settings("max", emptyList(), emptyMap(), 7), "Saved. Make the mixes again to see them now.", emptyList(),
+                        save = { _, _ -> }, again = {})
                 }
             },
             Scene("record_crate") {

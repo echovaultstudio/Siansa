@@ -200,7 +200,8 @@ what goes into them: which mixes are made and how many, songs in a mix, how many
 how long a song you played stays out, genres and artists to leave out, whether the part of the day, weekends, the dark
 and this time of year count, how far back your listening counts, On repeat's and Rediscover's spans, names from the AI
 service, and how long a mix is kept. Siansa Beats keeps them, and its own Mixes page changes the same. **As they come**
-puts every one back.
+puts every one back. Once you've changed one, **Make the mixes again** makes them again now, a new pick from the same
+songs and settings, and puts them on Home; press it again for another (Siansa Beats 0.60.4 or newer).
 
 ## Your mixes carousel
 

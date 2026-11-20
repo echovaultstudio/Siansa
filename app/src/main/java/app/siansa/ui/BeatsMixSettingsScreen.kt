@@ -1,5 +1,6 @@
 package app.siansa.ui
 
+import androidx.compose.material3.Button
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -58,6 +59,9 @@ fun BeatsMixSettingsScreen(nav: NavController) {
     var loaded by remember { mutableStateOf<BeatsMixSettings.Settings?>(null) }
     var problem by remember { mutableStateOf<String?>(null) }
     var note by remember { mutableStateOf<String?>(null) }
+    // Shown once a setting is changed (the owner, 20 Nov): the mixes made again now, a new pick.
+    var changed by remember { mutableStateOf(false) }
+    var making by remember { mutableStateOf(false) }
     val listener = BeatsListens.listener(s)
     LaunchedEffect(listener) {
         runCatching { graph.beatsMixSettings.load(listener) }
@@ -75,7 +79,8 @@ fun BeatsMixSettingsScreen(nav: NavController) {
             runCatching { graph.beatsMixSettings.save(listener, changes, now.settings.associate { it.name to it.kind }, keepDays) }
                 .onSuccess {
                     loaded = it
-                    note = "Saved: your mixes are made again"
+                    changed = true
+                    note = "Saved. Make the mixes again to see them now."
                     AppLog.i("Beats", "Mix settings: ${changes.keys.joinToString()}${keepDays?.let { d -> ", kept $d days" }.orEmpty()}")
                     graph.beatsMixes.refresh(force = true)
                 }
@@ -93,7 +98,26 @@ fun BeatsMixSettingsScreen(nav: NavController) {
             when {
                 problem != null -> Text(problem.orEmpty(), color = MaterialTheme.colorScheme.error)
                 d == null -> Hint("Loading…")
-                else -> MixSettingsBody(d, note, graph.beatsGenres.saved().orEmpty().map { it.name }, ::save)
+                else -> MixSettingsBody(d, note, graph.beatsGenres.saved().orEmpty().map { it.name }, ::save,
+                    again = if (!changed) null else ({
+                        if (!making) {
+                            making = true
+                            note = "Making them again…"
+                            scope.launch {
+                                runCatching { graph.beatsMixSettings.again(listener, java.time.ZoneId.systemDefault().id) }
+                                    .onSuccess { times ->
+                                        AppLog.i("Beats", "Mixes made again by hand ($times today)")
+                                        graph.beatsMixes.refresh(force = true)
+                                        note = "Made again: they're on Home"
+                                    }
+                                    .onFailure {
+                                        note = if ((it as? app.siansa.net.ApiException)?.code == 404) "Needs Siansa Beats 0.60.4 or newer." else "Not made again: ${it.message}"
+                                        AppLog.w("Beats", "The mixes weren't made again: ${it.message}")
+                                    }
+                                making = false
+                            }
+                        }
+                    }))
             }
         }
     }
@@ -102,7 +126,11 @@ fun BeatsMixSettingsScreen(nav: NavController) {
 /** The settings themselves, in their groups; how long mixes are kept; and "As they come". */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun MixSettingsBody(d: BeatsMixSettings.Settings, note: String?, genres: List<String>, save: (Map<String, Value>, Int?) -> Unit) {
+internal fun MixSettingsBody(
+    d: BeatsMixSettings.Settings, note: String?, genres: List<String>, save: (Map<String, Value>, Int?) -> Unit,
+    // After a change: makes the mixes again now (null: not shown).
+    again: (() -> Unit)? = null,
+) {
     Column(verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
         d.grouped().forEach { (title, settings) ->
             HorizontalDivider()
@@ -128,12 +156,16 @@ internal fun MixSettingsBody(d: BeatsMixSettings.Settings, note: String?, genres
             }
         }
         HorizontalDivider()
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
+        // The two buttons wrap onto two lines rather than squeeze one onto two lines of its own.
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.Medium), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
             OutlinedButton(onClick = { save(d.settings.associate { it.name to it.default }, null) }, modifier = Modifier.testTag("mixSettingsReset")) {
                 Text("As they come")
             }
-            note?.let { Hint(it) }
+            if (again != null) {
+                Button(onClick = again, modifier = Modifier.testTag("mixSettingsAgain")) { Text("Make the mixes again") }
+            }
         }
+        note?.let { Hint(it) }
     }
 }
 
