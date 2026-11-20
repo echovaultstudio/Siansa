@@ -434,7 +434,9 @@ Siansa shows up in Android Auto as a music app. On the car's screen you can brow
 
 - **Home**: your newest mix of each vibe, the mood radios (when AudioMuse-AI is set up) and **Recently played**,
   the albums, playlists, mixes and artists you last played on the phone.
-- **Playlists**, **Albums** and **Artists**: each opens to its songs. An artist's songs are grouped by album.
+- **Playlists** and **Albums**: each opens to its songs; tapping one never starts it by itself.
+- **Artists**: each opens to **Play all** (its songs album by album), **Shuffle**, then its albums, each opening to
+  its songs.
 - **Search**, by typing (when parked) or by voice: "Play Radiohead on Siansa". A name that matches an artist or
   album exactly plays that artist or album; otherwise the songs found play. "Play music on Siansa" plays your newest
   mix.

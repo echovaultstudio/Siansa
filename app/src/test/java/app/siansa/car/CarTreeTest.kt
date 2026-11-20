@@ -140,14 +140,33 @@ class CarTreeTest {
         assertEquals(Uri.parse("content://test.covers/cover/al-al1"), first.mediaMetadata.artworkUri)
     }
 
-    @Test fun anArtistsSongsKeepEachAlbumTogether() = runBlocking {
-        val songs = tree().children("artist:ar1")!!
-        assertEquals(listOf("s1", "s3", "s2"), songs.map { (CarId.parse(it.mediaId) as CarId.Song).songId })
-        assertEquals("One", songs[0].mediaMetadata.extras!!.getString(MediaConstants.EXTRAS_KEY_CONTENT_STYLE_GROUP_TITLE))
-        // Playing from the second song of the list starts where the list shows it.
-        val queue = tree().queue(songs[1].mediaId)!!
-        assertEquals(listOf("s1", "s3", "s2"), queue.songs.map { it.id })
-        assertEquals(1, queue.start)
+    @Test fun anArtistOpensToPlayAllShuffleAndItsAlbums() = runBlocking {
+        // Issue #1237: tapping an artist in the car opened nothing and played everything.
+        val rows = tree().children("artist:ar1")!!
+        assertEquals(listOf("artistplay:ar1", "artistshuffle:ar1", "album:a1", "album:a2"), rows.map { it.mediaId })
+        assertEquals(listOf("Play all", "Shuffle", "One", "Two"), rows.map { it.mediaMetadata.title.toString() })
+        // Play all and Shuffle play; each album opens (to its songs) and never plays on a tap.
+        assertTrue(rows.take(2).all { it.mediaMetadata.isPlayable == true && it.mediaMetadata.isBrowsable == false })
+        assertTrue(rows.drop(2).all { it.mediaMetadata.isBrowsable == true && it.mediaMetadata.isPlayable == false })
+        // Play all plays the artist's songs album by album; Shuffle the same songs, as the artist's page.
+        val all = tree().queue("artistplay:ar1")!!
+        assertEquals(listOf("s1", "s3", "s2"), all.songs.map { it.id })
+        assertEquals("artist/ar1", all.route)
+        assertEquals(setOf("s1", "s2", "s3"), tree().queue("artistshuffle:ar1")!!.songs.map { it.id }.toSet())
+        assertEquals("Play all", tree().item("artistplay:ar1")!!.mediaMetadata.title.toString())
+        assertEquals(CarId.ArtistPlay("a b/c", shuffle = true), CarId.parse(CarId.ArtistPlay("a b/c", shuffle = true).mediaId))
+    }
+
+    @Test fun artistsAndAlbumsOpenOnATapNeverPlay() = runBlocking {
+        val lib = Fake(found = SearchResults(listOf(Artist("ar1", "Artist")), listOf(Album("al1", "First")), emptyList()))
+        val lists = tree(lib).children("artists")!! + tree(lib).children("albums")!! + tree(lib).search("x") +
+            listOf(tree(lib).item("artist:ar1")!!, tree(lib).item("album:al1")!!)
+        for (item in lists) {
+            assertEquals("${item.mediaId} opens", true, item.mediaMetadata.isBrowsable)
+            assertEquals("${item.mediaId} doesn't play on a tap", false, item.mediaMetadata.isPlayable)
+        }
+        // "Play the artist" by voice still plays it.
+        assertEquals("artist/ar1", tree(lib).voice("artist")!!.route)
     }
 
     @Test fun playlistsAlbumsAndArtistsAreListed() = runBlocking {
