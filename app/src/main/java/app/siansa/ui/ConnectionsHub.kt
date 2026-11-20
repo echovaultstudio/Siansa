@@ -813,16 +813,16 @@ internal fun serviceOf(key: String): Service? = when (key) {
 /** What a service is used for, each line opening the page where that job is set (the owner, 17 Nov). */
 internal fun usedFor(service: Service): List<Triple<String, String, String>> = when (service) {
     Service.BEATS -> listOf(
-        Triple("Loudness and DJ blends", "Sound & playback", "settings/sound"),
+        Triple("Loudness and DJ blends", "Playback", "settings/sound"),
         // Its AI names the phone's playlists too (0.57), when it's set up there: they're on the same page.
-        Triple("Home's mixes, Mix settings and playlist names", "Mixes & radios", "settings/radios"),
+        Triple("Home's mixes, Mix settings and playlist names", "Mixes", "settings/radios"),
         Triple("Genres, similar music, moods", "Discovery", "settings/discovery"),
-        Triple("Your listens", "Listening", "settings/scrobbling"),
+        Triple("Your listens", "Scrobbling", "settings/scrobbling"),
     )
     Service.AUDIOMUSE -> listOf(Triple("Similar music and search by words", "Discovery", "settings/discovery"))
-    Service.BOOKS -> listOf(Triple("Book skips", "Sound & playback", "settings/sound"))
-    Service.AI -> listOf(Triple("Today's mix, Flow's words and the mood radios", "Mixes & radios", "settings/radios"))
-    Service.LASTFM, Service.LISTENBRAINZ -> listOf(Triple("Your listens", "Listening", "settings/scrobbling"))
+    Service.BOOKS -> listOf(Triple("Book skips", "Playback", "settings/sound"))
+    Service.AI -> listOf(Triple("Today's mix, Flow's words and the mood radios", "Mixes", "settings/radios"))
+    Service.LASTFM, Service.LISTENBRAINZ -> listOf(Triple("Your listens", "Scrobbling", "settings/scrobbling"))
 }
 
 /**

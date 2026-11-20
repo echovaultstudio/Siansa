@@ -67,7 +67,7 @@ fun CrossfadeScreen(nav: NavController) {
     val scope = rememberCoroutineScope()
     var test by remember { mutableStateOf<String?>(null) }
     val eq by graph.equaliser.state.collectAsStateWithLifecycle()
-    Screen(title = "Sound & playback", nav = nav) { padding ->
+    Screen(title = "Playback", nav = nav) { padding ->
         Column(
             Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState()).padding(Space.Page),
             verticalArrangement = Arrangement.spacedBy(CROSSFADE_GAP),

@@ -55,7 +55,7 @@ import java.time.LocalDate
 /**
  * The notices at the top of Home (issue #784): chips for what needs you, what you're partway through and what's new.
  * Pinned kinds always show; the automatic ones come and go as they're needed (issue #794). None while [shown] is off
- * (Settings › Home page › Top of Home).
+ * (Settings › Home › Top of Home).
  */
 @Composable
 internal fun rememberNotices(graph: AppGraph, settings: AppSettings, shown: Boolean): List<Notice> {

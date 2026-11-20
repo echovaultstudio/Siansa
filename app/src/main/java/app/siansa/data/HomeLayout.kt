@@ -16,7 +16,7 @@ enum class HomeSection(val id: String, val label: String) {
     MADE_FOR_YOU("made", "Made for you"),
     /** Siansa Beats' On repeat, Rediscover and New for you (the owner, 17 Nov: its own row); empty without them. */
     MORE_OF_YOU("more_of_you", "More of you"),
-    /** Custom cards pinned to Home (issue #622); each shows in its own look, in the order set in Settings › Home page › Cards. */
+    /** Custom cards pinned to Home (issue #622); each shows in its own look, in the order set in Settings › Home › Cards. */
     CARDS("cards", "Your cards"),
     REDISCOVER("rediscover", "Rediscover"),
     RADIOS("radios", "Radios"),
@@ -27,7 +27,7 @@ enum class HomeSection(val id: String, val label: String) {
     GENRES("genres", "Your genres"),
     RANDOM("random", "Random picks");
 
-    /** Its look can be changed under Arrange Home (issue #655); Your cards each have their own, in Settings › Home page › Cards. */
+    /** Its look can be changed under Arrange Home (issue #655); Your cards each have their own, in Settings › Home › Cards. */
     val lookable: Boolean get() = this != CARDS && this != NOTICES
 
     companion object {

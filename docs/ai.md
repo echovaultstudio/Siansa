@@ -45,7 +45,7 @@ plainer.
 
 ## Situation
 
-The **Use the moment** panel (in **Settings › Mixes & radios › Today's mix and vibes**) lets today's mixes suit what's going on
+The **Use the moment** panel (in **Settings › Mixes › Today's mix and vibes**) lets today's mixes suit what's going on
 around you. Each part is switched on by itself, and is read once when a mix is made, never in the background:
 
 | Part | How it's read |
