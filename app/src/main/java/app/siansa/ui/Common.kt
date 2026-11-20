@@ -933,40 +933,109 @@ fun QuickTile(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     icon: ImageVector? = null,
+    // The tile's height (the owner, 20 Nov): [QUICK_TILE_SMALL] three a row, [QUICK_TILE_BIG] with [subtitle] under the name.
+    tall: Dp = QUICK_TILE_HEIGHT,
+    subtitle: String? = null,
 ) {
     // Plain, unless its row has a colour of its own (#1261).
     val paint = LocalShortcutLook.current?.let { look -> cardPaint(colors ?: tileColors(title), coverArt, title, look) }
+    val small = tall < QUICK_TILE_HEIGHT
+    val big = tall > QUICK_TILE_HEIGHT
     Row(
         modifier
-            .height(QUICK_TILE_HEIGHT)
+            .height(tall)
             .clip(RoundedCornerShape(QUICK_TILE_CORNER))
             .then(if (paint != null) Modifier.cardFill(paint, RoundedCornerShape(QUICK_TILE_CORNER)) else Modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh))
             .clickable(onClick = onClick),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (coverArt != null) {
-            Cover(coverArt, 150, Modifier.size(56.dp), RoundedCornerShape(topStart = 6.dp, bottomStart = 6.dp))
+            Cover(coverArt, if (big) 300 else 150, Modifier.size(tall), RoundedCornerShape(topStart = QUICK_TILE_CORNER, bottomStart = QUICK_TILE_CORNER))
         } else {
             Box(
-                Modifier.size(56.dp).background(
+                Modifier.size(tall).background(
                     Brush.linearGradient(listOf(colors?.first ?: Color.Gray, colors?.second ?: Color.DarkGray))
                 ),
                 contentAlignment = Alignment.Center,
             ) {
-                if (icon != null) Icon(icon, null, tint = Color.White, modifier = Modifier.size(26.dp))
+                if (icon != null) Icon(icon, null, tint = Color.White, modifier = Modifier.size(if (small) 20.dp else if (big) 32.dp else 26.dp))
             }
         }
-        Text(
-            title,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            color = paint?.text ?: androidx.compose.ui.graphics.Color.Unspecified,
-            modifier = Modifier.padding(horizontal = Space.Medium),
-        )
+        Column(Modifier.padding(horizontal = if (small) Space.Small else Space.Medium), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
+            if (small || big) {
+                // Every tile's name the same size (the owner, 20 Nov): a word too long for a narrow tile is hyphenated
+                // where it may be, and a name too long for two lines ends with "…".
+                Text(
+                    title,
+                    style = (if (small) MaterialTheme.typography.labelMedium else MaterialTheme.typography.titleSmall).copy(
+                        fontWeight = if (big) FontWeight.Bold else FontWeight.SemiBold,
+                        hyphens = androidx.compose.ui.text.style.Hyphens.Auto,
+                        lineBreak = androidx.compose.ui.text.style.LineBreak.Paragraph,
+                    ),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    color = paint?.text ?: androidx.compose.ui.graphics.Color.Unspecified,
+                )
+            } else {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    color = paint?.text ?: androidx.compose.ui.graphics.Color.Unspecified,
+                )
+            }
+            if (big && !subtitle.isNullOrBlank()) {
+                Text(subtitle, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    color = paint?.faint ?: MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
     }
 }
+
+/** Shortcut tiles three a row (the owner, 20 Nov): the space of four holds six. */
+val QUICK_TILE_SMALL = 44.dp
+/** Big shortcut tiles, two a row with what each is under its name (the owner, 20 Nov). */
+val QUICK_TILE_BIG = 76.dp
+
+/**
+ * A shortcut as a pill (the owner, 20 Nov): a round picture (its cover, else its colours and icon) and its name, as
+ * wide as the name; the pills flow on to as many lines as they need.
+ */
+@Composable
+fun ShortcutChip(title: String, coverArt: String?, colors: Pair<Color, Color>?, onClick: () -> Unit, modifier: Modifier = Modifier, icon: ImageVector? = null) {
+    val paint = LocalShortcutLook.current?.let { look -> cardPaint(colors ?: tileColors(title), coverArt, title, look) }
+    val shape = RoundedCornerShape(percent = 50)
+    Row(
+        modifier
+            .height(QUICK_CHIP_HEIGHT)
+            .clip(shape)
+            .then(if (paint != null) Modifier.cardFill(paint, shape) else Modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh))
+            .clickable(onClick = onClick)
+            .padding(start = Space.Tight, end = Space.Medium),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Space.Small),
+    ) {
+        if (coverArt != null) {
+            Cover(coverArt, 100, Modifier.size(QUICK_CHIP_PICTURE), androidx.compose.foundation.shape.CircleShape)
+        } else {
+            Box(
+                Modifier.size(QUICK_CHIP_PICTURE).clip(androidx.compose.foundation.shape.CircleShape)
+                    .background(Brush.linearGradient(listOf(colors?.first ?: Color.Gray, colors?.second ?: Color.DarkGray))),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (icon != null) Icon(icon, null, tint = Color.White, modifier = Modifier.size(16.dp))
+            }
+        }
+        Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            color = paint?.text ?: androidx.compose.ui.graphics.Color.Unspecified)
+    }
+}
+
+/** A shortcut pill's height and its picture: a touch target, the picture inside it with room round it. */
+val QUICK_CHIP_HEIGHT = 44.dp
+val QUICK_CHIP_PICTURE = 32.dp
 
 /**
  * A horizontal shelf of tiles under a section title. With [onOpenAll], a shelf with more than a handful of
