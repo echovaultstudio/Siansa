@@ -20,10 +20,18 @@ class CarouselNamesSettingTest {
         settings().setHomeCarouselOnCover(HomeSection.CAROUSEL, false)
         assertEquals(setOf(HomeSection.MADE_FOR_YOU), settings().state.value.homeCarouselOnCover)
         // Big or compact, kept per row the same way (the owner, 20 Nov).
-        settings().setHomeCarouselCompact(HomeSection.CAROUSEL, true)
-        assertEquals(setOf(HomeSection.CAROUSEL), settings().state.value.homeCarouselCompact)
+        settings().setHomeCarouselSize(HomeSection.CAROUSEL, CrateSize.COMPACT)
+        settings().setHomeCarouselSize(HomeSection.MADE_FOR_YOU, CrateSize.SMALL)
+        assertEquals(CrateSize.COMPACT, settings().state.value.carouselSize(HomeSection.CAROUSEL))
+        assertEquals(CrateSize.SMALL, settings().state.value.carouselSize(HomeSection.MADE_FOR_YOU))
+        assertEquals(CrateSize.BIG, settings().state.value.carouselSize(HomeSection.MORE_OF_YOU))
+        // One size at a time: small after compact is small only.
+        settings().setHomeCarouselSize(HomeSection.CAROUSEL, CrateSize.SMALL)
+        assertEquals(CrateSize.SMALL, settings().state.value.carouselSize(HomeSection.CAROUSEL))
+        assertEquals(emptySet<HomeSection>(), settings().state.value.homeCarouselCompact)
         settings().resetHomeLooks()
         assertEquals(emptySet<HomeSection>(), settings().state.value.homeCarouselOnCover)
         assertEquals(emptySet<HomeSection>(), settings().state.value.homeCarouselCompact)
+        assertEquals(emptySet<HomeSection>(), settings().state.value.homeCarouselSmall)
     }
 }

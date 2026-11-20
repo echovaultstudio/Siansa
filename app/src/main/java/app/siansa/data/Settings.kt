@@ -223,6 +223,8 @@ data class AppSettings(
     val homeCarouselOnCover: Set<HomeSection> = emptySet(),
     /** Rows shown as the compact carousel: smaller sleeves, three in view (the owner, 20 Nov), not the big one. */
     val homeCarouselCompact: Set<HomeSection> = emptySet(),
+    /** Rows shown as the small carousel: a strip of squares, each named under it (the owner, 20 Nov). */
+    val homeCarouselSmall: Set<HomeSection> = emptySet(),
     /** How Home's coloured cards are painted (the owner, 13 Nov), and the cards with a look of their own. */
     val homeCardLook: CardLook = CardLook.DEFAULT,
     val homeCardLooks: Map<HomeSection, CardLook> = emptyMap(),
@@ -545,6 +547,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         homeUntitled = HomeSection.parseHidden(prefs.getString("home_untitled", null)),
         homeCarouselOnCover = HomeSection.parseHidden(prefs.getString("home_carousel_on_cover", null)),
         homeCarouselCompact = HomeSection.parseHidden(prefs.getString("home_carousel_compact", null)),
+        homeCarouselSmall = HomeSection.parseHidden(prefs.getString("home_carousel_small", null)),
         homeGap = prefs.getInt("home_gap", AppSettings.HOME_GAP_DEFAULT).coerceIn(0, AppSettings.HOME_GAP_MAX),
         downloadedOnly = prefs.getBoolean("downloaded_only", false),
         timeMachineMissing = prefs.getBoolean("time_machine_missing", true),
@@ -819,11 +822,15 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         _state.value = _state.value.copy(homeCarouselOnCover = set)
     }
 
-    /** Whether [section]'s carousel is the compact one or the big one (the owner, 20 Nov). */
-    fun setHomeCarouselCompact(section: HomeSection, compact: Boolean) {
-        val set = if (compact) _state.value.homeCarouselCompact + section else _state.value.homeCarouselCompact - section
-        prefs.edit().putString("home_carousel_compact", HomeSection.formatHidden(set)).apply()
-        _state.value = _state.value.copy(homeCarouselCompact = set)
+    /** [section]'s carousel: big, compact or small (the owner, 20 Nov). */
+    fun setHomeCarouselSize(section: HomeSection, size: CrateSize) {
+        val compact = if (size == CrateSize.COMPACT) _state.value.homeCarouselCompact + section else _state.value.homeCarouselCompact - section
+        val small = if (size == CrateSize.SMALL) _state.value.homeCarouselSmall + section else _state.value.homeCarouselSmall - section
+        prefs.edit()
+            .putString("home_carousel_compact", HomeSection.formatHidden(compact))
+            .putString("home_carousel_small", HomeSection.formatHidden(small))
+            .apply()
+        _state.value = _state.value.copy(homeCarouselCompact = compact, homeCarouselSmall = small)
     }
 
     fun setNavTabs(tabs: List<NavTab>) {
@@ -902,8 +909,8 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
 
     /** Every row back in its own look, and every card in Home's colour. */
     fun resetHomeLooks() {
-        prefs.edit().remove("home_looks").remove("home_grid_sizes").remove("home_card_look").remove("home_card_looks").remove("home_carousel_on_cover").remove("home_carousel_compact").remove("home_cover_grid_sizes").apply()
-        _state.value = _state.value.copy(homeLooks = emptyMap(), homeGridSizes = emptyMap(), homeCardLook = CardLook.DEFAULT, homeCardLooks = emptyMap(), homeCarouselOnCover = emptySet(), homeCarouselCompact = emptySet(), homeCoverGrids = emptyMap())
+        prefs.edit().remove("home_looks").remove("home_grid_sizes").remove("home_card_look").remove("home_card_looks").remove("home_carousel_on_cover").remove("home_carousel_compact").remove("home_carousel_small").remove("home_cover_grid_sizes").apply()
+        _state.value = _state.value.copy(homeLooks = emptyMap(), homeGridSizes = emptyMap(), homeCardLook = CardLook.DEFAULT, homeCardLooks = emptyMap(), homeCarouselOnCover = emptySet(), homeCarouselCompact = emptySet(), homeCarouselSmall = emptySet(), homeCoverGrids = emptyMap())
     }
 
     /** How every coloured card on Home is painted (the owner, 13 Nov). */
@@ -1070,4 +1077,14 @@ object BeatsUse {
     const val MOODS = "moods"
     /** Home's mixes made from your listening (Siansa Beats 0.53), instead of your own carousels. */
     const val MIXES = "mixes"
+}
+
+/** The carousel's three sizes on Home (the owner, 20 Nov): big sleeves, compact (three in view), or a small strip. */
+enum class CrateSize(val label: String) { BIG("Big"), COMPACT("Compact"), SMALL("Small") }
+
+/** [section]'s carousel size, as kept. */
+fun AppSettings.carouselSize(section: HomeSection): CrateSize = when (section) {
+    in homeCarouselSmall -> CrateSize.SMALL
+    in homeCarouselCompact -> CrateSize.COMPACT
+    else -> CrateSize.BIG
 }

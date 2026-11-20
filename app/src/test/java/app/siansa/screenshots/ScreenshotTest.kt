@@ -411,12 +411,27 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                 )
                 Column(Modifier.padding(vertical = Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Section)) {
                     app.siansa.ui.SectionTitle("For now", top = 0.dp)
-                    app.siansa.ui.RecordCrate(records, compact = true)
-                    app.siansa.ui.RecordCrate(records, compact = true, namesOnCover = true)
+                    app.siansa.ui.RecordCrate(records, size = app.siansa.data.CrateSize.COMPACT)
+                    app.siansa.ui.RecordCrate(records, size = app.siansa.data.CrateSize.COMPACT, namesOnCover = true)
+                }
+            },
+            // The small carousel (the owner, 20 Nov): a strip of squares, names under each or on each.
+            Scene("record_crate_small") {
+                fun record(key: String, name: String, caption: String) = app.siansa.ui.CrateRecord(key, name, caption, emptyList(), emptyList(), {})
+                val records = listOf(
+                    record("small-1", "Velvet Undertow", "Slow synths and hazy voices"),
+                    record("small-2", "Neo-Classical Downtempo With Field Recordings", "Strings, soft beats and field recordings drifting by on a rainy afternoon"),
+                    record("small-3", "Driving Post-Punk", "Wiry guitars and restless drums"),
+                    record("small-4", "Night Drive", "Synths and long roads"),
+                )
+                Column(Modifier.padding(vertical = Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Section)) {
+                    app.siansa.ui.SectionTitle("Made for you", top = 0.dp)
+                    app.siansa.ui.RecordCrate(records, size = app.siansa.data.CrateSize.SMALL)
+                    app.siansa.ui.RecordCrate(records, size = app.siansa.data.CrateSize.SMALL, namesOnCover = true)
                 }
             },
             Scene("crate_size_choice") {
-                Column(Modifier.padding(Space.Page)) { app.siansa.ui.CrateSizeChoice(compact = true) {} }
+                Column(Modifier.padding(Space.Page)) { app.siansa.ui.CrateSizeChoice(app.siansa.data.CrateSize.SMALL) {} }
             },
             // Under the row's cog: where the carousel's names go (the owner, 19 Nov).
             Scene("crate_names_choice") {

@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -88,10 +89,15 @@ fun RecordCrate(
     // Where it opens: the second, so there's one on each side (the owner, 17 Nov), unless there are only two.
     startAt: Int = if (records.size >= 3) 1 else 0,
     namesOnCover: Boolean = LocalCrateNamesOnCover.current,
-    compact: Boolean = LocalCrateCompact.current,
+    size: app.siansa.data.CrateSize = LocalCrateSize.current,
 ) {
-    val look = if (compact) CrateLook.COMPACT else CrateLook.BIG
     if (records.isEmpty()) return
+    if (size == app.siansa.data.CrateSize.SMALL) {
+        CrateStrip(records, namesOnCover, modifier)
+        return
+    }
+    val compact = size == app.siansa.data.CrateSize.COMPACT
+    val look = if (compact) CrateLook.COMPACT else CrateLook.BIG
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     val pager = rememberPagerState(initialPage = startAt.coerceIn(0, records.lastIndex)) { records.size }
     Column(modifier.fillMaxWidth().testTag("recordCrate"), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
@@ -159,8 +165,49 @@ fun RecordCrate(
     }
 }
 
-/** Whether the carousel of the row being drawn is the compact one (Arrange Home, the owner 20 Nov). */
-val LocalCrateCompact = androidx.compose.runtime.compositionLocalOf { false }
+/** The size of the carousel of the row being drawn (Arrange Home, the owner 20 Nov). */
+val LocalCrateSize = androidx.compose.runtime.compositionLocalOf { app.siansa.data.CrateSize.BIG }
+
+/**
+ * The small carousel (the owner, 20 Nov): a strip of squares flicked like any row of covers, settling on a square's
+ * edge, every one in full and each with its own name and line, under it or on it ([namesOnCover]). No front one,
+ * so nothing is dimmed; the same sleeves, fade and words as the big carousel, a size smaller.
+ */
+@Composable
+private fun CrateStrip(records: List<CrateRecord>, namesOnCover: Boolean, modifier: Modifier) {
+    val state = androidx.compose.foundation.lazy.rememberLazyListState()
+    androidx.compose.foundation.lazy.LazyRow(
+        state = state,
+        modifier = modifier.fillMaxWidth().testTag("recordCrate"),
+        contentPadding = PaddingValues(horizontal = Space.Page),
+        horizontalArrangement = Arrangement.spacedBy(Space.Medium),
+        flingBehavior = androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior(state),
+    ) {
+        items(records.size, key = { records[it].key }) { i ->
+            val record = records[i]
+            Column(
+                Modifier
+                    .width(CRATE_STRIP)
+                    .clickable(onClickLabel = "Open ${record.name}", onClick = record.onOpen)
+                    .semantics { contentDescription = record.name },
+                verticalArrangement = Arrangement.spacedBy(Space.Small),
+            ) {
+                Sleeve(record, namesOnCover, true, Modifier.size(CRATE_STRIP))
+                if (!namesOnCover) {
+                    // Three lines on a narrow square, so a long name keeps its size before a word is cut.
+                    WholeWordsText(record.name, MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), maxLines = 3)
+                    if (record.caption.isNotBlank()) {
+                        Text(record.caption, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** A square of the small carousel: three and a bit in view on a phone. */
+private val CRATE_STRIP: Dp = 112.dp
 
 /** The two carousels' sizes: the front sleeve's part of the width and most, and how its neighbours step back. */
 private enum class CrateLook(val sleeve: Float, val most: Float, val shrink: Float, val dim: Float, val blur: Dp) {
