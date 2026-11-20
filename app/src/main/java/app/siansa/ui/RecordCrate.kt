@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
@@ -234,15 +235,7 @@ private fun Sleeve(record: CrateRecord, nameOnIt: Boolean, compact: Boolean, mod
             .background(Brush.linearGradient(listOf(colors.first, colors.second)))
             .testTag("crateSleeve"),
     ) {
-        val covers = record.covers.filterNotNull().distinct()
-        when {
-            covers.size >= 4 -> Column(Modifier.fillMaxSize()) {
-                for (row in 0..1) Row(Modifier.weight(1f).fillMaxWidth()) {
-                    for (col in 0..1) Cover(covers[row * 2 + col], 300, Modifier.weight(1f).fillMaxSize(), RoundedCornerShape(0.dp))
-                }
-            }
-            covers.isNotEmpty() -> Cover(covers.first(), 600, Modifier.fillMaxSize(), RoundedCornerShape(0.dp))
-        }
+        CardPicture(record.covers, null, colors, record.name, Modifier.fillMaxSize(), RectangleShape, 600)
         if (nameOnIt) {
             Column(
                 Modifier

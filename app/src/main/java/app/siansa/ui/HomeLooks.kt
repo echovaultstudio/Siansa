@@ -184,13 +184,7 @@ private fun NamedSquare(item: HomeItem, featured: Boolean, modifier: Modifier) {
             .semantics(mergeDescendants = true) {}
             .testTag(if (featured) "homeFeatured" else "homeCoverGridCell"),
     ) {
-        val mosaic = item.mosaic.filterNotNull().distinct()
-        val square = Modifier.fillMaxWidth().aspectRatio(1f)
-        when {
-            mosaic.size >= 4 -> CoverMosaic(mosaic, square)
-            item.coverArt != null -> Cover(item.coverArt, if (featured) 600 else 300, square, RoundedCornerShape(0.dp))
-            else -> Box(square.background(Brush.linearGradient(listOf(item.colors.first, item.colors.second))))
-        }
+        CardPicture(item.mosaic, item.coverArt, item.colors, item.title, Modifier.fillMaxWidth().aspectRatio(1f), RoundedCornerShape(0.dp), if (featured) 600 else 300)
         Column(
             Modifier
                 .align(Alignment.BottomStart)
@@ -246,13 +240,7 @@ fun HomeHero(
             Text(title.uppercase(), style = MaterialTheme.typography.labelMedium.copy(letterSpacing = androidx.compose.ui.unit.TextUnit(1.5f, androidx.compose.ui.unit.TextUnitType.Sp)),
                 fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.8f))
             Row(horizontalArrangement = Arrangement.spacedBy(Space.Page), verticalAlignment = Alignment.Bottom) {
-                val mosaic = item.mosaic.filterNotNull().distinct()
-                val art = Modifier.size(HERO_COVER).clip(RoundedCornerShape(8.dp))
-                when {
-                    mosaic.size >= 4 -> CoverMosaic(mosaic, art)
-                    item.coverArt != null -> Cover(item.coverArt, 600, art, RoundedCornerShape(8.dp))
-                    else -> Box(art.background(Brush.linearGradient(listOf(item.colors.first, item.colors.second))))
-                }
+                CardPicture(item.mosaic, item.coverArt, item.colors, item.title, Modifier.size(HERO_COVER), RoundedCornerShape(8.dp), 600)
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
                     WholeWordsText(item.title, MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.ExtraBold), color = Color.White, maxLines = 3)
                     val line = listOf(item.subtitle, item.meta).filter { it.isNotBlank() }.joinToString(" · ")
@@ -289,16 +277,11 @@ private fun CoverGridCell(item: HomeItem, named: Boolean, modifier: Modifier) {
             .testTag("homeCoverGridCell"),
     ) {
         val square = Modifier.fillMaxWidth().aspectRatio(1f).clip(shape)
-        val mosaic = item.mosaic.filterNotNull().distinct()
         when {
-            mosaic.size >= 4 -> CoverMosaic(mosaic, square)
-            item.coverArt != null -> Cover(item.coverArt, 300, square, shape)
-            else -> Box(square.background(Brush.linearGradient(listOf(item.colors.first, item.colors.second))), contentAlignment = Alignment.BottomStart) {
-                // Its name on its colours only when it isn't under it, and not on a round one, where it would be cut.
-                if (named || item.round) return@Box
-                Text(item.title, color = Color.White, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold,
-                    maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(Space.Small))
-            }
+            // An artist keeps its round photo whatever the row's pictures.
+            item.round && item.coverArt != null -> Cover(item.coverArt, 300, square, shape)
+            item.round -> Box(square.background(Brush.linearGradient(listOf(item.colors.first, item.colors.second))))
+            else -> CardPicture(item.mosaic, item.coverArt, item.colors, item.title, square, shape, showName = !named)
         }
         if (named) {
             Text(item.title, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis,
@@ -356,7 +339,15 @@ private fun argb(c: Color): Long = c.toArgb().toLong() and 0xFFFFFFFFL
 
 @Composable
 private fun HomeItemTile(item: HomeItem) {
-    if (item.coverArt != null) {
+    if (item.mosaic.isNotEmpty() && !item.round) {
+        // A mix: its picture in the row's style, its name and line under it, as an album's tile has.
+        Column(Modifier.width(TILE).clickable(onClickLabel = "Open ${item.title}", onClick = item.open).testTag("homeLookTile")) {
+            CardPicture(item.mosaic, item.coverArt, item.colors, item.title, Modifier.fillMaxWidth().aspectRatio(1f))
+            Spacer(Modifier.height(Space.Small))
+            Text(item.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (item.subtitle.isNotBlank()) Text(item.subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    } else if (item.coverArt != null) {
         AlbumTile(item.title, item.subtitle, item.coverArt, item.open, Modifier.width(TILE).testTag("homeLookTile"), round = item.round)
     } else {
         GradientTile(title = item.title, colors = item.colors, onClick = item.open, size = TILE, modifier = Modifier.testTag("homeLookTile"))
@@ -367,7 +358,8 @@ private fun HomeItemTile(item: HomeItem) {
 @Composable
 private fun ItemArt(item: HomeItem, modifier: Modifier) {
     val shape = if (item.round) CircleShape else RoundedCornerShape(8.dp)
-    if (item.coverArt != null) Cover(item.coverArt, 300, modifier, shape)
+    if (!item.round) CardPicture(item.mosaic, item.coverArt, item.colors, item.title, modifier, shape)
+    else if (item.coverArt != null) Cover(item.coverArt, 300, modifier, shape)
     else Box(modifier.clip(shape).background(Brush.linearGradient(listOf(item.colors.first, item.colors.second))))
 }
 

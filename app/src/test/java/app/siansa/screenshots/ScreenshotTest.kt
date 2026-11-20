@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+
 package app.siansa.screenshots
 
 import androidx.compose.material.icons.rounded.Favorite
@@ -97,6 +99,7 @@ import app.siansa.ui.icon
 import app.siansa.ui.playerColors
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.material3.Text
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.graphics.lerp
@@ -445,6 +448,36 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     app.siansa.ui.HomeHero("Made for you", items.first(), play = {}, rowSongs = emptyList()) { _, _ -> }
                     app.siansa.ui.HomeFeaturedGrid("Made for you", items)
                 }
+            },
+            // A card's picture in each style (the owner, 20 Nov), with covers drawn as colours: no server here.
+            Scene("card_pictures") {
+                val fakes = mapOf(
+                    "a" to (Color(0xFFE8D44D) to Color(0xFFB8860B)), "b" to (Color(0xFF1F6F78) to Color(0xFF0B2B30)),
+                    "c" to (Color(0xFFF2F2F3) to Color(0xFF9A9AA0)), "d" to (Color(0xFFC2185B) to Color(0xFF4A0A24)),
+                )
+                val draw: app.siansa.ui.CoverDraw = { id, _, modifier, shape, filter ->
+                    val c = fakes[id] ?: (Color.DarkGray to Color.Black)
+                    Box(modifier.clip(shape).drawBehind { drawRect(Brush.linearGradient(listOf(c.first, c.second)), colorFilter = filter) })
+                }
+                val covers = listOf("b", "b", "b", "a", "c", "d")
+                androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalCoverDraw provides draw) {
+                    androidx.compose.foundation.layout.FlowRow(Modifier.padding(Space.Page), horizontalArrangement = Arrangement.spacedBy(Space.Medium), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
+                        for (style in app.siansa.data.PictureStyle.entries) {
+                            Column(Modifier.width(104.dp), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
+                                app.siansa.ui.CardPicture(covers, null, Color(0xFF5B2A86) to Color(0xFF1E1E22), "Neo-Classical Downtempo Velvet Undertow",
+                                    Modifier.size(104.dp), style = style, showName = true)
+                                Text(style.label, style = MaterialTheme.typography.labelMedium)
+                            }
+                        }
+                        Column(Modifier.width(104.dp), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
+                            app.siansa.ui.CardPicture(emptyList(), null, Color(0xFF5B2A86) to Color(0xFF1E1E22), "No covers yet", Modifier.size(104.dp), style = app.siansa.data.PictureStyle.GLOW, showName = true)
+                            Text("No covers", style = MaterialTheme.typography.labelMedium)
+                        }
+                    }
+                }
+            },
+            Scene("picture_choice") {
+                Column(Modifier.padding(Space.Page)) { app.siansa.ui.PictureChoice(app.siansa.data.PictureStyle.DUOTONE) {} }
             },
             // The small carousel (the owner, 20 Nov): a strip of squares, names under each or on each.
             Scene("record_crate_small") {

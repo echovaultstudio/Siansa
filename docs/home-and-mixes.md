@@ -69,6 +69,13 @@ added and Random picks in order. Sections of radios, playlists, genres, books an
 choices, Shortcuts and Siansa Beats' rows too. **Your cards** keep their own looks, set with each card: their cog has
 the title and colour, and **Your cards in Settings** opens **Settings › Home page › Cards**.
 
+The same cog has **Pictures**: how its cards' pictures show. **Auto** (the default) shows four covers two by two only
+when they sit well together, and otherwise the cover most of its songs have. Or pick one for the row: **Mosaic** (four
+covers), **One cover** (its top album), **Colour** (its colours, with its name where nothing else shows it), **Glow**
+(one cover, small, on a soft light in its own colours), **Duotone** (its cover in two tones of one colour) or **Stack**
+(three covers fanned out). A card without enough covers for its style shows one cover, or its colours when it has none.
+An artist keeps its round photo.
+
 The same cog has **Show its title**: turn it off and the section shows without the heading above it ("Your evening",
 "Recently played"), keeping the gap where it was. And its **Colour**: a card shows the section's cards in the chosen
 look, and **As Home** follows the choice made under Cards, or pick one for this section alone. For Shortcuts, As Home

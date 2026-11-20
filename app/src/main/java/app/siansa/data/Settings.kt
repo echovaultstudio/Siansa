@@ -232,6 +232,8 @@ data class AppSettings(
     val homeCoverGrids: Map<HomeSection, CoverGridSize> = emptyMap(),
     /** Each row's way of laying out its look ([LookVariant], the owner, 20 Nov): shortcut tiles, featured, hero. */
     val homeVariants: Map<HomeSection, LookVariant> = emptyMap(),
+    /** How each row's card pictures show (the owner, 20 Nov); a row not in it is [PictureStyle.AUTO]. */
+    val homePictures: Map<HomeSection, PictureStyle> = emptyMap(),
     /** The gap between Home's sections (#554), as a step of the spacing scale: 0 tight … 4 airy. 2 is the default. */
     val homeGap: Int = HOME_GAP_DEFAULT,
     /** Show only music on the phone, across the whole app (issue #141). */
@@ -546,6 +548,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         homeCardLooks = CardLook.parse(prefs.getString("home_card_looks", null)),
         homeCoverGrids = CoverGridSize.parse(prefs.getString("home_cover_grid_sizes", null)),
         homeVariants = LookVariant.parse(prefs.getString("home_variants", null)),
+        homePictures = PictureStyle.parse(prefs.getString("home_pictures", null)),
         homeGridSizes = HomeLook.parseGridSizes(prefs.getString("home_grid_sizes", null)),
         homeUntitled = HomeSection.parseHidden(prefs.getString("home_untitled", null)),
         homeCarouselOnCover = HomeSection.parseHidden(prefs.getString("home_carousel_on_cover", null)),
@@ -910,6 +913,13 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         _state.value = _state.value.copy(homeVariants = variants)
     }
 
+    /** How [section]'s card pictures show (the owner, 20 Nov). */
+    fun setHomePicture(section: HomeSection, style: PictureStyle) {
+        val styles = _state.value.homePictures + (section to style)
+        prefs.edit().putString("home_pictures", PictureStyle.format(styles)).apply()
+        _state.value = _state.value.copy(homePictures = styles - styles.filterValues { it == PictureStyle.AUTO }.keys)
+    }
+
     /** The columns and rows of [section] as a cover grid (#1263). */
     fun setHomeCoverGrid(section: HomeSection, size: CoverGridSize) {
         val sizes = _state.value.homeCoverGrids + (section to size)
@@ -919,8 +929,8 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
 
     /** Every row back in its own look, and every card in Home's colour. */
     fun resetHomeLooks() {
-        prefs.edit().remove("home_looks").remove("home_grid_sizes").remove("home_card_look").remove("home_card_looks").remove("home_carousel_on_cover").remove("home_carousel_compact").remove("home_carousel_small").remove("home_cover_grid_sizes").remove("home_variants").apply()
-        _state.value = _state.value.copy(homeLooks = emptyMap(), homeGridSizes = emptyMap(), homeCardLook = CardLook.DEFAULT, homeCardLooks = emptyMap(), homeCarouselOnCover = emptySet(), homeCarouselCompact = emptySet(), homeCarouselSmall = emptySet(), homeCoverGrids = emptyMap(), homeVariants = emptyMap())
+        prefs.edit().remove("home_looks").remove("home_grid_sizes").remove("home_card_look").remove("home_card_looks").remove("home_carousel_on_cover").remove("home_carousel_compact").remove("home_carousel_small").remove("home_cover_grid_sizes").remove("home_variants").remove("home_pictures").apply()
+        _state.value = _state.value.copy(homeLooks = emptyMap(), homeGridSizes = emptyMap(), homeCardLook = CardLook.DEFAULT, homeCardLooks = emptyMap(), homeCarouselOnCover = emptySet(), homeCarouselCompact = emptySet(), homeCarouselSmall = emptySet(), homeCoverGrids = emptyMap(), homeVariants = emptyMap(), homePictures = emptyMap())
     }
 
     /** How every coloured card on Home is painted (the owner, 13 Nov). */

@@ -117,12 +117,8 @@ fun BeatsMixesHome(nav: NavController, shelves: Set<String>, look: HomeLook) {
 internal fun MixMosaicTile(record: CrateRecord) {
     Column(Modifier.width(MOSAIC_TILE).clickable(onClickLabel = "Open ${record.name}", onClick = record.onOpen).padding(LocalTileInset.current).testTag("mixMosaicTile")) {
         val square = Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(8.dp))
-        if (record.covers.any { it != null }) CoverMosaic(record.covers, square)
-        else {
-            // No cover known yet: its colours, as the sleeve has.
-            val colors = remember(record.key) { tileColors(record.key) }
-            androidx.compose.foundation.layout.Box(square.background(Brush.linearGradient(listOf(colors.first, colors.second))))
-        }
+        val colors = remember(record.key, record.colors) { record.colors ?: tileColors(record.key) }
+        CardPicture(record.covers, null, colors, record.name, square)
         androidx.compose.foundation.layout.Spacer(Modifier.height(Space.Small))
         Text(record.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
         if (record.caption.isNotBlank()) {

@@ -238,3 +238,33 @@ enum class LookVariant(val id: String, val label: String, val look: HomeLook) {
             HomeSection.entries.mapNotNull { s -> variants[s]?.let { "${s.id}:${it.id}" } }.joinToString(",")
     }
 }
+
+/**
+ * How a card's picture shows (the owner, 20 Nov: "some do not look good with the cover mosaic"), per row, under its cog
+ * in Arrange Home. [AUTO] is how it was: four covers two by two, now only when they sit well together.
+ */
+enum class PictureStyle(val id: String, val label: String, val blurb: String) {
+    AUTO("auto", "Auto", "Mosaic when its covers sit well together, else one cover"),
+    MOSAIC("mosaic", "Mosaic", "Four covers"),
+    COVER("cover", "One cover", "Its top album"),
+    COLOUR("colour", "Colour", "Its colours and name"),
+    GLOW("glow", "Glow", "One cover on its own light"),
+    DUOTONE("duotone", "Duotone", "Its cover in two tones"),
+    STACK("stack", "Stack", "Three covers fanned out");
+
+    companion object {
+        /** Reads the saved styles ("made_for_you:glow,quick:colour"); unknown sections and styles are dropped. */
+        fun parse(saved: String?): Map<HomeSection, PictureStyle> {
+            if (saved.isNullOrBlank()) return emptyMap()
+            return saved.split(',').mapNotNull { pair ->
+                val (section, id) = pair.split(':').takeIf { it.size == 2 } ?: return@mapNotNull null
+                val s = HomeSection.entries.firstOrNull { it.id == section.trim() } ?: return@mapNotNull null
+                val v = entries.firstOrNull { it.id == id.trim() } ?: return@mapNotNull null
+                s to v
+            }.toMap()
+        }
+
+        fun format(styles: Map<HomeSection, PictureStyle>): String =
+            HomeSection.entries.mapNotNull { s -> styles[s]?.takeIf { it != AUTO }?.let { "${s.id}:${it.id}" } }.joinToString(",")
+    }
+}

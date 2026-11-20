@@ -335,6 +335,8 @@ fun Cover(
     size: Int?,
     modifier: Modifier = Modifier,
     shape: Shape = RoundedCornerShape(8.dp),
+    // A card picture in two tones (PictureStyle.DUOTONE); null draws it as it is.
+    colorFilter: androidx.compose.ui.graphics.ColorFilter? = null,
 ) {
     val graph = LocalGraph.current
     // An artist's picture as looked up this run (ArtistPhotos), wherever it shows: their page, Fans also like, Home,
@@ -389,6 +391,7 @@ fun Cover(
                 painter = remember(cached) { cached.asPainter(context) },
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
+                colorFilter = colorFilter,
                 modifier = Modifier.fillMaxSize(),
             )
             request != null -> {
@@ -397,6 +400,7 @@ fun Cover(
                         painter = remember(standIn) { standIn.asPainter(context) },
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
+                colorFilter = colorFilter,
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
@@ -405,6 +409,7 @@ fun Cover(
                     model = request,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
+                colorFilter = colorFilter,
                     modifier = Modifier.fillMaxSize(),
                 )
             }
