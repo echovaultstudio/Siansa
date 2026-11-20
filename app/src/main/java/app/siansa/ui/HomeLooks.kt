@@ -66,7 +66,11 @@ data class HomeItem(
     val mosaic: List<String?> = emptyList(),
     /** Its songs, when known: a hero's Play and Shuffle play them (the owner, 20 Nov). */
     val songs: List<Song> = emptyList(),
-)
+    /** Its songs' ids, for its colours by mood (the owner, 20 Nov); its [songs]' when not given. */
+    val songIdList: List<String> = emptyList(),
+) {
+    val songIds: List<String> get() = songIdList.ifEmpty { songs.map { it.id } }
+}
 
 /**
  * A row of Home in one of the custom cards' looks (issue #655), for rows that aren't [HomeLook.AS_IS]:
@@ -184,20 +188,23 @@ private fun NamedSquare(item: HomeItem, featured: Boolean, modifier: Modifier) {
             .semantics(mergeDescendants = true) {}
             .testTag(if (featured) "homeFeatured" else "homeCoverGridCell"),
     ) {
-        CardPicture(item.mosaic, item.coverArt, item.colors, item.title, Modifier.fillMaxWidth().aspectRatio(1f), RoundedCornerShape(0.dp), if (featured) 600 else 300)
-        Column(
-            Modifier
-                .align(Alignment.BottomStart)
-                .fillMaxWidth()
-                .background(Brush.verticalGradient(0f to Color.Transparent, 0.35f to Color.Black.copy(alpha = 0.45f), 1f to Color.Black.copy(alpha = 0.85f)))
-                .padding(start = Space.Small, end = Space.Small, top = if (featured) Space.Large else Space.Section, bottom = Space.Small),
-            verticalArrangement = Arrangement.spacedBy(Space.Tight),
-        ) {
-            WholeWordsText(item.title, (if (featured) MaterialTheme.typography.titleMedium else MaterialTheme.typography.labelLarge).copy(fontWeight = FontWeight.ExtraBold),
-                color = Color.White, maxLines = if (featured) 2 else 3)
-            val line = item.subtitle.ifBlank { item.meta }
-            if (featured && line.isNotBlank()) {
-                Text(line, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.82f), maxLines = 2, overflow = TextOverflow.Ellipsis)
+        CardPicture(item.mosaic, item.coverArt, item.colors, item.title, Modifier.fillMaxWidth().aspectRatio(1f), RoundedCornerShape(0.dp), if (featured) 600 else 300,
+            songIds = item.songIds) { paint ->
+            Column(
+                Modifier
+                    .align(Alignment.BottomStart)
+                    .fillMaxWidth()
+                    // Its own deep shade, easing in (the owner, 20 Nov).
+                    .background(nameFade(paint.deep))
+                    .padding(start = Space.Small, end = Space.Small, top = if (featured) Space.Large else Space.Section, bottom = Space.Small),
+                verticalArrangement = Arrangement.spacedBy(Space.Tight),
+            ) {
+                WholeWordsText(item.title, (if (featured) MaterialTheme.typography.titleMedium else MaterialTheme.typography.labelLarge).copy(fontWeight = FontWeight.ExtraBold),
+                    color = Color.White, maxLines = if (featured) 2 else 3)
+                val line = item.subtitle.ifBlank { item.meta }
+                if (featured && line.isNotBlank()) {
+                    Text(line, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.82f), maxLines = 2, overflow = TextOverflow.Ellipsis)
+                }
             }
         }
     }
@@ -240,7 +247,7 @@ fun HomeHero(
             Text(title.uppercase(), style = MaterialTheme.typography.labelMedium.copy(letterSpacing = androidx.compose.ui.unit.TextUnit(1.5f, androidx.compose.ui.unit.TextUnitType.Sp)),
                 fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.8f))
             Row(horizontalArrangement = Arrangement.spacedBy(Space.Page), verticalAlignment = Alignment.Bottom) {
-                CardPicture(item.mosaic, item.coverArt, item.colors, item.title, Modifier.size(HERO_COVER), RoundedCornerShape(8.dp), 600)
+                CardPicture(item.mosaic, item.coverArt, item.colors, item.title, Modifier.size(HERO_COVER), RoundedCornerShape(8.dp), 600, songIds = item.songIds)
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
                     WholeWordsText(item.title, MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.ExtraBold), color = Color.White, maxLines = 3)
                     val line = listOf(item.subtitle, item.meta).filter { it.isNotBlank() }.joinToString(" · ")
@@ -281,7 +288,7 @@ private fun CoverGridCell(item: HomeItem, named: Boolean, modifier: Modifier) {
             // An artist keeps its round photo whatever the row's pictures.
             item.round && item.coverArt != null -> Cover(item.coverArt, 300, square, shape)
             item.round -> Box(square.background(Brush.linearGradient(listOf(item.colors.first, item.colors.second))))
-            else -> CardPicture(item.mosaic, item.coverArt, item.colors, item.title, square, shape, showName = !named)
+            else -> CardPicture(item.mosaic, item.coverArt, item.colors, item.title, square, shape, showName = !named, songIds = item.songIds)
         }
         if (named) {
             Text(item.title, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis,
@@ -342,7 +349,7 @@ private fun HomeItemTile(item: HomeItem) {
     if (item.mosaic.isNotEmpty() && !item.round) {
         // A mix: its picture in the row's style, its name and line under it, as an album's tile has.
         Column(Modifier.width(TILE).clickable(onClickLabel = "Open ${item.title}", onClick = item.open).testTag("homeLookTile")) {
-            CardPicture(item.mosaic, item.coverArt, item.colors, item.title, Modifier.fillMaxWidth().aspectRatio(1f))
+            CardPicture(item.mosaic, item.coverArt, item.colors, item.title, Modifier.fillMaxWidth().aspectRatio(1f), songIds = item.songIds)
             Spacer(Modifier.height(Space.Small))
             Text(item.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (item.subtitle.isNotBlank()) Text(item.subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -358,7 +365,7 @@ private fun HomeItemTile(item: HomeItem) {
 @Composable
 private fun ItemArt(item: HomeItem, modifier: Modifier) {
     val shape = if (item.round) CircleShape else RoundedCornerShape(8.dp)
-    if (!item.round) CardPicture(item.mosaic, item.coverArt, item.colors, item.title, modifier, shape)
+    if (!item.round) CardPicture(item.mosaic, item.coverArt, item.colors, item.title, modifier, shape, songIds = item.songIds)
     else if (item.coverArt != null) Cover(item.coverArt, 300, modifier, shape)
     else Box(modifier.clip(shape).background(Brush.linearGradient(listOf(item.colors.first, item.colors.second))))
 }

@@ -38,21 +38,26 @@ class PictureStyleTest {
 
     @Test fun aStyleWithoutTheCoversForItFallsBack() {
         val none = { emptyList<Color?>() }
-        assertEquals(PictureStyle.MOSAIC, pictureShown(PictureStyle.MOSAIC, 4, true, none))
-        assertEquals(PictureStyle.COVER, pictureShown(PictureStyle.MOSAIC, 3, true, none))
-        assertEquals(PictureStyle.STACK, pictureShown(PictureStyle.STACK, 2, true, none))
-        assertEquals(PictureStyle.COVER, pictureShown(PictureStyle.STACK, 1, true, none))
-        assertEquals(PictureStyle.COLOUR, pictureShown(PictureStyle.GLOW, 0, false, none))
-        assertEquals(PictureStyle.COLOUR, pictureShown(PictureStyle.COLOUR, 4, true, none))
+        assertEquals(PictureStyle.MOSAIC, pictureShown(PictureStyle.MOSAIC, 4, true, tones = none))
+        assertEquals(PictureStyle.COVER, pictureShown(PictureStyle.MOSAIC, 3, true, tones = none))
+        assertEquals(PictureStyle.STACK, pictureShown(PictureStyle.STACK, 2, true, tones = none))
+        assertEquals(PictureStyle.COVER, pictureShown(PictureStyle.STACK, 1, true, tones = none))
+        assertEquals(PictureStyle.COLOUR, pictureShown(PictureStyle.GLOW, 0, false, tones = none))
+        assertEquals(PictureStyle.COLOUR, pictureShown(PictureStyle.COLOUR, 4, true, tones = none))
+        assertEquals(PictureStyle.PILE, pictureShown(PictureStyle.PILE, 2, true, tones = none))
+        assertEquals(PictureStyle.COVER, pictureShown(PictureStyle.CUTOUTS, 1, true, tones = none))
     }
 
     @Test fun autoTakesTheMosaicOnlyWhenItsCoversSitWell() {
         val blues = { listOf<Color?>(Color(0xFF1F4F78), Color(0xFF2A6F9A), Color(0xFF1F6F78), Color(0xFF203A60)) }
         val clash = { listOf<Color?>(Color(0xFFE8D44D), Color(0xFF1F6F78), Color(0xFFF2F2F3), Color(0xFFC2185B)) }
-        assertEquals(PictureStyle.MOSAIC, pictureShown(PictureStyle.AUTO, 4, true, blues))
-        assertEquals(PictureStyle.COVER, pictureShown(PictureStyle.AUTO, 4, true, clash))
-        assertEquals(PictureStyle.COVER, pictureShown(PictureStyle.AUTO, 2, true, blues))
-        assertEquals(PictureStyle.COLOUR, pictureShown(PictureStyle.AUTO, 0, false, blues))
+        assertEquals(PictureStyle.MOSAIC, pictureShown(PictureStyle.AUTO, 4, true, tones = blues))
+        // Clashing covers, or all one album: Glow, not one flat cover (the owner, 20 Nov).
+        assertEquals(PictureStyle.GLOW, pictureShown(PictureStyle.AUTO, 4, true, tones = clash))
+        assertEquals(PictureStyle.GLOW, pictureShown(PictureStyle.AUTO, 1, true, tones = blues))
+        // An album keeps its cover.
+        assertEquals(PictureStyle.COVER, pictureShown(PictureStyle.AUTO, 1, true, mix = false, tones = blues))
+        assertEquals(PictureStyle.COLOUR, pictureShown(PictureStyle.AUTO, 0, false, tones = blues))
     }
 
     @Test fun whatSitsWell() {

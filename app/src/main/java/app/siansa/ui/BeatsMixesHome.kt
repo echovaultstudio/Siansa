@@ -118,7 +118,7 @@ internal fun MixMosaicTile(record: CrateRecord) {
     Column(Modifier.width(MOSAIC_TILE).clickable(onClickLabel = "Open ${record.name}", onClick = record.onOpen).padding(LocalTileInset.current).testTag("mixMosaicTile")) {
         val square = Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(8.dp))
         val colors = remember(record.key, record.colors) { record.colors ?: tileColors(record.key) }
-        CardPicture(record.covers, null, colors, record.name, square)
+        CardPicture(record.covers, null, colors, record.name, square, songIds = remember(record.songs) { record.songs.map { it.id } })
         androidx.compose.foundation.layout.Spacer(Modifier.height(Space.Small))
         Text(record.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
         if (record.caption.isNotBlank()) {

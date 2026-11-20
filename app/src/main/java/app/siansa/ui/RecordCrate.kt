@@ -235,13 +235,15 @@ private fun Sleeve(record: CrateRecord, nameOnIt: Boolean, compact: Boolean, mod
             .background(Brush.linearGradient(listOf(colors.first, colors.second)))
             .testTag("crateSleeve"),
     ) {
-        CardPicture(record.covers, null, colors, record.name, Modifier.fillMaxSize(), RectangleShape, 600)
-        if (nameOnIt) {
+        val ids = remember(record.songs) { record.songs.map { it.id } }
+        CardPicture(record.covers, null, colors, record.name, Modifier.fillMaxSize(), RectangleShape, 600, songIds = ids) { paint ->
+            if (!nameOnIt) return@CardPicture
             Column(
                 Modifier
                     .align(Alignment.BottomStart)
                     .fillMaxWidth()
-                    .background(Brush.verticalGradient(0f to Color.Transparent, 0.35f to Color.Black.copy(alpha = 0.45f), 1f to Color.Black.copy(alpha = 0.85f)))
+                    // Its own deep shade, easing in (the owner, 20 Nov: not a grey-black fade with a line).
+                    .background(nameFade(paint.deep))
                     .padding(
                         start = if (compact) Space.Small else Space.Medium, end = if (compact) Space.Small else Space.Medium,
                         top = if (compact) Space.Section else Space.Large, bottom = if (compact) Space.Small else Space.Medium,

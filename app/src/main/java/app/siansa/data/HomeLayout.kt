@@ -250,7 +250,10 @@ enum class PictureStyle(val id: String, val label: String, val blurb: String) {
     COLOUR("colour", "Colour", "Its colours and name"),
     GLOW("glow", "Glow", "One cover on its own light"),
     DUOTONE("duotone", "Duotone", "Its cover in two tones"),
-    STACK("stack", "Stack", "Three covers fanned out");
+    STACK("stack", "Stack", "Three covers fanned out"),
+    PILE("pile", "Stickers", "Its covers stuck on at angles"),
+    TAPED("taped", "Taped", "Its covers taped on paper"),
+    CUTOUTS("cutouts", "Cut-outs", "Circles and squares, like a scrapbook");
 
     companion object {
         /** Reads the saved styles ("made_for_you:glow,quick:colour"); unknown sections and styles are dropped. */
@@ -266,5 +269,37 @@ enum class PictureStyle(val id: String, val label: String, val blurb: String) {
 
         fun format(styles: Map<HomeSection, PictureStyle>): String =
             HomeSection.entries.mapNotNull { s -> styles[s]?.takeIf { it != AUTO }?.let { "${s.id}:${it.id}" } }.joinToString(",")
+    }
+}
+
+/**
+ * Where a row's picture colours come from (the owner, 20 Nov: "it doesn't always need to come from the covers"): its
+ * covers' own, made brighter; the moods of its songs; or a set of colours. Each card of a set takes one of its pairs.
+ */
+enum class PictureColours(val id: String, val label: String) {
+    COVERS("covers", "From covers"),
+    MOOD("mood", "By mood"),
+    SIANSA("siansa", "Siansa"),
+    SUNSET("sunset", "Sunset"),
+    OCEAN("ocean", "Ocean"),
+    FOREST("forest", "Forest"),
+    NEON("neon", "Neon"),
+    PASTEL("pastel", "Pastel"),
+    MONO("mono", "Mono");
+
+    companion object {
+        /** Reads the saved choices ("made_for_you:mood,quick:neon"); unknown sections and sets are dropped. */
+        fun parse(saved: String?): Map<HomeSection, PictureColours> {
+            if (saved.isNullOrBlank()) return emptyMap()
+            return saved.split(',').mapNotNull { pair ->
+                val (section, id) = pair.split(':').takeIf { it.size == 2 } ?: return@mapNotNull null
+                val s = HomeSection.entries.firstOrNull { it.id == section.trim() } ?: return@mapNotNull null
+                val v = entries.firstOrNull { it.id == id.trim() } ?: return@mapNotNull null
+                s to v
+            }.toMap()
+        }
+
+        fun format(chosen: Map<HomeSection, PictureColours>): String =
+            HomeSection.entries.mapNotNull { s -> chosen[s]?.takeIf { it != COVERS }?.let { "${s.id}:${it.id}" } }.joinToString(",")
     }
 }
