@@ -3,8 +3,6 @@ package app.siansa.ui
 import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
@@ -68,11 +66,6 @@ internal fun setPaint(colours: PictureColours, key: String): PicturePaint? {
 private val SETS: Map<PictureColours, List<Pair<Long, Long>>> = mapOf(
     // Siansa's own: amber, frost and black.
     PictureColours.SIANSA to listOf(0xFFFFB547 to 0xFFD8E3EC, 0xFFFFB547 to 0xFFB5793A, 0xFFD8E3EC to 0xFF6F86A0),
-    PictureColours.SUNSET to listOf(0xFFFFB15C to 0xFFE0457B, 0xFFFF8A5C to 0xFFC2367A, 0xFFFFC861 to 0xFFF0543A),
-    PictureColours.OCEAN to listOf(0xFF5EC8F2 to 0xFF2F5FD0, 0xFF4FE0D0 to 0xFF2F7FD0, 0xFF7FB8FF to 0xFF3E4AC8),
-    PictureColours.FOREST to listOf(0xFF9BD67A to 0xFF2FA38F, 0xFFC8E070 to 0xFF3E8E4A, 0xFF7FD18A to 0xFF1F7F6A),
-    PictureColours.NEON to listOf(0xFF39F0C8 to 0xFFFF3CAC, 0xFFFF3CAC to 0xFF7B5CFF, 0xFFF0F03C to 0xFF3CC8FF),
-    PictureColours.PASTEL to listOf(0xFFFFD1DC to 0xFFBDE0FE, 0xFFCDB4DB to 0xFFFFC8DD, 0xFFB9FBC0 to 0xFFA3C4F3),
     PictureColours.MONO to listOf(0xFFF2F2F3 to 0xFF8A8A90, 0xFFC8C8CC to 0xFF5A5A60),
 )
 
@@ -185,15 +178,18 @@ object MoodColourStore {
 /** Reads a mix's mood colours ([MoodColourStore.read]); none in screenshot scenes, which have no server. */
 val LocalMoodReader = staticCompositionLocalOf<(suspend (String, List<String>) -> Unit)?> { null }
 
-/** The mood colours of the mix of [songIds], read when not known yet; null until then, or when none can be had. */
+/**
+ * The mood colours of the mix of [songIds], read when not known yet. Held as they were when the card came on screen,
+ * so it doesn't change colour while it's seen (the owner, 20 Nov: "the colour cards flicker when moving"); colours read
+ * meanwhile show the next time it comes on screen.
+ */
 @Composable
 internal fun rememberMoodPaint(songIds: List<String>): PicturePaint? {
     val reader = LocalMoodReader.current
     if (songIds.isEmpty()) return null
     val key = remember(songIds) { MoodColourStore.key(songIds) }
-    val version by MoodColourStore.version.collectAsState()
     if (reader != null) LaunchedEffect(key) { reader(key, songIds) }
-    return remember(key, version) { MoodColourStore.get(key) }
+    return remember(key) { MoodColourStore.get(key) }
 }
 
 /** [c] as hue (0 to 360), saturation and lightness (0 to 1). */

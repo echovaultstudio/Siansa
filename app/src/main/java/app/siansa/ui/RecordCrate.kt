@@ -236,7 +236,7 @@ private fun Sleeve(record: CrateRecord, nameOnIt: Boolean, compact: Boolean, mod
             .testTag("crateSleeve"),
     ) {
         val ids = remember(record.songs) { record.songs.map { it.id } }
-        CardPicture(record.covers, null, colors, record.name, Modifier.fillMaxSize(), RectangleShape, 600, songIds = ids) { paint ->
+        CardPicture(record.covers, null, colors, record.name, Modifier.fillMaxSize(), RectangleShape, 600, nameOver = nameOnIt, songIds = ids) { paint ->
             if (!nameOnIt) return@CardPicture
             Column(
                 Modifier

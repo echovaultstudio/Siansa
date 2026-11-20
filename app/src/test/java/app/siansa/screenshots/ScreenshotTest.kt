@@ -489,7 +489,7 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                             androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalPictureColours provides set) {
                                 Column(Modifier.width(104.dp), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
                                     app.siansa.ui.CardPicture(listOf("b", "a", "c", "d"), null, Color(0xFF6B5E4E) to Color(0xFF3B3328), "Dusty Roads",
-                                        Modifier.size(104.dp), style = app.siansa.data.PictureStyle.COLOUR, showName = true)
+                                        Modifier.size(104.dp), style = app.siansa.data.PictureStyle.INK, showName = true)
                                     Text(set.label, style = MaterialTheme.typography.labelMedium)
                                 }
                             }
@@ -501,7 +501,7 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                 Column(Modifier.padding(Space.Page)) { app.siansa.ui.PictureColoursChoice(app.siansa.data.PictureColours.MOOD) {} }
             },
             Scene("picture_choice") {
-                Column(Modifier.padding(Space.Page)) { app.siansa.ui.PictureChoice(app.siansa.data.PictureStyle.DUOTONE) {} }
+                Column(Modifier.padding(Space.Page)) { app.siansa.ui.PictureChoice(app.siansa.data.PictureStyle.FROST) {} }
             },
             // The small carousel (the owner, 20 Nov): a strip of squares, names under each or on each.
             Scene("record_crate_small") {

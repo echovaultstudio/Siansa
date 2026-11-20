@@ -770,7 +770,7 @@ internal fun PictureColoursChoice(colours: app.siansa.data.PictureColours, modif
             when (colours) {
                 app.siansa.data.PictureColours.COVERS -> "Its covers' colours, made brighter."
                 app.siansa.data.PictureColours.MOOD -> "Its songs' moods, from Siansa Beats or AudioMuse-AI. Brighter the more energetic."
-                else -> "Each card takes one pair of the set. None comes out dull."
+                else -> "Each card takes one pair of the set."
             },
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

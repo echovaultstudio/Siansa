@@ -34,7 +34,7 @@ class PicturePaintTest {
     }
 
     @Test fun aSetGivesACardTheSamePairEveryTime() {
-        assertEquals(setPaint(PictureColours.OCEAN, "Night Drive"), setPaint(PictureColours.OCEAN, "Night Drive"))
+        assertEquals(setPaint(PictureColours.SIANSA, "Night Drive"), setPaint(PictureColours.SIANSA, "Night Drive"))
         assertNull(setPaint(PictureColours.COVERS, "Night Drive"))
         assertNull(setPaint(PictureColours.MOOD, "Night Drive"))
     }
@@ -61,10 +61,10 @@ class PicturePaintTest {
     @Test fun keptPerRowAndClearedByReset() {
         fun settings() = SettingsRepository(ApplicationProvider.getApplicationContext())
         settings().setHomePictureColours(HomeSection.MADE_FOR_YOU, PictureColours.MOOD)
-        settings().setHomePictureColours(HomeSection.QUICK, PictureColours.NEON)
+        settings().setHomePictureColours(HomeSection.QUICK, PictureColours.MONO)
         settings().setHomePictureColours(HomeSection.QUICK, PictureColours.COVERS)
         assertEquals(mapOf(HomeSection.MADE_FOR_YOU to PictureColours.MOOD), settings().state.value.homePictureColours)
-        assertEquals(mapOf(HomeSection.QUICK to PictureColours.PASTEL), PictureColours.parse("quick:pastel,nothing:neon"))
+        assertEquals(mapOf(HomeSection.QUICK to PictureColours.MONO), PictureColours.parse("quick:mono,nothing:siansa,made_for_you:neon"))
         settings().resetHomeLooks()
         assertEquals(emptyMap<HomeSection, PictureColours>(), settings().state.value.homePictureColours)
     }
