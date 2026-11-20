@@ -156,7 +156,8 @@ internal fun MixSettingsBody(
             }
         }
         HorizontalDivider()
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
+        // The two buttons wrap onto two lines rather than squeeze one onto two lines of its own.
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.Medium), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
             OutlinedButton(onClick = { save(d.settings.associate { it.name to it.default }, null) }, modifier = Modifier.testTag("mixSettingsReset")) {
                 Text("As they come")
             }
