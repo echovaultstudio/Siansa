@@ -50,7 +50,7 @@ import kotlinx.coroutines.withContext
  * **Made for you** (the kinds of music you play most) and **More of you** (On repeat, Rediscover, New for you).
  *
  * Each stands in a row of Arrange Home and follows it (the owner, 17 Nov: "you cannot change the mixes card type, it
- * needs to be possible"): For now in **Your mixes carousel**, Made for you and More of you in **Made for you**, so
+ * needs to be possible"): For now in **For now** (once Your mixes carousel), Made for you and More of you in **Made for you**, so
  * each row's place, whether it shows, its cards' colours and its look are the row's. "As it is" is the row of sleeves
  * to flick through ([RecordCrate]); any other look draws the mixes as that look does.
  */

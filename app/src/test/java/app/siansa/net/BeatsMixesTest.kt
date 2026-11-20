@@ -80,9 +80,12 @@ class BeatsMixesTest {
     @Test fun arrangeHomeSaysWhichRowsHoldThem() {
         assertEquals(emptyMap<app.siansa.data.HomeSection, String>(), app.siansa.ui.beatsRows(false))
         val rows = app.siansa.ui.beatsRows(true)
-        assertEquals("Siansa Beats: For now", rows[app.siansa.data.HomeSection.CAROUSEL])
-        assertEquals("Siansa Beats: Made for you", rows[app.siansa.data.HomeSection.MADE_FOR_YOU])
-        assertEquals("Siansa Beats: On repeat, Rediscover, New for you", rows[app.siansa.data.HomeSection.MORE_OF_YOU])
+        assertEquals("From Siansa Beats", rows[app.siansa.data.HomeSection.CAROUSEL])
+        assertEquals("From Siansa Beats", rows[app.siansa.data.HomeSection.MADE_FOR_YOU])
+        // The rows have Siansa Beats' names (the owner, 20 Nov).
+        assertEquals(listOf("For now", "Made for you", "More of you"),
+            listOf(app.siansa.data.HomeSection.CAROUSEL, app.siansa.data.HomeSection.MADE_FOR_YOU, app.siansa.data.HomeSection.MORE_OF_YOU).map { it.label })
+        assertEquals("From Siansa Beats: On repeat, Rediscover, New for you", rows[app.siansa.data.HomeSection.MORE_OF_YOU])
     }
 
     @Test fun twoRowsAskingAtOnceAskOnce() = runBlocking {
