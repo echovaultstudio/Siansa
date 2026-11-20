@@ -378,13 +378,8 @@ fun ArrangeHomeSheet(
                                     style = MaterialTheme.typography.bodyLarge,
                                     color = if (isHidden) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
                                 )
-                                // A row in another look says which (issue #655), and its cards' own colour; a hidden one says so.
-                                val shownLook = (if (section in holds) beatsLook(looks[section]) else looks[section])?.let { l ->
-                                    if (l == HomeLook.COVER_GRID) "${l.label} ${(coverGrids[section] ?: app.siansa.data.CoverGridSize.DEFAULT).label}" else l.label
-                                }
-                                    ?: if (section == HomeSection.CARDS) "Each its own look" else null
-                                val line = if (isHidden) "Hidden" else listOfNotNull(holds[section], shownLook, cardLooks[section]?.label).joinToString(" · ").ifEmpty { null }
-                                if (line != null) Text(line, style = MaterialTheme.typography.bodySmall, color = if (isHidden) MaterialTheme.colorScheme.onSurfaceVariant else Accent, modifier = Modifier.testTag("homeLookLabel"))
+                                // Only "Hidden" under a name: what a row holds and how it looks are under its cog (the owner, 20 Nov).
+                                if (isHidden) Text("Hidden", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.testTag("homeLookLabel"))
                             }
                             IconButton(onClick = {
                                 hiddenItems = if (isHidden) hiddenItems - section else hiddenItems + section
