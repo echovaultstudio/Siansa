@@ -55,8 +55,8 @@ class SettingsLayoutTest {
             val text = file.readText()
             for (old in listOf("Settings › Servers and services", "Settings › Streaming and data", "Settings › Mixes and vibes", "Settings › Notices and Cards", "Settings › Auto Generated Mixes", "Settings › Style ›", "Settings › Scrobbling and history",
                 "Settings › Connections", "Settings › Streaming & storage", "Settings › Scrobbling & history", "Settings › Radios & mixes",
-                "Settings › Sound & playback", "Settings › Mixes & radios", "Settings › Storage & downloads", "Settings › Backup & restore",
-                "Settings › Help & feedback", "Settings › Home page", "Settings › Now playing", "Settings › Bottom bar", "Settings › Listening")) {
+                "Settings › Playback", "Settings › Mixes", "Settings › Storage", "Settings › Backup",
+                "Settings › Help", "Settings › Home", "Settings › Player", "Settings › Navigation", "Settings › Scrobbling")) {
                 assertFalse("${file.name} still says $old", text.contains(old))
             }
         }

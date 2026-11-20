@@ -203,3 +203,38 @@ data class CoverGridSize(val columns: Int, val rows: Int) {
             HomeSection.entries.mapNotNull { s -> sizes[s]?.let { "${s.id}:${it.columns}x${it.rows}" } }.joinToString(",")
     }
 }
+
+/**
+ * A look's own way of laying its row out (the owner, 20 Nov, from the mockups), one per row and kept with it: the
+ * shortcut tiles ([HomeLook.GRID], and Shortcuts in its own look) three a row, big or as pill chips; a cover grid
+ * with one featured; a banner as a hero. A row whose look isn't the variant's [look] draws as it otherwise would.
+ */
+enum class LookVariant(val id: String, val label: String, val look: HomeLook) {
+    TWO("two", "Two a row", HomeLook.GRID),
+    THREE("three", "Three a row", HomeLook.GRID),
+    BIG("big", "Big tiles", HomeLook.GRID),
+    CHIPS("chips", "Pill chips", HomeLook.GRID),
+    EVEN("even", "Even", HomeLook.COVER_GRID),
+    FEATURED("featured", "One featured", HomeLook.COVER_GRID),
+    CARD("card", "Card", HomeLook.BANNER),
+    HERO("hero", "Hero", HomeLook.BANNER);
+
+    companion object {
+        /** The variants of [look]: the first is how it looked before there were any. */
+        fun of(look: HomeLook): List<LookVariant> = entries.filter { it.look == look }
+
+        /** Reads the saved variants ("quick:chips,made_for_you:featured"); unknown sections and variants are dropped. */
+        fun parse(saved: String?): Map<HomeSection, LookVariant> {
+            if (saved.isNullOrBlank()) return emptyMap()
+            return saved.split(',').mapNotNull { pair ->
+                val (section, id) = pair.split(':').takeIf { it.size == 2 } ?: return@mapNotNull null
+                val s = HomeSection.entries.firstOrNull { it.id == section.trim() } ?: return@mapNotNull null
+                val v = entries.firstOrNull { it.id == id.trim() } ?: return@mapNotNull null
+                s to v
+            }.toMap()
+        }
+
+        fun format(variants: Map<HomeSection, LookVariant>): String =
+            HomeSection.entries.mapNotNull { s -> variants[s]?.let { "${s.id}:${it.id}" } }.joinToString(",")
+    }
+}

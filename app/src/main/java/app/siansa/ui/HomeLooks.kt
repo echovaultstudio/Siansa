@@ -22,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -63,6 +64,8 @@ data class HomeItem(
     val progress: Float? = null,
     /** A mix's covers: in a cover grid it shows four of them, two by two, as its own tiles do (#1263). */
     val mosaic: List<String?> = emptyList(),
+    /** Its songs, when known: a hero's Play and Shuffle play them (the owner, 20 Nov). */
+    val songs: List<Song> = emptyList(),
 )
 
 /**
@@ -90,13 +93,20 @@ fun HomeLookRow(
     val open = openAll ?: items.first().open
     when (look) {
         HomeLook.AS_IS, HomeLook.TILES -> Shelf(title, items, key = { it.key }, onOpenAll = openAll) { item -> HomeItemTile(item) }
-        HomeLook.BANNER -> HomeBanner(id, title, items, open, play, songs)
+        HomeLook.BANNER -> if (LocalLookVariant.current == app.siansa.data.LookVariant.HERO) {
+            val graph = LocalGraph.current
+            val first = items.first()
+            val tint = rememberHeaderTint(first.mosaic.firstOrNull { it != null } ?: first.coverArt, first.title)
+            HomeHero(title, first, play, songs, tint) { list, shuffle -> graph.player.play(list, shuffle = shuffle) }
+        }
+            else HomeBanner(id, title, items, open, play, songs)
         HomeLook.LIST -> HomeList(title, items, open)
         HomeLook.BUTTON -> HomeButton(id, title, items, open, play, songs)
         HomeLook.COVER_ROWS -> HomeCoverRows(title, items, open)
-        HomeLook.GRID -> TileGrid(title, items.map { GridTile(it.key, it.title, it.coverArt, it.colors, onClick = it.open) }, gridSize, openAll)
+        HomeLook.GRID -> TileGrid(title, items.map { GridTile(it.key, it.title, it.coverArt, it.colors, onClick = it.open, subtitle = it.subtitle) }, gridSize, openAll)
         HomeLook.CAROUSEL -> HomeCarouselLook(title, items)
-        HomeLook.COVER_GRID -> HomeCoverGrid(title, items, LocalCoverGridSize.current, openAll)
+        HomeLook.COVER_GRID -> if (LocalLookVariant.current == app.siansa.data.LookVariant.FEATURED) HomeFeaturedGrid(title, items, openAll)
+            else HomeCoverGrid(title, items, LocalCoverGridSize.current, openAll)
     }
 }
 
@@ -127,6 +137,147 @@ fun HomeCoverGrid(title: String, items: List<HomeItem>, size: app.siansa.data.Co
         }
     }
 }
+
+/**
+ * A cover grid with one featured (the owner, 20 Nov): the row's first card two by two, its name and line on it over a
+ * soft fade, and the next five small around it (two beside it, three under), each named on its cover.
+ */
+@Composable
+fun HomeFeaturedGrid(title: String, items: List<HomeItem>, onOpenAll: (() -> Unit)? = null) {
+    if (items.isEmpty()) return
+    val first = items.first()
+    val rest = items.drop(1).take(FEATURED_AROUND)
+    Column(Modifier.testTag("homeFeaturedGrid")) {
+        if (onOpenAll != null && LocalSectionTitleShown.current) {
+            SectionTitle(title, Modifier.clickable(onClickLabel = "Show all", onClick = onOpenAll))
+        } else SectionTitle(title)
+        Column(Modifier.padding(horizontal = Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(Space.Tight), modifier = Modifier.height(androidx.compose.foundation.layout.IntrinsicSize.Min)) {
+                NamedSquare(first, featured = true, Modifier.weight(2f))
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
+                    rest.take(2).forEach { NamedSquare(it, featured = false, Modifier.fillMaxWidth()) }
+                    repeat(2 - rest.take(2).size) { Spacer(Modifier.fillMaxWidth().aspectRatio(1f)) }
+                }
+            }
+            if (rest.size > 2) {
+                Row(horizontalArrangement = Arrangement.spacedBy(Space.Tight)) {
+                    rest.drop(2).forEach { NamedSquare(it, featured = false, Modifier.weight(1f)) }
+                    repeat(3 - rest.drop(2).size) { Spacer(Modifier.weight(1f)) }
+                }
+            }
+        }
+    }
+}
+
+/** How many small cards are round the featured one: two beside it, three under. */
+private const val FEATURED_AROUND = 5
+
+/** A square of a featured cover grid: its picture, its name (and on the featured one its line) over a soft fade. */
+@Composable
+private fun NamedSquare(item: HomeItem, featured: Boolean, modifier: Modifier) {
+    val shape = RoundedCornerShape(8.dp)
+    Box(
+        modifier
+            .aspectRatio(1f)
+            .clip(shape)
+            .clickable(onClickLabel = "Open ${item.title}", onClick = item.open)
+            .semantics(mergeDescendants = true) {}
+            .testTag(if (featured) "homeFeatured" else "homeCoverGridCell"),
+    ) {
+        val mosaic = item.mosaic.filterNotNull().distinct()
+        val square = Modifier.fillMaxWidth().aspectRatio(1f)
+        when {
+            mosaic.size >= 4 -> CoverMosaic(mosaic, square)
+            item.coverArt != null -> Cover(item.coverArt, if (featured) 600 else 300, square, RoundedCornerShape(0.dp))
+            else -> Box(square.background(Brush.linearGradient(listOf(item.colors.first, item.colors.second))))
+        }
+        Column(
+            Modifier
+                .align(Alignment.BottomStart)
+                .fillMaxWidth()
+                .background(Brush.verticalGradient(0f to Color.Transparent, 0.35f to Color.Black.copy(alpha = 0.45f), 1f to Color.Black.copy(alpha = 0.85f)))
+                .padding(start = Space.Small, end = Space.Small, top = if (featured) Space.Large else Space.Section, bottom = Space.Small),
+            verticalArrangement = Arrangement.spacedBy(Space.Tight),
+        ) {
+            WholeWordsText(item.title, (if (featured) MaterialTheme.typography.titleMedium else MaterialTheme.typography.labelLarge).copy(fontWeight = FontWeight.ExtraBold),
+                color = Color.White, maxLines = if (featured) 2 else 3)
+            val line = item.subtitle.ifBlank { item.meta }
+            if (featured && line.isNotBlank()) {
+                Text(line, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.82f), maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
+        }
+    }
+}
+
+/**
+ * A banner as a hero (the owner, 20 Nov): the row's first card across the whole width at the top of the row, in the
+ * colours of its picture fading into the page: [title] in capitals over its big cover, its name and line, and Play
+ * and Shuffle. Play plays the card ([HomeItem.play]), else its songs, else the row ([play]); Shuffle its songs, or
+ * the row's, shuffled.
+ */
+@Composable
+fun HomeHero(
+    title: String,
+    item: HomeItem,
+    play: (() -> Unit)?,
+    rowSongs: List<Song>,
+    // The colour of its picture ([rememberHeaderTint]); without one, its own colours.
+    tint: Color? = null,
+    playSongs: (List<Song>, Boolean) -> Unit,
+) {
+    val songs = item.songs.ifEmpty { rowSongs }
+    val tint = tint ?: item.colors.first
+    val ground = MaterialTheme.colorScheme.background
+    val onPlay: (() -> Unit)? = item.play ?: songs.takeIf { it.isNotEmpty() }?.let { { playSongs(it, false) } } ?: play
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .padding(top = LocalSectionGap.current)
+            // Deep enough under the white words in light mode too; the page only shows through at its foot.
+            .background(Brush.verticalGradient(
+                0f to lerp(lerp(tint, item.colors.first, 0.35f), Color.Black, 0.25f),
+                0.75f to lerp(lerp(tint, item.colors.second, 0.5f), Color.Black, 0.4f),
+                1f to ground,
+            ))
+            .clickable(onClick = item.open)
+            .testTag("homeHero"),
+    ) {
+        Column(Modifier.padding(start = Space.Page, end = Space.Page, top = Space.Section, bottom = Space.Section), verticalArrangement = Arrangement.spacedBy(Space.Page)) {
+            Text(title.uppercase(), style = MaterialTheme.typography.labelMedium.copy(letterSpacing = androidx.compose.ui.unit.TextUnit(1.5f, androidx.compose.ui.unit.TextUnitType.Sp)),
+                fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.8f))
+            Row(horizontalArrangement = Arrangement.spacedBy(Space.Page), verticalAlignment = Alignment.Bottom) {
+                val mosaic = item.mosaic.filterNotNull().distinct()
+                val art = Modifier.size(HERO_COVER).clip(RoundedCornerShape(8.dp))
+                when {
+                    mosaic.size >= 4 -> CoverMosaic(mosaic, art)
+                    item.coverArt != null -> Cover(item.coverArt, 600, art, RoundedCornerShape(8.dp))
+                    else -> Box(art.background(Brush.linearGradient(listOf(item.colors.first, item.colors.second))))
+                }
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
+                    WholeWordsText(item.title, MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.ExtraBold), color = Color.White, maxLines = 3)
+                    val line = listOf(item.subtitle, item.meta).filter { it.isNotBlank() }.joinToString(" · ")
+                    if (line.isNotBlank()) Text(line, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.82f), maxLines = 3, overflow = TextOverflow.Ellipsis)
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(Space.Medium), verticalAlignment = Alignment.CenterVertically) {
+                androidx.compose.material3.Button(onClick = { (onPlay ?: item.open)() }, modifier = Modifier.height(HERO_BUTTON).testTag("homeHeroPlay")) {
+                    Icon(if (onPlay == null) Icons.Rounded.ChevronRight else Icons.Rounded.PlayArrow, null)
+                    Text(if (onPlay == null) "Open" else "Play", Modifier.padding(start = Space.Tight), fontWeight = FontWeight.Bold)
+                }
+                if (songs.isNotEmpty()) {
+                    androidx.compose.material3.OutlinedIconButton(
+                        onClick = { playSongs(songs, true) },
+                        modifier = Modifier.size(HERO_BUTTON).testTag("homeHeroShuffle"),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.35f)),
+                    ) { Icon(Icons.Rounded.Shuffle, "Shuffle", tint = Color.White) }
+                }
+            }
+        }
+    }
+}
+
+private val HERO_COVER = 148.dp
+private val HERO_BUTTON = 48.dp
 
 @Composable
 private fun CoverGridCell(item: HomeItem, named: Boolean, modifier: Modifier) {
@@ -352,7 +503,48 @@ data class GridTile(
     val colors: Pair<Color, Color>? = null,
     val icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
     val onClick: () -> Unit,
+    /** What it is ("Mix", "Album"…), under its name on a big tile. */
+    val subtitle: String = "",
 )
+
+/** The layout chosen for the row being drawn ([app.siansa.data.LookVariant], Arrange Home): null as before. */
+val LocalLookVariant = androidx.compose.runtime.compositionLocalOf<app.siansa.data.LookVariant?> { null }
+
+/**
+ * Shortcut tiles in the row's layout (the owner, 20 Nov): two a row as always, three a row and smaller, big two a row
+ * with what each is, or pill chips flowing on to as many lines as they need.
+ */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+fun ShortcutTiles(tiles: List<GridTile>, variant: app.siansa.data.LookVariant?, modifier: Modifier = Modifier) {
+    if (variant == app.siansa.data.LookVariant.CHIPS) {
+        androidx.compose.foundation.layout.FlowRow(
+            modifier.testTag("shortcutChips"),
+            horizontalArrangement = Arrangement.spacedBy(Space.Small),
+            verticalArrangement = Arrangement.spacedBy(Space.Small),
+        ) {
+            tiles.forEach { t -> ShortcutChip(t.title, t.coverArt, t.colors, t.onClick, Modifier.testTag("tileGridTile"), icon = t.icon) }
+        }
+        return
+    }
+    val perRow = if (variant == app.siansa.data.LookVariant.THREE) 3 else 2
+    val tall = when (variant) {
+        app.siansa.data.LookVariant.THREE -> QUICK_TILE_SMALL
+        app.siansa.data.LookVariant.BIG -> QUICK_TILE_BIG
+        else -> QUICK_TILE_HEIGHT
+    }
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(if (perRow == 3) Space.Tight else Space.Small)) {
+        tiles.chunked(perRow).forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(if (perRow == 3) Space.Tight else Space.Small)) {
+                row.forEach { t ->
+                    QuickTile(t.title, t.coverArt, t.colors, t.onClick, Modifier.weight(1f).testTag("tileGridTile"), icon = t.icon,
+                        tall = tall, subtitle = t.subtitle.takeIf { variant == app.siansa.data.LookVariant.BIG })
+                }
+                repeat(perRow - row.size) { Spacer(Modifier.weight(1f)) }
+            }
+        }
+    }
+}
 
 /**
  * The Shortcuts card's look for any card or row of Home (the owner, 10 Nov): its title (tapped, [onOpenAll]), then
@@ -366,16 +558,7 @@ fun TileGrid(title: String, tiles: List<GridTile>, most: Int, onOpenAll: (() -> 
         if (onOpenAll != null && LocalSectionTitleShown.current) {
             SectionTitle(title, Modifier.clickable(onClickLabel = "Show all", onClick = onOpenAll))
         } else SectionTitle(title)
-        Column(Modifier.padding(horizontal = Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
-            shown.chunked(2).forEach { row ->
-                Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
-                    row.forEach { t ->
-                        QuickTile(t.title, t.coverArt, t.colors, t.onClick, Modifier.weight(1f).testTag("tileGridTile"), icon = t.icon)
-                    }
-                    if (row.size == 1) Spacer(Modifier.weight(1f))
-                }
-            }
-        }
+        ShortcutTiles(shown, LocalLookVariant.current, Modifier.padding(horizontal = Space.Page))
     }
 }
 

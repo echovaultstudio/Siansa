@@ -1,5 +1,7 @@
 package app.siansa.screenshots
 
+import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.Radio
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.Home
@@ -413,6 +415,35 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     app.siansa.ui.SectionTitle("For now", top = 0.dp)
                     app.siansa.ui.RecordCrate(records, size = app.siansa.data.CrateSize.COMPACT)
                     app.siansa.ui.RecordCrate(records, size = app.siansa.data.CrateSize.COMPACT, namesOnCover = true)
+                }
+            },
+            // Shortcuts in each layout (the owner, 20 Nov): three a row, big tiles, pill chips, with long names.
+            Scene("shortcut_layouts") {
+                fun tiles(variant: app.siansa.data.LookVariant?) = listOf(
+                    app.siansa.ui.GridTile("s1", "Liked songs", null, androidx.compose.ui.graphics.Color(0xFF4B2BD6) to androidx.compose.ui.graphics.Color(0xFF8FD3C8), Icons.Rounded.Favorite, {}, subtitle = "Your hearts"),
+                    app.siansa.ui.GridTile("s2", "Neo-Classical Downtempo With Field Recordings", null, app.siansa.ui.tileColors("s2"), null, {}, subtitle = "Mix"),
+                    app.siansa.ui.GridTile("s3", "Kinetic Flow State", null, app.siansa.ui.tileColors("s3"), null, {}, subtitle = "Mix"),
+                    app.siansa.ui.GridTile("s4", "Rediscover", null, app.siansa.ui.tileColors("s4"), null, {}, subtitle = "Mix"),
+                    app.siansa.ui.GridTile("s5", "Night Drive", null, app.siansa.ui.tileColors("s5"), Icons.Rounded.Radio, {}, subtitle = "Radio"),
+                    app.siansa.ui.GridTile("s6", "In Verses", null, app.siansa.ui.tileColors("s6"), null, {}, subtitle = "Album"),
+                )
+                Column(Modifier.padding(vertical = Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Section)) {
+                    for (v in listOf(app.siansa.data.LookVariant.THREE, app.siansa.data.LookVariant.BIG, app.siansa.data.LookVariant.CHIPS)) {
+                        app.siansa.ui.ShortcutTiles(tiles(v).take(if (v == app.siansa.data.LookVariant.BIG) 4 else 6), v, Modifier.padding(horizontal = Space.Page))
+                    }
+                }
+            },
+            // A cover grid with one featured, and a banner as a hero (the owner, 20 Nov), with long names.
+            Scene("featured_and_hero") {
+                fun item(key: String, name: String, line: String) = app.siansa.ui.HomeItem(key, name, line, open = {})
+                val items = listOf(
+                    item("f1", "Neo-Classical Downtempo With Field Recordings", "Strings, soft beats and field recordings drifting by on a rainy afternoon"),
+                    item("f2", "Kinetic Flow State", "Driving beats"), item("f3", "Forest path, dappled light", "Soft folk"),
+                    item("f4", "Night Drive", "Synths"), item("f5", "Velvet Undertow", "Hazy voices"), item("f6", "Ethereal Shadow", "Dark ambient"),
+                )
+                Column(verticalArrangement = Arrangement.spacedBy(Space.Section)) {
+                    app.siansa.ui.HomeHero("Made for you", items.first(), play = {}, rowSongs = emptyList()) { _, _ -> }
+                    app.siansa.ui.HomeFeaturedGrid("Made for you", items)
                 }
             },
             // The small carousel (the owner, 20 Nov): a strip of squares, names under each or on each.
