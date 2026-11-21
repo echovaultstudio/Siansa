@@ -525,6 +525,18 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
             Scene("card_names_choice") {
                 Column(Modifier.padding(Space.Page)) { app.siansa.ui.NamesChoice(app.siansa.data.CardNames.ON) {} }
             },
+            // Tiles at each Size (the owner, 21 Nov: Size for tiles too, not only the carousel).
+            Scene("tile_sizes") {
+                Row(Modifier.padding(Space.Page), horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
+                    for (size in app.siansa.data.CrateSize.entries) {
+                        Column(Modifier.width(app.siansa.ui.tileWidth(size))) {
+                            app.siansa.ui.CardPicture(emptyList(), null, Color(0xFF6B5E4E) to Color(0xFF3B3328), "Steady Alternative Rock Anthems",
+                                Modifier.fillMaxWidth().size(app.siansa.ui.tileWidth(size)), style = app.siansa.data.PictureStyle.AURA, names = false)
+                            app.siansa.ui.TileNames("Steady Alternative Rock Anthems", "Steady alternative rock, mostly sung")
+                        }
+                    }
+                }
+            },
             // Names on the picture for pictures without their own (a fade of its colour), and Aura's own.
             Scene("names_on_pictures") {
                 val draw: app.siansa.ui.CoverDraw = { id, _, modifier, shape, filter ->

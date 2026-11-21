@@ -97,7 +97,9 @@ fun HomeLookRow(
     if (items.isEmpty()) return
     val open = openAll ?: items.first().open
     when (look) {
-        HomeLook.AS_IS, HomeLook.TILES -> Shelf(title, items, key = { it.key }, onOpenAll = openAll) { item -> HomeItemTile(item) }
+        HomeLook.AS_IS -> Shelf(title, items, key = { it.key }, onOpenAll = openAll) { item -> HomeItemTile(item) }
+        // Tiles take the row's Size (the owner, 21 Nov: every option for every card type).
+        HomeLook.TILES -> { val tile = tileWidth(LocalCrateSize.current); Shelf(title, items, key = { it.key }, onOpenAll = openAll) { item -> HomeItemTile(item, tile) } }
         HomeLook.BANNER -> if (LocalLookVariant.current == app.siansa.data.LookVariant.HERO) {
             val graph = LocalGraph.current
             val first = items.first()
@@ -351,21 +353,21 @@ internal fun coverRowOf(item: HomeItem): app.siansa.mix.CoverRow = app.siansa.mi
 private fun argb(c: Color): Long = c.toArgb().toLong() and 0xFFFFFFFFL
 
 @Composable
-private fun HomeItemTile(item: HomeItem) {
+private fun HomeItemTile(item: HomeItem, tile: androidx.compose.ui.unit.Dp = TILE) {
     val names = LocalCardNames.current
     if (!item.round && (item.mosaic.isNotEmpty() || names == app.siansa.data.CardNames.ON)) {
         // A mix (or, with names on the picture, any cover): its picture in the row's style, its name and line under it
         // or on it, as the row's Names choice says (the owner, 21 Nov).
         val on = names == app.siansa.data.CardNames.ON
-        Column(Modifier.width(TILE).clickable(onClickLabel = "Open ${item.title}", onClick = item.open).testTag("homeLookTile")) {
+        Column(Modifier.width(tile).clickable(onClickLabel = "Open ${item.title}", onClick = item.open).testTag("homeLookTile")) {
             CardPicture(item.mosaic, item.coverArt, item.colors, item.title, Modifier.fillMaxWidth().aspectRatio(1f), songIds = item.songIds, artists = item.artists,
                 names = when (names) { app.siansa.data.CardNames.UNDER -> false; app.siansa.data.CardNames.ON -> true; else -> null }, line = item.subtitle)
             if (!on) TileNames(item.title, item.subtitle)
         }
     } else if (item.coverArt != null) {
-        AlbumTile(item.title, item.subtitle, item.coverArt, item.open, Modifier.width(TILE).testTag("homeLookTile"), round = item.round)
+        AlbumTile(item.title, item.subtitle, item.coverArt, item.open, Modifier.width(tile).testTag("homeLookTile"), round = item.round)
     } else {
-        GradientTile(title = item.title, colors = item.colors, onClick = item.open, size = TILE, modifier = Modifier.testTag("homeLookTile"))
+        GradientTile(title = item.title, colors = item.colors, onClick = item.open, size = tile, modifier = Modifier.testTag("homeLookTile"))
     }
 }
 
@@ -512,6 +514,15 @@ internal fun homeButtonCaption(plays: Boolean, playing: Boolean, count: Int): St
 }
 
 private val TILE = 140.dp
+private val TILE_COMPACT = 120.dp
+private val TILE_SMALL = 100.dp
+
+/** A tile's width for the row's Size: Big as Home's tiles have always been, Compact and Small narrower. */
+internal fun tileWidth(size: app.siansa.data.CrateSize): androidx.compose.ui.unit.Dp = when (size) {
+    app.siansa.data.CrateSize.BIG -> TILE
+    app.siansa.data.CrateSize.COMPACT -> TILE_COMPACT
+    app.siansa.data.CrateSize.SMALL -> TILE_SMALL
+}
 
 /** One tile of a [TileGrid]: as a shortcut, its cover (or its colours and an icon) and its name. */
 data class GridTile(

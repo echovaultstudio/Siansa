@@ -49,4 +49,13 @@ class CarouselNamesSettingTest {
         settings().resetHomeLooks()
         assertEquals(CardNames.AUTO, settings().state.value.cardNames(HomeSection.MADE_FOR_YOU))
     }
+
+    @Test fun tilesHaveASizeToo() {
+        // The owner, 21 Nov: every option for every card type; Big is the size tiles have always had.
+        assertEquals(setOf(HomeLook.CAROUSEL, HomeLook.TILES), HomeLook.SIZED)
+        assertEquals(140f, app.siansa.ui.tileWidth(CrateSize.BIG).value, 0f)
+        val widths = CrateSize.entries.map { app.siansa.ui.tileWidth(it).value }
+        assertEquals(widths.sortedDescending(), widths)
+        assertEquals(3, widths.toSet().size)
+    }
 }

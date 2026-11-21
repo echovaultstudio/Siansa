@@ -89,6 +89,8 @@ enum class HomeLook(val id: String, val label: String, val hint: String) {
     COVER_GRID("cover_grid", "Cover grid", "Covers in a grid across the screen: choose its columns and rows");
 
     companion object {
+        /** The looks with a Size choice under the row's cog (the owner, 21 Nov: tiles too, not only the carousel). */
+        val SIZED = setOf(CAROUSEL, TILES)
         /** The looks whose cards have pictures with names, so the Names choice is theirs (the owner, 21 Nov). */
         val NAMED = setOf(AS_IS, TILES, CAROUSEL, COVER_GRID)
 
