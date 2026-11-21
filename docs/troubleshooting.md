@@ -71,6 +71,8 @@ Siansa shows the picture your server sends, and keeps it on the phone so it show
 - **A cover you replaced on the server** shows after the next sync. **Sync all** (the music source at the top of
   Home) checks every cover kept on the phone: stand-ins kept by older versions are removed, and a cover that changed
   on Navidrome, Emby or Jellyfin is fetched fresh. Nothing else in the image cache is thrown away.
+- **One album wrong?** Open its page and hold its cover: every picture kept of that album, its songs' own included,
+  is cleared and fetched fresh, on its page, in Shortcuts, recent plays, the mini player and Now playing.
 - Still wrong? **Settings › Storage › Covers on the phone › Clear image cache** starts over, and the log (lines marked `Covers`) says
   what was removed and replaced.
 
