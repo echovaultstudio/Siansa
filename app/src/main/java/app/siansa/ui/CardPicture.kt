@@ -126,6 +126,18 @@ fun CardPicture(
     }
 }
 
+/**
+ * Whether a card's picture in [style] puts its name on itself (Aura, Frost, Poster), with the row's Names on Auto: its
+ * card then shows just its line under it, not the name a second time (the owner, 21 Nov: names under were cut off and
+ * said twice).
+ */
+internal fun pictureNamesItself(style: PictureStyle, covers: List<String?>, cover: String?): Boolean {
+    val distinct = covers.filterNotNull().distinct()
+    return pictureShown(style, distinct.size, topCover(covers, cover) != null, covers.isNotEmpty()) { emptyList() } in SELF_NAMED
+}
+
+private val SELF_NAMED = setOf(PictureStyle.AURA, PictureStyle.FROST, PictureStyle.POSTER)
+
 private val UNNAMED = setOf(PictureStyle.AUTO, PictureStyle.MOSAIC, PictureStyle.COVER, PictureStyle.GLOW)
 
 @Composable
