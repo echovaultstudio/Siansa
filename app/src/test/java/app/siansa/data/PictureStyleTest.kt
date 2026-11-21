@@ -4,6 +4,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.test.core.app.ApplicationProvider
 import app.siansa.ui.hueRange
 import app.siansa.ui.mosaicSitsWell
+import app.siansa.ui.pictureNamesItself
 import app.siansa.ui.pictureShown
 import app.siansa.ui.topCover
 import org.junit.Assert.assertEquals
@@ -88,5 +89,18 @@ class PictureStyleTest {
     @Test fun theArtistLineHasItsMainArtistsMostFirst() {
         val songs = listOf("Feist", "Low", "Low", "Daughter", "Low", "Feist", "Björk", "").mapIndexed { i, a -> app.siansa.data.Song(id = "$i", title = "t", artist = a) }
         assertEquals("Low, Feist, Daughter", app.siansa.ui.artistLine(songs))
+    }
+
+    @Test fun aPictureWithItsNameOnItIsntNamedAgainUnderIt() {
+        // The owner, 21 Nov: Aura tiles said their name twice, and the one under was cut off.
+        val four = listOf("a", "b", "c", "d")
+        assertTrue(pictureNamesItself(PictureStyle.AURA, four, null))
+        assertTrue(pictureNamesItself(PictureStyle.FROST, four, null))
+        assertTrue(pictureNamesItself(PictureStyle.POSTER, four, null))
+        assertFalse(pictureNamesItself(PictureStyle.MOSAIC, four, null))
+        assertFalse(pictureNamesItself(PictureStyle.PILE, four, null))
+        // Auto with no cover at all falls back to Aura, which names itself.
+        assertTrue(pictureNamesItself(PictureStyle.AUTO, emptyList(), null))
+        assertFalse(pictureNamesItself(PictureStyle.AUTO, four, null))
     }
 }

@@ -80,7 +80,7 @@ its name on a label) and **Cut-outs** (circles and squares, like a scrapbook). W
 the same and one always looks the same. A card without enough covers for its style shows one cover, or Aura when it has
 none. An artist keeps its round photo.
 
-**Names**, for Tiles, Carousel, Cover grid and a mix row as it is: **Auto** (as each look does by itself), **Under the
+**Names**, for Tiles, Carousel, Cover grid and a mix row as it is: **Auto** (as each look does by itself; a picture with its name on it, Aura, Frost or Poster, has only what it is under it, not its name again), **Under the
 picture** (two lines for the name and two for what it is, so long genres aren't cut off; no name on the picture), or
 **On the picture** (Aura, Frost, Poster and the stickers each their own way, the others on a soft fade of the
 picture's own colour).
