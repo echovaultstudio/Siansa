@@ -70,6 +70,7 @@ import androidx.compose.runtime.LaunchedEffect
 import app.siansa.mix.MixGenerator
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.onLongClick
@@ -374,7 +375,7 @@ fun AlbumScreen(nav: NavController, id: String) {
                     Unit
                 }
                 Modifier
-                    .pointerInput(album.album.id) { androidx.compose.foundation.gestures.detectTapGestures(onLongPress = { clear() }) }
+                    .pointerInput(album.album.id) { detectTapGestures(onLongPress = { clear() }) }
                     .semantics { onLongClick(label = "Clear this album's pictures") { clear(); true } }
             } ?: Modifier
             BigCover(d?.album?.coverArt, d?.album?.coverArt ?: standIn, m.then(held), RoundedCornerShape(6.dp))
