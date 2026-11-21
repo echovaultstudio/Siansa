@@ -50,7 +50,7 @@ around you. Each part is switched on by itself, and is read once when a mix is m
 
 | Part | How it's read |
 |---|---|
-| **Weather** | Rain, sun, cold, sunset. From Open-Meteo, with your approximate location rounded to about 10 km, only to ask it. The location isn't kept. Off until you switch it on. |
+| **Weather** | Rain, sun, cold, sunset. From Open-Meteo, with your approximate location rounded to about 10 km, only to ask it. The location isn't kept. Off until you switch it on. With it on, Siansa Beats gets one word for the weather (rain, snow, clear…), never the location, for the names of its mixes of now ("Rainy Folk"). |
 | **Movement** | Sitting, walking or running, from the phone's step counter. Stays on the phone. Off until you switch it on. |
 | **Light** | A dark room or daylight, from the light sensor. Off until you switch it on. |
 | **Charging** | Whether the phone is charging, or its battery is low. Off until you switch it on. |

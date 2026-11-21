@@ -68,6 +68,12 @@ class SituationReader(private val context: Context, private val http: OkHttpClie
 
     // ---- Weather ----
 
+    /**
+     * The weather for Siansa Beats' mix names, only when Weather is on under Mix made in (it asks Open-Meteo at most
+     * every half hour, as for the app's own mixes); null otherwise or when it can't be read.
+     */
+    suspend fun weatherForMixes(options: SituationOptions): Weather? = if (options.weather) safely("weather") { weather() } else null
+
     private suspend fun weather(): Weather? {
         weatherCache?.let { (at, w) -> if (System.currentTimeMillis() - at < WEATHER_FRESH_MS) return w }
         val place = location() ?: return null.also { AppLog.i("Situation", "No position known yet: no weather this time") }
