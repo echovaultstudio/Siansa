@@ -166,9 +166,9 @@ private fun rememberDrift(periodMs: Int, seed: Int): androidx.compose.runtime.St
     val moving = LocalPictureMotion.current && animationsOn()
     androidx.compose.runtime.LaunchedEffect(moving, periodMs) {
         if (!moving) return@LaunchedEffect
-        var last = androidx.compose.runtime.withFrameNanos { it }
+        var last = androidx.compose.animation.core.withInfiniteAnimationFrameNanos { it }
         while (true) {
-            val now = androidx.compose.runtime.withFrameNanos { it }
+            val now = androidx.compose.animation.core.withInfiniteAnimationFrameNanos { it }
             if (now - last >= DRIFT_FRAME_NANOS) {
                 phase.floatValue = (phase.floatValue + (now - last) / 1_000_000f / periodMs) % 1f
                 last = now
