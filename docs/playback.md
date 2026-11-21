@@ -359,7 +359,7 @@ as you fall asleep. Without a timer, Wind down queues a number of calm songs (**
 
 The device button in now playing shows TVs and speakers on the same Wi-Fi: Chromecast and Google TV, and DLNA
 ones (most smart TVs, Sonos, AV receivers). They play straight from your server: a Chromecast gets your music
-lossless (see **Chromecast sound quality** below), a DLNA one Opus 320 kbit/s if it lists Ogg among the formats it
+lossless (see **Chromecast sound quality** below), a DLNA one Opus 320 kbit/s if it lists Opus among the formats it
 plays, otherwise MP3 320, unless you ask for the original files.
 Stopping the cast brings the music back to the phone, paused. If the TV's Siansa screen closes by itself, the phone
 joins the TV again straight away and the music carries on there (at most once in two minutes; if it keeps closing,
@@ -429,8 +429,9 @@ format; other songs are still converted. Better sound, and no tiny gap between s
 setting is kept for each device, shows which formats the device says it plays, and isn't offered when it only
 plays MP3. It applies from the next song.
 
-**Opus on DLNA.** Songs converted for a DLNA TV or speaker go as Opus 320 kbit/s (in Ogg) when the device lists Ogg or
-Opus among the formats it plays, and as MP3 320 when it doesn't. If it doesn't start an Opus song after all, Siansa
+**Opus on DLNA.** Songs converted for a DLNA TV or speaker go as Opus 320 kbit/s (in Ogg) when the device lists Opus
+among the formats it plays, and as MP3 320 when it doesn't. A device that lists only Ogg gets MP3: many play only
+Vorbis in Ogg, and some (a JBL Bar 800) say they're playing an Opus song with no sound. If it doesn't start an Opus song after all, Siansa
 sends that song again as MP3 320, and that device gets MP3 until you restart the app.
 
 ## Android Auto
