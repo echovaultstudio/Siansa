@@ -33,4 +33,20 @@ class ClearAlbumCoversTest {
         assertEquals(2, CoverCache.clearAll(loader, listOf("dc-a1:1", "dc-a1:1", "", "al-a1")))
         assertEquals(before + 1, CoverCache.cleared.value["dc-a1:1"])
     }
+
+    @Test fun aShortcutsOldAlbumCoverShowsTheNewOne() {
+        // The owner, 21 Nov: the shortcut kept the picture from before it was replaced on the server.
+        val stamps = mapOf("a1" to "new")
+        assertEquals("al-a1_new", CoverVersions.currentFor("al-a1_old") { stamps[it] })
+        assertEquals("al-a1_new", CoverVersions.currentFor("al-a1_new") { stamps[it] })
+        assertEquals("al-zz_old", CoverVersions.currentFor("al-zz_old") { stamps[it] })
+        assertEquals("dc-a1:1", CoverVersions.currentFor("dc-a1:1") { stamps[it] })
+        assertEquals("f00d", CoverVersions.currentFor("f00d") { stamps[it] })
+    }
+
+    @Test fun aShortcutTakesTheAlbumsCoverNow() {
+        val list = listOf(app.siansa.data.RecentPlay("album/a1", "Night Drive", "al-a1_old"), app.siansa.data.RecentPlay("album/b2", "Other", "al-b2_x"))
+        val after = app.siansa.data.withCover(list, "album/a1", "al-a1_new")
+        assertEquals(listOf("al-a1_new", "al-b2_x"), after.map { it.cover })
+    }
 }

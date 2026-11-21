@@ -344,7 +344,7 @@ fun Cover(
     // new one shows as soon as it's known, without the page being opened again (the owner, 10 Nov).
     val freshArtists by graph.artistPhotos.covers.collectAsStateWithLifecycle()
     @Suppress("NAME_SHADOWING")
-    val coverId = coverId?.let { app.siansa.data.freshArtistCover(it, freshArtists) }
+    val coverId = coverId?.let { app.siansa.covers.CoverVersions.current(app.siansa.data.freshArtistCover(it, freshArtists)) }
     val context = LocalContext.current
     val loader = SingletonImageLoader.get(context)
     // A stand-in showing here is asked for again when its time comes (StandIns: soon the first times), without the

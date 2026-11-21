@@ -357,27 +357,34 @@ fun AlbumScreen(nav: NavController, id: String) {
         cover = { m ->
             // The album's id stands in for a missing cover only where that works (issue #792).
             val standIn = d?.album?.id?.takeIf { graph.settings.current.sourceKind.albumIdIsCover }
-            // Held: every picture kept of the album, its songs' own included, is cleared and fetched fresh, here, in
-            // shortcuts, recent plays and the mini player (the owner, 21 Nov).
+            // Held: a card with what can be done with the cover (the owner, 21 Nov: "a card pop", more to come there).
+            // Clear all images: every picture kept of the album, its songs' own and its shortcut's included, is cleared
+            // and fetched fresh, here, in Shortcuts, recent plays and the mini player.
             val loader = coil3.SingletonImageLoader.get(LocalContext.current)
             val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
             val snack = LocalSnack.current
             val scope = rememberCoroutineScope()
-            val held = d?.let { album ->
-                val clear = {
+            var coverCard by remember { mutableStateOf(false) }
+            val held = d?.let {
+                val open = {
                     haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                    scope.launch {
-                        val ids = albumCoverIds(album.album, album.songs, standIn)
-                        AppLog.i("Covers", "Clearing the pictures of album ${album.album.id}, held on its page")
-                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { app.siansa.covers.CoverCache.clearAll(loader, ids) }
-                        snack.showSnackbar("Album pictures cleared. Getting them again.")
-                    }
-                    Unit
+                    coverCard = true
                 }
                 Modifier
-                    .pointerInput(album.album.id) { detectTapGestures(onLongPress = { clear() }) }
-                    .semantics { onLongClick(label = "Clear this album's pictures") { clear(); true } }
+                    .pointerInput(it.album.id) { detectTapGestures(onLongPress = { open() }) }
+                    .semantics { onLongClick(label = "Album cover options") { open(); true } }
             } ?: Modifier
+            if (coverCard && d != null) AlbumCoverSheet(d.album.name, onDismiss = { coverCard = false }, onClearImages = {
+                val album = d
+                graph.scope.launch {
+                    AppLog.i("Covers", "Clearing the pictures of album ${album.album.id}, chosen from its cover's card")
+                    // Its shortcut's cover too, which may be from before the picture changed; it shows the album's own after.
+                    val shortcut = graph.recentPlays.refreshCover("album/${album.album.id}", album.album.coverArt)
+                    val ids = albumCoverIds(album.album, album.songs, standIn) + shortcut
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { app.siansa.covers.CoverCache.clearAll(loader, ids) }
+                }
+                scope.launch { snack.showSnackbar("Album images cleared. Getting them again.") }
+            })
             BigCover(d?.album?.coverArt, d?.album?.coverArt ?: standIn, m.then(held), RoundedCornerShape(6.dp))
         },
         header = {
