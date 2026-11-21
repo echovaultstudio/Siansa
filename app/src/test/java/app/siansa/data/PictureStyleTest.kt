@@ -19,9 +19,9 @@ import org.robolectric.annotation.Config
 @Config(sdk = [35], application = android.app.Application::class)
 class PictureStyleTest {
     @Test fun keptAndReadBack() {
-        val saved = mapOf(HomeSection.QUICK to PictureStyle.INK, HomeSection.MADE_FOR_YOU to PictureStyle.GLOW)
+        val saved = mapOf(HomeSection.QUICK to PictureStyle.AURA, HomeSection.MADE_FOR_YOU to PictureStyle.GLOW)
         assertEquals(saved, PictureStyle.parse(PictureStyle.format(saved)))
-        assertEquals(mapOf(HomeSection.QUICK to PictureStyle.LINE), PictureStyle.parse("quick:line,nothing:glow,made_for_you:sideways"))
+        assertEquals(mapOf(HomeSection.QUICK to PictureStyle.POSTER), PictureStyle.parse("quick:poster,nothing:glow,made_for_you:sideways"))
         // Auto is how it is without a choice: not written.
         assertEquals("", PictureStyle.format(mapOf(HomeSection.QUICK to PictureStyle.AUTO)))
     }
@@ -40,11 +40,13 @@ class PictureStyleTest {
         val none = { emptyList<Color?>() }
         assertEquals(PictureStyle.MOSAIC, pictureShown(PictureStyle.MOSAIC, 4, true, tones = none))
         assertEquals(PictureStyle.COVER, pictureShown(PictureStyle.MOSAIC, 3, true, tones = none))
-        assertEquals(PictureStyle.INK, pictureShown(PictureStyle.GLOW, 0, false, tones = none))
-        assertEquals(PictureStyle.INK, pictureShown(PictureStyle.FROST, 0, false, tones = none))
-        assertEquals(PictureStyle.LINE, pictureShown(PictureStyle.LINE, 0, false, tones = none))
+        assertEquals(PictureStyle.AURA, pictureShown(PictureStyle.GLOW, 0, false, tones = none))
+        assertEquals(PictureStyle.AURA, pictureShown(PictureStyle.FROST, 0, false, tones = none))
+        assertEquals(PictureStyle.AURA, pictureShown(PictureStyle.POSTER, 0, false, tones = none))
+        assertEquals(PictureStyle.POSTER, pictureShown(PictureStyle.POSTER, 1, true, tones = none))
+        assertEquals(PictureStyle.AURA, pictureShown(PictureStyle.AURA, 0, false, tones = none))
         // A row set to Colour, or to the styles that went, shows Ink, or Auto (the owner, 20 Nov).
-        assertEquals(mapOf(HomeSection.QUICK to PictureStyle.INK), PictureStyle.parse("quick:colour,made_for_you:duotone,on_repeat:stack"))
+        assertEquals(mapOf(HomeSection.QUICK to PictureStyle.AURA), PictureStyle.parse("quick:colour,made_for_you:duotone,on_repeat:line"))
         assertEquals(PictureStyle.PILE, pictureShown(PictureStyle.PILE, 2, true, tones = none))
         assertEquals(PictureStyle.COVER, pictureShown(PictureStyle.CUTOUTS, 1, true, tones = none))
     }
@@ -58,7 +60,7 @@ class PictureStyleTest {
         assertEquals(PictureStyle.GLOW, pictureShown(PictureStyle.AUTO, 1, true, tones = blues))
         // An album keeps its cover.
         assertEquals(PictureStyle.COVER, pictureShown(PictureStyle.AUTO, 1, true, mix = false, tones = blues))
-        assertEquals(PictureStyle.INK, pictureShown(PictureStyle.AUTO, 0, false, tones = blues))
+        assertEquals(PictureStyle.AURA, pictureShown(PictureStyle.AUTO, 0, false, tones = blues))
     }
 
     @Test fun whatSitsWell() {
@@ -81,5 +83,10 @@ class PictureStyleTest {
         assertEquals("b", topCover(listOf("a", "b", null, "b", "c"), "x"))
         assertEquals("a", topCover(listOf("a", "b"), "x"))
         assertEquals("x", topCover(listOf(null, null), "x"))
+    }
+
+    @Test fun theArtistLineHasItsMainArtistsMostFirst() {
+        val songs = listOf("Feist", "Low", "Low", "Daughter", "Low", "Feist", "Björk", "").mapIndexed { i, a -> app.siansa.data.Song(id = "$i", title = "t", artist = a) }
+        assertEquals("Low, Feist, Daughter", app.siansa.ui.artistLine(songs))
     }
 }

@@ -465,7 +465,7 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                         for (style in app.siansa.data.PictureStyle.entries) {
                             Column(Modifier.width(104.dp), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
                                 app.siansa.ui.CardPicture(covers, null, Color(0xFF5B2A86) to Color(0xFF1E1E22), "Neo-Classical Downtempo Velvet Undertow",
-                                    Modifier.size(104.dp), style = style, showName = true)
+                                    Modifier.size(104.dp), style = style, showName = true, artists = "Sleep Token, Deftones, Loathe")
                                 Text(style.label, style = MaterialTheme.typography.labelMedium)
                             }
                         }
@@ -489,7 +489,7 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                             androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalPictureColours provides set) {
                                 Column(Modifier.width(104.dp), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
                                     app.siansa.ui.CardPicture(listOf("b", "a", "c", "d"), null, Color(0xFF6B5E4E) to Color(0xFF3B3328), "Dusty Roads",
-                                        Modifier.size(104.dp), style = app.siansa.data.PictureStyle.INK, showName = true)
+                                        Modifier.size(104.dp), style = app.siansa.data.PictureStyle.AURA, showName = true)
                                     Text(set.label, style = MaterialTheme.typography.labelMedium)
                                 }
                             }
