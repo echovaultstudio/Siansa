@@ -59,6 +59,11 @@ object CoverCache {
             SIZES.forEach { size -> CoverEtags.remove("cover:$cacheId:$size") }
             forget(loader, id)
             val anim = "anim:${CoverStore.canonical(id)}:"
+            // An album's cover at any of its versions (`al-<album>_<stamp>`): a shortcut may hold an older one.
+            if (id.startsWith("al-")) {
+                val album = "cover:al-" + id.removePrefix("al-").substringBefore('_')
+                memory?.keys?.filter { it.key.startsWith("${album}_") || it.key.startsWith("$album:") }?.forEach { memory.remove(it) }
+            }
             memory?.keys?.filter { it.key.startsWith(anim) }?.forEach { memory.remove(it) }
             runCatching { CoverStore.forget(id) }
         }

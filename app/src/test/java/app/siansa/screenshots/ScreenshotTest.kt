@@ -522,6 +522,10 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                 Column(Modifier.padding(Space.Page)) { app.siansa.ui.CrateSizeChoice(app.siansa.data.CrateSize.SMALL) {} }
             },
             // Under the row's cog: where its cards' names go, the same for every look with pictures (the owner, 21 Nov).
+            // Holding an album's cover: its card (the owner, 21 Nov), with a long name.
+            Scene("album_cover_sheet") {
+                app.siansa.ui.AlbumCoverChoices("Grand Theft Auto VI: The Album (Original Soundtrack, Deluxe Edition)") {}
+            },
             Scene("card_names_choice") {
                 Column(Modifier.padding(Space.Page)) { app.siansa.ui.NamesChoice(app.siansa.data.CardNames.ON) {} }
             },
