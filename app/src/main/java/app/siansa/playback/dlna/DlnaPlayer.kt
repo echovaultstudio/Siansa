@@ -337,7 +337,7 @@ class DlnaPlayer(private val device: DlnaDevice, private val api: MusicSource) :
     /**
      * The address the device gets for [item] and its DIDL description: the original file when that's turned on
      * for this device (the cog in the device list) and it lists the file's format (beta testers #23), else Opus 320 in
-     * Ogg when it lists Ogg or Opus and hasn't failed to play it, else MP3 320 (issue #114).
+     * Ogg when it lists Opus and hasn't failed to play it, else MP3 320 (issue #114).
      */
     private suspend fun streamFor(item: MediaItem): Pair<String, String> {
         val song = item.toSong()
@@ -348,7 +348,7 @@ class DlnaPlayer(private val device: DlnaDevice, private val api: MusicSource) :
         if (DlnaFormats.takesOpus(device.formats) && device.id !in Dlna.opusFailed && opus != raw) {
             url = opus
             mime = Streaming.CAST_OPUS_MIME
-            if (loggedOriginal.add("opus")) AppLog.i("DLNA", "${device.name} lists Ogg: songs that are converted go as Opus 320")
+            if (loggedOriginal.add("opus")) AppLog.i("DLNA", "${device.name} lists Opus: songs that are converted go as Opus 320")
         }
         if (device.id in Dlna.original.value) {
             val type = Dlna.originalType(item.mediaId, raw, song.suffix) { api.songDetails(item.mediaId).codec }
