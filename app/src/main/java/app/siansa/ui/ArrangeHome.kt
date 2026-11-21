@@ -575,7 +575,7 @@ private fun HomeLookDialog(
                     if (option == HomeLook.BANNER && look == HomeLook.BANNER) {
                         VariantChips("Style", HomeLook.BANNER, layout, Modifier.padding(start = Space.Section, bottom = Space.Small)) { layout = it; onVariant(it) }
                     }
-                    if (option == HomeLook.CAROUSEL && look == HomeLook.CAROUSEL) {
+                    if (option == look && look in HomeLook.SIZED) {
                         CrateSizeChoice(size, Modifier.padding(start = Space.Section, bottom = Space.Small)) { size = it; onCrateSize(it) }
                     }
                 }
@@ -794,7 +794,7 @@ private fun ColoursSwatch(colours: app.siansa.data.PictureColours) {
 
 private val SWATCH = 18.dp
 
-/** How big a carousel's sleeves are (the owner, 20 Nov): big, compact with three in view, or a small strip. */
+/** How big a carousel's sleeves or a row's tiles are (the owner, 20 and 21 Nov): big, compact or small. */
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 internal fun CrateSizeChoice(size: app.siansa.data.CrateSize, modifier: Modifier = Modifier, onPick: (app.siansa.data.CrateSize) -> Unit) {

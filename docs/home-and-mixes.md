@@ -54,7 +54,7 @@ The **cog** on a section changes its look, to any of the custom cards' looks:
 | Look | What it shows |
 |---|---|
 | **As it is** | The section's own look (the default). |
-| **Tiles** | A row of covers to swipe through. |
+| **Tiles** | A row of covers to swipe through. **Size**: **Big** (as tiles have always been), **Compact** or **Small**, for more in view. |
 | **Banner** | One wide card with the first covers and a button. Its **Style**: **Card**, or **Hero**: the top of the section in the first mix's own colours, its covers big, its name and line, **Play** and **Shuffle**. |
 | **List** | The first five, listed; the title opens the rest. |
 | **Play button** | A slim card: its ▶ plays the section; a tap anywhere else on the card opens it. |

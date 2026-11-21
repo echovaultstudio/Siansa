@@ -115,7 +115,7 @@ fun BeatsMixesHome(nav: NavController, shelves: Set<String>, look: HomeLook) {
 /** A mix as a tile: four of its covers two by two, its name, and what's in it. */
 @Composable
 internal fun MixMosaicTile(record: CrateRecord) {
-    Column(Modifier.width(MOSAIC_TILE).clickable(onClickLabel = "Open ${record.name}", onClick = record.onOpen).padding(LocalTileInset.current).testTag("mixMosaicTile")) {
+    Column(Modifier.width(tileWidth(LocalCrateSize.current)).clickable(onClickLabel = "Open ${record.name}", onClick = record.onOpen).padding(LocalTileInset.current).testTag("mixMosaicTile")) {
         val square = Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(8.dp))
         val colors = remember(record.key, record.colors) { record.colors ?: tileColors(record.key) }
         val names = LocalCardNames.current
@@ -127,7 +127,6 @@ internal fun MixMosaicTile(record: CrateRecord) {
     }
 }
 
-private val MOSAIC_TILE = 140.dp // as Home's other tiles
 private val REMAKING_SPINNER = 14.dp
 private const val REMAKING_ALPHA = 0.6f
 private const val REMAKING_AFTER_MS = 600L
