@@ -60,7 +60,7 @@ The **cog** on a section changes its look, to any of the custom cards' looks:
 | **Play button** | A slim card: its ▶ plays the section; a tap anywhere else on the card opens it. |
 | **Cover rows** | Covers with their details beside them, three to a column, to swipe through: the same look as a custom card's. The cover plays that album or opens that item; the row opens it. Books and podcasts show how far you are along the cover. A radio or genre shows its colours instead of a cover. |
 | **Shortcut grid** | Small tiles two to a row, like Shortcuts. Pick **2, 4, 6 or 8 tiles** under it in the same dialog. A tile opens its item; the title opens the rest. Shortcuts is the grid already as it is (its count is under Settings › Home › Top of Home); picked here, it takes the count chosen here. Its **Tiles**: **Two a row**, **Three a row** (smaller, six in the space of four), **Big tiles** (two a row, with what each is: a mix, an album, your hearts) or **Pill chips** (round chips, as many to a line as fit). Shortcuts has the same choice under its cog. |
-| **Carousel** | Big covers to flick through, the one in the middle in focus and the ones beside it blurred. Its name and what it is show **Under the covers** (the middle one's, under the row) or **On the cover** (each one's, over a soft fade at its foot): pick it under **Name and details** when Carousel is chosen. **Size**: **Big**, **Compact** (smaller covers, three in view, the name and details a size smaller), or **Small** (a strip of small squares like a row of albums, every one named, none dimmed). Tap the middle one to open it. |
+| **Carousel** | Big covers to flick through, the one in the middle in focus and the ones beside it blurred. Its name and what it is show under the row (the middle one's) or on each cover, as **Names** says (below). **Size**: **Big**, **Compact** (smaller covers, three in view, the name and details a size smaller), or **Small** (a strip of small squares like a row of albums, every one named, none dimmed). Tap the middle one to open it. |
 | **Cover grid** | The cards in a grid across the screen, each with its own picture: an album its cover, a mix four of its covers, an artist its round photo. Pick its **Columns** (2 to 6) and **Rows** (1 to 6) under it in the same dialog: the squares grow or shrink to fill the width, and cards beyond columns × rows are left out (the title opens the rest). Names show under the pictures up to 3 columns. Its **Layout**: **Even**, or **One featured**: the first card two by two with its name and line on it, five smaller ones around it, names on their covers. |
 
 A section in another look says which under its name. **Play** in a banner or the ▶ of a play button card plays the section:
@@ -80,7 +80,12 @@ its name on a label) and **Cut-outs** (circles and squares, like a scrapbook). W
 the same and one always looks the same. A card without enough covers for its style shows one cover, or Aura when it has
 none. An artist keeps its round photo.
 
-Under it, **Picture colours**: where those colours come from. **From covers** (the default) takes its covers' own
+**Names**, for Tiles, Carousel, Cover grid and a mix row as it is: **Auto** (as each look does by itself), **Under the
+picture** (two lines for the name and two for what it is, so long genres aren't cut off; no name on the picture), or
+**On the picture** (Aura, Frost, Poster and the stickers each their own way, the others on a soft fade of the
+picture's own colour).
+
+Under Pictures, **Picture colours**: where those colours come from. **From covers** (the default) takes its covers' own
 colours, made brighter so a dull cover doesn't give a dull card (a grey one turns silver). **By mood** takes them from
 its songs' moods (happy is gold, relaxed teal, sad blue, party pink, intense red…), brighter the more energetic the
 songs are: it needs Siansa Beats or AudioMuse-AI, and a mix whose songs haven't been analysed yet keeps its covers'

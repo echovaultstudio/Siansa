@@ -34,4 +34,19 @@ class CarouselNamesSettingTest {
         assertEquals(emptySet<HomeSection>(), settings().state.value.homeCarouselCompact)
         assertEquals(emptySet<HomeSection>(), settings().state.value.homeCarouselSmall)
     }
+
+    @Test fun namesAreOneChoiceForEveryLook() {
+        // The owner, 21 Nov: Names for every look with pictures; a carousel's older "on the cover" reads as On.
+        fun settings() = SettingsRepository(ApplicationProvider.getApplicationContext())
+        settings().setHomeCarouselOnCover(HomeSection.CAROUSEL, true)
+        assertEquals(CardNames.ON, settings().state.value.cardNames(HomeSection.CAROUSEL))
+        settings().setHomeNames(HomeSection.CAROUSEL, CardNames.UNDER)
+        settings().setHomeNames(HomeSection.MADE_FOR_YOU, CardNames.ON)
+        assertEquals(CardNames.UNDER, settings().state.value.cardNames(HomeSection.CAROUSEL))
+        assertEquals(CardNames.ON, settings().state.value.cardNames(HomeSection.MADE_FOR_YOU))
+        assertEquals(CardNames.AUTO, settings().state.value.cardNames(HomeSection.QUICK))
+        assertEquals(mapOf(HomeSection.QUICK to CardNames.ON), CardNames.parse("quick:on,nowhere:under,made_for_you:sideways"))
+        settings().resetHomeLooks()
+        assertEquals(CardNames.AUTO, settings().state.value.cardNames(HomeSection.MADE_FOR_YOU))
+    }
 }

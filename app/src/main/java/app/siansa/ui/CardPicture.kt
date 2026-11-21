@@ -76,6 +76,11 @@ fun CardPicture(
     showName: Boolean = false,
     // The card draws its name over the picture itself ([content]): Ink, Frost and Line then leave theirs out.
     nameOver: Boolean = false,
+    // Where its name goes (the owner, 21 Nov: the Names choice): true on it (each picture its own way, a name on a
+    // fade where the picture has none), false nowhere on it (the card puts it under), null as the picture does.
+    names: Boolean? = null,
+    // Its line under its name, where its name is on it.
+    line: String = "",
     style: PictureStyle = LocalPictureStyle.current,
     songIds: List<String> = emptyList(),
     // Its main artists, for Frost's glass and the Poster ("Sleep Token, Deftones, Loathe"): [artistLine].
@@ -84,6 +89,7 @@ fun CardPicture(
 ) {
     val draw = LocalCoverDraw.current
     val palette = LocalPictureColours.current
+    val ownName = names != false && !nameOver
     val distinct = remember(covers) { covers.filterNotNull().distinct() }
     val top = remember(covers, cover) { topCover(covers, cover) }
     val mix = covers.isNotEmpty()
@@ -104,19 +110,44 @@ fun CardPicture(
                 }
             }
             PictureStyle.COVER, PictureStyle.AUTO -> draw(top, px, Modifier.fillMaxSize(), RectangleShape, null)
-            PictureStyle.AURA -> AuraPicture(paint, title, !nameOver)
-            PictureStyle.FROST -> FrostPicture(paint, top, title, artists, !nameOver, px)
-            PictureStyle.POSTER -> PosterPicture(paint, distinct.ifEmpty { listOfNotNull(top) }, title, artists, !nameOver, px)
+            PictureStyle.AURA -> AuraPicture(paint, title, ownName)
+            PictureStyle.FROST -> FrostPicture(paint, top, title, artists, ownName, px)
+            PictureStyle.POSTER -> PosterPicture(paint, distinct.ifEmpty { listOfNotNull(top) }, title, artists, ownName, px)
             PictureStyle.GLOW -> {
                 // Its light is its colours, not the cover blurred, so a dull cover glows too.
                 Box(Modifier.fillMaxSize().glowFill(paint))
                 draw(top, px, Modifier.align(Alignment.Center).fillMaxSize(GLOW_COVER).shadow(GLOW_SHADOW, RoundedCornerShape(4.dp)), RoundedCornerShape(4.dp), null)
             }
-            PictureStyle.PILE, PictureStyle.TAPED, PictureStyle.CUTOUTS -> Stickers(shown, distinct, paint, title, showName, px)
+            PictureStyle.PILE, PictureStyle.TAPED, PictureStyle.CUTOUTS -> Stickers(shown, distinct, paint, title, names ?: showName, px)
         }
+        // A picture with no name of its own gets one on a fade of its own colour, when names go on the picture.
+        if (names == true && !nameOver && shown in UNNAMED) NameOnPicture(title, line, paint)
         content(paint)
     }
 }
+
+private val UNNAMED = setOf(PictureStyle.AUTO, PictureStyle.MOSAIC, PictureStyle.COVER, PictureStyle.GLOW)
+
+@Composable
+private fun androidx.compose.foundation.layout.BoxScope.NameOnPicture(title: String, line: String, paint: PicturePaint) {
+    BoxWithConstraints(Modifier.align(Alignment.BottomStart).fillMaxWidth()) {
+        val wide = maxWidth
+        if (wide < COLOUR_SMALLEST) return@BoxWithConstraints
+        val roomy = wide >= COLOUR_MEDIUM
+        Column(
+            Modifier.fillMaxWidth().background(nameFade(paint.deep))
+                .padding(start = Space.Small, end = Space.Small, top = if (roomy) Space.Large else Space.Section, bottom = Space.Small),
+            verticalArrangement = Arrangement.spacedBy(Space.Tight),
+        ) {
+            WholeWordsText(title, (if (wide >= COLOUR_BIG) MaterialTheme.typography.titleMedium else MaterialTheme.typography.labelLarge).copy(fontWeight = FontWeight.ExtraBold),
+                color = Color.White, maxLines = 3)
+            if (roomy && line.isNotBlank()) Text(line, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.82f), maxLines = 2, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+/** Where the cards of the row being drawn show their names (the owner, 21 Nov). */
+val LocalCardNames = androidx.compose.runtime.compositionLocalOf { app.siansa.data.CardNames.AUTO }
 
 /** Its colours as soft light: the first from the top left, the second from the foot, on its deep shade. */
 internal fun Modifier.meshFill(paint: PicturePaint): Modifier = drawBehind {

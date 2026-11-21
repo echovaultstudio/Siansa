@@ -521,9 +521,23 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
             Scene("crate_size_choice") {
                 Column(Modifier.padding(Space.Page)) { app.siansa.ui.CrateSizeChoice(app.siansa.data.CrateSize.SMALL) {} }
             },
-            // Under the row's cog: where the carousel's names go (the owner, 19 Nov).
-            Scene("crate_names_choice") {
-                Column(Modifier.padding(Space.Page)) { app.siansa.ui.CrateNamesChoice(onCover = true) {} }
+            // Under the row's cog: where its cards' names go, the same for every look with pictures (the owner, 21 Nov).
+            Scene("card_names_choice") {
+                Column(Modifier.padding(Space.Page)) { app.siansa.ui.NamesChoice(app.siansa.data.CardNames.ON) {} }
+            },
+            // Names on the picture for pictures without their own (a fade of its colour), and Aura's own.
+            Scene("names_on_pictures") {
+                val draw: app.siansa.ui.CoverDraw = { id, _, modifier, shape, filter ->
+                    Box(modifier.clip(shape).drawBehind { drawRect(Brush.linearGradient(listOf(Color(0xFFE9D9B8), Color(0xFFC9B38A))), colorFilter = filter) })
+                }
+                androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalCoverDraw provides draw) {
+                    Row(Modifier.padding(Space.Page), horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
+                        for (style in listOf(app.siansa.data.PictureStyle.MOSAIC, app.siansa.data.PictureStyle.COVER, app.siansa.data.PictureStyle.AURA)) {
+                            app.siansa.ui.CardPicture(listOf("a", "b", "c", "d"), null, Color(0xFF6B5E4E) to Color(0xFF3B3328), "Steady Alternative Rock Anthems",
+                                Modifier.size(140.dp), style = style, names = true, line = "Steady alternative rock, mostly sung")
+                        }
+                    }
+                }
             },
             // Arrange Home with Siansa Beats' rows: the line under a name wraps instead of being cut (the owner, 19 Nov).
             Scene("arrange_home_beats_rows") {
