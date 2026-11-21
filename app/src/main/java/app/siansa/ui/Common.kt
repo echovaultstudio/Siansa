@@ -350,6 +350,9 @@ fun Cover(
     // A stand-in showing here is asked for again when its time comes (StandIns: soon the first times), without the
     // cover having to leave the screen and come back (the owner, 12 Nov: a song's row kept the blue disc).
     var again by remember(coverId) { androidx.compose.runtime.mutableIntStateOf(0) }
+    // Cleared by hand (hold an album's cover): fetched fresh here at once, wherever it shows (the owner, 21 Nov).
+    val clearedAll by app.siansa.covers.CoverCache.cleared.collectAsStateWithLifecycle()
+    val cleared = coverId?.let { clearedAll[app.siansa.covers.CoverVersions.cacheId(it)] } ?: 0
     LaunchedEffect(coverId) {
         val id = coverId ?: return@LaunchedEffect
         val cacheId = app.siansa.covers.CoverVersions.cacheId(id)
@@ -363,7 +366,7 @@ fun Cover(
             }
         }
     }
-    val cached = remember(coverId, size, again) {
+    val cached = remember(coverId, size, again, cleared) {
         coverId?.let {
             // The server's stand-in, shown a while ago, is dropped here, so the cover is asked for again.
             app.siansa.covers.CoverCache.askAgain(loader, it)
@@ -375,7 +378,7 @@ fun Cover(
         if (cached != null || coverId == null) null
         else coverFallbackKeys(coverId, size).firstNotNullOfOrNull { loader.memoryCache?.get(MemoryCache.Key(it))?.image }
     }
-    val request = remember(coverId, size, again) { coverId?.let { coverRequest(context, graph, it, size) } }
+    val request = remember(coverId, size, again, cleared) { coverId?.let { coverRequest(context, graph, it, size) } }
     // Its colours, worked out in the background while it shows (CoverToneStore): the page it opens has them in its
     // first frame. A cover only scrolled past isn't read.
     LaunchedEffect(coverId) {
