@@ -1,6 +1,9 @@
 package app.siansa.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.foundation.layout.size
@@ -75,6 +78,8 @@ fun CardPicture(
     nameOver: Boolean = false,
     style: PictureStyle = LocalPictureStyle.current,
     songIds: List<String> = emptyList(),
+    // Its main artists, for Frost's glass and the Poster ("Sleep Token, Deftones, Loathe"): [artistLine].
+    artists: String = "",
     content: @Composable androidx.compose.foundation.layout.BoxScope.(PicturePaint) -> Unit = {},
 ) {
     val draw = LocalCoverDraw.current
@@ -99,7 +104,9 @@ fun CardPicture(
                 }
             }
             PictureStyle.COVER, PictureStyle.AUTO -> draw(top, px, Modifier.fillMaxSize(), RectangleShape, null)
-            PictureStyle.INK, PictureStyle.FROST, PictureStyle.LINE -> SleekPicture(shown, paint, top, title, !nameOver, px)
+            PictureStyle.AURA -> AuraPicture(paint, title, !nameOver)
+            PictureStyle.FROST -> FrostPicture(paint, top, title, artists, !nameOver, px)
+            PictureStyle.POSTER -> PosterPicture(paint, distinct.ifEmpty { listOfNotNull(top) }, title, artists, !nameOver, px)
             PictureStyle.GLOW -> {
                 // Its light is its colours, not the cover blurred, so a dull cover glows too.
                 Box(Modifier.fillMaxSize().glowFill(paint))
@@ -135,45 +142,171 @@ internal fun nameFade(shade: Color): Brush = Brush.verticalGradient(
 )
 
 /**
- * The sleek pictures (the owner, 20 Nov: the colour cards "don't suit the sleek style of the app"): black first, its
- * colour as a hint. [INK][PictureStyle.INK]: its colour glowing up from the foot, a short bar of it, its name at the top.
- * [FROST][PictureStyle.FROST]: its cover blurred behind dark glass, the cover small and sharp, its name at the foot.
- * [LINE][PictureStyle.LINE]: a thin edge in its colour, "MIX" in it, its name big at the foot.
+ * Whether the cards may move now: Home says no while it scrolls ([LocalPictureMotion]), and Android's "remove
+ * animations" says no for good.
+ */
+val LocalPictureMotion = androidx.compose.runtime.compositionLocalOf { true }
+
+@Composable
+private fun animationsOn(): Boolean {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    return remember {
+        android.provider.Settings.Global.getFloat(context.contentResolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f) > 0f
+    }
+}
+
+/**
+ * A slow clock for a moving card, 0 to 1 every [periodMs]: it starts where [seed] says, so cards beside each other
+ * don't move together, and only runs while the card may move ([LocalPictureMotion]). Read it only while drawing, so
+ * the card is redrawn, not composed again, at about 30 frames a second.
  */
 @Composable
-private fun SleekPicture(kind: PictureStyle, paint: PicturePaint, top: String?, title: String, named: Boolean, px: Int) {
-    val draw = LocalCoverDraw.current
-    val accent = paint.first
-    BoxWithConstraints(Modifier.fillMaxSize().background(SLEEK_GROUND)) {
-        val roomy = maxWidth >= COLOUR_MEDIUM
-        val inset = if (roomy) Space.Medium else Space.Small
-        val showName = named && maxWidth >= COLOUR_SMALLEST
-        val type = (if (maxWidth >= COLOUR_BIG) MaterialTheme.typography.titleLarge else if (roomy) MaterialTheme.typography.titleSmall else MaterialTheme.typography.labelMedium)
-            .copy(fontWeight = FontWeight.ExtraBold)
-        when (kind) {
-            PictureStyle.INK -> {
-                // One soft light, wide and low, so there's little to band or shimmer as it moves.
-                Box(Modifier.fillMaxSize().drawBehind {
-                    drawRect(Brush.radialGradient(listOf(accent.copy(alpha = 0.85f), accent.copy(alpha = 0f)), Offset(size.width / 2f, size.height * 1.05f), size.width * 0.72f))
-                })
-                if (showName) WholeWordsText(title, type, Modifier.align(Alignment.TopStart).padding(inset), color = SLEEK_TEXT, maxLines = 3)
-                Box(Modifier.align(Alignment.BottomStart).padding(inset).size(INK_BAR_WIDTH, INK_BAR_HEIGHT).clip(RoundedCornerShape(2.dp)).background(accent))
-            }
-            PictureStyle.FROST -> {
-                draw(top, FROST_LIGHT_PX, Modifier.fillMaxSize().graphicsLayer { scaleX = 1.25f; scaleY = 1.25f; alpha = 0.8f }
-                    .then(if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) Modifier.blur(FROST_BLUR) else Modifier), RectangleShape, null)
-                Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(SLEEK_GROUND.copy(alpha = 0.15f), SLEEK_GROUND.copy(alpha = 0.72f)))))
-                draw(top, px / 2, Modifier.align(Alignment.TopStart).padding(inset).fillMaxSize(FROST_COVER).shadow(FROST_SHADOW, RoundedCornerShape(4.dp)), RoundedCornerShape(4.dp), null)
-                if (showName) WholeWordsText(title, type, Modifier.align(Alignment.BottomStart).padding(inset), color = SLEEK_TEXT, maxLines = 3)
-            }
-            else -> {
-                Box(Modifier.fillMaxSize().border(LINE_EDGE, accent, RoundedCornerShape(8.dp)))
-                if (roomy) Text("MIX", Modifier.align(Alignment.TopStart).padding(inset), style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold, color = accent, letterSpacing = androidx.compose.ui.unit.TextUnit(1f, androidx.compose.ui.unit.TextUnitType.Sp))
-                if (showName) WholeWordsText(title, type.copy(fontWeight = FontWeight.Black), Modifier.align(Alignment.BottomStart).padding(inset), color = SLEEK_TEXT, maxLines = 3)
+private fun rememberDrift(periodMs: Int, seed: Int): androidx.compose.runtime.State<Float> {
+    val phase = remember { androidx.compose.runtime.mutableFloatStateOf(Math.floorMod(seed, 1000) / 1000f) }
+    val moving = LocalPictureMotion.current && animationsOn()
+    androidx.compose.runtime.LaunchedEffect(moving, periodMs) {
+        if (!moving) return@LaunchedEffect
+        var last = androidx.compose.animation.core.withInfiniteAnimationFrameNanos { it }
+        while (true) {
+            val now = androidx.compose.animation.core.withInfiniteAnimationFrameNanos { it }
+            if (now - last >= DRIFT_FRAME_NANOS) {
+                phase.floatValue = (phase.floatValue + (now - last) / 1_000_000f / periodMs) % 1f
+                last = now
             }
         }
     }
+    return phase
+}
+
+/** A mix's main artists, most songs first: "Sleep Token, Deftones, Loathe". */
+fun artistLine(songs: List<app.siansa.data.Song>, most: Int = 3): String =
+    songs.map { it.artist }.filter { it.isNotBlank() }.groupingBy { it }.eachCount().entries
+        .sortedByDescending { it.value }.take(most).joinToString(", ") { it.key }
+
+/** Fine grain over a moving card, so its soft colours never show steps. */
+private val GRAIN: androidx.compose.ui.graphics.ImageBitmap by lazy {
+    val size = 96
+    val random = java.util.Random(7)
+    val pixels = IntArray(size * size) { if (random.nextBoolean()) 0x22FFFFFF else 0x22000000 }
+    android.graphics.Bitmap.createBitmap(pixels, size, size, android.graphics.Bitmap.Config.ARGB_8888).asImageBitmap()
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.grain() {
+    drawRect(androidx.compose.ui.graphics.ShaderBrush(androidx.compose.ui.graphics.ImageShader(GRAIN, androidx.compose.ui.graphics.TileMode.Repeated, androidx.compose.ui.graphics.TileMode.Repeated)), alpha = GRAIN_ALPHA)
+}
+
+/**
+ * Aura (the owner, 21 Nov, after Apple Music's moving mixes): layers of its colours drifting like light through water,
+ * slow for a calm mix and quicker for a loud one ([PicturePaint.energy]), fine grain over them, its name big and tight
+ * at the foot.
+ */
+@Composable
+private fun AuraPicture(paint: PicturePaint, title: String, named: Boolean) {
+    val period = (AURA_SLOW_MS - (AURA_SLOW_MS - AURA_QUICK_MS) * paint.energy).toInt()
+    val drift = rememberDrift(period, title.hashCode())
+    BoxWithConstraints(
+        Modifier.fillMaxSize().drawBehind {
+            val a = drift.value * 2f * Math.PI.toFloat()
+            val w = size.width
+            val h = size.height
+            drawRect(lerp(paint.deep, Color.Black, 0.35f))
+            fun blob(c: Color, x: Float, y: Float, r: Float) = drawRect(Brush.radialGradient(listOf(c, c.copy(alpha = 0f)), Offset(x * w, y * h), r * w))
+            blob(paint.first, 0.28f + 0.18f * kotlin.math.sin(a), 0.3f + 0.12f * kotlin.math.cos(a), 0.9f)
+            blob(paint.second, 0.72f + 0.16f * kotlin.math.cos(a + 1f), 0.74f + 0.14f * kotlin.math.sin(a + 1f), 0.85f)
+            blob(paint.first.copy(alpha = 0.6f), 0.55f + 0.22f * kotlin.math.sin(2f * a + 2f), 0.2f + 0.16f * kotlin.math.cos(a + 2f), 0.5f)
+            drawRect(Brush.verticalGradient(0.4f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.38f)))
+            grain()
+        },
+    ) {
+        val roomy = maxWidth >= COLOUR_MEDIUM
+        val inset = if (roomy) Space.Medium else Space.Small
+        if (roomy) Text("SIANSA", Modifier.align(Alignment.TopStart).padding(inset), style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.ExtraBold, color = Color.White.copy(alpha = 0.8f), letterSpacing = androidx.compose.ui.unit.TextUnit(1.6f, androidx.compose.ui.unit.TextUnitType.Sp))
+        if (named && maxWidth >= COLOUR_SMALLEST) {
+            val type = if (maxWidth >= COLOUR_BIG) MaterialTheme.typography.headlineMedium else if (roomy) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleSmall
+            WholeWordsText(title, type.copy(fontWeight = FontWeight.Black, letterSpacing = androidx.compose.ui.unit.TextUnit(-0.4f, androidx.compose.ui.unit.TextUnitType.Sp), lineHeight = type.fontSize * 1.02f),
+                Modifier.align(Alignment.BottomStart).padding(inset), color = Color.White, maxLines = 3)
+        }
+    }
+}
+
+/**
+ * Frost (the owner, 21 Nov): its cover blurred to fill the card and slowly breathing, the sleeve floating on it with a
+ * slight tilt, its name and main artists on a pane of glass.
+ */
+@Composable
+private fun FrostPicture(paint: PicturePaint, top: String?, title: String, artists: String, named: Boolean, px: Int) {
+    val draw = LocalCoverDraw.current
+    val drift = rememberDrift(FROST_BREATH_MS, title.hashCode())
+    BoxWithConstraints(Modifier.fillMaxSize().background(lerp(paint.deep, Color.Black, 0.3f))) {
+        val wide = maxWidth
+        val roomy = wide >= COLOUR_MEDIUM
+        draw(top, FROST_LIGHT_PX, Modifier.fillMaxSize().graphicsLayer {
+            val breath = 1.25f + 0.1f * kotlin.math.sin(drift.value * 2f * Math.PI.toFloat())
+            scaleX = breath; scaleY = breath; alpha = 0.9f
+        }.then(if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) Modifier.blur(FROST_BLUR) else Modifier), RectangleShape, null)
+        // A soft light from the top, and the foot a little darker for the glass.
+        Box(Modifier.fillMaxSize().drawBehind {
+            drawRect(Brush.radialGradient(listOf(Color.White.copy(alpha = 0.1f), Color.Transparent), Offset(size.width / 2f, 0f), size.width))
+            drawRect(Brush.verticalGradient(0.35f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.45f)))
+            grain()
+        })
+        draw(top, px / 2, Modifier.align(Alignment.TopCenter).offset(y = maxHeight * FROST_SLEEVE_TOP).fillMaxSize(if (named && roomy) FROST_SLEEVE else FROST_SLEEVE_ALONE)  // spacing: exact (where the sleeve floats)
+            .graphicsLayer { rotationX = 6f; cameraDistance = 12f * density }.shadow(FROST_SHADOW, RoundedCornerShape(5.dp)), RoundedCornerShape(5.dp), null)
+        if (named && maxWidth >= COLOUR_SMALLEST) {
+            Column(
+                Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(Space.Small).clip(RoundedCornerShape(8.dp))
+                    .background(GLASS).border(GLASS_EDGE, Color.White.copy(alpha = 0.18f), RoundedCornerShape(8.dp))
+                    .padding(horizontal = Space.Small, vertical = Space.Tight + Space.Tight / 2),
+            ) {
+                Text(title, style = (if (wide >= COLOUR_BIG) MaterialTheme.typography.labelLarge else MaterialTheme.typography.labelMedium).copy(fontWeight = FontWeight.ExtraBold),
+                    color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (wide >= ARTISTS_FROM && artists.isNotBlank()) Text(artists, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.72f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+    }
+}
+
+/**
+ * Poster (the owner, 21 Nov, after Tidal's mixes): three of its covers washed in one bold colour of it, its name in
+ * heavy type on that colour below, and its main artists.
+ */
+@Composable
+private fun PosterPicture(paint: PicturePaint, covers: List<String>, title: String, artists: String, named: Boolean, px: Int) {
+    val draw = LocalCoverDraw.current
+    val accent = paint.first
+    val ink = if (accent.luminance() > POSTER_DARK_TEXT) POSTER_INK else Color.White
+    val wash = remember(accent) { wash(lerp(accent, Color.Black, 0.82f), lerp(accent, Color.White, 0.55f)) }
+    fun cover(i: Int) = covers.getOrNull(i % covers.size.coerceAtLeast(1))
+    BoxWithConstraints(Modifier.fillMaxSize().background(accent)) {
+        val wide = maxWidth
+        val roomy = wide >= COLOUR_MEDIUM
+        Box(Modifier.fillMaxWidth().fillMaxHeight(if (named) POSTER_IMAGE else 1f)) {
+            Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(POSTER_HAIRLINE)) {  // spacing: exact (a hairline between covers)
+                draw(cover(0), px / 2, Modifier.weight(1.3f).fillMaxHeight(), RectangleShape, wash)
+                Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(POSTER_HAIRLINE)) {  // spacing: exact (a hairline between covers)
+                    draw(cover(1), px / 3, Modifier.weight(1f).fillMaxWidth(), RectangleShape, wash)
+                    draw(cover(2), px / 3, Modifier.weight(1f).fillMaxWidth(), RectangleShape, wash)
+                }
+            }
+            if (named) Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0.55f to Color.Transparent, 1f to accent)))
+        }
+        if (named && wide >= COLOUR_SMALLEST) {
+            Column(Modifier.align(Alignment.BottomStart).padding(horizontal = if (roomy) Space.Medium else Space.Small, vertical = Space.Small)) {
+                val type = if (wide >= COLOUR_BIG) MaterialTheme.typography.headlineSmall else if (roomy) MaterialTheme.typography.titleMedium else MaterialTheme.typography.labelLarge
+                WholeWordsText(title, type.copy(fontWeight = FontWeight.Black, letterSpacing = androidx.compose.ui.unit.TextUnit(-0.4f, androidx.compose.ui.unit.TextUnitType.Sp), lineHeight = type.fontSize * 1.02f),
+                    color = ink, maxLines = 3)
+                if (wide >= ARTISTS_FROM && artists.isNotBlank()) Text(artists, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold,
+                    color = ink.copy(alpha = 0.7f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+    }
+}
+
+/** A cover in grey, its shadows [dark] and its lights [light]: washed in one colour. */
+internal fun wash(dark: Color, light: Color): ColorFilter {
+    fun row(d: Float, l: Float) = floatArrayOf((l - d) * 0.299f, (l - d) * 0.587f, (l - d) * 0.114f, 0f, d * 255f)
+    return ColorFilter.colorMatrix(androidx.compose.ui.graphics.ColorMatrix(row(dark.red, light.red) + row(dark.green, light.green) + row(dark.blue, light.blue) + floatArrayOf(0f, 0f, 0f, 1f, 0f)))
 }
 
 /** Where one sticker sits: its left and top as a share of the picture, its width (and height), its angle, round or not. */
@@ -256,18 +389,18 @@ private fun Stickers(kind: PictureStyle, covers: List<String>, paint: PicturePai
  * else Glow (the owner, 20 Nov: one flat cover looked poor).
  */
 internal fun pictureShown(style: PictureStyle, distinct: Int, hasCover: Boolean, mix: Boolean = true, tones: () -> List<Color?>): PictureStyle {
-    val one = if (hasCover) PictureStyle.COVER else PictureStyle.INK
+    val one = if (hasCover) PictureStyle.COVER else PictureStyle.AURA
     return when (style) {
         PictureStyle.AUTO -> when {
-            !hasCover -> PictureStyle.INK
+            !hasCover -> PictureStyle.AURA
             !mix -> PictureStyle.COVER
             distinct >= 4 && mosaicSitsWell(tones()) -> PictureStyle.MOSAIC
             else -> PictureStyle.GLOW
         }
         PictureStyle.MOSAIC -> if (distinct >= 4) PictureStyle.MOSAIC else one
         PictureStyle.PILE, PictureStyle.TAPED, PictureStyle.CUTOUTS -> if (distinct >= 2) style else one
-        PictureStyle.COVER, PictureStyle.GLOW, PictureStyle.FROST -> if (hasCover) style else PictureStyle.INK
-        PictureStyle.INK, PictureStyle.LINE -> style
+        PictureStyle.COVER, PictureStyle.GLOW, PictureStyle.FROST, PictureStyle.POSTER -> if (hasCover) style else PictureStyle.AURA
+        PictureStyle.AURA -> style
     }
 }
 
@@ -340,12 +473,22 @@ private val TAPE = Color(0xA6FFECAA)
 private val PAPER_LIGHT = Color(0xFFEFE6D2)
 private val PAPER_DARK = Color(0xFFD9CBAE)
 private val LABEL = Color(0xFF1A1206)
-private val SLEEK_GROUND = Color(0xFF131315)
-private val SLEEK_TEXT = Color(0xFFF2F2F3)
-private val INK_BAR_WIDTH = 18.dp
-private val INK_BAR_HEIGHT = 3.dp
-private val LINE_EDGE = 1.5.dp
 private const val FROST_LIGHT_PX = 64
-private const val FROST_COVER = 0.38f
 private val FROST_BLUR = 18.dp
 private val FROST_SHADOW = 8.dp
+private const val DRIFT_FRAME_NANOS = 33_000_000L
+private const val GRAIN_ALPHA = 0.22f
+private const val AURA_SLOW_MS = 22_000f
+private const val AURA_QUICK_MS = 8_000f
+private const val FROST_BREATH_MS = 14_000
+private const val FROST_SLEEVE = 0.48f
+private const val FROST_SLEEVE_ALONE = 0.6f
+private const val FROST_SLEEVE_TOP = 0.11f
+private val GLASS = Color(0x61141418)
+private val GLASS_EDGE = 0.5.dp
+private const val POSTER_IMAGE = 0.62f
+private val POSTER_HAIRLINE = 2.dp
+private const val POSTER_DARK_TEXT = 0.4f
+private val POSTER_INK = Color(0xFF0B0B0C)
+// Its artists under its name only where there's room for them to be read.
+private val ARTISTS_FROM = 136.dp

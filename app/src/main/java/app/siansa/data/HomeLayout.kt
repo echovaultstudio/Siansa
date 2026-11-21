@@ -251,9 +251,11 @@ enum class PictureStyle(val id: String, val label: String, val blurb: String) {
     COVER("cover", "One cover", "Its top album"),
     // The sleek ones (the owner, 20 Nov: the loud colour cards "don't suit the sleek style of the app"): black first,
     // its colour as a hint. Ink keeps Colour's id, so a row set to Colour shows Ink.
-    INK("colour", "Ink", "Black, its colour glowing up from the foot"),
-    FROST("frost", "Frost", "Its cover blurred behind dark glass"),
-    LINE("line", "Line", "Black, a thin edge in its colour"),
+    // Round three (the owner, 21 Nov: "more outstanding and dynamic", after Apple Music and Tidal). Aura keeps
+    // Colour's id, so a row set to Colour or Ink shows Aura; a row set to Line goes back to Auto.
+    AURA("colour", "Aura", "Its colours drifting, slow for a calm mix, quicker for a loud one"),
+    FROST("frost", "Frost", "Its cover blurred and breathing, its name on glass"),
+    POSTER("poster", "Poster", "Its covers washed in one bold colour, its name in heavy type"),
     GLOW("glow", "Glow", "One cover on its own light"),
     PILE("pile", "Stickers", "Its covers stuck on at angles"),
     TAPED("taped", "Taped", "Its covers taped on paper"),

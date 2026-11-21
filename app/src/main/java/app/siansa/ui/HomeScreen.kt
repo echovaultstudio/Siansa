@@ -42,6 +42,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -274,6 +275,8 @@ fun HomeScreen(nav: NavController) {
 
     // The Home tab tapped again: glide back to the top. From far down, jump most of the way first so it's quick.
     val listState = rememberLazyListState()
+    // Moving cards stand still while Home scrolls (the owner, 21 Nov: steady, not flickering).
+    val homeStill by remember { derivedStateOf { !listState.isScrollInProgress } }
     val scrollRequests by HomeScrollToTop.requests.collectAsStateWithLifecycle()
     var handledScroll by rememberSaveable { mutableStateOf(scrollRequests) }
     LaunchedEffect(scrollRequests) {
@@ -291,7 +294,7 @@ fun HomeScreen(nav: NavController) {
     ) { albums.drop(1).take(PLAY_ALBUMS - 1).flatMap { a -> runCatching { graph.source.album(a.id).songs }.getOrDefault(emptyList()) } }
 
     // The gap between sections, from Arrange Home's spacing slider (#554).
-    CompositionLocalProvider(LocalSectionGap provides homeGap(homeSettings.homeGap)) {
+    CompositionLocalProvider(LocalSectionGap provides homeGap(homeSettings.homeGap), LocalPictureMotion provides homeStill) {
     Box(Modifier.fillMaxSize()) {
     LazyColumn(
         Modifier.fillMaxSize().aboveKeyboard(),
@@ -748,7 +751,7 @@ private fun HeroMix(
     ) {
         Column(Modifier.padding(Space.Page)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                CardPicture(mix.songs.map { it.cover }, null, tileColors(mix.id), mix.title, Modifier.size(104.dp), songIds = mix.songs.map { it.id })
+                CardPicture(mix.songs.map { it.cover }, null, tileColors(mix.id), mix.title, Modifier.size(104.dp), songIds = mix.songs.map { it.id }, artists = artistLine(mix.songs))
                 Spacer(Modifier.width(Space.Page))
                 Column(Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {

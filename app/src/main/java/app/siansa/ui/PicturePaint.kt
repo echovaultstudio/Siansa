@@ -26,7 +26,7 @@ import kotlin.math.min
  * two bright ones ([first], [second]) for its light, and [deep], a dark shade of the first, for its ground and for the
  * fade under a name, instead of black.
  */
-data class PicturePaint(val first: Color, val second: Color, val deep: Color) {
+data class PicturePaint(val first: Color, val second: Color, val deep: Color, val energy: Float = 0.5f) {
     companion object {
         /** From any two colours: each made bright enough ([lift]), the ground a deep shade of the first. */
         fun of(a: Color, b: Color, lifted: Boolean = true): PicturePaint {
@@ -112,7 +112,7 @@ internal fun moodPaint(songs: List<TrackFeatures>): PicturePaint? {
     }
     val one = bright(top[0].key.colour)
     val two = bright((top.getOrNull(1)?.key ?: top[0].key).colour)
-    return PicturePaint(one, two, deep(one))
+    return PicturePaint(one, two, deep(one), energy)
 }
 
 /**
@@ -139,7 +139,7 @@ object MoodColourStore {
         runCatching {
             f.forEachLine { line ->
                 val p = line.split('\t')
-                if (p.size == 4) paints[p[0]] = PicturePaint(Color(p[1].toInt()), Color(p[2].toInt()), Color(p[3].toInt()))
+                if (p.size >= 4) paints[p[0]] = PicturePaint(Color(p[1].toInt()), Color(p[2].toInt()), Color(p[3].toInt()), p.getOrNull(4)?.toFloatOrNull() ?: 0.5f)
             }
         }.onFailure { AppLog.w("Colours", "Kept mood colours not readable: ${it.message}") }
     }
@@ -166,7 +166,7 @@ object MoodColourStore {
         runCatching {
             val tmp = File(f.parentFile, f.name + ".new")
             tmp.bufferedWriter().use { out ->
-                paints.forEach { (k, p) -> out.write("$k\t${p.first.toArgb()}\t${p.second.toArgb()}\t${p.deep.toArgb()}"); out.newLine() }
+                paints.forEach { (k, p) -> out.write("$k\t${p.first.toArgb()}\t${p.second.toArgb()}\t${p.deep.toArgb()}\t${p.energy}"); out.newLine() }
             }
             tmp.renameTo(f)
         }.onFailure { AppLog.w("Colours", "Couldn't keep mood colours: ${it.message}") }
