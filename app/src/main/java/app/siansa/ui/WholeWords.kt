@@ -119,7 +119,12 @@ fun wholeWordsScale(widestWord: (Float) -> Int, lines: (Float) -> Int, width: In
 
 private const val STEP = 0.05f
 
-private fun words(text: String): List<String> = text.split(Regex("\\s+")).filter { it.isNotEmpty() }
+/**
+ * The pieces a title breaks into: split at plain spaces only. Android's regex counts a no-break space as a space too
+ * (\\s is every Unicode space there), so "On repeat" held together by [keepTogether] was measured as two words, fitted
+ * at full size, and then broken inside a word ("On re / peat", the owner, 21 Nov).
+ */
+internal fun words(text: String): List<String> = text.split(Regex("[ \\t\\n]+")).filter { it.isNotEmpty() }
 
 private fun scaled(style: TextStyle, scale: Float): TextStyle = if (scale >= 1f) style else style.copy(
     fontSize = if (style.fontSize.isSpecified) style.fontSize * scale else style.fontSize,
