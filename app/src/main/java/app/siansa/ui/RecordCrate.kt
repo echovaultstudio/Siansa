@@ -237,6 +237,8 @@ private fun Sleeve(record: CrateRecord, nameOnIt: Boolean, compact: Boolean, mod
     ) {
         val ids = remember(record.songs) { record.songs.map { it.id } }
         CardPicture(record.covers, null, colors, record.name, Modifier.fillMaxSize(), RectangleShape, 600, nameOver = nameOnIt, songIds = ids,
+            // Names under the row, as the row's Names says: none on the sleeve then (the owner, 21 Nov).
+            names = if (LocalCardNames.current == app.siansa.data.CardNames.UNDER) false else null,
             artists = remember(record.songs) { artistLine(record.songs) }) { paint ->
             if (!nameOnIt) return@CardPicture
             Column(

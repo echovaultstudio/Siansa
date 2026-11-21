@@ -221,6 +221,8 @@ data class AppSettings(
     val homeUntitled: Set<HomeSection> = emptySet(),
     /** Rows shown as a carousel with each mix's name and details on its cover, not under the row (the owner, 19 Nov). */
     val homeCarouselOnCover: Set<HomeSection> = emptySet(),
+    /** Where each row's cards show their names (the owner, 21 Nov); see [cardNames]. */
+    val homeNames: Map<HomeSection, CardNames> = emptyMap(),
     /** Rows shown as the compact carousel: smaller sleeves, three in view (the owner, 20 Nov), not the big one. */
     val homeCarouselCompact: Set<HomeSection> = emptySet(),
     /** Rows shown as the small carousel: a strip of squares, each named under it (the owner, 20 Nov). */
@@ -555,6 +557,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         homeGridSizes = HomeLook.parseGridSizes(prefs.getString("home_grid_sizes", null)),
         homeUntitled = HomeSection.parseHidden(prefs.getString("home_untitled", null)),
         homeCarouselOnCover = HomeSection.parseHidden(prefs.getString("home_carousel_on_cover", null)),
+        homeNames = CardNames.parse(prefs.getString("home_names", null)),
         homeCarouselCompact = HomeSection.parseHidden(prefs.getString("home_carousel_compact", null)),
         homeCarouselSmall = HomeSection.parseHidden(prefs.getString("home_carousel_small", null)),
         homeGap = prefs.getInt("home_gap", AppSettings.HOME_GAP_DEFAULT).coerceIn(0, AppSettings.HOME_GAP_MAX),
@@ -831,6 +834,17 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         _state.value = _state.value.copy(homeCarouselOnCover = set)
     }
 
+    /**
+     * Where [section]'s cards show their names (the owner, 21 Nov). It takes over a carousel's older "on the cover", so
+     * that is cleared for it.
+     */
+    fun setHomeNames(section: HomeSection, names: CardNames) {
+        val chosen = _state.value.homeNames + (section to names)
+        val onCover = _state.value.homeCarouselOnCover - section
+        prefs.edit().putString("home_names", CardNames.format(chosen)).putString("home_carousel_on_cover", HomeSection.formatHidden(onCover)).apply()
+        _state.value = _state.value.copy(homeNames = chosen - chosen.filterValues { it == CardNames.AUTO }.keys, homeCarouselOnCover = onCover)
+    }
+
     /** [section]'s carousel: big, compact or small (the owner, 20 Nov). */
     fun setHomeCarouselSize(section: HomeSection, size: CrateSize) {
         val compact = if (size == CrateSize.COMPACT) _state.value.homeCarouselCompact + section else _state.value.homeCarouselCompact - section
@@ -939,8 +953,8 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
 
     /** Every row back in its own look, and every card in Home's colour. */
     fun resetHomeLooks() {
-        prefs.edit().remove("home_looks").remove("home_grid_sizes").remove("home_card_look").remove("home_card_looks").remove("home_carousel_on_cover").remove("home_carousel_compact").remove("home_carousel_small").remove("home_cover_grid_sizes").remove("home_variants").remove("home_pictures").remove("home_picture_colours").apply()
-        _state.value = _state.value.copy(homeLooks = emptyMap(), homeGridSizes = emptyMap(), homeCardLook = CardLook.DEFAULT, homeCardLooks = emptyMap(), homeCarouselOnCover = emptySet(), homeCarouselCompact = emptySet(), homeCarouselSmall = emptySet(), homeCoverGrids = emptyMap(), homeVariants = emptyMap(), homePictures = emptyMap(), homePictureColours = emptyMap())
+        prefs.edit().remove("home_looks").remove("home_grid_sizes").remove("home_card_look").remove("home_card_looks").remove("home_carousel_on_cover").remove("home_carousel_compact").remove("home_carousel_small").remove("home_cover_grid_sizes").remove("home_variants").remove("home_pictures").remove("home_picture_colours").remove("home_names").apply()
+        _state.value = _state.value.copy(homeLooks = emptyMap(), homeGridSizes = emptyMap(), homeCardLook = CardLook.DEFAULT, homeCardLooks = emptyMap(), homeCarouselOnCover = emptySet(), homeCarouselCompact = emptySet(), homeCarouselSmall = emptySet(), homeCoverGrids = emptyMap(), homeVariants = emptyMap(), homePictures = emptyMap(), homePictureColours = emptyMap(), homeNames = emptyMap())
     }
 
     /** How every coloured card on Home is painted (the owner, 13 Nov). */
@@ -1118,3 +1132,7 @@ fun AppSettings.carouselSize(section: HomeSection): CrateSize = when (section) {
     in homeCarouselCompact -> CrateSize.COMPACT
     else -> CrateSize.BIG
 }
+
+/** Where [section]'s cards show their names: its own choice, a carousel's older "on the cover", or Auto. */
+fun AppSettings.cardNames(section: HomeSection): CardNames =
+    homeNames[section] ?: if (section in homeCarouselOnCover) CardNames.ON else CardNames.AUTO

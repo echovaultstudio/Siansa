@@ -89,6 +89,9 @@ enum class HomeLook(val id: String, val label: String, val hint: String) {
     COVER_GRID("cover_grid", "Cover grid", "Covers in a grid across the screen: choose its columns and rows");
 
     companion object {
+        /** The looks whose cards have pictures with names, so the Names choice is theirs (the owner, 21 Nov). */
+        val NAMED = setOf(AS_IS, TILES, CAROUSEL, COVER_GRID)
+
         /** Reads the saved looks ("recent:list,added:banner"); unknown sections and looks are dropped. */
         fun parse(saved: String?): Map<HomeSection, HomeLook> {
             if (saved.isNullOrBlank()) return emptyMap()
@@ -302,5 +305,30 @@ enum class PictureColours(val id: String, val label: String) {
 
         fun format(chosen: Map<HomeSection, PictureColours>): String =
             HomeSection.entries.mapNotNull { s -> chosen[s]?.takeIf { it != COVERS }?.let { "${s.id}:${it.id}" } }.joinToString(",")
+    }
+}
+
+/**
+ * Where a row's cards show their names (the owner, 21 Nov: the same choice for every kind of card): [AUTO] as each look
+ * does by itself, under the picture, or on it.
+ */
+enum class CardNames(val id: String, val label: String) {
+    AUTO("auto", "Auto"),
+    UNDER("under", "Under the picture"),
+    ON("on", "On the picture");
+
+    companion object {
+        fun parse(saved: String?): Map<HomeSection, CardNames> {
+            if (saved.isNullOrBlank()) return emptyMap()
+            return saved.split(',').mapNotNull { pair ->
+                val (section, id) = pair.split(':').takeIf { it.size == 2 } ?: return@mapNotNull null
+                val s = HomeSection.entries.firstOrNull { it.id == section.trim() } ?: return@mapNotNull null
+                val v = entries.firstOrNull { it.id == id.trim() } ?: return@mapNotNull null
+                s to v
+            }.toMap()
+        }
+
+        fun format(chosen: Map<HomeSection, CardNames>): String =
+            HomeSection.entries.mapNotNull { s -> chosen[s]?.takeIf { it != AUTO }?.let { "${s.id}:${it.id}" } }.joinToString(",")
     }
 }

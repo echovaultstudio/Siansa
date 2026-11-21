@@ -118,13 +118,12 @@ internal fun MixMosaicTile(record: CrateRecord) {
     Column(Modifier.width(MOSAIC_TILE).clickable(onClickLabel = "Open ${record.name}", onClick = record.onOpen).padding(LocalTileInset.current).testTag("mixMosaicTile")) {
         val square = Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(8.dp))
         val colors = remember(record.key, record.colors) { record.colors ?: tileColors(record.key) }
+        val names = LocalCardNames.current
         CardPicture(record.covers, null, colors, record.name, square, songIds = remember(record.songs) { record.songs.map { it.id } },
-            artists = remember(record.songs) { artistLine(record.songs) })
-        androidx.compose.foundation.layout.Spacer(Modifier.height(Space.Small))
-        Text(record.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        if (record.caption.isNotBlank()) {
-            Text(record.caption, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
+            artists = remember(record.songs) { artistLine(record.songs) },
+            names = when (names) { app.siansa.data.CardNames.UNDER -> false; app.siansa.data.CardNames.ON -> true; else -> null }, line = record.caption)
+        // Under it, two lines each (the owner, 21 Nov: genres were cut off); on it, when the row's Names says so.
+        if (names != app.siansa.data.CardNames.ON) TileNames(record.name, record.caption)
     }
 }
 

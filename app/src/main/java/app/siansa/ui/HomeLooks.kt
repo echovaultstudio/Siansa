@@ -135,7 +135,11 @@ fun HomeCoverGrid(title: String, items: List<HomeItem>, size: app.siansa.data.Co
         Column(Modifier.padding(horizontal = Space.Page), verticalArrangement = Arrangement.spacedBy(if (size.named) Space.Medium else Space.Small)) {
             shown.chunked(size.columns).forEach { row ->
                 Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
-                    row.forEach { item -> CoverGridCell(item, size.named, Modifier.weight(1f)) }
+                    row.forEach { item ->
+                        // The Names choice (the owner, 21 Nov), else names under up to three columns.
+                        val named = when (LocalCardNames.current) { app.siansa.data.CardNames.UNDER -> true; app.siansa.data.CardNames.ON -> false; else -> size.named }
+                        CoverGridCell(item, named, Modifier.weight(1f))
+                    }
                     repeat(size.columns - row.size) { Spacer(Modifier.weight(1f)) }
                 }
             }
@@ -289,10 +293,11 @@ private fun CoverGridCell(item: HomeItem, named: Boolean, modifier: Modifier) {
             // An artist keeps its round photo whatever the row's pictures.
             item.round && item.coverArt != null -> Cover(item.coverArt, 300, square, shape)
             item.round -> Box(square.background(Brush.linearGradient(listOf(item.colors.first, item.colors.second))))
-            else -> CardPicture(item.mosaic, item.coverArt, item.colors, item.title, square, shape, showName = !named, songIds = item.songIds, artists = item.artists)
+            else -> CardPicture(item.mosaic, item.coverArt, item.colors, item.title, square, shape, showName = !named, songIds = item.songIds, artists = item.artists,
+                names = when (LocalCardNames.current) { app.siansa.data.CardNames.UNDER -> false; app.siansa.data.CardNames.ON -> true; else -> null }, line = item.subtitle)
         }
         if (named) {
-            Text(item.title, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            Text(item.title, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis,
                 textAlign = if (item.round) androidx.compose.ui.text.style.TextAlign.Center else null,
                 modifier = Modifier.fillMaxWidth().padding(top = Space.Tight))
         }
@@ -347,19 +352,32 @@ private fun argb(c: Color): Long = c.toArgb().toLong() and 0xFFFFFFFFL
 
 @Composable
 private fun HomeItemTile(item: HomeItem) {
-    if (item.mosaic.isNotEmpty() && !item.round) {
-        // A mix: its picture in the row's style, its name and line under it, as an album's tile has.
+    val names = LocalCardNames.current
+    if (!item.round && (item.mosaic.isNotEmpty() || names == app.siansa.data.CardNames.ON)) {
+        // A mix (or, with names on the picture, any cover): its picture in the row's style, its name and line under it
+        // or on it, as the row's Names choice says (the owner, 21 Nov).
+        val on = names == app.siansa.data.CardNames.ON
         Column(Modifier.width(TILE).clickable(onClickLabel = "Open ${item.title}", onClick = item.open).testTag("homeLookTile")) {
-            CardPicture(item.mosaic, item.coverArt, item.colors, item.title, Modifier.fillMaxWidth().aspectRatio(1f), songIds = item.songIds, artists = item.artists)
-            Spacer(Modifier.height(Space.Small))
-            Text(item.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (item.subtitle.isNotBlank()) Text(item.subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            CardPicture(item.mosaic, item.coverArt, item.colors, item.title, Modifier.fillMaxWidth().aspectRatio(1f), songIds = item.songIds, artists = item.artists,
+                names = when (names) { app.siansa.data.CardNames.UNDER -> false; app.siansa.data.CardNames.ON -> true; else -> null }, line = item.subtitle)
+            if (!on) TileNames(item.title, item.subtitle)
         }
     } else if (item.coverArt != null) {
         AlbumTile(item.title, item.subtitle, item.coverArt, item.open, Modifier.width(TILE).testTag("homeLookTile"), round = item.round)
     } else {
         GradientTile(title = item.title, colors = item.colors, onClick = item.open, size = TILE, modifier = Modifier.testTag("homeLookTile"))
     }
+}
+
+/**
+ * A tile's name and line under its picture: two lines each, so a long one (its genres, the owner, 21 Nov) isn't cut
+ * off after a few words.
+ */
+@Composable
+internal fun TileNames(title: String, line: String) {
+    Spacer(Modifier.height(Space.Small))
+    Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+    if (line.isNotBlank()) Text(line, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
 }
 
 /** The covers of the first items, or a colour block for an item without one. */

@@ -1,6 +1,7 @@
 package app.siansa.ui
 
 import app.siansa.data.carouselSize
+import app.siansa.data.cardNames
 import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -120,15 +121,15 @@ fun HomeSettingsSheet(nav: androidx.navigation.NavController, startOnSources: Bo
             graph.settings.setHomeLook(section, look)
         },
         gridSizes = s.homeGridSizes,
-        carouselOnCover = s.homeCarouselOnCover,
+        cardNames = HomeSection.entries.associateWith { s.cardNames(it) },
         carouselSizes = HomeSection.entries.associateWith { s.carouselSize(it) },
         onCarouselSizeChange = { section, size ->
             AppLog.i("Home", "${section.id} carousel: ${size.label}")
             graph.settings.setHomeCarouselSize(section, size)
         },
-        onCarouselOnCoverChange = { section, onCover ->
-            AppLog.i("Home", "${section.id} carousel: names ${if (onCover) "on the cover" else "under the row"}")
-            graph.settings.setHomeCarouselOnCover(section, onCover)
+        onCardNamesChange = { section, names ->
+            AppLog.i("Home", "${section.label}: names ${names.label}")
+            graph.settings.setHomeNames(section, names)
         },
         onGridSizeChange = { section, size ->
             AppLog.i("Home", "${section.label}: $size tiles in its grid")
@@ -206,8 +207,8 @@ fun ArrangeHomeSheet(
     onResetLooks: () -> Unit = {},
     // Tiles of a row shown as the shortcut grid (the owner, 10 Nov), picked in its look's dialog.
     gridSizes: Map<HomeSection, Int> = emptyMap(),
-    carouselOnCover: Set<HomeSection> = emptySet(),
-    onCarouselOnCoverChange: (HomeSection, Boolean) -> Unit = { _, _ -> },
+    cardNames: Map<HomeSection, app.siansa.data.CardNames> = emptyMap(),
+    onCardNamesChange: (HomeSection, app.siansa.data.CardNames) -> Unit = { _, _ -> },
     carouselSizes: Map<HomeSection, app.siansa.data.CrateSize> = emptyMap(),
     onCarouselSizeChange: (HomeSection, app.siansa.data.CrateSize) -> Unit = { _, _ -> },
     onGridSizeChange: (HomeSection, Int) -> Unit = { _, _ -> },
@@ -251,8 +252,8 @@ fun ArrangeHomeSheet(
             onPicture = { onPictureChange(section, it) },
             pictureColours = pictureColours[section] ?: app.siansa.data.PictureColours.COVERS,
             onPictureColours = { onPictureColoursChange(section, it) },
-            namesOnCover = section in carouselOnCover,
-            onNamesOnCover = { onCarouselOnCoverChange(section, it) },
+            names = cardNames[section] ?: app.siansa.data.CardNames.AUTO,
+            onNames = { onCardNamesChange(section, it) },
             crateSize = carouselSizes[section] ?: app.siansa.data.CrateSize.BIG,
             onCrateSize = { onCarouselSizeChange(section, it) },
             cardLook = cardLooks[section] ?: CardLook.AS_HOME,
@@ -477,8 +478,9 @@ private fun HomeLookDialog(
     // Your cards: each card's look is its own, chosen in Settings; this opens it (null: the row's looks are listed).
     onOpenSettings: (() -> Unit)? = null,
     // As a carousel, each name and its details on the cover or under the row (the owner, 19 Nov).
-    namesOnCover: Boolean = false,
-    onNamesOnCover: (Boolean) -> Unit = {},
+    // Where its cards show their names (the owner, 21 Nov): the same choice for every look with pictures.
+    names: app.siansa.data.CardNames = app.siansa.data.CardNames.AUTO,
+    onNames: (app.siansa.data.CardNames) -> Unit = {},
     // As a carousel, big, compact or small (the owner, 20 Nov).
     crateSize: app.siansa.data.CrateSize = app.siansa.data.CrateSize.BIG,
     onCrateSize: (app.siansa.data.CrateSize) -> Unit = {},
@@ -491,7 +493,7 @@ private fun HomeLookDialog(
     var layout by remember(section) { mutableStateOf(variant) }
     var pictureStyle by remember(section) { mutableStateOf(picture) }
     var pictureColour by remember(section) { mutableStateOf(pictureColours) }
-    var onCover by remember(section) { mutableStateOf(namesOnCover) }
+    var cardNames by remember(section) { mutableStateOf(names) }
     var size by remember(section) { mutableStateOf(crateSize) }
     var colour by remember(section) { mutableStateOf(cardLook) }
     AlertDialog(
@@ -530,6 +532,10 @@ private fun HomeLookDialog(
                     PictureChoice(pictureStyle) { pictureStyle = it; onPicture(it) }
                     Spacer(Modifier.height(Space.Medium))
                     PictureColoursChoice(pictureColour) { pictureColour = it; onPictureColours(it) }
+                    if (look in HomeLook.NAMED) {
+                        Spacer(Modifier.height(Space.Medium))
+                        NamesChoice(cardNames) { cardNames = it; onNames(it) }
+                    }
                     HorizontalDivider(Modifier.padding(vertical = Space.Small))
                 }
                 if (onOpenSettings != null) {
@@ -571,7 +577,6 @@ private fun HomeLookDialog(
                     }
                     if (option == HomeLook.CAROUSEL && look == HomeLook.CAROUSEL) {
                         CrateSizeChoice(size, Modifier.padding(start = Space.Section, bottom = Space.Small)) { size = it; onCrateSize(it) }
-                        CrateNamesChoice(onCover, Modifier.padding(start = Space.Section, bottom = Space.Small)) { onCover = it; onNamesOnCover(it) }
                     }
                 }
             }
@@ -808,19 +813,19 @@ internal fun CrateSizeChoice(size: app.siansa.data.CrateSize, modifier: Modifier
     }
 }
 
-/** Where a carousel shows each name and its details (the owner, 19 Nov): under the row, or on the cover. */
+/** Where a row's cards show their names (the owner, 21 Nov): as the look does, under the picture, or on it. */
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
-internal fun CrateNamesChoice(onCover: Boolean, modifier: Modifier = Modifier, onPick: (Boolean) -> Unit) {
-    Column(modifier.testTag("crateNames"), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
-        Text("Name and details", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+internal fun NamesChoice(names: app.siansa.data.CardNames, modifier: Modifier = Modifier, onPick: (app.siansa.data.CardNames) -> Unit) {
+    Column(modifier.testTag("cardNames"), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
+        Text("Names", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
-            for ((value, label) in listOf(false to "Under the covers", true to "On the cover")) {
+            for (option in app.siansa.data.CardNames.entries) {
                 FilterChip(
-                    selected = onCover == value,
-                    onClick = { onPick(value) },
-                    label = { Text(label) },
-                    modifier = Modifier.testTag(if (value) "crateNames-cover" else "crateNames-under"),
+                    selected = names == option,
+                    onClick = { onPick(option) },
+                    label = { Text(option.label) },
+                    modifier = Modifier.testTag("cardNames-${option.id}"),
                 )
             }
         }
