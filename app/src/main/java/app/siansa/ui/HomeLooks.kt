@@ -364,7 +364,8 @@ private fun HomeItemTile(item: HomeItem, tile: androidx.compose.ui.unit.Dp = TIL
                 names = when (names) { app.siansa.data.CardNames.UNDER -> false; app.siansa.data.CardNames.ON -> true; else -> null }, line = item.subtitle)
             // On Auto, a picture with its name on it has just its line under it.
             val style = LocalPictureStyle.current
-            val named = names == app.siansa.data.CardNames.AUTO && remember(style, item.mosaic, item.coverArt) { pictureNamesItself(style, item.mosaic, item.coverArt) }
+            val namesItself = androidx.compose.runtime.remember(style, item.mosaic, item.coverArt) { pictureNamesItself(style, item.mosaic, item.coverArt) }
+            val named = names == app.siansa.data.CardNames.AUTO && namesItself
             if (!on) TileNames(item.title, item.subtitle, showTitle = !named)
         }
     } else if (item.coverArt != null) {
