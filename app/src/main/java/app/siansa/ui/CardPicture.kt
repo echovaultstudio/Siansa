@@ -258,9 +258,9 @@ private fun FrostPicture(paint: PicturePaint, top: String?, title: String, artis
                     .background(GLASS).border(GLASS_EDGE, Color.White.copy(alpha = 0.18f), RoundedCornerShape(8.dp))
                     .padding(horizontal = Space.Small, vertical = Space.Tight + Space.Tight / 2),
             ) {
-                Text(title, style = (if (roomy) MaterialTheme.typography.labelLarge else MaterialTheme.typography.labelMedium).copy(fontWeight = FontWeight.ExtraBold),
+                Text(title, style = (if (maxWidth >= COLOUR_BIG) MaterialTheme.typography.labelLarge else MaterialTheme.typography.labelMedium).copy(fontWeight = FontWeight.ExtraBold),
                     color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                if (roomy && artists.isNotBlank()) Text(artists, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.72f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (maxWidth >= ARTISTS_FROM && artists.isNotBlank()) Text(artists, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.72f), maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }
@@ -294,8 +294,8 @@ private fun PosterPicture(paint: PicturePaint, covers: List<String>, title: Stri
             Column(Modifier.align(Alignment.BottomStart).padding(horizontal = if (roomy) Space.Medium else Space.Small, vertical = Space.Small)) {
                 val type = if (wide >= COLOUR_BIG) MaterialTheme.typography.headlineSmall else if (roomy) MaterialTheme.typography.titleMedium else MaterialTheme.typography.labelLarge
                 WholeWordsText(title, type.copy(fontWeight = FontWeight.Black, letterSpacing = androidx.compose.ui.unit.TextUnit(-0.4f, androidx.compose.ui.unit.TextUnitType.Sp), lineHeight = type.fontSize * 1.02f),
-                    color = ink, maxLines = 2)
-                if (roomy && artists.isNotBlank()) Text(artists, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold,
+                    color = ink, maxLines = 3)
+                if (wide >= ARTISTS_FROM && artists.isNotBlank()) Text(artists, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold,
                     color = ink.copy(alpha = 0.7f), maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
@@ -476,7 +476,7 @@ private const val FROST_LIGHT_PX = 64
 private val FROST_BLUR = 18.dp
 private val FROST_SHADOW = 8.dp
 private const val DRIFT_FRAME_NANOS = 33_000_000L
-private const val GRAIN_ALPHA = 0.5f
+private const val GRAIN_ALPHA = 0.22f
 private const val AURA_SLOW_MS = 22_000f
 private const val AURA_QUICK_MS = 8_000f
 private const val FROST_BREATH_MS = 14_000
@@ -489,3 +489,5 @@ private const val POSTER_IMAGE = 0.62f
 private val POSTER_GAP = 2.dp
 private const val POSTER_DARK_TEXT = 0.4f
 private val POSTER_INK = Color(0xFF0B0B0C)
+// Its artists under its name only where there's room for them to be read.
+private val ARTISTS_FROM = 136.dp
