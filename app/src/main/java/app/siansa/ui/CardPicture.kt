@@ -239,7 +239,8 @@ private fun FrostPicture(paint: PicturePaint, top: String?, title: String, artis
     val draw = LocalCoverDraw.current
     val drift = rememberDrift(FROST_BREATH_MS, title.hashCode())
     BoxWithConstraints(Modifier.fillMaxSize().background(lerp(paint.deep, Color.Black, 0.3f))) {
-        val roomy = maxWidth >= COLOUR_MEDIUM
+        val wide = maxWidth
+        val roomy = wide >= COLOUR_MEDIUM
         draw(top, FROST_LIGHT_PX, Modifier.fillMaxSize().graphicsLayer {
             val breath = 1.25f + 0.1f * kotlin.math.sin(drift.value * 2f * Math.PI.toFloat())
             scaleX = breath; scaleY = breath; alpha = 0.9f
@@ -258,9 +259,9 @@ private fun FrostPicture(paint: PicturePaint, top: String?, title: String, artis
                     .background(GLASS).border(GLASS_EDGE, Color.White.copy(alpha = 0.18f), RoundedCornerShape(8.dp))
                     .padding(horizontal = Space.Small, vertical = Space.Tight + Space.Tight / 2),
             ) {
-                Text(title, style = (if (maxWidth >= COLOUR_BIG) MaterialTheme.typography.labelLarge else MaterialTheme.typography.labelMedium).copy(fontWeight = FontWeight.ExtraBold),
+                Text(title, style = (if (wide >= COLOUR_BIG) MaterialTheme.typography.labelLarge else MaterialTheme.typography.labelMedium).copy(fontWeight = FontWeight.ExtraBold),
                     color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                if (maxWidth >= ARTISTS_FROM && artists.isNotBlank()) Text(artists, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.72f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (wide >= ARTISTS_FROM && artists.isNotBlank()) Text(artists, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.72f), maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }
