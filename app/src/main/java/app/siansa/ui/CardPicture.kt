@@ -282,9 +282,9 @@ private fun PosterPicture(paint: PicturePaint, covers: List<String>, title: Stri
         val wide = maxWidth
         val roomy = wide >= COLOUR_MEDIUM
         Box(Modifier.fillMaxWidth().fillMaxHeight(if (named) POSTER_IMAGE else 1f)) {
-            Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(POSTER_GAP)) {  // spacing: exact (a hairline between covers)
+            Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(POSTER_HAIRLINE)) {  // spacing: exact (a hairline between covers)
                 draw(cover(0), px / 2, Modifier.weight(1.3f).fillMaxHeight(), RectangleShape, wash)
-                Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(POSTER_GAP)) {  // spacing: exact (a hairline between covers)
+                Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(POSTER_HAIRLINE)) {  // spacing: exact (a hairline between covers)
                     draw(cover(1), px / 3, Modifier.weight(1f).fillMaxWidth(), RectangleShape, wash)
                     draw(cover(2), px / 3, Modifier.weight(1f).fillMaxWidth(), RectangleShape, wash)
                 }
@@ -487,7 +487,7 @@ private const val FROST_SLEEVE_TOP = 0.11f
 private val GLASS = Color(0x61141418)
 private val GLASS_EDGE = 0.5.dp
 private const val POSTER_IMAGE = 0.62f
-private val POSTER_GAP = 2.dp
+private val POSTER_HAIRLINE = 2.dp
 private const val POSTER_DARK_TEXT = 0.4f
 private val POSTER_INK = Color(0xFF0B0B0C)
 // Its artists under its name only where there's room for them to be read.
