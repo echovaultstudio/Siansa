@@ -120,6 +120,24 @@ class BeatsMixesTest {
         assertNull(BeatsMixes({ AppJson.parseToJsonElement(answer) }, { settings }, loadKept = { "{broken" }).state.value)
     }
 
+    @Test fun theWeatherGoesAlongForTheNames() = runBlocking {
+        // Beats 0.61 (the owner, 21 Nov): names "taking weather, location, season etc into consideration".
+        var weather: String? = "rain"
+        val rainy = BeatsMixes({ path -> asked += path; AppJson.parseToJsonElement(answer) }, { settings },
+            { ZoneId.of("Europe/Helsinki") }, { clock.toInstant().toEpochMilli() }, weather = { weather })
+        BeatsSound.restoreMixes(true)
+        rainy.refresh(force = true)
+        assertTrue(asked.last(), asked.last().endsWith("&weather=rain"))
+        weather = null
+        rainy.refresh(force = true)
+        assertFalse(asked.last(), "weather=" in asked.last())
+        val w = app.siansa.situation.Weather(app.siansa.situation.Sky.DRIZZLE, 12.0, true, null)
+        assertEquals("rain", w.forBeats)
+        assertEquals("cold", w.copy(sky = app.siansa.situation.Sky.SNOW, celsius = -14.0).forBeats)
+        assertEquals("hot", w.copy(sky = app.siansa.situation.Sky.CLEAR, celsius = 31.0).forBeats)
+        assertEquals("snow", w.copy(sky = app.siansa.situation.Sky.SNOW, celsius = -2.0).forBeats)
+    }
+
     @Test fun thePartsOfTheDayAreSiansaBeats() {
         assertEquals(listOf("night", "early", "early", "morning", "afternoon", "evening", "evening", "night"),
             listOf(4, 5, 8, 9, 12, 17, 21, 22).map { BeatsMixes.partOf(it) })

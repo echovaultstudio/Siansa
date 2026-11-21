@@ -465,6 +465,7 @@ class AppGraph(val app: Application) {
         { path -> beats.get(path) }, { settings.current },
         loadKept = { beatsMixesFile.takeIf { it.exists() }?.readText() },
         saveKept = { text -> beatsMixesFile.writeText(text) },
+        weather = { situation.weatherForMixes(settings.current.situation)?.forBeats },
     )
     val beatsMixSettings = BeatsMixSettings({ path -> beats.get(path) }, { path, body -> beats.post(path, body) })
     val taste = Taste(this)
