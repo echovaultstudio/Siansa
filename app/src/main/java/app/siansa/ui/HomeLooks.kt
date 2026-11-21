@@ -362,7 +362,11 @@ private fun HomeItemTile(item: HomeItem, tile: androidx.compose.ui.unit.Dp = TIL
         Column(Modifier.width(tile).clickable(onClickLabel = "Open ${item.title}", onClick = item.open).testTag("homeLookTile")) {
             CardPicture(item.mosaic, item.coverArt, item.colors, item.title, Modifier.fillMaxWidth().aspectRatio(1f), songIds = item.songIds, artists = item.artists,
                 names = when (names) { app.siansa.data.CardNames.UNDER -> false; app.siansa.data.CardNames.ON -> true; else -> null }, line = item.subtitle)
-            if (!on) TileNames(item.title, item.subtitle)
+            // On Auto, a picture with its name on it has just its line under it.
+            val style = LocalPictureStyle.current
+            val namesItself = androidx.compose.runtime.remember(style, item.mosaic, item.coverArt) { pictureNamesItself(style, item.mosaic, item.coverArt) }
+            val named = names == app.siansa.data.CardNames.AUTO && namesItself
+            if (!on) TileNames(item.title, item.subtitle, showTitle = !named)
         }
     } else if (item.coverArt != null) {
         AlbumTile(item.title, item.subtitle, item.coverArt, item.open, Modifier.width(tile).testTag("homeLookTile"), round = item.round)
@@ -376,9 +380,9 @@ private fun HomeItemTile(item: HomeItem, tile: androidx.compose.ui.unit.Dp = TIL
  * off after a few words.
  */
 @Composable
-internal fun TileNames(title: String, line: String) {
+internal fun TileNames(title: String, line: String, showTitle: Boolean = true) {
     Spacer(Modifier.height(Space.Small))
-    Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+    if (showTitle) Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
     if (line.isNotBlank()) Text(line, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
 }
 

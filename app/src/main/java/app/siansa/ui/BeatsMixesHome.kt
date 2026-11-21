@@ -123,7 +123,11 @@ internal fun MixMosaicTile(record: CrateRecord) {
             artists = remember(record.songs) { artistLine(record.songs) },
             names = when (names) { app.siansa.data.CardNames.UNDER -> false; app.siansa.data.CardNames.ON -> true; else -> null }, line = record.caption)
         // Under it, two lines each (the owner, 21 Nov: genres were cut off); on it, when the row's Names says so.
-        if (names != app.siansa.data.CardNames.ON) TileNames(record.name, record.caption)
+        // On Auto, a picture with its name on it (Aura, Frost, Poster) has just its line under it.
+        val style = LocalPictureStyle.current
+        val namesItself = remember(style, record.covers) { pictureNamesItself(style, record.covers, null) }
+        val named = names == app.siansa.data.CardNames.AUTO && namesItself
+        if (names != app.siansa.data.CardNames.ON) TileNames(record.name, record.caption, showTitle = !named)
     }
 }
 
