@@ -253,8 +253,12 @@ The page has three parts, one line each:
   and says **AUTO** while it's as it comes, **TUNED** once you've changed something of it.
 - **For all mixes**: **What's in a mix** (songs in a mix, how many you know, songs by one artist), **Leave out**
   (songs played lately, genres, artists), **Made around** (the part of the day, weekends, the dark, this time of year,
-  how far back your listening counts) and **In Siansa** (all in one row, names from the AI service, how long a mix is
+  **Songs you skip count for less**, how far back your listening counts) and **In Siansa** (all in one row, names from the AI service, how long a mix is
   kept).
+
+**Skips** (Siansa Beats 0.64 or newer, with **Scrobble to Siansa Beats** on): each skip halves what that song's
+listens count for in your mixes, a song skipped lately doesn't come back as a new find (in a mix or in New for you),
+and a skip fades as a listen does. They count from the next time the mixes are made.
 
 Tap a line to open its choices under it; each line says what's chosen in a few words. **Back to automatic** puts that
 line back, **All back to automatic** every one. **Make the mixes again** makes them again now, a new pick from the same

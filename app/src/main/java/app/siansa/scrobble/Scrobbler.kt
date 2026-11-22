@@ -9,6 +9,7 @@ import app.siansa.log.AppLog
 import app.siansa.net.BeatsListens
 import app.siansa.net.LastFmApi
 import app.siansa.net.beatsScrobbleReady
+import app.siansa.net.beatsSkipsReady
 import app.siansa.net.ListenBrainzApi
 import app.siansa.net.MusicSource
 import kotlinx.coroutines.CoroutineScope
@@ -21,7 +22,11 @@ import java.io.File
 
 /** A finished listen that still has to reach one or more services (kept across restarts). */
 @Serializable
-data class PendingListen(val song: Song, val startedAtSec: Long, val targets: Set<String>, val albumArtist: String? = null)
+data class PendingListen(
+    val song: Song, val startedAtSec: Long, val targets: Set<String>, val albumArtist: String? = null,
+    /** For a skip ([Scrobbler.BEATS_SKIP]): how many seconds of the song were heard. */
+    val heardSec: Long = 0,
+)
 
 /**
  * Sends "now playing" and finished listens to the music server, Siansa Beats, Last.fm and ListenBrainz/Koito.
@@ -105,6 +110,23 @@ class Scrobbler(
         }
     }
 
+    /**
+     * The listener went on to another song by hand, [listenedMs] into [song], before it counted as a listen: a skip,
+     * which Siansa Beats' mixes go by (0.64; the owner, 22 Nov). Sent with the listens, and kept like them while it
+     * can't be reached. A song that ended by itself, or one given up within a second, is no skip.
+     */
+    fun skipped(song: Song, startedAtMs: Long, listenedMs: Long) {
+        if (!scrobblesSong(song.id)) return
+        val s = settings.current
+        if (!s.beatsSkipsReady || !skipCounts(song.durationSec * 1000L, listenedMs, s.scrobblePercent)) return
+        scope.launch {
+            if (!scrobbles(song, s.scrobbleOffUsers)) return@launch
+            AppLog.i("Scrobble", "Skipped: ${song.title} (heard ${listenedMs / 1000}s of ${song.durationSec}s)")
+            pending.update { it + PendingListen(song, startedAtMs / 1000, setOf(BEATS_SKIP), heardSec = listenedMs / 1000) }
+            flush()
+        }
+    }
+
     /** The album's artist when the library knows it; a lookup that fails is no reason to lose the listen. */
     private suspend fun albumArtist(song: Song): String? =
         runCatching { albumArtistOf(song)?.trim()?.takeIf { it.isNotBlank() } }
@@ -138,6 +160,9 @@ class Scrobbler(
                 BEATS -> if (s.beatsScrobbleReady) {
                     beats?.invoke(BeatsListens.PATH, BeatsListens.listen(BeatsListens.listener(s), item.song, item.startedAtSec, item.albumArtist))
                 } else Unit
+                BEATS_SKIP -> if (s.beatsSkipsReady) {
+                    beats?.invoke(BeatsListens.SKIPS, BeatsListens.skip(BeatsListens.listener(s), item.song, item.startedAtSec, item.heardSec))
+                } else Unit
                 LASTFM -> if (s.lastFmReady) lastFm.scrobble(lastFmKeys(), item.song, item.startedAtSec, item.albumArtist) else Unit
                 LISTENBRAINZ -> if (s.listenBrainzReady) listenBrainz.listen(s.listenBrainzUrl, s.listenBrainzToken, item.song, item.startedAtSec) else Unit
                 else -> Unit
@@ -145,7 +170,7 @@ class Scrobbler(
         }.onFailure {
             val name = when (target) {
                 NAVIDROME -> "Your server (${source.kind.name.lowercase()})"
-                BEATS -> "Siansa Beats"
+                BEATS, BEATS_SKIP -> "Siansa Beats"
                 else -> target
             }
             AppLog.w("Scrobble", "$name failed for ${item.song.title}: ${it.message}")
@@ -164,6 +189,7 @@ class Scrobbler(
     companion object {
         const val NAVIDROME = "navidrome"
         const val BEATS = "beats"
+        const val BEATS_SKIP = "beats skip"
         const val LASTFM = "lastfm"
         const val LISTENBRAINZ = "listenbrainz"
     }
@@ -207,6 +233,16 @@ fun scrobbleNeededMs(durationMs: Long, percent: Int): Long =
  */
 fun listenCounts(durationMs: Long, listenedMs: Long, percent: Int): Boolean =
     durationMs !in 1..30_000 && listenedMs >= scrobbleNeededMs(durationMs, percent) && listenedMs >= 10_000
+
+/** A song given up this early is a slip of the finger or a flick through the queue, not a skip. */
+const val SKIP_HEARD_MS = 1_000L
+
+/**
+ * Whether going on from a song of [durationMs] after [listenedMs] is a skip: heard for a second or more, and not long
+ * enough to count as a listen ([listenCounts], by "When a song counts").
+ */
+fun skipCounts(durationMs: Long, listenedMs: Long, percent: Int): Boolean =
+    listenedMs >= SKIP_HEARD_MS && !listenCounts(durationMs, listenedMs, percent)
 
 /** Whether songs from [user]'s library are scrobbled, given the users set not to be (issue #356). */
 fun scrobblesFrom(user: Int, off: Set<Int>): Boolean = user !in off
