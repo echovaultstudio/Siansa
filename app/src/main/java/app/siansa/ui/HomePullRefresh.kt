@@ -1,11 +1,10 @@
 package app.siansa.ui
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -20,6 +19,16 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshState
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
@@ -34,7 +43,8 @@ import app.siansa.R
 /**
  * Pull Home down to load it again (the owner, 22 Nov: "a pull down to refresh on home page, with an animated Siansa
  * logo and the header until refresh is done"): the page follows the finger, the Siansa logo grows into the space above
- * it, and while Home loads again the page stays down with the logo breathing in that space, until [refreshing] ends.
+ * it, and while Home loads again the page stays down with the logo's half circles turning in that space, until
+ * [refreshing] ends.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -59,36 +69,73 @@ internal fun pulledDown(refreshing: Boolean, fraction: Float): Float = if (refre
 @Composable
 private fun PullLogo(state: PullToRefreshState, refreshing: Boolean, modifier: Modifier) {
     val fraction = pulledDown(refreshing, state.distanceFraction)
+    // While it loads its half circles turn round the bars like a record, as the TV's logo does while a DJ mix plays
+    // (the owner, 22 Nov), at 33⅓; let go of, they wind on to the next half turn, where they look as at rest.
+    val turn = remember { Animatable(0f) }
+    LaunchedEffect(refreshing) {
+        if (refreshing) {
+            while (true) turn.animateTo(turn.value + FULL_TURN, tween(RECORD_TURN_MS, easing = LinearEasing))
+        } else {
+            turn.animateTo(restingTurn(turn.value), tween(RECORD_STOP_MS, easing = FastOutSlowInEasing))
+            turn.snapTo(0f)
+        }
+    }
     if (fraction <= 0f) return
-    // Breathing only while it loads, so a still Home has no endless animation (and tests settle).
-    val breath = if (refreshing) {
-        val t = rememberInfiniteTransition(label = "pull")
-        t.animateFloat(0f, 1f, infiniteRepeatable(tween(BREATH_MS, easing = LinearEasing), RepeatMode.Reverse), label = "breath").value
-    } else 0f
     Box(
         modifier.windowInsetsPadding(WindowInsets.statusBars).padding(top = Space.Small).size(PULL_HEADER)
-            .semantics { contentDescription = if (refreshing) "Loading Home again" else "Pull to load Home again" },
+            .semantics { contentDescription = if (refreshing) "Loading Home again" else "Pull to load Home again" }
+            .testTag(if (refreshing) "homePullTurning" else "homePullLogo"),
         contentAlignment = Alignment.Center,
     ) {
-        Image(
-            painterResource(R.drawable.ic_launcher_foreground),
-            contentDescription = null,
-            modifier = Modifier.size(PULL_LOGO).graphicsLayer {
+        Box(
+            Modifier.size(PULL_LOGO).graphicsLayer {
                 val grow = LOGO_SMALLEST + (1f - LOGO_SMALLEST) * fraction
-                scaleX = grow * (1f + LOGO_BREATH * breath)
-                scaleY = grow * (1f + LOGO_BREATH * breath)
-                alpha = (fraction * 1.4f).coerceAtMost(1f) * (1f - LOGO_FADE * breath)
-                // A turn as the finger pulls, a slow sway while it loads.
-                rotationZ = if (refreshing) LOGO_SWAY * (breath * 2f - 1f) else 180f * (1f - fraction)
+                scaleX = grow
+                scaleY = grow
+                alpha = (fraction * 1.4f).coerceAtMost(1f)
             },
-        )
+        ) {
+            // The launcher icon's bars, and its half circles drawn here so they can turn; pulling turns them too.
+            Image(painterResource(R.drawable.logo_bars), contentDescription = null, modifier = Modifier.matchParentSize())
+            Canvas(Modifier.matchParentSize()) {
+                val unit = size.width / LOGO_VIEW
+                val pulled = if (refreshing) 0f else HALF_TURN * (1f - fraction)
+                rotate(turn.value + pulled, pivot = Offset(LOGO_MIDDLE * unit, LOGO_MIDDLE * unit)) {
+                    PULL_RINGS.forEach { drawRing(it, unit) }
+                }
+            }
+        }
     }
+}
+
+/** Where the half circles come to rest: the next half turn, where they look as they do at rest (both sides alike). */
+internal fun restingTurn(turned: Float): Float = kotlin.math.ceil(turned / HALF_TURN) * HALF_TURN
+
+/** One pair of the logo's half circles, as the launcher icon draws them (the TV's logo has the same). */
+private class Ring(val radius: Float, val sweep: Float, val width: Float, val end: Color, val mid: Color)
+
+private val PULL_RINGS = listOf(
+    Ring(radius = 22.8f, sweep = 95f, width = 2.6f, end = Color(0x4DAFC2D3), mid = Color(0x8CAFC2D3)),
+    Ring(radius = 31.2f, sweep = 94f, width = 2.2f, end = Color(0x22AFC2D3), mid = Color(0x3DAFC2D3)),
+)
+
+private fun DrawScope.drawRing(ring: Ring, unit: Float) {
+    val r = ring.radius * unit
+    val middle = LOGO_MIDDLE * unit
+    val top = Offset(middle - r, middle - r)
+    val box = Size(2 * r, 2 * r)
+    val brush = Brush.verticalGradient(listOf(ring.end, ring.mid, ring.end), startY = middle - r, endY = middle + r)
+    val stroke = Stroke(width = ring.width * unit, cap = StrokeCap.Round)
+    drawArc(brush, 180f - ring.sweep / 2, ring.sweep, useCenter = false, topLeft = top, size = box, style = stroke)
+    drawArc(brush, -ring.sweep / 2, ring.sweep, useCenter = false, topLeft = top, size = box, style = stroke)
 }
 
 private val PULL_HEADER = 72.dp
 private val PULL_LOGO = 96.dp // the launcher drawing has room round it: its mark is two thirds of this
 private const val LOGO_SMALLEST = 0.4f
-private const val LOGO_BREATH = 0.12f
-private const val LOGO_FADE = 0.25f
-private const val LOGO_SWAY = 8f
-private const val BREATH_MS = 700
+private const val LOGO_VIEW = 108f
+private const val LOGO_MIDDLE = 54f
+private const val FULL_TURN = 360f
+private const val HALF_TURN = 180f
+private const val RECORD_TURN_MS = 1_800
+private const val RECORD_STOP_MS = 700

@@ -9,8 +9,8 @@ the chips and the same height. When there are more chips than fit, they scroll a
 With no notices, or notices turned off, the button sits on its own.
 
 **Pull to load again.** At the top of Home, pull the page down: the Siansa logo grows above it, and when you let go
-Home loads everything again (Siansa Beats' mixes too, asked afresh). The page stays down with the logo breathing above
-it until that's done.
+Home loads everything again (Siansa Beats' mixes too, asked afresh). The page stays down with the logo's half circles turning
+round its bars above it, like the TV's logo while a DJ mix plays, until that's done.
 
 ## Home's menu
 
