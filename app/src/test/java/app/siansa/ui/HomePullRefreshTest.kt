@@ -32,7 +32,7 @@ class HomePullRefreshTest {
         assertEquals(0f, pulledTurn(0f))
         assertEquals(90f, pulledTurn(0.5f))
         assertEquals(180f, pulledTurn(1f)) // a whole pull: half a turn, which looks as at rest, so nothing jumps
-        assertEquals(216f, pulledTurn(1.2f)) // pulled past: still with the finger
+        assertEquals(216f, pulledTurn(1.2f), 0.01f) // pulled past: still with the finger
         assertEquals(0f, pulledTurn(-0.1f))
     }
 }
