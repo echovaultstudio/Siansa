@@ -193,7 +193,8 @@ separately, the way a DJ uses a mixer's EQ.
 - **Highs:** the new song's hats come in first, from 12 dB down to full over the first quarter; the old song's go down
   as much over the last quarter.
 - **Mids** (where a voice is): the new song's come in over the first half and the old song's go over the second.
-- **Never two vocals at once** (with Siansa Beats 0.60 or newer, which finds where each song sings): when both songs
+- **Never two vocals at once** (with Siansa Beats 0.60 or newer, which finds where each song sings; from 0.61 only
+  once **Find vocals** is switched on under its Setup, as it makes the analysis much slower): when both songs
   would sing at the same moment of the blend, the mids and highs are swapped on a bar line instead. The old song's
   voice is cut over the bar before it and the new song's let in over the bar after it, so one voice is heard at a time.
   The bar is chosen to cut off the least singing, weighing each song by how loud it is then in the blend, a phrase
