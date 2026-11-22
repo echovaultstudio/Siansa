@@ -219,6 +219,8 @@ data class AppSettings(
     val homeGridSizes: Map<HomeSection, Int> = emptyMap(),
     /** Home's sections shown without their title (issue #961). */
     val homeUntitled: Set<HomeSection> = emptySet(),
+    // The rows whose cards don't show their lines (the owner, 22 Nov): what's in a mix, an album's artist.
+    val homeNoLines: Set<HomeSection> = emptySet(),
     /** Rows shown as a carousel with each mix's name and details on its cover, not under the row (the owner, 19 Nov). */
     val homeCarouselOnCover: Set<HomeSection> = emptySet(),
     /** Where each row's cards show their names (the owner, 21 Nov); see [cardNames]. */
@@ -559,6 +561,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         homePictureColours = PictureColours.parse(prefs.getString("home_picture_colours", null)),
         homeGridSizes = HomeLook.parseGridSizes(prefs.getString("home_grid_sizes", null)),
         homeUntitled = HomeSection.parseHidden(prefs.getString("home_untitled", null)),
+        homeNoLines = HomeSection.parseHidden(prefs.getString("home_no_lines", null)),
         homeCarouselOnCover = HomeSection.parseHidden(prefs.getString("home_carousel_on_cover", null)),
         homeNames = CardNames.parse(prefs.getString("home_names", null)),
         homeCarouselCompact = HomeSection.parseHidden(prefs.getString("home_carousel_compact", null)),
@@ -823,6 +826,13 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         _state.value = _state.value.copy(homeShortcuts = kept)
     }
 
+    /** Shows or hides the lines of [section]'s cards (the owner, 22 Nov). */
+    fun setHomeLinesShown(section: HomeSection, shown: Boolean) {
+        val without = if (shown) _state.value.homeNoLines - section else _state.value.homeNoLines + section
+        prefs.edit().putString("home_no_lines", HomeSection.formatHidden(without)).apply()
+        _state.value = _state.value.copy(homeNoLines = without)
+    }
+
     /** Shows or hides [section]'s title on Home (issue #961). */
     fun setHomeTitleShown(section: HomeSection, shown: Boolean) {
         val untitled = if (shown) _state.value.homeUntitled - section else _state.value.homeUntitled + section
@@ -963,8 +973,8 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
 
     /** Every row back in its own look, and every card in Home's colour. */
     fun resetHomeLooks() {
-        prefs.edit().remove("home_looks").remove("home_grid_sizes").remove("home_card_look").remove("home_card_looks").remove("home_carousel_on_cover").remove("home_carousel_compact").remove("home_carousel_small").remove("home_cover_grid_sizes").remove("home_variants").remove("home_pictures").remove("home_hero_card_pictures").remove("home_picture_colours").remove("home_names").apply()
-        _state.value = _state.value.copy(homeLooks = emptyMap(), homeGridSizes = emptyMap(), homeCardLook = CardLook.DEFAULT, homeCardLooks = emptyMap(), homeCarouselOnCover = emptySet(), homeCarouselCompact = emptySet(), homeCarouselSmall = emptySet(), homeCoverGrids = emptyMap(), homeVariants = emptyMap(), homePictures = emptyMap(), homeHeroCardPictures = emptyMap(), homePictureColours = emptyMap(), homeNames = emptyMap())
+        prefs.edit().remove("home_looks").remove("home_grid_sizes").remove("home_card_look").remove("home_card_looks").remove("home_carousel_on_cover").remove("home_carousel_compact").remove("home_carousel_small").remove("home_cover_grid_sizes").remove("home_variants").remove("home_pictures").remove("home_hero_card_pictures").remove("home_no_lines").remove("home_picture_colours").remove("home_names").apply()
+        _state.value = _state.value.copy(homeLooks = emptyMap(), homeGridSizes = emptyMap(), homeCardLook = CardLook.DEFAULT, homeCardLooks = emptyMap(), homeCarouselOnCover = emptySet(), homeCarouselCompact = emptySet(), homeCarouselSmall = emptySet(), homeCoverGrids = emptyMap(), homeVariants = emptyMap(), homePictures = emptyMap(), homeHeroCardPictures = emptyMap(), homePictureColours = emptyMap(), homeNames = emptyMap(), homeNoLines = emptySet())
     }
 
     /** How every coloured card on Home is painted (the owner, 13 Nov). */

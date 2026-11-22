@@ -92,6 +92,9 @@ fun RecordCrate(
     namesOnCover: Boolean = LocalCrateNamesOnCover.current,
     size: app.siansa.data.CrateSize = LocalCrateSize.current,
 ) {
+    // Without their lines when the row hides them (the owner, 22 Nov).
+    @Suppress("NAME_SHADOWING")
+    val records = if (LocalCardLines.current) records else remember(records) { records.map { it.copy(caption = "") } }
     if (records.isEmpty()) return
     if (size == app.siansa.data.CrateSize.SMALL) {
         CrateStrip(records, namesOnCover, modifier)

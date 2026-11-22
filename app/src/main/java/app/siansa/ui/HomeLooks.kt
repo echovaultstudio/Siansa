@@ -96,6 +96,9 @@ fun HomeLookRow(
     gridSize: Int = LocalGridSize.current,
 ) {
     if (items.isEmpty()) return
+    // Without their lines when the row hides them (the owner, 22 Nov), whichever look draws them.
+    @Suppress("NAME_SHADOWING")
+    val items = if (LocalCardLines.current) items else remember(items) { items.map { it.copy(subtitle = "", meta = "") } }
     val open = openAll ?: items.first().open
     when (look) {
         HomeLook.AS_IS -> Shelf(title, items, key = { it.key }, onOpenAll = openAll) { item -> HomeItemTile(item) }
@@ -440,6 +443,9 @@ private fun HomeItemTile(item: HomeItem, tile: androidx.compose.ui.unit.Dp = TIL
  */
 @Composable
 internal fun TileNames(title: String, line: String, showTitle: Boolean = true) {
+    @Suppress("NAME_SHADOWING")
+    val line = if (LocalCardLines.current) line else ""
+    if (!showTitle && line.isBlank()) return
     Spacer(Modifier.height(Space.Small))
     if (showTitle) Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
     if (line.isNotBlank()) Text(line, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -630,7 +636,7 @@ fun ShortcutTiles(tiles: List<GridTile>, variant: app.siansa.data.LookVariant?, 
             Row(horizontalArrangement = Arrangement.spacedBy(if (perRow == 3) Space.Tight else Space.Small)) {
                 row.forEach { t ->
                     QuickTile(t.title, t.coverArt, t.colors, t.onClick, Modifier.weight(1f).testTag("tileGridTile"), icon = t.icon,
-                        tall = tall, subtitle = t.subtitle.takeIf { variant == app.siansa.data.LookVariant.BIG })
+                        tall = tall, subtitle = t.subtitle.takeIf { variant == app.siansa.data.LookVariant.BIG && LocalCardLines.current })
                 }
                 repeat(perRow - row.size) { Spacer(Modifier.weight(1f)) }
             }

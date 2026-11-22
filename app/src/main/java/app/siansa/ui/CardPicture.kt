@@ -47,6 +47,12 @@ import kotlin.math.min
 /** How the card pictures of the row being drawn show (the owner, 20 Nov), from its cog in Arrange Home. */
 val LocalPictureStyle = compositionLocalOf { PictureStyle.AUTO }
 
+/**
+ * Whether the row's cards show their line (what's in a mix, an album's artist), on the card or under it (the owner,
+ * 22 Nov: "make it possible to hide the descriptions on any card if they are present"). Names always show.
+ */
+val LocalCardLines = compositionLocalOf { true }
+
 /** How the cards at the foot of the row's hero show their pictures (the owner, 22 Nov): chosen apart from the hero's. */
 val LocalHeroCardPictures = compositionLocalOf { PictureStyle.AUTO }
 

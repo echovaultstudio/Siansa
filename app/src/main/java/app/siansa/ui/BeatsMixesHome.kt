@@ -121,7 +121,7 @@ internal fun MixMosaicTile(record: CrateRecord) {
         val names = LocalCardNames.current
         CardPicture(record.covers, null, colors, record.name, square, songIds = remember(record.songs) { record.songs.map { it.id } },
             artists = remember(record.songs) { artistLine(record.songs) },
-            names = when (names) { app.siansa.data.CardNames.UNDER -> false; app.siansa.data.CardNames.ON -> true; else -> null }, line = record.caption)
+            names = when (names) { app.siansa.data.CardNames.UNDER -> false; app.siansa.data.CardNames.ON -> true; else -> null }, line = if (LocalCardLines.current) record.caption else "")
         // Under it, two lines each (the owner, 21 Nov: genres were cut off); on it, when the row's Names says so.
         // On Auto, a picture with its name on it (Aura, Frost, Poster) has just its line under it.
         val style = LocalPictureStyle.current

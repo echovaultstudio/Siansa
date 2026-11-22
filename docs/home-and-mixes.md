@@ -84,6 +84,8 @@ its name on a label) and **Cut-outs** (circles and squares, like a scrapbook). W
 the same and one always looks the same. A card without enough covers for its style shows one cover, or Aura when it has
 none. An artist keeps its round photo.
 
+**Show descriptions**, for every row: off hides the small line on or under each of its cards (what's in a mix, an album's artist), whatever its look. Names stay.
+
 **Names**, for Tiles, Carousel, Cover grid and a mix row as it is: **Auto** (as each look does by itself; a picture with its name on it, Aura, Frost or Poster, has only what it is under it, not its name again), **Under the
 picture** (two lines for the name and two for what it is, so long genres aren't cut off; no name on the picture), or
 **On the picture** (Aura, Frost, Poster and the stickers each their own way, the others on a soft fade of the
@@ -208,6 +210,8 @@ zone). Three shelves, the same as on Siansa Beats' page:
 - **For now**: this part of the day, as you listen in it.
 - **Made for you**: the kinds of music you play most, each with more like it.
 - **More of you**: On repeat, Rediscover and New for you.
+
+If you'd rather have them together, **Mix settings › On Home › All in one row** (Siansa Beats 0.62) puts every mix in one row, in For now's place, and **How many cards** says how many it has at most. The other two rows then stay away.
 
 Each shelf is a row of mixes: the one in the middle is sharp, the ones beside it smaller and blurred. Swipe to flick through,
 and tap the front one to open it and play it from there. Under it is its name and a few words on what's in it ("Wiry guitars and

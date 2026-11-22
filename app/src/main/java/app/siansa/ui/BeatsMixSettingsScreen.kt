@@ -176,7 +176,7 @@ internal fun shown(name: String, d: BeatsMixSettings.Settings): Boolean {
 }
 
 private val NEEDS = mapOf(
-    "now_count" to "now", "daily_count" to "daily", "repeat_days" to "repeat", "forgotten_days" to "rediscover",
+    "now_count" to "now", "together_count" to "together", "daily_count" to "daily", "repeat_days" to "repeat", "forgotten_days" to "rediscover",
     "weekend_apart" to "time_of_day",
 )
 

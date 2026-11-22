@@ -60,4 +60,17 @@ class LookVariantTest {
         settings().resetHomeLooks()
         assertEquals(emptyMap<HomeSection, PictureStyle>(), settings().state.value.homeHeroCardPictures)
     }
+
+    @Test fun aRowsCardsCanHideTheirLines() {
+        // The owner, 22 Nov: "make it possible to hide the descriptions on any card if they are present".
+        fun settings() = SettingsRepository(androidx.test.core.app.ApplicationProvider.getApplicationContext())
+        assertEquals(emptySet<HomeSection>(), settings().state.value.homeNoLines)
+        settings().setHomeLinesShown(HomeSection.MADE_FOR_YOU, false)
+        assertEquals(setOf(HomeSection.MADE_FOR_YOU), settings().state.value.homeNoLines)
+        settings().setHomeLinesShown(HomeSection.MADE_FOR_YOU, true)
+        assertEquals(emptySet<HomeSection>(), settings().state.value.homeNoLines)
+        settings().setHomeLinesShown(HomeSection.QUICK, false)
+        settings().resetHomeLooks()
+        assertEquals(emptySet<HomeSection>(), settings().state.value.homeNoLines)
+    }
 }
