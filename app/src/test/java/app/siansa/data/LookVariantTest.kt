@@ -73,4 +73,35 @@ class LookVariantTest {
         settings().resetHomeLooks()
         assertEquals(emptySet<HomeSection>(), settings().state.value.homeNoLines)
     }
+
+    @Test fun aRowsSettingsSayWhatItIsAndGoBackToHowItCame() {
+        // The owner, 22 Nov: a tidier cog, each choice a line with what's chosen, and "Reset this row".
+        assertEquals("Hero and 3 cards · Stickers", app.siansa.ui.rowSummary(HomeLook.BANNER, LookVariant.HERO_THREE, PictureStyle.PILE))
+        assertEquals("Carousel", app.siansa.ui.rowSummary(HomeLook.CAROUSEL, null, PictureStyle.AUTO))
+        assertEquals("Cover grid · Aura", app.siansa.ui.rowSummary(HomeLook.COVER_GRID, LookVariant.FEATURED, PictureStyle.AURA))
+        assertEquals(listOf("Card", "Hero", "Hero + 3", "Hero + 4"), LookVariant.of(HomeLook.BANNER).map { app.siansa.ui.shortLabel(it) })
+        fun settings() = SettingsRepository(androidx.test.core.app.ApplicationProvider.getApplicationContext())
+        for (section in listOf(HomeSection.MADE_FOR_YOU, HomeSection.QUICK)) {
+            settings().setHomeLook(section, HomeLook.BANNER)
+            settings().setHomeVariant(section, LookVariant.HERO_FOUR)
+            settings().setHomePicture(section, PictureStyle.FROST)
+            settings().setHomeHeroCardPicture(section, PictureStyle.AURA)
+            settings().setHomePictureColours(section, PictureColours.MONO)
+            settings().setHomeNames(section, CardNames.ON)
+            settings().setHomeLinesShown(section, false)
+            settings().setHomeTitleShown(section, false)
+        }
+        settings().resetHomeRow(HomeSection.MADE_FOR_YOU)
+        val s = settings().state.value
+        // That row is as it came; the other keeps everything.
+        assertEquals(setOf(HomeSection.QUICK), s.homeLooks.keys)
+        assertEquals(mapOf(HomeSection.QUICK to LookVariant.HERO_FOUR), s.homeVariants)
+        assertEquals(mapOf(HomeSection.QUICK to PictureStyle.FROST), s.homePictures)
+        assertEquals(mapOf(HomeSection.QUICK to PictureStyle.AURA), s.homeHeroCardPictures)
+        assertEquals(mapOf(HomeSection.QUICK to PictureColours.MONO), s.homePictureColours)
+        assertEquals(mapOf(HomeSection.QUICK to CardNames.ON), s.homeNames)
+        assertEquals(setOf(HomeSection.QUICK), s.homeNoLines)
+        assertEquals(setOf(HomeSection.QUICK), s.homeUntitled)
+        settings().resetHomeLooks()
+    }
 }
