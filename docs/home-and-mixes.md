@@ -53,7 +53,19 @@ its cog). Four small cards show the choice:
 the handle at the left to move it, the eye to hide it and the cog for its look. **Reset** puts the order, the hidden
 sections, the spacing, the looks and the cards' colour back.
 
-The **cog** on a section changes its look, to any of the custom cards' looks:
+The **cog** on a section opens its settings, a sheet in three parts. Each choice is one line with what's chosen on
+it; tap the line to open its options under it, and again to close them. Only what the section's look has is listed.
+
+- **Show**: switches for **On Home** (the same as the eye), **Title** and **Descriptions**.
+- **Look**: the **Look** (small pictures of each, below), then what that look has of its own: its **Style** or
+  **Layout**, **Tiles**, **Columns and rows**, **Size**.
+- **Cards**: **Pictures** (for a hero with cards under it, **Picture of the big card** and **Pictures of the cards
+  under it**), **Colours**, **Names** and **Card colour**.
+
+**Reset this row** at its foot puts that section's look, pictures, colours, names, title and descriptions back as they
+came; where it is on Home and whether it shows stay.
+
+The looks:
 
 | Look | What it shows |
 |---|---|

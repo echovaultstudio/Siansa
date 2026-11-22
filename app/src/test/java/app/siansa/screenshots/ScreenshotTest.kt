@@ -533,12 +533,6 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     }
                 }
             },
-            Scene("picture_colours_choice") {
-                Column(Modifier.padding(Space.Page)) { app.siansa.ui.PictureColoursChoice(app.siansa.data.PictureColours.MOOD) {} }
-            },
-            Scene("picture_choice") {
-                Column(Modifier.padding(Space.Page)) { app.siansa.ui.PictureChoice(app.siansa.data.PictureStyle.FROST) {} }
-            },
             // The small carousel (the owner, 20 Nov): a strip of squares, names under each or on each.
             Scene("record_crate_small") {
                 fun record(key: String, name: String, caption: String) = app.siansa.ui.CrateRecord(key, name, caption, emptyList(), emptyList(), {})
@@ -554,16 +548,9 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     app.siansa.ui.RecordCrate(records, size = app.siansa.data.CrateSize.SMALL, namesOnCover = true)
                 }
             },
-            Scene("crate_size_choice") {
-                Column(Modifier.padding(Space.Page)) { app.siansa.ui.CrateSizeChoice(app.siansa.data.CrateSize.SMALL) {} }
-            },
-            // Under the row's cog: where its cards' names go, the same for every look with pictures (the owner, 21 Nov).
             // Holding an album's cover: its card (the owner, 21 Nov), with a long name.
             Scene("album_cover_sheet") {
                 app.siansa.ui.AlbumCoverChoices("Grand Theft Auto VI: The Album (Original Soundtrack, Deluxe Edition)") {}
-            },
-            Scene("card_names_choice") {
-                Column(Modifier.padding(Space.Page)) { app.siansa.ui.NamesChoice(app.siansa.data.CardNames.ON) {} }
             },
             // Tiles at each Size (the owner, 21 Nov: Size for tiles too, not only the carousel).
             Scene("tile_sizes") {
@@ -971,12 +958,24 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
             Scene("home_style_shortcuts") {
                 Column(Modifier.padding(vertical = Space.Page)) { app.siansa.ui.ShortcutCountRow(6) {} }
             },
-            // Arrange Home's switch for a section's title (issue #961), on and off.
-            Scene("home_section_title_switch") {
-                Column(Modifier.padding(Space.Page)) {
-                    app.siansa.ui.SectionTitleSwitch(true) {}
-                    app.siansa.ui.SectionTitleSwitch(false) {}
-                }
+            // A row's settings under its cog (the owner, 22 Nov, from the mockup): everything at a glance, each choice a
+            // line with what's chosen; then with parts opened; then a row of your own cards, which has less.
+            Scene("row_settings") {
+                app.siansa.ui.HomeLookDialog(app.siansa.data.HomeSection.MADE_FOR_YOU, app.siansa.data.HomeLook.BANNER, titleShown = true, onTitleShown = {},
+                    linesShown = false, onPick = {}, onDismiss = {}, variant = app.siansa.data.LookVariant.HERO_THREE,
+                    picture = app.siansa.data.PictureStyle.PILE, heroCardPicture = app.siansa.data.PictureStyle.AURA,
+                    pictureColours = app.siansa.data.PictureColours.MOOD, sheet = false)
+            },
+            Scene("row_settings_open") {
+                app.siansa.ui.HomeLookDialog(app.siansa.data.HomeSection.MADE_FOR_YOU, app.siansa.data.HomeLook.BANNER, titleShown = true, onTitleShown = {},
+                    linesShown = false, onPick = {}, onDismiss = {}, variant = app.siansa.data.LookVariant.HERO_THREE,
+                    picture = app.siansa.data.PictureStyle.PILE, heroCardPicture = app.siansa.data.PictureStyle.AURA,
+                    pictureColours = app.siansa.data.PictureColours.MOOD, sheet = false, opened = setOf("look", "style", "cards"))
+            },
+            Scene("row_settings_carousel_open") {
+                app.siansa.ui.HomeLookDialog(app.siansa.data.HomeSection.CAROUSEL, app.siansa.data.HomeLook.CAROUSEL, titleShown = false, onTitleShown = {},
+                    onPick = {}, onDismiss = {}, crateSize = app.siansa.data.CrateSize.COMPACT, names = app.siansa.data.CardNames.ON,
+                    sheet = false, opened = setOf("size", "colours", "names", "colour"))
             },
             // An album's details with "Continue from 8", and its bar (issue #965, the owner's layout): at rest; continuing (a ring
             // round Play); sliding shuffle onto Play (the rest dims, Play a record); while the album's DJ mix plays; and DJ mix

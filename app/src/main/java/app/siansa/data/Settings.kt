@@ -826,6 +826,34 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         _state.value = _state.value.copy(homeShortcuts = kept)
     }
 
+    /**
+     * [section] as it came (the owner, 22 Nov: "Reset this row" under its cog): its look, its look's layout and sizes,
+     * its pictures, colours and names, its title and its cards' lines. Where it is on Home and whether it shows stay.
+     */
+    fun resetHomeRow(section: HomeSection) {
+        val now = _state.value
+        val next = now.copy(
+            homeLooks = now.homeLooks - section, homeGridSizes = now.homeGridSizes - section, homeVariants = now.homeVariants - section,
+            homeCoverGrids = now.homeCoverGrids - section, homePictures = now.homePictures - section,
+            homeHeroCardPictures = now.homeHeroCardPictures - section, homePictureColours = now.homePictureColours - section,
+            homeNames = now.homeNames - section, homeCardLooks = now.homeCardLooks - section,
+            homeCarouselOnCover = now.homeCarouselOnCover - section, homeCarouselCompact = now.homeCarouselCompact - section,
+            homeCarouselSmall = now.homeCarouselSmall - section, homeNoLines = now.homeNoLines - section, homeUntitled = now.homeUntitled - section,
+        )
+        prefs.edit()
+            .putString("home_looks", HomeLook.format(next.homeLooks)).putString("home_grid_sizes", HomeLook.formatGridSizes(next.homeGridSizes))
+            .putString("home_variants", LookVariant.format(next.homeVariants)).putString("home_cover_grid_sizes", CoverGridSize.format(next.homeCoverGrids))
+            .putString("home_pictures", PictureStyle.format(next.homePictures)).putString("home_hero_card_pictures", PictureStyle.format(next.homeHeroCardPictures))
+            .putString("home_picture_colours", PictureColours.format(next.homePictureColours)).putString("home_names", CardNames.format(next.homeNames))
+            .putString("home_card_looks", CardLook.format(next.homeCardLooks))
+            .putString("home_carousel_on_cover", HomeSection.formatHidden(next.homeCarouselOnCover))
+            .putString("home_carousel_compact", HomeSection.formatHidden(next.homeCarouselCompact))
+            .putString("home_carousel_small", HomeSection.formatHidden(next.homeCarouselSmall))
+            .putString("home_no_lines", HomeSection.formatHidden(next.homeNoLines)).putString("home_untitled", HomeSection.formatHidden(next.homeUntitled))
+            .apply()
+        _state.value = next
+    }
+
     /** Shows or hides the lines of [section]'s cards (the owner, 22 Nov). */
     fun setHomeLinesShown(section: HomeSection, shown: Boolean) {
         val without = if (shown) _state.value.homeNoLines - section else _state.value.homeNoLines + section
