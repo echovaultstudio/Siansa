@@ -353,10 +353,10 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                 Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
                     app.siansa.ui.Heading("Sound quality")
                     app.siansa.ui.SwitchRow("Untouched playback", app.siansa.ui.UNTOUCHED_HINT, true, tag = "untouchedPlayback") {}
-                    HorizontalDivider()
-                    val on = app.siansa.data.AppSettings(untouchedPlayback = true, crossfade = app.siansa.data.CrossfadeMode.SMART)
+                    androidx.compose.material3.HorizontalDivider()
+                    val on = app.siansa.data.AppSettings(untouchedPlayback = true, crossfade = app.siansa.playback.CrossfadeMode.SMART)
                     app.siansa.ui.PageLink("Equaliser", app.siansa.ui.equaliserSummary(on, on = true, preset = "Rock"), "soundEqualiser") {}
-                    HorizontalDivider()
+                    androidx.compose.material3.HorizontalDivider()
                     app.siansa.ui.FoldSection("Crossfade & DJ blends", app.siansa.ui.crossfadeFoldSummary(on), startOpen = true) {
                         app.siansa.ui.Hint("Untouched playback is on, so songs play back to back with nothing blended. Switch it off above to use crossfades and DJ blends.")
                     }

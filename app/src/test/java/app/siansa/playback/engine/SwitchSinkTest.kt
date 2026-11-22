@@ -2,7 +2,7 @@ package app.siansa.playback.engine
 
 import androidx.media3.exoplayer.audio.AudioSink
 import app.siansa.data.AppSettings
-import app.siansa.data.CrossfadeMode
+import app.siansa.playback.CrossfadeMode
 import app.siansa.ui.crossfadeFoldSummary
 import app.siansa.ui.equaliserSummary
 import org.junit.Assert.assertEquals
