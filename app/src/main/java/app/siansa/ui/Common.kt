@@ -826,6 +826,8 @@ fun AlbumTile(
     modifier: Modifier = Modifier,
     round: Boolean = false,
 ) {
+    @Suppress("NAME_SHADOWING")
+    val subtitle = if (LocalCardLines.current) subtitle else ""
     // The name sits a step under the cover, and the subtitle straight under the name, as one block (issue #338):
     // an even gap between all three left the artist floating away from the album name.
     Column(modifier.clickable(onClick = onClick).padding(LocalTileInset.current)) {
@@ -877,6 +879,8 @@ fun GradientTile(
     size: Dp = 160.dp,
     busy: Boolean = false,
 ) {
+    @Suppress("NAME_SHADOWING")
+    val caption = caption.takeIf { LocalCardLines.current }
     // In the look chosen for Home's cards (the owner, 13 Nov): its own colours, softened, plain, or its cover's.
     val paint = cardPaint(colors, coverArt, "tile-$title")
     Column(modifier.width(size).clickable(onClick = onClick)) {

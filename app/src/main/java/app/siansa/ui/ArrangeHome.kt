@@ -111,6 +111,11 @@ fun HomeSettingsSheet(nav: androidx.navigation.NavController, startOnSources: Bo
         graph.settings.setHomeHidden(it)
     }, onDismiss = onDismiss, asPage = asPage,
         looks = s.homeLooks,
+        noLines = s.homeNoLines,
+        onLinesShownChange = { section, shown ->
+            AppLog.i("Home", "${section.label}: its cards' lines ${if (shown) "shown" else "hidden"}")
+            graph.settings.setHomeLinesShown(section, shown)
+        },
         untitled = s.homeUntitled,
         onTitleShownChange = { section, shown ->
             AppLog.i("Home", "${section.label}: title ${if (shown) "shown" else "hidden"}")
@@ -206,6 +211,8 @@ fun ArrangeHomeSheet(
     // Notices' cog Settings › Home › Top of Home (issue #784).
     looks: Map<HomeSection, HomeLook> = emptyMap(),
     // Each row's title shown or hidden (issue #961), in the same dialog as its look.
+    noLines: Set<HomeSection> = emptySet(),
+    onLinesShownChange: (HomeSection, Boolean) -> Unit = { _, _ -> },
     untitled: Set<HomeSection> = emptySet(),
     onTitleShownChange: (HomeSection, Boolean) -> Unit = { _, _ -> },
     onLookChange: (HomeSection, HomeLook) -> Unit = { _, _ -> },
@@ -243,6 +250,8 @@ fun ArrangeHomeSheet(
     picking?.let { section ->
         HomeLookDialog(
             section, looks[section] ?: HomeLook.AS_IS,
+            linesShown = section !in noLines,
+            onLinesShown = { onLinesShownChange(section, it) },
             titleShown = section !in untitled,
             onTitleShown = { onTitleShownChange(section, it) },
             // The grid stays open, so how many tiles it has can be picked there.
@@ -466,6 +475,9 @@ private fun HomeLookDialog(
     current: HomeLook,
     titleShown: Boolean,
     onTitleShown: (Boolean) -> Unit,
+    // Whether its cards show their lines (the owner, 22 Nov).
+    linesShown: Boolean = true,
+    onLinesShown: (Boolean) -> Unit = {},
     onPick: (HomeLook) -> Unit,
     onDismiss: () -> Unit,
     gridSize: Int = HomeLook.GRID_MOST,
@@ -500,6 +512,7 @@ private fun HomeLookDialog(
 ) {
     // The switch shows its change at once: the dialog stays open for the look.
     var shown by remember(section) { mutableStateOf(titleShown) }
+    var lines by remember(section) { mutableStateOf(linesShown) }
     var look by remember(section) { mutableStateOf(current) }
     var tiles by remember(section) { mutableStateOf(gridSize) }
     var coverGridSize by remember(section) { mutableStateOf(coverGrid) }
@@ -541,6 +554,8 @@ private fun HomeLookDialog(
                     shown = it
                     onTitleShown(it)
                 }
+                // Its cards' lines (the owner, 22 Nov): what's in a mix, an album's artist, on the card or under it.
+                if (onOpenSettings == null) CardLinesSwitch(lines) { lines = it; onLinesShown(it) }
                 HorizontalDivider(Modifier.padding(vertical = Space.Small))
                 if (onOpenSettings == null) {
                     // A hero with cards under it: the hero's picture here, the cards' own under it.
@@ -721,6 +736,22 @@ internal fun SectionTitleSwitch(shown: Boolean, onChange: (Boolean) -> Unit) {
         }
         Spacer(Modifier.width(Space.Medium))
         androidx.compose.material3.Switch(checked = shown, onCheckedChange = onChange, modifier = Modifier.testTag("homeTitleSwitch"))
+    }
+}
+
+/** Whether a row's cards show their lines, whatever its look (the owner, 22 Nov). */
+@Composable
+internal fun CardLinesSwitch(shown: Boolean, onChange: (Boolean) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clickable { onChange(!shown) }.padding(vertical = Space.Small).testTag("homeCardLines"),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text("Show descriptions", style = MaterialTheme.typography.bodyLarge)
+            Text("The small line on or under each card", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Spacer(Modifier.width(Space.Medium))
+        androidx.compose.material3.Switch(checked = shown, onCheckedChange = onChange, modifier = Modifier.testTag("homeCardLinesSwitch"))
     }
 }
 

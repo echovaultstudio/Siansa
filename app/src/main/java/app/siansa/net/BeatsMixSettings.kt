@@ -72,6 +72,7 @@ class BeatsMixSettings(
     companion object {
         val GROUPS = listOf(
             "Which mixes" to listOf("now", "now_count", "daily", "daily_count", "repeat", "rediscover", "new"),
+            "On Home" to listOf("together", "together_count"),
             "What's in each" to listOf("size", "familiar", "per_artist", "fresh_days", "leave_genres", "leave_artists"),
             "What they're made from" to listOf("time_of_day", "weekend_apart", "daylight", "season", "half_life", "repeat_days", "forgotten_days"),
             "Names" to listOf("ai_names"),

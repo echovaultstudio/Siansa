@@ -447,6 +447,23 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                 )
                 app.siansa.ui.HomeHero("For now", items.first(), play = {}, rowSongs = emptyList(), under = items.drop(1).take(3)) { _, _ -> }
             },
+            // Cards without their lines (the owner, 22 Nov): the hero's, its cards' and a row of tiles'.
+            Scene("cards_without_lines") {
+                fun item(key: String, name: String, line: String) = app.siansa.ui.HomeItem(key, name, line, open = {})
+                val items = listOf(
+                    item("h1", "Clear-sky mix", "High-energy music, sung · 50 songs"),
+                    item("h2", "Smoky Metalcore", "Calm metalcore"), item("h3", "Lively mix", "High-energy music"),
+                    item("h4", "Easy Alternative Rock", "Steady alternative rock, sung"),
+                )
+                androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalCardLines provides false, app.siansa.ui.LocalLookVariant provides app.siansa.data.LookVariant.HERO_THREE) {
+                    Column {
+                        // The hero drawn as the row draws it without lines (HomeLookRow's banner needs the app's player).
+                        val bare = items.map { it.copy(subtitle = "", meta = "") }
+                        app.siansa.ui.HomeHero("For now", bare.first(), play = {}, rowSongs = emptyList(), under = bare.drop(1)) { _, _ -> }
+                        app.siansa.ui.HomeLookRow(app.siansa.data.HomeLook.TILES, "made", "Made for you", items)
+                    }
+                }
+            },
             Scene("hero_four_cards") {
                 fun item(key: String, name: String, line: String) = app.siansa.ui.HomeItem(key, name, line, open = {})
                 val items = listOf(
