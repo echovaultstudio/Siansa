@@ -262,8 +262,8 @@ class SpacingHomeTest : SpacingCheck() {
         assertEven("The left margin is the page margin", dp(cards.first().left) - screen.left, Space.Page, 1.dp)
         assertEven("The gaps between the cards", dp(cards[1].left - cards[0].right), dp(cards[3].left - cards[2].right), 0.5.dp)
         assertEven("The gap between cards is a small step", dp(cards[1].left - cards[0].right), Space.Small, 1.dp)
+        assertEven("A section's gap from the buttons to the cards", dp(cards[0].top - play.bottom), Space.Section, 1.dp)
     }
-
 
     /** A cover grid with one featured (the owner, 22 Nov): the gap under the big square is the gap between all of them. */
     @Test fun featuredCoverGridHasEvenGaps() {
