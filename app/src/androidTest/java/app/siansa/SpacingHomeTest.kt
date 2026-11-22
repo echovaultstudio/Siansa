@@ -355,6 +355,24 @@ class SpacingHomeTest : SpacingCheck() {
         gaps.forEach { assertEven("Cards: the gap between them", it, Space.Medium, 1.dp) }
     }
 
+    /** A row's settings sheet (the owner, 22 Nov): its switch lines one height, one after the other, with the same margin on both sides. */
+    @Test fun rowSettingsLinesAreEven() {
+        compose.setContent {
+            SiansaTheme {
+                app.siansa.ui.HomeLookDialog(app.siansa.data.HomeSection.MADE_FOR_YOU, app.siansa.data.HomeLook.TILES, titleShown = true, onTitleShown = {},
+                    onPick = {}, onDismiss = {}, sheet = false)
+            }
+        }
+        val screen = compose.onRoot().getBoundsInRoot()
+        val lines = listOf("rowOnHome", "homeTitleShown", "homeCardLines").map { compose.onNodeWithTag(it).getBoundsInRoot() }
+        val height = lines[0].bottom - lines[0].top
+        lines.forEach {
+            assertEven("Row settings: each switch line as tall as the first", it.bottom - it.top, height, 1.dp)
+            assertEven("Row settings: a line's margins", it.left - screen.left, screen.right - it.right, 1.dp)
+            assertEven("Row settings: a line's left margin", it.left - screen.left, Space.Section, 1.dp)
+        }
+    }
+
     /** Home's rows as a list (issue #655): five rows of one height, evenly spaced. */
     @Test fun homeLookListRowsAreEven() {
         val items = (1..8).map { app.siansa.ui.HomeItem("a$it", "Album $it", "Artist", open = {}) }
