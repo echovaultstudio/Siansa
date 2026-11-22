@@ -263,8 +263,7 @@ private fun AuraPicture(paint: PicturePaint, title: String, named: Boolean) {
     ) {
         val roomy = maxWidth >= COLOUR_MEDIUM
         val inset = if (roomy) Space.Medium else Space.Small
-        if (roomy) Text("SIANSA", Modifier.align(Alignment.TopStart).padding(inset), style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.ExtraBold, color = Color.White.copy(alpha = 0.8f), letterSpacing = androidx.compose.ui.unit.TextUnit(1.6f, androidx.compose.ui.unit.TextUnitType.Sp))
+        // No "SIANSA" over it (the owner, 22 Nov: "we don't need to ever show that"): the name alone.
         if (named && maxWidth >= COLOUR_SMALLEST) {
             val type = if (maxWidth >= COLOUR_BIG) MaterialTheme.typography.headlineMedium else if (roomy) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleSmall
             WholeWordsText(title, type.copy(fontWeight = FontWeight.Black, letterSpacing = androidx.compose.ui.unit.TextUnit(-0.4f, androidx.compose.ui.unit.TextUnitType.Sp), lineHeight = type.fontSize * 1.02f),
