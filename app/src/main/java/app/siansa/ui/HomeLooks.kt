@@ -98,7 +98,7 @@ fun HomeLookRow(
     if (items.isEmpty()) return
     // Without their lines when the row hides them (the owner, 22 Nov), whichever look draws them.
     @Suppress("NAME_SHADOWING")
-    val items = if (LocalCardLines.current) items else remember(items) { items.map { it.copy(subtitle = "", meta = "") } }
+    val items = if (LocalCardLines.current) items else androidx.compose.runtime.remember(items) { items.map { it.copy(subtitle = "", meta = "") } }
     val open = openAll ?: items.first().open
     when (look) {
         HomeLook.AS_IS -> Shelf(title, items, key = { it.key }, onOpenAll = openAll) { item -> HomeItemTile(item) }
