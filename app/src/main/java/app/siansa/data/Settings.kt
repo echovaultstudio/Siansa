@@ -237,6 +237,8 @@ data class AppSettings(
     /** How each row's card pictures show (the owner, 20 Nov); a row not in it is [PictureStyle.AUTO]. */
     val homePictures: Map<HomeSection, PictureStyle> = emptyMap(),
     /** Where each row's picture colours come from (the owner, 20 Nov); a row not in it takes its covers'. */
+    // How the cards at a hero's foot show their pictures, apart from the hero's own (the owner, 22 Nov).
+    val homeHeroCardPictures: Map<HomeSection, PictureStyle> = emptyMap(),
     val homePictureColours: Map<HomeSection, PictureColours> = emptyMap(),
     /** The gap between Home's sections (#554), as a step of the spacing scale: 0 tight … 4 airy. 2 is the default. */
     val homeGap: Int = HOME_GAP_DEFAULT,
@@ -553,6 +555,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         homeCoverGrids = CoverGridSize.parse(prefs.getString("home_cover_grid_sizes", null)),
         homeVariants = LookVariant.parse(prefs.getString("home_variants", null)),
         homePictures = PictureStyle.parse(prefs.getString("home_pictures", null)),
+        homeHeroCardPictures = PictureStyle.parse(prefs.getString("home_hero_card_pictures", null)),
         homePictureColours = PictureColours.parse(prefs.getString("home_picture_colours", null)),
         homeGridSizes = HomeLook.parseGridSizes(prefs.getString("home_grid_sizes", null)),
         homeUntitled = HomeSection.parseHidden(prefs.getString("home_untitled", null)),
@@ -930,6 +933,13 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         _state.value = _state.value.copy(homeVariants = variants)
     }
 
+    /** How the cards at the foot of [section]'s hero show their pictures (the owner, 22 Nov). */
+    fun setHomeHeroCardPicture(section: HomeSection, style: PictureStyle) {
+        val styles = _state.value.homeHeroCardPictures + (section to style)
+        prefs.edit().putString("home_hero_card_pictures", PictureStyle.format(styles)).apply()
+        _state.value = _state.value.copy(homeHeroCardPictures = styles - styles.filterValues { it == PictureStyle.AUTO }.keys)
+    }
+
     /** How [section]'s card pictures show (the owner, 20 Nov). */
     fun setHomePicture(section: HomeSection, style: PictureStyle) {
         val styles = _state.value.homePictures + (section to style)
@@ -953,8 +963,8 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
 
     /** Every row back in its own look, and every card in Home's colour. */
     fun resetHomeLooks() {
-        prefs.edit().remove("home_looks").remove("home_grid_sizes").remove("home_card_look").remove("home_card_looks").remove("home_carousel_on_cover").remove("home_carousel_compact").remove("home_carousel_small").remove("home_cover_grid_sizes").remove("home_variants").remove("home_pictures").remove("home_picture_colours").remove("home_names").apply()
-        _state.value = _state.value.copy(homeLooks = emptyMap(), homeGridSizes = emptyMap(), homeCardLook = CardLook.DEFAULT, homeCardLooks = emptyMap(), homeCarouselOnCover = emptySet(), homeCarouselCompact = emptySet(), homeCarouselSmall = emptySet(), homeCoverGrids = emptyMap(), homeVariants = emptyMap(), homePictures = emptyMap(), homePictureColours = emptyMap(), homeNames = emptyMap())
+        prefs.edit().remove("home_looks").remove("home_grid_sizes").remove("home_card_look").remove("home_card_looks").remove("home_carousel_on_cover").remove("home_carousel_compact").remove("home_carousel_small").remove("home_cover_grid_sizes").remove("home_variants").remove("home_pictures").remove("home_hero_card_pictures").remove("home_picture_colours").remove("home_names").apply()
+        _state.value = _state.value.copy(homeLooks = emptyMap(), homeGridSizes = emptyMap(), homeCardLook = CardLook.DEFAULT, homeCardLooks = emptyMap(), homeCarouselOnCover = emptySet(), homeCarouselCompact = emptySet(), homeCarouselSmall = emptySet(), homeCoverGrids = emptyMap(), homeVariants = emptyMap(), homePictures = emptyMap(), homeHeroCardPictures = emptyMap(), homePictureColours = emptyMap(), homeNames = emptyMap())
     }
 
     /** How every coloured card on Home is painted (the owner, 13 Nov). */

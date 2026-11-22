@@ -47,6 +47,9 @@ import kotlin.math.min
 /** How the card pictures of the row being drawn show (the owner, 20 Nov), from its cog in Arrange Home. */
 val LocalPictureStyle = compositionLocalOf { PictureStyle.AUTO }
 
+/** How the cards at the foot of the row's hero show their pictures (the owner, 22 Nov): chosen apart from the hero's. */
+val LocalHeroCardPictures = compositionLocalOf { PictureStyle.AUTO }
+
 /** Draws one cover: its id, size in pixels, where, its shape and an optional colour filter. */
 typealias CoverDraw = @Composable (String?, Int, Modifier, Shape, ColorFilter?) -> Unit
 
