@@ -105,11 +105,13 @@ class SwitchSink(private val mixed: AudioSink, private val direct: AudioSink, pr
     override fun enableTunnelingV21() = active.enableTunnelingV21()
     override fun disableTunneling() = active.disableTunneling()
 
+    @androidx.annotation.RequiresApi(29)
     override fun setOffloadMode(offloadMode: Int) {
         mixed.setOffloadMode(offloadMode)
         direct.setOffloadMode(offloadMode)
     }
 
+    @androidx.annotation.RequiresApi(29)
     override fun setOffloadDelayPadding(delayInFrames: Int, paddingInFrames: Int) = active.setOffloadDelayPadding(delayInFrames, paddingInFrames)
 
     // Each way out keeps the output it was built with: the mixer's for one, the phone's own for the other.
