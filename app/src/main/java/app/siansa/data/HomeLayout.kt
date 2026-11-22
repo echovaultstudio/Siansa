@@ -224,7 +224,16 @@ enum class LookVariant(val id: String, val label: String, val look: HomeLook) {
     EVEN("even", "Even", HomeLook.COVER_GRID),
     FEATURED("featured", "One featured", HomeLook.COVER_GRID),
     CARD("card", "Card", HomeLook.BANNER),
-    HERO("hero", "Hero", HomeLook.BANNER);
+    HERO("hero", "Hero", HomeLook.BANNER),
+    // The hero with the row's next cards at its foot, on the same gradient (the owner, 22 Nov, from the mockup).
+    HERO_THREE("hero3", "Hero and 3 cards", HomeLook.BANNER),
+    HERO_FOUR("hero4", "Hero and 4 cards", HomeLook.BANNER);
+
+    /** How many of the row's next cards sit at a hero's foot; 0 for a look without. */
+    val cardsUnder: Int get() = when (this) { HERO_THREE -> 3; HERO_FOUR -> 4; else -> 0 }
+
+    /** Whether the row is drawn as a hero, alone or with cards under it. */
+    val hero: Boolean get() = this == HERO || cardsUnder > 0
 
     companion object {
         /** The variants of [look]: the first is how it looked before there were any. */

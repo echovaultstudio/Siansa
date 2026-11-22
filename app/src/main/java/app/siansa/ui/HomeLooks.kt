@@ -1,6 +1,7 @@
 package app.siansa.ui
 
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.background
@@ -100,11 +101,13 @@ fun HomeLookRow(
         HomeLook.AS_IS -> Shelf(title, items, key = { it.key }, onOpenAll = openAll) { item -> HomeItemTile(item) }
         // Tiles take the row's Size (the owner, 21 Nov: every option for every card type).
         HomeLook.TILES -> { val tile = tileWidth(LocalCrateSize.current); Shelf(title, items, key = { it.key }, onOpenAll = openAll) { item -> HomeItemTile(item, tile) } }
-        HomeLook.BANNER -> if (LocalLookVariant.current == app.siansa.data.LookVariant.HERO) {
+        HomeLook.BANNER -> if (LocalLookVariant.current?.hero == true) {
             val graph = LocalGraph.current
             val first = items.first()
             val tint = rememberHeaderTint(first.mosaic.firstOrNull { it != null } ?: first.coverArt, first.title)
-            HomeHero(title, first, play, songs, tint) { list, shuffle -> graph.player.play(list, shuffle = shuffle) }
+            // With cards (the owner, 22 Nov): the row's next three or four at the hero's foot.
+            val under = items.drop(1).take(LocalLookVariant.current?.cardsUnder ?: 0)
+            HomeHero(title, first, play, songs, tint, under) { list, shuffle -> graph.player.play(list, shuffle = shuffle) }
         }
             else HomeBanner(id, title, items, open, play, songs)
         HomeLook.LIST -> HomeList(title, items, open)
@@ -248,6 +251,9 @@ fun HomeHero(
     rowSongs: List<Song>,
     // The colour of its picture ([rememberHeaderTint]); without one, its own colours.
     tint: Color? = null,
+    // The row's next cards, at its foot on the same gradient (the owner, 22 Nov): three or four, each as wide as its
+    // share of the row, its name on its picture and its line under it.
+    under: List<HomeItem> = emptyList(),
     playSongs: (List<Song>, Boolean) -> Unit,
 ) {
     val songs = item.songs.ifEmpty { rowSongs }
@@ -261,7 +267,8 @@ fun HomeHero(
             // Deep enough under the white words in light mode too; the page only shows through at its foot.
             .background(Brush.verticalGradient(
                 0f to lerp(lerp(tint, item.colors.first, 0.35f), Color.Black, 0.25f),
-                0.75f to lerp(lerp(tint, item.colors.second, 0.5f), Color.Black, 0.4f),
+                // With cards under it the colour holds to their lines, and only its foot fades into the page.
+                (if (under.isEmpty()) 0.75f else HERO_CARDS_FADE_FROM) to lerp(lerp(tint, item.colors.second, 0.5f), Color.Black, 0.4f),
                 1f to ground,
             ))
             .clickable(onClick = item.open)
@@ -291,10 +298,45 @@ fun HomeHero(
                     ) { Icon(Icons.Rounded.Shuffle, "Shuffle", tint = Color.White) }
                 }
             }
+            if (under.isNotEmpty()) HeroCards(under)
         }
     }
 }
 
+/**
+ * The cards at a hero's foot: a section's gap under its buttons ([Space.Page] from the column and [Space.Small] here),
+ * the cards a small step apart and as wide as their share of the row, so their outer edges are the hero's own.
+ */
+@Composable
+private fun HeroCards(cards: List<HomeItem>) {
+    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth().padding(top = Space.Small).testTag("homeHeroCards")) {
+        val density = androidx.compose.ui.platform.LocalDensity.current
+        val gapPx = with(density) { Space.Small.roundToPx() }
+        val side = with(density) { heroCardSide(constraints.maxWidth, gapPx, cards.size).toDp() }
+        CompositionLocalProvider(LocalPictureStyle provides LocalHeroCardPictures.current) {
+            Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+                for (card in cards) {
+                    Column(
+                        Modifier.width(side).clip(RoundedCornerShape(8.dp)).clickable(onClickLabel = "Open ${card.title}", onClick = card.open)
+                            .semantics(mergeDescendants = true) {}.testTag("homeHeroCard"),
+                    ) {
+                        CardPicture(card.mosaic, card.coverArt, card.colors, card.title, Modifier.size(side), RoundedCornerShape(8.dp), 300,
+                            names = true, line = "", songIds = card.songIds, artists = card.artists)
+                        if (card.subtitle.isNotBlank()) {
+                            Spacer(Modifier.height(Space.Small))
+                            Text(card.subtitle, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.82f), maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** The side of each of [count] cards, in px, sharing a row [width] wide with [gap] between them. */
+internal fun heroCardSide(width: Int, gap: Int, count: Int): Int = ((width - gap * (count - 1).coerceAtLeast(0)) / count.coerceAtLeast(1)).coerceAtLeast(0)
+
+private const val HERO_CARDS_FADE_FROM = 0.93f
 private val HERO_COVER = 148.dp
 private val HERO_BUTTON = 48.dp
 

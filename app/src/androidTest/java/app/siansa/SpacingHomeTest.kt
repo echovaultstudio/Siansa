@@ -248,6 +248,23 @@ class SpacingHomeTest : SpacingCheck() {
         assertEven("The gap is a small step", dp(boxes[1].left - boxes[0].right), Space.Small, 1.dp)
     }
 
+    /** A hero with cards at its foot (the owner, 22 Nov: "spacing needs to be 100% correct"). */
+    @Test fun heroCardsSitEvenlyAtItsFoot() {
+        val items = (1..5).map { i -> app.siansa.ui.HomeItem(key = "h$i", title = "Mix $i with a long name", subtitle = "Calm music", open = {}) }
+        compose.setContent { SiansaTheme { Column { app.siansa.ui.HomeHero("For now", items.first(), play = {}, rowSongs = emptyList(), under = items.drop(1)) { _, _ -> } } } }
+        val screen = compose.onRoot().getBoundsInRoot()
+        val cards = compose.onAllNodesWithTag("homeHeroCard").fetchSemanticsNodes().map { it.boundsInRoot }
+        val play = compose.onNodeWithTag("homeHeroPlay").fetchSemanticsNode().boundsInRoot
+        assertEquals(4, cards.size)
+        val d = compose.density
+        fun dp(px: Float) = with(d) { px.toDp() }
+        assertEven("The cards' outer edges are the page's margins", dp(cards.first().left) - screen.left, screen.right - dp(cards.last().right), 1.dp)
+        assertEven("The left margin is the page margin", dp(cards.first().left) - screen.left, Space.Page, 1.dp)
+        assertEven("The gaps between the cards", dp(cards[1].left - cards[0].right), dp(cards[3].left - cards[2].right), 0.5.dp)
+        assertEven("The gap between cards is a small step", dp(cards[1].left - cards[0].right), Space.Small, 1.dp)
+        assertEven("A section's gap from the buttons to the cards", dp(cards[0].top - play.bottom), Space.Section, 1.dp)
+    }
+
     /** A cover grid with one featured (the owner, 22 Nov): the gap under the big square is the gap between all of them. */
     @Test fun featuredCoverGridHasEvenGaps() {
         val items = (1..6).map { i -> app.siansa.ui.HomeItem(key = "f$i", title = "Mix $i with a long name", subtitle = "Calm music", open = {}) }

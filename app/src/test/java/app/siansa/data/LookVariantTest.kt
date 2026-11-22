@@ -15,7 +15,7 @@ class LookVariantTest {
     @Test fun eachLookHasItsOwnFirstOneAsBefore() {
         assertEquals(listOf("Two a row", "Three a row", "Big tiles", "Pill chips"), LookVariant.of(HomeLook.GRID).map { it.label })
         assertEquals(listOf(LookVariant.EVEN, LookVariant.FEATURED), LookVariant.of(HomeLook.COVER_GRID))
-        assertEquals(listOf(LookVariant.CARD, LookVariant.HERO), LookVariant.of(HomeLook.BANNER))
+        assertEquals(listOf(LookVariant.CARD, LookVariant.HERO, LookVariant.HERO_THREE, LookVariant.HERO_FOUR), LookVariant.of(HomeLook.BANNER))
         assertEquals(emptyList<LookVariant>(), LookVariant.of(HomeLook.LIST))
     }
 
@@ -41,5 +41,23 @@ class LookVariantTest {
         assertEquals("Album", shortcutKind("album/1"))
         assertEquals("Radio", shortcutKind("radio/mood/chill"))
         assertEquals("", shortcutKind("somewhere"))
+    }
+
+    @Test fun aHeroCanHaveThreeOrFourCardsUnderItWithPicturesOfTheirOwn() {
+        // The owner, 22 Nov: "Extended hero looks awesome. Let users choose different pictures for main top card and
+        // the bottom ones also".
+        assertEquals(listOf(0, 0, 3, 4), LookVariant.of(HomeLook.BANNER).map { it.cardsUnder })
+        assertEquals(listOf(false, true, true, true), LookVariant.of(HomeLook.BANNER).map { it.hero })
+        assertEquals(mapOf(HomeSection.MADE_FOR_YOU to LookVariant.HERO_FOUR), LookVariant.parse("made:hero4,quick:hero9"))
+        // Cards share the row: 358 px wide with 8 between, as in the mockup.
+        assertEquals(114, app.siansa.ui.heroCardSide(358, 8, 3))
+        assertEquals(83, app.siansa.ui.heroCardSide(358, 8, 4))
+        fun settings() = SettingsRepository(androidx.test.core.app.ApplicationProvider.getApplicationContext())
+        settings().setHomePicture(HomeSection.MADE_FOR_YOU, PictureStyle.PILE)
+        settings().setHomeHeroCardPicture(HomeSection.MADE_FOR_YOU, PictureStyle.AURA)
+        assertEquals(PictureStyle.PILE, settings().state.value.homePictures[HomeSection.MADE_FOR_YOU])
+        assertEquals(PictureStyle.AURA, settings().state.value.homeHeroCardPictures[HomeSection.MADE_FOR_YOU])
+        settings().resetHomeLooks()
+        assertEquals(emptyMap<HomeSection, PictureStyle>(), settings().state.value.homeHeroCardPictures)
     }
 }

@@ -446,6 +446,9 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                 )
                 Column(verticalArrangement = Arrangement.spacedBy(Space.Section)) {
                     app.siansa.ui.HomeHero("Made for you", items.first(), play = {}, rowSongs = emptyList()) { _, _ -> }
+                    // With the row's next cards at its foot (the owner, 22 Nov): three, then four.
+                    app.siansa.ui.HomeHero("For now", items.first(), play = {}, rowSongs = emptyList(), under = items.drop(1).take(3)) { _, _ -> }
+                    app.siansa.ui.HomeHero("For now", items.first(), play = {}, rowSongs = emptyList(), under = items.drop(1).take(4)) { _, _ -> }
                     app.siansa.ui.HomeFeaturedGrid("Made for you", items)
                 }
             },

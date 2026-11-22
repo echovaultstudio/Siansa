@@ -146,6 +146,11 @@ fun HomeSettingsSheet(nav: androidx.navigation.NavController, startOnSources: Bo
             AppLog.i("Home", "${section.label}: pictures as ${style.label}")
             graph.settings.setHomePicture(section, style)
         },
+        heroCardPictures = s.homeHeroCardPictures,
+        onHeroCardPictureChange = { section, style ->
+            AppLog.i("Home", "${section.label}: the pictures of the cards under its hero as ${style.label}")
+            graph.settings.setHomeHeroCardPicture(section, style)
+        },
         variants = s.homeVariants,
         onVariantChange = { section, variant ->
             AppLog.i("Home", "${section.label}: ${variant.look.label} as ${variant.label}")
@@ -219,6 +224,9 @@ fun ArrangeHomeSheet(
     onVariantChange: (HomeSection, app.siansa.data.LookVariant) -> Unit = { _, _ -> },
     // How each row's card pictures show (the owner, 20 Nov).
     pictures: Map<HomeSection, app.siansa.data.PictureStyle> = emptyMap(),
+    // How the cards at a hero's foot show theirs (the owner, 22 Nov).
+    heroCardPictures: Map<HomeSection, app.siansa.data.PictureStyle> = emptyMap(),
+    onHeroCardPictureChange: (HomeSection, app.siansa.data.PictureStyle) -> Unit = { _, _ -> },
     onPictureChange: (HomeSection, app.siansa.data.PictureStyle) -> Unit = { _, _ -> },
     pictureColours: Map<HomeSection, app.siansa.data.PictureColours> = emptyMap(),
     onPictureColoursChange: (HomeSection, app.siansa.data.PictureColours) -> Unit = { _, _ -> },
@@ -250,6 +258,8 @@ fun ArrangeHomeSheet(
             onVariant = { onVariantChange(section, it) },
             picture = pictures[section] ?: app.siansa.data.PictureStyle.AUTO,
             onPicture = { onPictureChange(section, it) },
+            heroCardPicture = heroCardPictures[section] ?: app.siansa.data.PictureStyle.AUTO,
+            onHeroCardPicture = { onHeroCardPictureChange(section, it) },
             pictureColours = pictureColours[section] ?: app.siansa.data.PictureColours.COVERS,
             onPictureColours = { onPictureColoursChange(section, it) },
             names = cardNames[section] ?: app.siansa.data.CardNames.AUTO,
@@ -468,6 +478,9 @@ private fun HomeLookDialog(
     // How its cards' pictures show (the owner, 20 Nov).
     picture: app.siansa.data.PictureStyle = app.siansa.data.PictureStyle.AUTO,
     onPicture: (app.siansa.data.PictureStyle) -> Unit = {},
+    // And the cards at its hero's foot theirs, chosen apart (the owner, 22 Nov).
+    heroCardPicture: app.siansa.data.PictureStyle = app.siansa.data.PictureStyle.AUTO,
+    onHeroCardPicture: (app.siansa.data.PictureStyle) -> Unit = {},
     // Where its pictures' colours come from (the owner, 20 Nov).
     pictureColours: app.siansa.data.PictureColours = app.siansa.data.PictureColours.COVERS,
     onPictureColours: (app.siansa.data.PictureColours) -> Unit = {},
@@ -492,6 +505,7 @@ private fun HomeLookDialog(
     var coverGridSize by remember(section) { mutableStateOf(coverGrid) }
     var layout by remember(section) { mutableStateOf(variant) }
     var pictureStyle by remember(section) { mutableStateOf(picture) }
+    var heroCardStyle by remember(section) { mutableStateOf(heroCardPicture) }
     var pictureColour by remember(section) { mutableStateOf(pictureColours) }
     var cardNames by remember(section) { mutableStateOf(names) }
     var size by remember(section) { mutableStateOf(crateSize) }
@@ -529,7 +543,13 @@ private fun HomeLookDialog(
                 }
                 HorizontalDivider(Modifier.padding(vertical = Space.Small))
                 if (onOpenSettings == null) {
-                    PictureChoice(pictureStyle) { pictureStyle = it; onPicture(it) }
+                    // A hero with cards under it: the hero's picture here, the cards' own under it.
+                    val heroCards = look == HomeLook.BANNER && (layout?.cardsUnder ?: 0) > 0
+                    PictureChoice(pictureStyle, title = if (heroCards) "Picture of the big card" else "Pictures") { pictureStyle = it; onPicture(it) }
+                    if (heroCards) {
+                        Spacer(Modifier.height(Space.Medium))
+                        PictureChoice(heroCardStyle, title = "Pictures of the cards under it", tag = "heroCardPictureStyle") { heroCardStyle = it; onHeroCardPicture(it) }
+                    }
                     Spacer(Modifier.height(Space.Medium))
                     PictureColoursChoice(pictureColour) { pictureColour = it; onPictureColours(it) }
                     if (look in HomeLook.NAMED) {
@@ -734,16 +754,22 @@ internal fun VariantChips(label: String, look: HomeLook, chosen: app.siansa.data
  */
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
-internal fun PictureChoice(style: app.siansa.data.PictureStyle, modifier: Modifier = Modifier, onPick: (app.siansa.data.PictureStyle) -> Unit) {
-    Column(modifier.testTag("pictureStyle"), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
-        Text("Pictures", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+internal fun PictureChoice(
+    style: app.siansa.data.PictureStyle,
+    modifier: Modifier = Modifier,
+    title: String = "Pictures",
+    tag: String = "pictureStyle",
+    onPick: (app.siansa.data.PictureStyle) -> Unit,
+) {
+    Column(modifier.testTag(tag), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
+        Text(title, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
             for (option in app.siansa.data.PictureStyle.entries) {
                 FilterChip(
                     selected = style == option,
                     onClick = { onPick(option) },
                     label = { Text(option.label) },
-                    modifier = Modifier.testTag("pictureStyle-${option.id}"),
+                    modifier = Modifier.testTag("$tag-${option.id}"),
                 )
             }
         }
