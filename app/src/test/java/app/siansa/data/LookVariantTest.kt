@@ -48,7 +48,7 @@ class LookVariantTest {
         // the bottom ones also".
         assertEquals(listOf(0, 0, 3, 4), LookVariant.of(HomeLook.BANNER).map { it.cardsUnder })
         assertEquals(listOf(false, true, true, true), LookVariant.of(HomeLook.BANNER).map { it.hero })
-        assertEquals(mapOf(HomeSection.MADE_FOR_YOU to LookVariant.HERO_FOUR), LookVariant.parse("made_for_you:hero4,quick:hero9"))
+        assertEquals(mapOf(HomeSection.MADE_FOR_YOU to LookVariant.HERO_FOUR), LookVariant.parse("made:hero4,quick:hero9"))
         // Cards share the row: 358 px wide with 8 between, as in the mockup.
         assertEquals(114, app.siansa.ui.heroCardSide(358, 8, 3))
         assertEquals(83, app.siansa.ui.heroCardSide(358, 8, 4))
