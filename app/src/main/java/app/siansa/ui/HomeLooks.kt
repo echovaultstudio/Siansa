@@ -165,22 +165,39 @@ fun HomeFeaturedGrid(title: String, items: List<HomeItem>, onOpenAll: (() -> Uni
         if (onOpenAll != null && LocalSectionTitleShown.current) {
             SectionTitle(title, Modifier.clickable(onClickLabel = "Show all", onClick = onOpenAll))
         } else SectionTitle(title)
-        Column(Modifier.padding(horizontal = Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(Space.Tight), modifier = Modifier.height(androidx.compose.foundation.layout.IntrinsicSize.Min)) {
-                NamedSquare(first, featured = true, Modifier.weight(2f))
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
-                    rest.take(2).forEach { NamedSquare(it, featured = false, Modifier.fillMaxWidth()) }
-                    repeat(2 - rest.take(2).size) { Spacer(Modifier.fillMaxWidth().aspectRatio(1f)) }
-                }
-            }
-            if (rest.size > 2) {
+        // Every gap the same (the owner, 22 Nov): the squares are sized from the three-column cell, the featured one two
+        // cells and a gap, so it's as tall as the two beside it and their gap. Shared by weight (2 to 1) it came out
+        // shorter, and the gap under it wider than the others.
+        androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth().padding(horizontal = Space.Page)) {
+            val density = androidx.compose.ui.platform.LocalDensity.current
+            val gapPx = with(density) { Space.Tight.roundToPx() }
+            val (cellPx, bigPx) = featuredSquares(constraints.maxWidth, gapPx)
+            val cell = with(density) { cellPx.toDp() }
+            val big = with(density) { bigPx.toDp() }
+            Column(verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(Space.Tight)) {
-                    rest.drop(2).forEach { NamedSquare(it, featured = false, Modifier.weight(1f)) }
-                    repeat(3 - rest.drop(2).size) { Spacer(Modifier.weight(1f)) }
+                    NamedSquare(first, featured = true, Modifier.size(big))
+                    Column(verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
+                        rest.take(2).forEach { NamedSquare(it, featured = false, Modifier.size(cell)) }
+                    }
+                }
+                if (rest.size > 2) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(Space.Tight)) {
+                        rest.drop(2).forEach { NamedSquare(it, featured = false, Modifier.size(cell)) }
+                    }
                 }
             }
         }
     }
+}
+
+/**
+ * The sides of a featured cover grid's squares, in px, for a row [width] wide with [gap] between squares: a cell of the
+ * three columns, and the featured one, two cells and the gap between them.
+ */
+internal fun featuredSquares(width: Int, gap: Int): Pair<Int, Int> {
+    val cell = ((width - 2 * gap) / 3).coerceAtLeast(0)
+    return cell to 2 * cell + gap
 }
 
 /** How many small cards are round the featured one: two beside it, three under. */
