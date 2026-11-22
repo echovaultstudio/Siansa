@@ -258,8 +258,12 @@ class SpacingHomeTest : SpacingCheck() {
         assertEquals(4, cards.size)
         val d = compose.density
         fun dp(px: Float) = with(d) { px.toDp() }
-        assertEven("The cards' outer edges are the page's margins", dp(cards.first().left) - screen.left, screen.right - dp(cards.last().right), 1.dp)
-        assertEven("The left margin is the page margin", dp(cards.first().left) - screen.left, Space.Page, 1.dp)
+        // The hero is a card with the page's margins beside it (the owner, 22 Nov), and its cards a page margin inside it.
+        val hero = compose.onNodeWithTag("homeHero").fetchSemanticsNode().boundsInRoot
+        assertEven("The hero's left margin is the page margin", dp(hero.left) - screen.left, Space.Page, 1.dp)
+        assertEven("The hero's margins left and right", dp(hero.left) - screen.left, screen.right - dp(hero.right), 1.dp)
+        assertEven("The cards' outer edges sit evenly in the hero", dp(cards.first().left - hero.left), dp(hero.right - cards.last().right), 1.dp)
+        assertEven("The cards' left margin in the hero", dp(cards.first().left - hero.left), Space.Page, 1.dp)
         assertEven("The gaps between the cards", dp(cards[1].left - cards[0].right), dp(cards[3].left - cards[2].right), 0.5.dp)
         assertEven("The gap between cards is a small step", dp(cards[1].left - cards[0].right), Space.Small, 1.dp)
         assertEven("A section's gap from the buttons to the cards", dp(cards[0].top - play.bottom), Space.Section, 1.dp)

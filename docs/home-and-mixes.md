@@ -71,7 +71,7 @@ The looks:
 |---|---|
 | **As it is** | The section's own look (the default). |
 | **Tiles** | A row of covers to swipe through. **Size**: **Big** (as tiles have always been), **Compact** or **Small**, for more in view. |
-| **Banner** | One wide card with the first covers and a button. Its **Style**: **Card**, or **Hero**: the top of the section in the first mix's own colours, its covers big, its name and line, **Play** and **Shuffle**. **Hero and 3 cards** or **Hero and 4 cards** puts the row's next three or four at its foot on the same colours, each with its name on its picture and its line under it. Then **Picture of the big card** and **Pictures of the cards under it** are chosen apart (stickers on top and Aura under, say). |
+| **Banner** | One wide card with the first covers and a button. Its **Style**: **Card**, or **Hero**: a big card at the top of the section in the first mix's own colours, its covers big, its name and line, **Play** and **Shuffle**. **Hero and 3 cards** or **Hero and 4 cards** puts the row's next three or four at its foot on the same colours, each with its name on its picture and its line under it. Then **Picture of the big card** and **Pictures of the cards under it** are chosen apart (stickers on top and Aura under, say). |
 | **List** | The first five, listed; the title opens the rest. |
 | **Play button** | A slim card: its ▶ plays the section; a tap anywhere else on the card opens it. |
 | **Cover rows** | Covers with their details beside them, three to a column, to swipe through: the same look as a custom card's. The cover plays that album or opens that item; the row opens it. Books and podcasts show how far you are along the cover. A radio or genre shows its colours instead of a cover. |
