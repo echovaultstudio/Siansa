@@ -89,24 +89,32 @@ private fun PullLogo(state: PullToRefreshState, refreshing: Boolean, modifier: M
     ) {
         Box(
             Modifier.size(PULL_LOGO).graphicsLayer {
-                val grow = LOGO_SMALLEST + (1f - LOGO_SMALLEST) * fraction
+                // Only ever in the room the page has given it (the owner, 22 Nov: "the logo appears in the notice
+                // pills"): as big as that room, in its middle, and seen once there's enough of it.
+                val grow = logoSize(fraction)
                 scaleX = grow
                 scaleY = grow
-                alpha = (fraction * 1.4f).coerceAtMost(1f)
+                alpha = logoShown(fraction)
+                translationY = -PULL_HEADER.toPx() * (1f - fraction) / 2f
             },
         ) {
-            // The launcher icon's bars, and its half circles drawn here so they can turn; pulling turns them too.
+            // The launcher icon's bars, and its half circles drawn here so they can turn round the bars while it loads.
             Image(painterResource(R.drawable.logo_bars), contentDescription = null, modifier = Modifier.matchParentSize())
             Canvas(Modifier.matchParentSize()) {
                 val unit = size.width / LOGO_VIEW
-                val pulled = if (refreshing) 0f else HALF_TURN * (1f - fraction)
-                rotate(turn.value + pulled, pivot = Offset(LOGO_MIDDLE * unit, LOGO_MIDDLE * unit)) {
+                rotate(turn.value, pivot = Offset(LOGO_MIDDLE * unit, LOGO_MIDDLE * unit)) {
                     PULL_RINGS.forEach { drawRing(it, unit) }
                 }
             }
         }
     }
 }
+
+/** The logo's size as a share of its own, for a page pulled [fraction] of the way: never taller than the room given. */
+internal fun logoSize(fraction: Float): Float = fraction.coerceIn(0f, 1f)
+
+/** How clearly the logo shows: not at all until there's room for it ([LOGO_FROM]), fully from [LOGO_FULL]. */
+internal fun logoShown(fraction: Float): Float = ((fraction - LOGO_FROM) / (LOGO_FULL - LOGO_FROM)).coerceIn(0f, 1f)
 
 /** Where the half circles come to rest: the next half turn, where they look as they do at rest (both sides alike). */
 internal fun restingTurn(turned: Float): Float = kotlin.math.ceil(turned / HALF_TURN) * HALF_TURN
@@ -132,7 +140,8 @@ private fun DrawScope.drawRing(ring: Ring, unit: Float) {
 
 private val PULL_HEADER = 72.dp
 private val PULL_LOGO = 96.dp // the launcher drawing has room round it: its mark is two thirds of this
-private const val LOGO_SMALLEST = 0.4f
+private const val LOGO_FROM = 0.35f
+private const val LOGO_FULL = 0.85f
 private const val LOGO_VIEW = 108f
 private const val LOGO_MIDDLE = 54f
 private const val FULL_TURN = 360f

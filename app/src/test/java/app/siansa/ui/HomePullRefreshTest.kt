@@ -18,4 +18,12 @@ class HomePullRefreshTest {
         assertEquals(360f, restingTurn(200f))
         assertEquals(0f, restingTurn(0f))
     }
+
+    @Test fun theLogoStaysInTheRoomThePageGivesIt() {
+        // The owner, 22 Nov: "the logo appears in the notice pills". Nothing of it until there's room, never taller than it.
+        assertEquals(0f, logoShown(0.2f))
+        assertEquals(1f, logoShown(1f))
+        assertEquals(0.5f, logoSize(0.5f))
+        assertEquals(1f, logoSize(1.7f))
+    }
 }
