@@ -665,6 +665,8 @@ fun HomeScreen(nav: NavController) {
         HomeSettingsSheet(nav, startOnSources = sources) { panel = null }
     }
     if (castOpen) CastSheet(onDismiss = { castOpen = false })
+    // Once after an update: what it brought, in short (the owner, 16 Nov).
+    WhatsNewAfterUpdate()
 }
 
 internal suspend fun recentlyPlayedAlbums(graph: AppGraph, limit: Int = 15): List<Album> {

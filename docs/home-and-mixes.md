@@ -145,6 +145,13 @@ Give it the words to show after the number ("new releases"), and an **Icon** for
 albums, a note for songs). **Show the number** off shows only the words ("New releases"). It shows while its rules find any, and a tap opens what
 it found. The switch beside each one turns it off without removing it.
 
+## What's new after an update
+
+The first time you open Siansa after an update, a small sheet comes up over Home with the biggest changes and fixes of
+that update, at most five lines, and **Every version's changes**, which opens the full list. Close it with **Done** or
+by swiping it down; it doesn't come back until the next update. It reads the list that comes with the app, so nothing
+is fetched. After a fresh install it doesn't show.
+
 ## Vibes and today's mix
 
 A **vibe** covers part of the day. Siansa starts with Morning, Daytime, Evening and Night. When you open the app,
