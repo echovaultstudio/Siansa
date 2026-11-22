@@ -2,7 +2,7 @@
 
 ## Streaming quality
 
-**Settings › Storage › Streaming quality**, set separately **On Wi-Fi** and **On mobile data**:
+**Settings › Playback › Streaming quality**, set separately **On Wi-Fi** and **On mobile data**:
 
 - **Original**: the file as it is on your server. Best on Wi-Fi.
 - **Opus 96–320 kbit/s**: converted by your server, to save data. Navidrome uses its "opus" transcoding profile;
@@ -14,6 +14,29 @@
 Moving to another spot in a converted song has the server start a new conversion from there, so it takes a moment.
 
 Siansa always plays the quality you chose; it never switches by itself. Changes apply from the next song.
+
+## Untouched playback
+
+**Settings › Playback › Untouched playback** (off as it comes) plays each song as its file is: at its own sample rate
+(44.1, 48, 96 kHz and so on) and its full bit depth, straight to your phone's sound output.
+
+Without it, every song goes through Siansa's own mixer, which runs at 44.1 kHz. That's what lets two songs sound at
+once, so it's needed for crossfades and DJ blends. Most music is 44.1 kHz and passes through it unchanged; a 48 kHz or
+hi-res song is converted to 44.1 kHz there (you won't hear it, but it isn't the file as it is).
+
+While Untouched playback is on:
+
+- **Crossfades and DJ blends are off**, as nothing can be blended on the way out. Songs play back to back, and albums
+  stay gapless. DJ radio and DJ mixes still pick and order their songs; they just aren't blended.
+- **The equaliser is off**, since it changes the sound.
+- **Levelling still works**: it only turns the volume of a song up or down.
+- Set **Streaming quality** to **Original** to get the file itself: Opus is a conversion made by your server.
+
+Switching it pauses the song for a moment and carries on from the same place.
+
+What happens after Siansa is up to Android and what you listen on. Bluetooth runs at the rate the phone and the
+headphones agree on (you can see and set it in Android's developer options), and Android converts whatever doesn't
+match it; Bluetooth then compresses the sound. A USB DAC or a wired output gets the closest to the file.
 
 ## Song cache and loading ahead
 

@@ -1070,7 +1070,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
     }
 
     fun setUntouchedPlayback(on: Boolean) {
-        AppLog.i("Settings", "Untouched playback: " + if (on) "on (crossfades, DJ blends and the equaliser are off)" else "off")
+        app.siansa.log.AppLog.i("Settings", "Untouched playback: " + if (on) "on (crossfades, DJ blends and the equaliser are off)" else "off")
         prefs.edit().putBoolean("untouched_playback", on).apply()
         _state.value = _state.value.copy(untouchedPlayback = on)
     }
