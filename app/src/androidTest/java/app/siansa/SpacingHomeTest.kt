@@ -248,6 +248,21 @@ class SpacingHomeTest : SpacingCheck() {
         assertEven("The gap is a small step", dp(boxes[1].left - boxes[0].right), Space.Small, 1.dp)
     }
 
+    /** A cover grid with one featured (the owner, 22 Nov): the gap under the big square is the gap between all of them. */
+    @Test fun featuredCoverGridHasEvenGaps() {
+        val items = (1..6).map { i -> app.siansa.ui.HomeItem(key = "f$i", title = "Mix $i with a long name", subtitle = "Calm music", open = {}) }
+        compose.setContent { SiansaTheme { Column { app.siansa.ui.HomeFeaturedGrid("Made for you", items) } } }
+        val big = compose.onNodeWithTag("homeFeatured").fetchSemanticsNode().boundsInRoot
+        val cells = compose.onAllNodesWithTag("homeCoverGridCell").fetchSemanticsNodes().map { it.boundsInRoot }
+        assertEquals(5, cells.size)
+        val d = compose.density
+        fun dp(px: Float) = with(d) { px.toDp() }
+        assertEven("The featured square ends with the two beside it", dp(big.bottom), dp(cells[1].bottom), 0.5.dp)
+        assertEven("Gap beside and gap under the featured square", dp(cells[0].left - big.right), dp(cells[2].top - big.bottom), 0.5.dp)
+        assertEven("Gap between the two beside it and in the row under", dp(cells[1].top - cells[0].bottom), dp(cells[3].left - cells[2].right), 0.5.dp)
+        assertEven("The row under ends where the two beside it do", dp(cells[4].right), dp(cells[0].right), 0.5.dp)
+    }
+
     /** Custom cards (issue #622): the play button card sits a page margin from both edges of the screen. */
     @Test fun pinnedPlayButtonHasEvenPageMargins() {
         val card = app.siansa.mix.PinnedCard.new("Shuffle it").copy(look = app.siansa.mix.CardLook.BUTTON, favourites = true)
