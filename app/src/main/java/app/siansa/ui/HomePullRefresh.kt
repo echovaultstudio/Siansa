@@ -68,16 +68,23 @@ internal fun pulledDown(refreshing: Boolean, fraction: Float): Float = if (refre
 @Composable
 private fun PullLogo(state: PullToRefreshState, refreshing: Boolean, modifier: Modifier) {
     // The half circles go round the bars with the finger while pulling (the owner, 22 Nov: "when pulling down the echo
-    // waves should move around also in same speed as the swipe"), carry on from where the finger left them, turning
+    // waves should move around also in same speed as the swipe"), carry on from exactly where the finger left them, turning
     // like a record while Home loads (as the TV's logo does while a DJ mix plays, at 33⅓), then wind on to the next half
     // turn, where they look as at rest.
     val turn = remember { Animatable(0f) }
+    // Where the finger left the half circles, kept as the layer is placed each frame, so the loading turn carries on
+    // from exactly there in the very frame Home starts loading (the owner, 22 Nov: "the echo bars jump back instead
+    // of continuing exactly from where user slid to": the turn used to start a frame late, from where the pull had
+    // sprung back to by then).
+    val held = remember { HeldTurn() }
     LaunchedEffect(refreshing) {
         if (refreshing) {
-            turn.snapTo(pulledTurn(state.distanceFraction))
+            held.carried = true
             while (true) turn.animateTo(turn.value + FULL_TURN, tween(RECORD_TURN_MS, easing = LinearEasing))
-        } else {
-            turn.animateTo(restingTurn(turn.value), tween(RECORD_STOP_MS, easing = FastOutSlowInEasing))
+        } else if (held.carried) {
+            turn.animateTo(restingTurn(held.angle + turn.value) - held.angle, tween(RECORD_STOP_MS, easing = FastOutSlowInEasing))
+            held.angle = 0f
+            held.carried = false
             turn.snapTo(0f)
         }
     }
@@ -105,7 +112,9 @@ private fun PullLogo(state: PullToRefreshState, refreshing: Boolean, modifier: M
             Image(painterResource(R.drawable.logo_bars), contentDescription = null, modifier = Modifier.matchParentSize())
             Canvas(
                 Modifier.matchParentSize().graphicsLayer {
-                    rotationZ = if (refreshing) turn.value else turn.value + pulledTurn(state.distanceFraction)
+                    // With the finger while pulling; from there on, the loading turn on top of where it was left.
+                    if (!refreshing && !held.carried) held.angle = pulledTurn(state.distanceFraction)
+                    rotationZ = held.angle + turn.value
                 },
             ) {
                 val unit = size.width / LOGO_VIEW
@@ -114,6 +123,10 @@ private fun PullLogo(state: PullToRefreshState, refreshing: Boolean, modifier: M
         }
     }
 }
+
+/** Where a pull left the half circles, and whether the loading turn is carrying on from there. Not state: read and
+ * written only as the layer is placed. */
+private class HeldTurn(var angle: Float = 0f, var carried: Boolean = false)
 
 /**
  * How far the half circles have gone round for a pull of [fraction] of the way (past all of it too): half a turn for a
