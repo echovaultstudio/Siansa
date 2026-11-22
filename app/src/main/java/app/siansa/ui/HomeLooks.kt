@@ -241,8 +241,9 @@ private fun NamedSquare(item: HomeItem, featured: Boolean, modifier: Modifier) {
 }
 
 /**
- * A banner as a hero (the owner, 20 Nov): the row's first card across the whole width at the top of the row, in the
- * colours of its picture fading into the page: [title] in capitals over its big cover, its name and line, and Play
+ * A banner as a hero (the owner, 20 Nov): the row's first card big at the top of the row, in the colours of its
+ * picture, a card with the page's margins beside it like every other (the owner, 22 Nov: "the same padding instead of
+ * extending right to the phone edges"): [title] in capitals over its big cover, its name and line, and Play
  * and Shuffle. Play plays the card ([HomeItem.play]), else its songs, else the row ([play]); Shuffle its songs, or
  * the row's, shuffled.
  */
@@ -261,18 +262,16 @@ fun HomeHero(
 ) {
     val songs = item.songs.ifEmpty { rowSongs }
     val tint = tint ?: item.colors.first
-    val ground = MaterialTheme.colorScheme.background
     val onPlay: (() -> Unit)? = item.play ?: songs.takeIf { it.isNotEmpty() }?.let { { playSongs(it, false) } } ?: play
     Box(
         Modifier
             .fillMaxWidth()
-            .padding(top = LocalSectionGap.current)
-            // Deep enough under the white words in light mode too; the page only shows through at its foot.
+            .padding(start = Space.Page, end = Space.Page, top = LocalSectionGap.current)
+            .clip(RoundedCornerShape(HERO_CORNER))
+            // Deep enough under the white words in light mode too, deeper towards its foot.
             .background(Brush.verticalGradient(
                 0f to lerp(lerp(tint, item.colors.first, 0.35f), Color.Black, 0.25f),
-                // With cards under it the colour holds to their lines, and only its foot fades into the page.
-                (if (under.isEmpty()) 0.75f else HERO_CARDS_FADE_FROM) to lerp(lerp(tint, item.colors.second, 0.5f), Color.Black, 0.4f),
-                1f to ground,
+                1f to lerp(lerp(tint, item.colors.second, 0.5f), Color.Black, 0.5f),
             ))
             .clickable(onClick = item.open)
             .testTag("homeHero"),
@@ -339,7 +338,7 @@ private fun HeroCards(cards: List<HomeItem>) {
 /** The side of each of [count] cards, in px, sharing a row [width] wide with [gap] between them. */
 internal fun heroCardSide(width: Int, gap: Int, count: Int): Int = ((width - gap * (count - 1).coerceAtLeast(0)) / count.coerceAtLeast(1)).coerceAtLeast(0)
 
-private const val HERO_CARDS_FADE_FROM = 0.93f
+private val HERO_CORNER = 16.dp
 private val HERO_COVER = 148.dp
 private val HERO_BUTTON = 48.dp
 
