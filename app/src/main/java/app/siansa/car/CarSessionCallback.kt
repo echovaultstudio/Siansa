@@ -161,7 +161,10 @@ class CarSessionCallback(private val graph: AppGraph, private val tree: CarTree)
                     ": ${queue.songs.size} songs from song ${queue.start + 1}, asked by ${controller.packageName}")
                 SongRegistry.register(queue.songs)
                 val items = queue.songs.map { it.toMediaItem(graph.source) }
-                if (queue.route != null && queue.title != null) runCatching { graph.recentPlays.note(queue.route, queue.title, queue.cover) }
+                if (queue.route != null && queue.title != null) {
+                    graph.playingFrom.note(queue.route, queue.title)
+                    runCatching { graph.recentPlays.note(queue.route, queue.title, queue.cover) }
+                }
                 future.set(MediaSession.MediaItemsWithStartPosition(items, queue.start, 0L))
             } catch (e: CancellationException) {
                 future.cancel(false)

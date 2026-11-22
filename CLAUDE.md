@@ -7,7 +7,8 @@ Source: `app/src/main/java/app/siansa/`. Unit tests: `app/src/test/`. Emulator t
 
 - **Big work and new features go to `dev`** (the owner decided, after v1.0): branch from `dev` and open the pull
   request against `dev`. Each push to `dev` builds Siansa Dev (`.github/workflows/dev-app.yml`) and Siansa TV Dev
-  (`tv-dev.yml`), test builds installed next to the real apps, for the owner to try before they reach everyone.
+  (`tv-dev.yml`; skipped when a push changes only phone-only files: see its `paths-ignore`), test builds installed next
+  to the real apps, for the owner to try before they reach everyone.
   A pull request against `dev` doesn't close its issue on merge (GitHub only does that on `main`): leave the issue
   open with a comment that it's in Siansa Dev; it closes when `dev` reaches `main`.
 - **Bug fixes and security fixes go straight to `main`**, as they're urgent: branch from `main` and open the pull
@@ -71,7 +72,7 @@ implements them and opens a pull request. Labels show where each one is: `claude
 - One issue per pull request; reference it with `Fixes #N`.
 - Label a pull request `ui` when it changes how pages scroll, move or respond to touch (rearranging, the player,
   gestures): the emulator tests then run on it before merging (`.github/workflows/ui-tests.yml`, issue #713).
-- Reports from the app (Settings › Help & feedback › Report a problem) are issues in this repository, with the log kept in the
+- Reports from the app (Settings › Help › Report a problem) are issues in this repository, with the log kept in the
   private logs repository. GitHub closes a fixed issue on merge, and the release comments on it with the version that
   has the fix (`scripts/notify_fixed.py`, issue #433).
 - Describe before and after, and how it was tested.

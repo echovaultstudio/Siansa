@@ -15,7 +15,7 @@ internal object ServerWords {
         else -> "OpenSubsonic"
     }
 
-    /** Settings › Streaming & storage, above the streaming quality. Every server converts to Opus (Emby and Jellyfin, issue #1204). */
+    /** Settings › Storage, above the streaming quality. Every server converts to Opus (Emby and Jellyfin, issue #1204). */
     fun streamingHint(kind: SourceKind): String =
         if (kind.embyLike) {
             "Opus is converted by ${name(kind)}. It saves data on mobile; the original file is best on Wi-Fi. Applies from the next song."

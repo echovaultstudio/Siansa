@@ -135,13 +135,14 @@ object FlowMood {
     fun picked(tuning: VibeTuning, name: String): Boolean = tuning.sounds.any { it.value != 0 && it.term.equals(name, ignoreCase = true) }
 
     /**
-     * [tuning] with [name] picked as "more" ([genre]: a genre, which re-ranks the songs; a sound steers the search).
+     * [tuning] with [name] picked as "more" ([genre]: a genre, which re-ranks the songs; [trait]: one of Siansa Beats'
+     * traits, which puts the songs that have it first; a sound steers the search).
      * Already picked, or no room left: unchanged.
      */
-    fun pick(tuning: VibeTuning, name: String, genre: Boolean): VibeTuning {
+    fun pick(tuning: VibeTuning, name: String, genre: Boolean, trait: Boolean = false): VibeTuning {
         if (picked(tuning, name) || !hasRoom(tuning)) return tuning
         val rest = tuning.sounds.filterNot { it.term.equals(name, ignoreCase = true) }
-        return tuning.copy(sounds = rest + SoundDial(name, MORE, genre))
+        return tuning.copy(sounds = rest + SoundDial(name, MORE, genre = genre && !trait, trait = trait))
     }
 
     /**

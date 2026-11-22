@@ -75,6 +75,10 @@ internal class MixedCrossfader(
     private var incomingId: String? = null
     /** Where the next song comes in (ms of its own), and the mix frame it does. */
     private var incomingFrom = 0L
+    /** The blend's EQ booked on the bars ([EqStyle]): the ticks then leave the lows, mids and highs alone. */
+    private var eqBooked = false
+    /** The EQ style's name, for the blend's report once it's recorded. */
+    private var eqLabel: String? = null
     private var incomingMix = 0L
     private var tailBase = 1f
     private var startedAt = 0L
@@ -88,6 +92,9 @@ internal class MixedCrossfader(
     private var baseSpeed = 1f
     private var plannedWithNext = true
     private var stepStats = BeatMatch.StepStats()
+    /** The kicks heard in each song during the blend (ms of the song), for the grid check. */
+    private val outKicks = ArrayList<Double>()
+    private val inKicks = ArrayList<Double>()
     private var loggedStage = 0
     private var lateLogged = false
     private var easingFrom = 0f
@@ -187,6 +194,7 @@ internal class MixedCrossfader(
                 beatMatch = beatMatch,
                 blendBars = blending.blendBars,
                 lastTechnique = lastTechnique,
+                profilesUsed = profiles.active,
             )
             if (planned == null) {
                 val why = Crossfade.whyNoFade(s.crossfade, maxMs, current, next, profiles.cached(current.id), profiles.cached(next.id), beatMatch)
@@ -205,20 +213,20 @@ internal class MixedCrossfader(
                     mode = s.crossfade, maxMs = maxMs, current = current, next = next, currentDurationMs = duration,
                     nextDurationMs = next.durationSec * 1000L, currentProfile = profiles.cached(current.id),
                     nextProfile = profiles.cached(next.id), beatMatch = beatMatch, blendBars = blending.blendBars,
-                    noRoom = true, lastTechnique = lastTechnique,
+                    noRoom = true, lastTechnique = lastTechnique, profilesUsed = profiles.active,
                 )
                 var quickAt = quick?.let { duration - it.cutMs - it.overlapMs }
                 var quickHandover = quickAt?.let { EngineFade.handoverAt(it, position) }
                 var chosen = quick
-                if (quick != null && quickHandover != null && quickHandover - position < MIN_PREPARE_MS && quick.beat == null && !quick.coldEnd) {
+                if (quickHandover == null || quickHandover - position < MIN_PREPARE_MS) {
                     // Not even that fits (the owner's log, 12 Nov: moved to the last half minute, the songs changed with
-                    // no blend at all): a plain blend of what's left, however short, never none.
-                    val left = duration - quick.cutMs - position - MIN_PREPARE_MS - EngineFade.LEAD_MS
-                    if (left >= SHORTEST_LEFT_MS) {
-                        chosen = quick.copy(overlapMs = left, fadeInMs = minOf(quick.fadeInMs, left).coerceAtLeast(Crossfade.MIN_FADE_IN_MS),
-                            why = "smart: a blend of what's left (%.1f s) after moving near the end · ${quick.why}".format(java.util.Locale.ROOT, left / 1000.0))
-                        quickAt = duration - chosen.cutMs - chosen.overlapMs
-                        quickHandover = EngineFade.handoverAt(quickAt, position)
+                    // no blend at all): a plain blend of what's left, however short, never none. Also when the quick
+                    // one is beat-matched (it can't be laid on the bar any more) or couldn't be planned (siansa-dev
+                    // #63, "no silence, ever"); only a cold end, which is meant to have none, stays as it is.
+                    EngineFade.whatsLeft(quick ?: fade, duration, position, MIN_PREPARE_MS, SHORTEST_LEFT_MS)?.let { left ->
+                        chosen = left
+                        quickAt = duration - left.cutMs - left.overlapMs
+                        quickHandover = EngineFade.handoverAt(quickAt!!, position)
                     }
                 }
                 if (chosen == null || quickAt == null || quickHandover == null || quickHandover - position < MIN_PREPARE_MS) {
@@ -358,6 +366,13 @@ internal class MixedCrossfader(
         stepStats = BeatMatch.StepStats()
         loggedStage = 0
         lateLogged = false
+        outKicks.clear()
+        inKicks.clear()
+        // The grid check (the owner's DJ plan, #63): both songs' kicks are listened for while they're laid beat on beat.
+        if (planned.beat != null) {
+            tMix.kicks = app.siansa.playback.engine.KickListener(engine.outRate)
+            mainMix.kicks = app.siansa.playback.engine.KickListener(engine.outRate)
+        }
         stopEasing()
         phase = Phase.FADING
         level = 0f
@@ -375,6 +390,12 @@ internal class MixedCrossfader(
             if (Blending.of(settings()).bassSwap) {
                 mainMix.filter.shelfDb = DeckFilter.SHELF_START_DB
                 AppLog.d("Crossfade", "Bass swap over the first ${SWAP_FRACTION_PERCENT} % of the blend: next song's bass held back ${-DeckFilter.SHELF_START_DB.toInt()} dB, old song's cut up to ${DeckFilter.LOW_CUT_HZ.toInt()} Hz")
+                // The three-band EQ: the next song comes in with its mids gone and its highs down ([BlendEq]).
+                planned.eq?.let { eq ->
+                    eq.apply(0f, null, mainMix.filter)
+                    AppLog.d("Crossfade", "EQ: ${eq.describe()}")
+                }
+                eqBooked = bookEq(planned, beat, tMix)
             }
             if (planned.filterHz > 0) AppLog.d("Crossfade", "Filter fade: the old song's high-pass sweeps up to ${planned.filterHz.toInt()} Hz over the blend")
             if (planned.swapFrom > 0f) AppLog.d("Crossfade", "Bass swap from ${(planned.swapFrom * 100).toInt()} % to ${(planned.swapTo * 100).toInt()} % of the blend")
@@ -404,6 +425,8 @@ internal class MixedCrossfader(
                 "next song comes in at ${clock(from)} (${from} ms) on mix frame $incomingMix, with ${clock(against)} of the old song (in $inMs ms)",
         )
         LastBlend.record(item.mediaId, incomingId ?: "", against, planned, dj = inDjRadio())
+        eqLabel?.let { LastBlend.eqStyle(it) }
+        eqLabel = null
         handler.post(fadeTick)
     }
 
@@ -425,7 +448,12 @@ internal class MixedCrossfader(
             val outLevel = if (planned.technique == Technique.ECHO_OUT) 1f else Crossfade.fadeOut(out)
             t.volume = if (tailDone) 0f else tailBase * sleepLevel() * outLevel
             val beat = planned.beat
-            if (beat != null && Blending.of(settings()).bassSwap) swapBass(out, tMix, planned)
+            if (beat != null && Blending.of(settings()).bassSwap) {
+                if (!eqBooked) {
+                    swapBass(out, tMix, planned)
+                    planned.eq?.apply(out, tMix.filter, mainMix.filter)
+                } else if (planned.filterHz > 0) tMix.filter.lowCutHz = DeckFilter.filterAt(out.toDouble(), planned.filterHz)
+            }
             else if (planned.filterHz > 0) tMix.filter.lowCutHz = DeckFilter.filterAt(out.toDouble(), planned.filterHz)
             echoBeatMs(planned)?.let { beatMs -> tMix.echo?.let { echoOut(it, planned, beatMs, tailMs, tailDone) } }
             val onNext = main.currentMediaItemIndex == incomingIndex
@@ -440,6 +468,7 @@ internal class MixedCrossfader(
                 return
             }
             if (beat != null && onNext && heardMix >= incomingMix && !tailDone) check(beat, tMix, heardMix)
+            if (beat != null) hearKicks(tMix, onNext)
             if (onNext && !lateLogged && heardMix >= incomingMix) {
                 lateLogged = true
                 if (mainMix.current?.cueGivenUp == true) AppLog.w("Crossfade", "The next song's cue was given up (seconds of its sound came before the point it was cued to); it plays from where it is")
@@ -495,6 +524,34 @@ internal class MixedCrossfader(
         })
     }
 
+    /**
+     * The kicks heard since the last tick, at their time in each song: the old song's while it plays, the next one's
+     * from when it came in. Read at once, while each deck can still say where its song was at that moment.
+     */
+    private fun hearKicks(tMix: MixCore.Deck, onNext: Boolean) {
+        tMix.kicks?.take()?.forEach { f -> tMix.mediaUsAt(f.toDouble())?.let { outKicks += it / 1000.0 - GridCheck.HEARD_LATE_MS } }
+        val heard = mainMix.kicks?.take() ?: return
+        if (!onNext) return
+        heard.forEach { f -> if (f >= incomingMix) mainMix.mediaUsAt(f.toDouble())?.let { inKicks += it / 1000.0 - GridCheck.HEARD_LATE_MS } }
+    }
+
+    /** The grid check's line in the log, once the blend is over, and the listening stops. */
+    private fun reportGrids(beat: BeatMatch.Plan?) {
+        val tMix = tailMix
+        if (beat != null && (outKicks.isNotEmpty() || inKicks.isNotEmpty())) {
+            val from = GridCheck.side(outKicks, beat.outgoing)
+            val to = GridCheck.side(inKicks, beat.incoming)
+            val line = GridCheck.describe(outgoing ?: "?", from, incomingId ?: "?", to)
+            if (from.off || to.off) AppLog.w("Crossfade", line, event = "crossfade.grid_off", fields = mapOf("from_off_ms" to from.offMs, "to_off_ms" to to.offMs))
+            else AppLog.i("Crossfade", line)
+            LastBlend.gridChecked(from, to)
+        }
+        tMix?.kicks = null
+        mainMix.kicks = null
+        outKicks.clear()
+        inKicks.clear()
+    }
+
     /** How far apart the two songs' beats are, from where each is on the one clock: it should be under a ms. */
     private fun check(beat: BeatMatch.Plan, tMix: MixCore.Deck, heardMix: Double) {
         val oldUs = tMix.mediaUsAt(heardMix) ?: return
@@ -508,6 +565,35 @@ internal class MixedCrossfader(
             loggedStage = stage
             AppLog.d("Crossfade", "Beat-matching, ${stage * 4} bars in: ${if (error >= 0) "+" else ""}$error ms out of step, next song at %.4f×".format(java.util.Locale.ROOT, main.playbackParameters.speed))
         }
+    }
+
+    /**
+     * Picks how this blend rides the EQ ([EqStyles.choose]) and, for one laid on the bars, books both decks' lanes on
+     * the mixer from the old song's own bar lines ([MixCore.Deck.mixFrameAt]), so each swap lands on its bar to the
+     * frame. True when booked; false leaves the blend to glide on its ticks, as before.
+     */
+    private fun bookEq(planned: FadePlan, beat: BeatMatch.Plan, tMix: MixCore.Deck): Boolean {
+        val style = EqStyles.choose(planned.technique, beat.onBars, beat.phraseBars != null, lastEqStyle)
+        lastEqStyle = style
+        val bars = beat.bars
+        val vocalBar = planned.eq?.midSwapAt?.let { Math.round(it * bars) }
+        val score = EqStyles.score(style, bars, vocalBar)
+        val rate = engine.outRate
+        val first = tMix.mixFrameAt(startAt * 1000, rate)
+        val last = tMix.mixFrameAt((startAt + planned.overlapMs) * 1000, rate)
+        if (score == null || first == null || last == null || last <= first) {
+            if (score != null) AppLog.w("Crossfade", "EQ: ${style.label} couldn't be laid on the bars (the old song can't say where it'll be); it glides")
+            else AppLog.d("Crossfade", "EQ: glide")
+            eqLabel = EqStyle.GLIDE.label
+            return false
+        }
+        val barFrames = (last - first) / bars
+        val instant = DeckFilter.INSTANT_MS * rate / 1000
+        tMix.filter.book(DeckFilter.Booked(score.outLow, score.outMid, score.outHigh, first, barFrames, instant))
+        mainMix.filter.book(DeckFilter.Booked(score.inLow, score.inMid, score.inHigh, first, barFrames, instant))
+        AppLog.i("Crossfade", "EQ: ${style.label}: ${score.note}", event = "crossfade.eq_style", fields = mapOf("style" to style.name, "bars" to bars))
+        eqLabel = style.label
+        return true
     }
 
     /** The bass swap over its span of the blend ([FadePlan.swapFrom] to [FadePlan.swapTo]), with a filter fade's sweep. */
@@ -673,6 +759,8 @@ internal class MixedCrossfader(
     private fun finish() {
         handler.removeCallbacks(fadeTick)
         val beat = plan?.beat
+        tailMix?.let { if (beat != null && phase == Phase.FADING) hearKicks(it, main.currentMediaItemIndex == incomingIndex) }
+        reportGrids(beat)
         if (phase == Phase.FADING) {
             if (beat != null && main.currentMediaItemIndex == incomingIndex) {
                 startEasing(beat)
@@ -712,6 +800,7 @@ internal class MixedCrossfader(
     }
 
     private fun releaseTail() {
+        eqBooked = false
         // The repeats ring out by themselves; nothing more goes in.
         tailMix?.echo?.send = 0f
         mainMix.filter.reset()
@@ -810,6 +899,8 @@ internal class MixedCrossfader(
     private fun clock(ms: Long): String = "%d:%02d".format(java.util.Locale.ROOT, ms / 60_000, ms / 1000 % 60)
 
     companion object {
+        /** The last blend's EQ style, so the next one is mixed a little differently ([EqStyles.choose]). */
+        @Volatile private var lastEqStyle: EqStyle? = null
         const val LOOK_MS = 1_000L
         /** The tail is made ready this long before the handover. */
         const val PREPARE_MS = 10_000L
@@ -868,6 +959,22 @@ internal object EngineFade {
     const val LEAD_MS = 2_500L
     /** And never sooner than this from now. */
     const val MIN_LEAD_MS = 1_500L
+
+    /**
+     * A plain blend of what's left of the song before its end (ms), for [base] that no longer fits: never laid on the
+     * beat (it can't be put on the bar any more), its whole length what's left once the next song is ready. Null when
+     * that's under [shortestMs], or for a cold end, which is meant to play the two back to back.
+     */
+    fun whatsLeft(base: FadePlan, durationMs: Long, positionMs: Long, prepareMs: Long, shortestMs: Long): FadePlan? {
+        if (base.coldEnd) return null
+        val left = durationMs - base.cutMs - positionMs - prepareMs - LEAD_MS
+        if (left < shortestMs) return null
+        return base.copy(
+            overlapMs = left, fadeInMs = minOf(base.fadeInMs, left).coerceAtLeast(Crossfade.MIN_FADE_IN_MS),
+            beat = null, technique = null, filterHz = 0.0, echoBeatMs = null, buildUp = false,
+            why = "smart: a blend of what's left (%.1f s) after moving near the end · ${base.why}".format(java.util.Locale.ROOT, left / 1000.0),
+        )
+    }
 
     /** Where (ms of the old song) the tail takes the old song over, for a fade starting at [startAtMs] heard at [positionMs]. */
     fun handoverAt(startAtMs: Long, positionMs: Long): Long =

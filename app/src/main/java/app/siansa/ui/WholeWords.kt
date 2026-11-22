@@ -26,6 +26,12 @@ fun WholeWordsText(
     maxLines: Int = 2,
     minScale: Float = MIN_TITLE_SCALE,
 ) {
+    // Short words kept with their neighbours and the lines balanced (the owner, 21 Nov: "New for / you" and "Drum n /
+    // Bass" looked bad split like that).
+    @Suppress("NAME_SHADOWING")
+    val text = remember(text) { keepTogether(text) }
+    @Suppress("NAME_SHADOWING")
+    val style = remember(style) { style.copy(lineBreak = androidx.compose.ui.text.style.LineBreak.Heading) }
     BoxWithConstraints(modifier) {
         val measurer = rememberTextMeasurer()
         val width = constraints.maxWidth
@@ -48,6 +54,30 @@ fun WholeWordsText(
             scaled(style, scale)
         }
         Text(text, style = fitted, color = color, maxLines = maxLines, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+/**
+ * [text] with its short words held to their neighbours by no-break spaces, so a line never starts or ends on one: a
+ * word of one or two letters ("n", "&", "of") to the words on both sides ("Drum n Bass" stays one piece), and a last
+ * word of three letters or fewer to the one before it ("New for you" breaks as "New / for you", never "New for / you").
+ */
+internal fun keepTogether(text: String): String {
+    val words = text.trim().split(Regex(" +")).filter { it.isNotEmpty() }
+    if (words.size < 2) return text
+    val glue = BooleanArray(words.size - 1)  // glue[i]: no break between word i and word i + 1
+    for (i in words.indices) {
+        if (words[i].length <= 2) {
+            if (i > 0) glue[i - 1] = true
+            if (i < words.size - 1) glue[i] = true
+        }
+    }
+    if (words.last().length <= 3) glue[words.size - 2] = true
+    return buildString {
+        words.forEachIndexed { i, w ->
+            if (i > 0) append(if (glue[i - 1]) '\u00A0' else ' ')
+            append(w)
+        }
     }
 }
 
@@ -89,7 +119,12 @@ fun wholeWordsScale(widestWord: (Float) -> Int, lines: (Float) -> Int, width: In
 
 private const val STEP = 0.05f
 
-private fun words(text: String): List<String> = text.split(Regex("\\s+")).filter { it.isNotEmpty() }
+/**
+ * The pieces a title breaks into: split at plain spaces only. Android's regex counts a no-break space as a space too
+ * (\\s is every Unicode space there), so "On repeat" held together by [keepTogether] was measured as two words, fitted
+ * at full size, and then broken inside a word ("On re / peat", the owner, 21 Nov).
+ */
+internal fun words(text: String): List<String> = text.split(Regex("[ \\t\\n]+")).filter { it.isNotEmpty() }
 
 private fun scaled(style: TextStyle, scale: Float): TextStyle = if (scale >= 1f) style else style.copy(
     fontSize = if (style.fontSize.isSpecified) style.fontSize * scale else style.fontSize,

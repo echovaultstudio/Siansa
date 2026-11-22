@@ -97,7 +97,7 @@ fun CardScreen(nav: NavController, id: String) {
 }
 
 /**
- * Settings › Home page › Cards: Made for you cards (issue #274) and custom cards pinned to Home (issue #622), each under its
+ * Settings › Home › Cards: Made for you cards (issue #274) and custom cards pinned to Home (issue #622), each under its
  * own heading on one page.
  */
 @Composable
@@ -142,7 +142,8 @@ fun CardsSettingsScreen(nav: NavController) {
             HorizontalDivider()
             Heading("Custom cards")
             Hint("Cards of your own on Home, in Your cards. A card lists songs or albums by a sound you describe, or by rules like a record label, years or a genre. Tap a card to change it.")
-            val pins = pinned.orEmpty()
+            // Your own notices (issue #1234) are kept with them, and listed under Notices.
+            val pins = pinned.orEmpty().filter { !it.notice }
             if (pins.isEmpty()) Hint("No custom cards yet.")
             pins.forEachIndexed { i, card ->
                 if (i > 0) HorizontalDivider()

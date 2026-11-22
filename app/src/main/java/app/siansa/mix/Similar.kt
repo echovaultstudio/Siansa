@@ -103,7 +103,7 @@ class Similar(private val graph: AppGraph) {
     /** Artists that sound like [name], as "Fans also like" shows them; empty when the plugin isn't there. */
     suspend fun artists(name: String): List<SimilarArtist> {
         val settings = graph.settings.current
-        val fromBeats = settings.beatsReady && BeatsSound.available
+        val fromBeats = settings.beatsSoundReady && BeatsSound.available
         if (!settings.soundReady || (pluginKnownMissing() && !fromBeats)) return emptyList()
         val hits = try {
             SimilarPlugin.parseArtists(ask(SimilarPlugin.artistsQuery(name)))
@@ -139,8 +139,8 @@ class Similar(private val graph: AppGraph) {
      */
     private suspend fun ask(query: String): JsonObject {
         val settings = graph.settings.current
-        val order = askOrder(settings.audioMuseReady, settings.beatsReady, BeatsSound.available)
-        if (order.isEmpty()) throw IllegalStateException("Set up AudioMuse-AI in Settings › Connections first")
+        val order = askOrder(settings.audioMuseReady, settings.beatsSoundReady, BeatsSound.available)
+        if (order.isEmpty()) throw IllegalStateException("Set up AudioMuse-AI in Settings › Services first")
         var failed: Exception? = null
         for (from in order) {
             try {

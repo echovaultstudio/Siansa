@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.BarChart
+import androidx.compose.material.icons.rounded.FilterList
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.SystemUpdate
@@ -54,7 +55,7 @@ import java.time.LocalDate
 /**
  * The notices at the top of Home (issue #784): chips for what needs you, what you're partway through and what's new.
  * Pinned kinds always show; the automatic ones come and go as they're needed (issue #794). None while [shown] is off
- * (Settings › Home page › Top of Home).
+ * (Settings › Home › Top of Home).
  */
 @Composable
 internal fun rememberNotices(graph: AppGraph, settings: AppSettings, shown: Boolean): List<Notice> {
@@ -175,13 +176,13 @@ private fun NoticePill(notice: Notice, onOpen: () -> Unit) {
         contentColor = MaterialTheme.colorScheme.onSurface,
         modifier = Modifier.widthIn(max = NOTICE_MAX_WIDTH).testTag("notice-${notice.kind.id}"),
     ) {
-        NoticePillContent(noticeIcon(notice.kind), notice.text)
+        NoticePillContent(noticeIcon(notice), notice.text)
     }
 }
 
 /** What's inside a notice pill; also measured, never shown, for the height of Home's menu button. */
 @Composable
-private fun NoticePillContent(icon: ImageVector, text: String) {
+internal fun NoticePillContent(icon: ImageVector, text: String) {
     Row(
         Modifier.padding(horizontal = Space.Medium, vertical = Space.Small),
         verticalAlignment = Alignment.CenterVertically,
@@ -192,6 +193,10 @@ private fun NoticePillContent(icon: ImageVector, text: String) {
     }
 }
 
+/** A notice's icon: a notice of your own's chosen one (the filter icon only when none can be read), else its kind's. */
+internal fun noticeIcon(notice: Notice): ImageVector =
+    (if (notice.kind == NoticeKind.CUSTOM) NoticeIcons.of(notice.icon) else null) ?: noticeIcon(notice.kind)
+
 internal fun noticeIcon(kind: NoticeKind): ImageVector = when (kind) {
     NoticeKind.NEEDS_YOU -> Icons.Rounded.Warning
     NoticeKind.UPDATE -> Icons.Rounded.SystemUpdate
@@ -200,6 +205,7 @@ internal fun noticeIcon(kind: NoticeKind): ImageVector = when (kind) {
     NoticeKind.YOUR_MONTH -> Icons.Rounded.BarChart
     NoticeKind.NEW_ARTISTS -> Icons.Rounded.Person
     NoticeKind.LIKED -> Icons.Rounded.Favorite
+    NoticeKind.CUSTOM -> Icons.Rounded.FilterList
 }
 
 /** Every notice there is something to say about now; [Notices.order] picks and orders them. Looks only at what's on the phone, except the books in progress. */
@@ -233,4 +239,17 @@ private suspend fun noticeCandidates(graph: AppGraph, settings: AppSettings, syn
     Notices.yourMonth(today)?.let(::add)
     Notices.newArtists(graph.suggestions.savedToday().size, today)?.let(::add)
     if (settings.notices.modeOf(NoticeKind.LIKED) != app.siansa.mix.NoticeMode.OFF) add(Notices.liked())
+    // Your own notices (issue #1234): each one's count, of what its card shows (its albums, songs, or books).
+    if (settings.notices.modeOf(NoticeKind.CUSTOM) != app.siansa.mix.NoticeMode.OFF && graph.library.isSynced) {
+        graph.pinnedCards.all().filter { it.notice && it.shown }.forEach { card ->
+            try {
+                val found = graph.pinnedCards.content(card)
+                Notices.custom(card.id, card.title, found.shownCount, card.noticeIconKey, card.noticeCount)?.let(::add)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                AppLog.w("Home", "Notices: \"${card.title}\" couldn't be worked out: ${e.message}")
+            }
+        }
+    }
 }

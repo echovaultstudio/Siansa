@@ -1,7 +1,7 @@
 package app.siansa.data
 
 /**
- * Star ratings on Now Playing (issue #1043; Settings › Now playing): off by default, as the top of Now Playing is full
+ * Star ratings on Now Playing (issue #1043; Settings › Player): off by default, as the top of Now Playing is full
  * already. On, the stars show in About this song (the lower part), under the title, or both: always in one place at
  * least. A song's menu has "Rate" whenever ratings are on.
  */

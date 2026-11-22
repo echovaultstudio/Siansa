@@ -43,6 +43,8 @@ sealed class CarId {
     data class Search(val query: String) : CarId()
     /** One letter's part of a long list ([list] is Albums or Artists), named by its [key] in [CarIndex]. */
     data class Letter(val list: CarId, val key: String) : CarId()
+    /** An artist's songs played whole, in album order or [shuffle]d: the first rows of an artist (issue #1237). */
+    data class ArtistPlay(val id: String, val shuffle: Boolean) : CarId()
     /** A song in a list: [list] is the list it was picked from, which then plays from it. */
     data class Song(val list: CarId, val songId: String) : CarId()
 
@@ -61,6 +63,7 @@ sealed class CarId {
             is Mix -> "mix:" + enc(id)
             is Mood -> "mood:" + enc(id)
             is Search -> "search:" + enc(query)
+            is ArtistPlay -> (if (shuffle) "artistshuffle:" else "artistplay:") + enc(id)
             is Letter -> "letter:" + enc(list.mediaId) + ":" + enc(key)
             is Song -> "song:" + enc(list.mediaId) + ":" + enc(songId)
         }
@@ -95,6 +98,8 @@ sealed class CarId {
                     "mix" -> Mix(dec(rest))
                     "mood" -> Mood(dec(rest))
                     "search" -> Search(dec(rest))
+                    "artistplay" -> ArtistPlay(dec(rest), shuffle = false)
+                    "artistshuffle" -> ArtistPlay(dec(rest), shuffle = true)
                     "letter" -> {
                         val parts = rest.split(':')
                         if (parts.size != 2) return null
@@ -218,6 +223,7 @@ class CarTree(private val library: CarLibrary, private val coverUri: (String) ->
         is CarId.Search -> folder(id, id.query)
         is CarId.Mood -> library.moods().firstOrNull { it.id == id.id }?.let(::moodItem)
         is CarId.Song -> songsOf(id.list).firstOrNull { it.id == id.songId }?.let { songItem(it, id.list, null) }
+        is CarId.ArtistPlay -> artistPlayItem(id)
     }
 
     /** What's inside [parentId], or null when it isn't a list the car can open. */
@@ -239,7 +245,10 @@ class CarTree(private val library: CarLibrary, private val coverUri: (String) ->
             CarId.Artists -> artistGroups()?.firstOrNull { it.key == id.key }?.entries.orEmpty().map(::artistItem)
             else -> null
         }
-        is CarId.Artist -> artistSongs(id.id).map { songItem(it, id, it.album.ifBlank { null }) }
+        // An artist opens to its albums, each opening to its songs, never playing on a tap (issue #1237); Play all
+        // and Shuffle first, for the artist's whole catalogue in one go.
+        is CarId.Artist -> listOf(artistPlayItem(CarId.ArtistPlay(id.id, false)), artistPlayItem(CarId.ArtistPlay(id.id, true))) +
+            artistAlbums(id.id)
         is CarId.Album, is CarId.Playlist, is CarId.Mix, is CarId.Search -> songsOf(id).map { songItem(it, id, null) }
         else -> null
     }
@@ -262,6 +271,9 @@ class CarTree(private val library: CarLibrary, private val coverUri: (String) ->
         }
         is CarId.Mood, is CarId.Album, is CarId.Playlist, is CarId.Mix, is CarId.Artist, is CarId.Search ->
             songsOf(id).takeIf { it.isNotEmpty() }?.let { whole(id, it) }
+        is CarId.ArtistPlay -> artistSongs(id.id).takeIf { it.isNotEmpty() }?.let { songs ->
+            whole(CarId.Artist(id.id), if (id.shuffle) songs.shuffled() else songs)
+        }
         else -> null
     }
 
@@ -298,6 +310,19 @@ class CarTree(private val library: CarLibrary, private val coverUri: (String) ->
             library.mixes().map { mixItem(it).grouped("Your mixes") } +
             library.moods().map { moodItem(it).grouped("Mood radios") }
     }
+
+    /**
+     * An artist's albums, as its songs have them (in the order they first come), each to open: one asked of the server
+     * for them all, not one per album. Songs on no album aren't lost: they play with Play all.
+     */
+    private suspend fun artistAlbums(id: String): List<MediaItem> =
+        library.artistSongs(id).filter { !it.albumId.isNullOrBlank() }.groupBy { it.albumId!! }.map { (albumId, songs) ->
+            val first = songs.first()
+            folder(CarId.Album(albumId), first.album.ifBlank { "Album" }, subtitle = first.year?.toString(), artwork = first.cover?.let(coverUri))
+        }
+
+    private fun artistPlayItem(id: CarId.ArtistPlay): MediaItem =
+        playable(id, if (id.shuffle) "Shuffle" else "Play all", if (id.shuffle) "All songs, in any order" else "All songs, album by album", null)
 
     /** An artist's songs with each album's together, in the order its albums first come. */
     private suspend fun artistSongs(id: String): List<Song> = library.artistSongs(id).groupBy { it.album }.values.flatten()
@@ -344,8 +369,9 @@ class CarTree(private val library: CarLibrary, private val coverUri: (String) ->
     private fun mixItem(mix: Mix) = folder(CarId.Mix(mix.id), mix.title, subtitle = "${mix.songs.size} songs", artwork = mix.songs.firstOrNull()?.cover?.let(coverUri))
     private fun moodItem(radio: MoodRadio) = playable(CarId.Mood(radio.id), radio.name, "Mood radio", null)
     private fun playlistItem(p: Playlist) = folder(CarId.Playlist(p.id), p.name, subtitle = "${p.songCount} songs", artwork = p.coverArt?.let(coverUri))
-    private fun albumItem(a: Album) = folder(CarId.Album(a.id), a.name, subtitle = a.artist.ifBlank { null }, artwork = a.coverArt?.let(coverUri), playableToo = true)
-    private fun artistItem(a: Artist) = folder(CarId.Artist(a.id), a.name, artwork = coverUri(a.picture), playableToo = true)
+    // Open only: Android Auto plays an item that can be played as well as opened when it's tapped (issue #1237).
+    private fun albumItem(a: Album) = folder(CarId.Album(a.id), a.name, subtitle = a.artist.ifBlank { null }, artwork = a.coverArt?.let(coverUri))
+    private fun artistItem(a: Artist) = folder(CarId.Artist(a.id), a.name, artwork = coverUri(a.picture))
 
     private fun songItem(song: Song, list: CarId, group: String?): MediaItem {
         val extras = Bundle().apply { if (group != null) putString(MediaConstants.EXTRAS_KEY_CONTENT_STYLE_GROUP_TITLE, group) }

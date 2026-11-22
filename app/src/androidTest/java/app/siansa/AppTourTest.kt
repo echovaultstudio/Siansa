@@ -18,6 +18,7 @@ import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.onRoot
@@ -227,8 +228,11 @@ class AppTourTest {
                 click("Lyrics")
                 idle(1500)
                 shot("10c-lyrics")
-                back()
-                idle(600)
+                // A hard pull down on the lyrics closes the lyrics only: now playing stays (the owner, 16 Nov).
+                compose.onAllNodesWithTag("lyricsScreen").onFirst().performTouchInput { swipeDown(startY = top + height * 0.3f, endY = bottom, durationMillis = 120) }
+                idle(1200)
+                check(compose.onAllNodesWithTag("lyricsScreen").fetchSemanticsNodes().isEmpty()) { "a pull down left the lyrics open" }
+                check(compose.onAllNodesWithContentDescription("Song options").fetchSemanticsNodes().isNotEmpty()) { "a pull down on the lyrics closed now playing too" }
                 // Scrolled down to the cards under the player.
                 compose.onRoot().performTouchInput { swipeUp(startY = bottom * 0.8f, endY = top + bottom * 0.1f) }
                 idle(1500)
@@ -331,7 +335,7 @@ class AppTourTest {
                 else if (compose.onAllNodesWithText("Radios").fetchSemanticsNodes().isEmpty()) problems += "Back from a search didn't return to the search page"
             }
             step("vibes") {
-                settingsRow("Radios & mixes")
+                settingsRow("Mixes")
                 click("Today's mix and vibes")
                 idle(1000)
                 shot("17-vibes")
@@ -342,7 +346,7 @@ class AppTourTest {
                 idle(800)
                 shot("18-settings")
                 // Regrouped (the owner, 13 Nov): you and the services first, then twelve tiles.
-                listOf("Sound", "Radios & mixes", "Streaming & storage", "Audiobooks & podcasts", "Home page", "Theme", "Now playing", "Bottom bar", "Scrobbling & history", "Help & feedback").forEachIndexed { i, page ->
+                listOf("Playback", "Mixes", "Discovery", "Scrobbling", "Storage", "Home", "Theme", "Player", "Navigation", "Help").forEachIndexed { i, page ->
                     settingsRow(page)
                     idle(1200)
                     shot("19-settings-${i + 1}-" + page.lowercase().replace(Regex("[^a-z0-9]+"), "-"))
@@ -351,7 +355,7 @@ class AppTourTest {
                 }
                 // The services' page, from Manage on the start page.
                 tab("Settings")
-                waitText("Manage")
+                waitText("All services")
                 // Scrolled into view: the start page stays where the last tile left it.
                 compose.onNodeWithTag("hubManage").performScrollTo().performClick()
                 idle(1500)
@@ -374,7 +378,7 @@ class AppTourTest {
                 back()
                 idle(400)
                 // Issue #302: Download all covers is in Settings › Streaming & storage, under the song download settings.
-                settingsRow("Streaming & storage")
+                settingsRow("Storage")
                 idle(800)
                 compose.onAllNodesWithText("Download all covers").onFirst().performScrollTo()
                 idle(600)
@@ -423,7 +427,7 @@ class AppTourTest {
                 }
             }
             step("equaliser") {
-                settingsRow("Sound")
+                settingsRow("Playback")
                 click("Equaliser")
                 idle(1200)
                 shot("19b-equaliser")
@@ -432,7 +436,7 @@ class AppTourTest {
             }
             step("crossfade and levelling") {
                 try {
-                    settingsRow("Sound")
+                    settingsRow("Playback")
                     idle(1000)
                     shot("19j-crossfade")
                     // Issue #214: levelling (ReplayGain) lives here now, with what levels the song playing now.

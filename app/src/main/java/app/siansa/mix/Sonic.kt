@@ -33,7 +33,7 @@ class Sonic(private val graph: AppGraph) {
     suspend fun similar(songId: String, count: Int): List<ClapHit> {
         val settings = graph.settings.current
         val audioMuse = settings.soundReady
-        val fromBeats = settings.beatsReady && BeatsSound.answers("/api/similar_tracks")
+        val fromBeats = settings.beatsSoundReady && BeatsSound.answers("/api/similar_tracks")
         val route = sonicRoute(graph.source.hasSonicMatch(), audioMuse, fromBeats)
         if (route == SonicRoute.BEATS) {
             // (AudioMuse itself is asked in the same call when Siansa Beats can't answer and it's set up.)

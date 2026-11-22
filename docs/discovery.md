@@ -7,7 +7,7 @@ Long-press a song (or use its menu) and pick **Start a mix**, or slide from the 
 adds songs that sound like it and share its mood. When only a few are left, it finds more, so it keeps going.
 Playing anything else ends the radio.
 
-**Settings › Radios & mixes › Radio wandering** sets how far it may wander:
+**Settings › Mixes › Radio wandering** sets how far it may wander:
 
 | Choice | What happens |
 |---|---|
@@ -81,7 +81,7 @@ Without AudioMuse-AI, song radio uses Navidrome's similar songs, or Emby's Insta
 
 ## Keep playing
 
-**Settings › Radios & mixes › When the queue ends**: what happens when the queue is about to end.
+**Settings › Mixes › When the queue ends**: what happens when the queue is about to end.
 
 | Choice | What happens |
 |---|---|
@@ -154,13 +154,23 @@ box: the mix starts playing and you stay on Flow.
   picks and the arrow take the colour of the mood you're in, and its name is under the pad ("Easy groove",
   "Late-night drift", "Get moving"…). Let go and the dot settles on the nearest of its 25 places.
   The line under the pad says it: dragging it while a vibe plays changes the vibe.
-- **Sounds and genres**: tap **+ Add a sound or genre** and pick from the list. Nothing is suggested: you choose,
+- **Sounds and genres**: tap **+ Add a sound or genre** (**+ Add a sound, genre or mood** with Siansa Beats 0.51
+  or newer) and pick from the list. Nothing is suggested: you choose,
   up to six. **Sounds** are the words your sound search understands (piano, vocals, dreamy…), its own list from
   AudioMuse-AI or Siansa Beats, without its genre words. **Genres** are the ones Siansa Beats hears in your music,
   or your songs' genre tags without it: the main ones (those with most songs) first, and the search box finds the
   rest. Each pick starts as **more** of it (filled). Tap it for **less** (dashed, struck through); tap again to
   take it off. A sound steers the search. A genre comes first: with **more** of a genre the mix is made of that
   genre's songs, the ones that fit the rest best first; **less** leaves that genre's songs out.
+  With Siansa Beats (0.51 or newer) there's a third list, **Moods**, under four headings. **Voice**: **Vocals**,
+  **Instrumental**, **Female vocals**, **Male vocals**. **Mood**: **Happy**, **Sad**, **Relaxed**, **Party**,
+  **Aggressive**, **Cheerful**, **Bittersweet**, **Passionate**, **Intense**, **Quirky**. **Style**: **Danceable**,
+  **Acoustic**, **Electronic**. **Tags**: **Beautiful**, **Chill**, **Mellow**, **Easy listening**, **Catchy**, **Sexy**,
+  AudioMuse-AI's own mood words, from each song's strongest tags. Siansa Beats hears these in every song. With
+  AudioMuse-AI and no Siansa Beats, Moods has what AudioMuse-AI's tags say: **Happy**, **Sad**, **Party** and the Tags.
+  They come from one or the other, never both: Siansa Beats when it has your songs' sound. **More** of one puts the songs that have it first and adds
+  its words to the search; **less** puts them last. Words you type ask for them too: "sad female vocals" picks
+  **Female vocals** and **Sad** for you, unless you've picked or set them aside already.
 - **Artists**: **Favourites** (the artists you play most), **A mix**, or **New to me** (artists you rarely play).
 - **Or say it**: type what you want to hear ("tired but hopeful", "rainy Sunday", "need to focus"). With AI set
   up it reads your words; what you set on the pad and your picks are used with them. Words count when you press

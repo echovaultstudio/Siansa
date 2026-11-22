@@ -2,7 +2,7 @@
 
 ## Streaming quality
 
-**Settings › Streaming & storage › Streaming quality**, set separately **On Wi-Fi** and **On mobile data**:
+**Settings › Storage › Streaming quality**, set separately **On Wi-Fi** and **On mobile data**:
 
 - **Original**: the file as it is on your server. Best on Wi-Fi.
 - **Opus 96–320 kbit/s**: converted by your server, to save data. Navidrome uses its "opus" transcoding profile;
@@ -17,10 +17,10 @@ Siansa always plays the quality you chose; it never switches by itself. Changes 
 
 ## Song cache and loading ahead
 
-- **Song cache** (**Settings › Streaming & storage**, 2 GB by default): songs are kept on the phone as they play, so replays
+- **Song cache** (**Settings › Storage**, 2 GB by default): songs are kept on the phone as they play, so replays
   and skips start at once and survive a bad connection. Only original-quality streams are cached. **Off** keeps
   no song once it has played (the songs already cached are removed); it applies from the next song.
-- **Load songs ahead** (**Settings › Streaming & storage**): while a song plays, Siansa loads the next ones, one at a time, so
+- **Load songs ahead** (**Settings › Storage**): while a song plays, Siansa loads the next ones, one at a time, so
   they start at once and keep playing if the connection drops. 2 on Wi-Fi and 1 on mobile data by default, up to
   5. Only original files are loaded ahead. This works with the song cache off too, for up to 3 songs: each is held
   only until it has played.
@@ -29,7 +29,7 @@ Siansa always plays the quality you chose; it never switches by itself. Changes 
 
 ## Downloads
 
-**Settings › Streaming & storage › Downloads** (or the download button on an album or playlist): music you download stays on the phone
+**Settings › Storage › Downloads** (or the download button on an album or playlist): music you download stays on the phone
 and plays without a connection. It isn't part of the song cache and is never removed by itself.
 
 - **Download on Wi-Fi only** (on by default).
@@ -46,7 +46,7 @@ size, so they stay gapless too.
 
 ## Levelling (even loudness)
 
-**Settings › Sound**:
+**Settings › Playback**:
 
 - **Levelling**: **Track** plays every song at the same level. **Album** keeps an album's loud and quiet songs
   apart. **Off** plays songs as they are.
@@ -73,6 +73,9 @@ How Smart decides:
 
 - Smart crossfades follow how songs end and start, measured by the Siansa plugin. A long fade-out starts blending
   early, a hard ending doesn't blend at all. A slow intro fades in slowly, a hard hit comes in at once.
+- A song Siansa Beats hasn't analysed, or couldn't be asked about at that moment, blends quickly (1.5 seconds), so two
+  beats it can't line up never run over each other. After Siansa Beats can't be reached, it's asked again after half a
+  minute, then after longer waits if it still doesn't answer.
 - **Cold ends**: when a song ends hard (loud to its last second) and the next one starts hard (loud straight away),
   they don't overlap at all: the old song plays to its very last sound, then a short pause (0.4 seconds, 0.6 when
   their tempos are far apart), then the next song from its start, as a radio DJ plays a cold end. Both songs stay
@@ -134,13 +137,14 @@ blend them the way a DJ mixes:
   length, so the song is back at its own speed sooner.
 - **Smart picks how to blend (with Siansa Beats' readings at both ends, and the keys from AudioMuse-AI):**
   - **Long blend**, 32 bars with the bass swapped in the middle: tempos within 2 %, keys that mix, both ends sure of
-    their beat, and 8 bars or more without bass at one end.
+    their beat, and 8 bars or more without bass at one end. With Siansa Beats 0.60 or newer, only where the two
+    songs' vocals won't meet in it.
   - **Drop swap**: the next song comes in 16 (or 8) bars before its first drop, so the drop lands where the old song
     goes; the old song keeps its bass until then. Not when the energy goes down.
   - **Filter fade**, 16 bars: the old song is swept out with a rising high-pass filter, when the next song starts 3 dB
     or more quieter, or the keys only half mix.
-  - **Quick swap**, 4 bars: when the keys clash, a beat is under 90 % sure, or you moved so near the end that the
-    blend picked no longer fits. Moving in the song keeps the blend picked whenever it still fits.
+  - **Quick swap**, 4 bars: when the keys clash, a beat is under 90 % sure, both songs sing right up to the change
+    (fewer than 4 bars without a voice between them), or you moved so near the end that the blend picked no longer fits. Moving in the song keeps the blend picked whenever it still fits.
   - **Echo out**: when the tempos are too far apart to match, the two never play together. The old song's last bar
     echoes out and it stops on the bar line; the next song drops in at full level on its first downbeat as it stops,
     under the last faint repeats. Only into a song whose beat starts right away: one with an intro without a beat
@@ -150,7 +154,13 @@ blend them the way a DJ mixes:
 - **Siansa Beats**: each end of a song is read from where its beat locks onto its grid (the first and
   last 4 bars it all keeps to). A blend stays inside that, and an end needs 80 % of its beats on the grid there to be
   beat-matched, and 80 % of them sitting on the grid. A track cut from a mixed CD carries the DJ's own changeovers at
-  its ends: its blends are laid inside its lock and kept to 8 bars, and without a lock it gets a short blend.
+  its ends. Going out of one, the swap is at its very end, in its last 2 bars (1 when 2 don't fit): the next song comes
+  in on its first downbeat on a downbeat of the old one, beat 1 on beat 1, since the CD already did the blending.
+  Without a downbeat to trust at both ends (bars only assumed from a song's first beat), it's a cut on the beat
+  instead: the old song to its last beat and the next on the very next one, so there's no gap and no bars laid on each
+  other out of place. A next song that's a CD's track too starts at its lock, after the CD's last record. Into a CD's
+  track from a normal song, the blend starts at its lock and is kept to 16 bars at most. Without a lock it gets a short
+  blend.
   - Two songs are beat-matched only when Siansa Beats has a grid for both (or, without Siansa Beats, the plugin's
     readings for both): one with a grid and one without gets a short blend, never the two readings laid on each other.
   - A song whose beat comes in more than 8 seconds into it (an ambient intro) isn't beat-matched from there, which
@@ -175,9 +185,36 @@ is about 15 seconds at 128 BPM, 16 bars about 30. A blend starts on a bar, so it
 longer, and it never takes more than a third of a song: into a short song it's laid over fewer bars, still beat
 on beat.
 
-**Bass swap** (always on, with no setting): over the first half of a blend the old song's bass is taken away (a filter sweeping
-up to about 200 Hz) while the new song's, held back at first, is let in, as a DJ does with the EQ: two kick drums
-never play at once, so a blend a few ms out of step is heard as a mix, not a flam.
+**Three-band EQ** (always on, with no setting): each beat-matched blend rides the lows, mids and highs of both songs
+separately, the way a DJ uses a mixer's EQ.
+- **Lows:** the old song's bass is taken away (a filter sweeping up to about 200 Hz) while the new song's, fully cut
+  at first, is let in, over the first half of the blend (the middle in a long blend, the end in a drop swap). Two
+  kick drums or basslines never play at once, so a blend a few ms out of step is heard as a mix, not a flam.
+- **Highs:** the new song's hats come in first, from 12 dB down to full over the first quarter; the old song's go down
+  as much over the last quarter.
+- **Mids** (where a voice is): the new song's come in over the first half and the old song's go over the second.
+- **Never two vocals at once** (with Siansa Beats 0.60 or newer, which finds where each song sings): when both songs
+  would sing at the same moment of the blend, the mids and highs are swapped on a bar line instead. The old song's
+  voice is cut over the bar before it and the new song's let in over the bar after it, so one voice is heard at a time.
+  The bar is chosen to cut off the least singing, weighing each song by how loud it is then in the blend, a phrase
+  line winning a near tie. Two vocal songs still blend; their voices just never overlap. Without the vocals known
+  for both (a song not separated yet, or a blend outside the ends Siansa Beats separated), the EQ crosses over as
+  above. The log says which it did ("EQ: mids swapped at bar 9 of 16 (both sing for 5.2 bars of it)").
+
+**Each blend mixed a little differently:** a long blend, a bass swap or a quick swap that's on the bars, with its
+phrases known, picks one of four ways to ride the EQ, never the same one twice in a row:
+- **Glide:** as above, everything crossed over smoothly.
+- **Bass swap on the bar:** both basslines swapped at once on the phrase line halfway, the new song's hats coming up
+  over the 4 bars before it.
+- **Tease, then swap:** the new song comes in on its hats alone, its mids later, and its bass at once on the last
+  phrase line.
+- **Bass, then mids, on the bar:** the basslines swapped at once on one phrase line and the mids (the voices) on the
+  next.
+
+A swap "at once" lands on the old song's own bar line to within a millisecond, over 8 ms so it doesn't click. Where
+both songs would sing at once, the mids still swap where only one voice is heard. A filter fade, a drop swap and an
+echo out keep their own way out, and a blend that isn't sure of its bars or phrases glides. The log names the style
+("EQ: tease, then swap: …"), and **Mark the last blend** keeps it, so a style that doesn't suit your music shows up.
 
 Echo at the end and Keep the key are off for now and not shown in Settings: the blends play plain, and the next
 song's pitch moves with its speed (by at most two thirds of a semitone at 4 %, like a DJ's pitch fader), then glides
@@ -210,7 +247,7 @@ one, or while the sleep timer lets a song finish.
 
 ## Equaliser
 
-**Settings › Sound › Equaliser**: ten bands, presets, and a pre-amp. Songs stay as loud as with the equaliser
+**Settings › Playback › Equaliser**: ten bands, presets, and a pre-amp. Songs stay as loud as with the equaliser
 off; the pre-amp makes everything louder or quieter on top, and peaks that would distort are smoothed. Moving a
 band saves it as your Custom preset. Not used while casting.
 
@@ -220,6 +257,10 @@ Tap the mini player, or swipe up on it, to open now playing; swipe down on now p
 Both follow your finger, and let go wherever you like: a hard swipe finishes quickly, a gentle one settles, and
 a short pull springs back. The mini player fades away as the player rises and comes back as it goes. The book
 player opens and closes the same way.
+
+At the top, now playing says what you're playing from: **Playing from mix** and the mix's name (a Siansa Beats mix or
+one made on the phone), **Playing from playlist**, **Playing from radio**, **Playing from artist**, or **Playing from
+album** and the song's album. Tap the name to open its page.
 
 A **DJ mix** (from the play button, the DJ mix bar, Start a mix, an album's or playlist's Shuffle, or Keep playing in DJ
 mode) is only offered when **Siansa Beats** answers with everything it needs: the beat grids its blends follow, and
@@ -237,7 +278,7 @@ choice: its icon beside the button, and its name in the middle of the cover, whi
 hides it. Until you're far enough the name is faint and says "Slide a little further"; then it lights up in your
 colour, says "Let go to start" and the phone clicks, and letting go there starts it. Everything else on the page dims while you
 slide, and going down, Play on makes way. Slide back to the middle to change your mind. A tap still plays and pauses, and pressing
-and holding still stops. What each way does can be changed, or the slides switched off, under **Settings › Now playing ›
+and holding still stops. What each way does can be changed, or the slides switched off, under **Settings › Player ›
 Play button**. While a DJ mix plays, the play button has record grooves in its colour, with a glint that turns as it
 plays.
 
@@ -250,7 +291,7 @@ queue does: the next songs change; the mix's shape now has a ring in your colour
 the place under your finger lights up (Stop in white, the rest in your colour) and the phone clicks at each one, while
 the cover shows its name, what it does and "Let go to start", "Let go to stop" or "Let go to reshape". Slide back down
 to change your mind. An album's or playlist's DJ mix plays its own songs, so its bar has only **Stop**. Put the places
-in your own order under **Settings › Now playing › DJ mix bar**.
+in your own order under **Settings › Player › DJ mix bar**.
 
 Swipe the mini player left for the next song or right for the one before: the title and artist follow your finger
 while the cover stays, and changes with the song. The phone gives a short buzz as the song
@@ -259,7 +300,10 @@ phone's settings). With no song after this one, a swipe left springs back and th
 it, a swipe right starts it again.
 
 Pull up from now playing, or tap the queue button, for the queue. Tapping a song in an album, a playlist or any list
-starts a new queue from that song: the songs before it in the list aren't queued (Shuffle plays the whole list). Tap a
+plays the whole list from that song: the songs before it are queued above it, in order, so **Shuffle** in now playing
+shuffles the whole album or playlist. Shuffle reorders the queue itself: the song playing stays first and plays on, the
+rest of the list follows in a random order, and the queue and Up next show that order. Turning Shuffle off puts the
+list back in its order. Songs that Keep playing adds come after all of the list, shuffled or not. Tap a
 song in the queue to jump to it. Swipe a song to the
 left to take it out of the queue, behind a red strip whose bin gives a little shake; swipe it to the right to play it
 next, straight after the song playing, behind an amber strip. Each gives a buzz. Its ⋮ menu has **Remove from queue**
@@ -279,15 +323,15 @@ format and bit rate) and, beside it, what is really playing and where it comes f
 
 - **Same as the file**, streamed as it is (on Wi-Fi or mobile data), from the song cache, or from its download.
 - **Opus** with its bit rate when your server converts the song for the connection you're on, or when the song was
-  downloaded as Opus. The box is lit then, so a converted song shows at a glance.
+  downloaded as Opus. It's written in the accent colour then, so a converted song shows at a glance.
 - **On** a TV or speaker's name while you cast.
 
 Offline, a downloaded song still shows how it plays, with the file type the library knows. Turn it off in **Settings ›
-Now playing › About this song**.
+Player › About this song**.
 
 ## Star ratings
 
-Turn on **Settings › Now playing › Star ratings** to rate songs from one to five stars. Tap a star to give that many;
+Turn on **Settings › Player › Star ratings** to rate songs from one to five stars. Tap a star to give that many;
 tap the rating again to take it off. The stars show in **About this song**, in the lower part of now playing, and
 under the title as well if you switch that on. A song's **⋮** menu has **Rate** too, in now playing and in every list.
 
@@ -308,14 +352,14 @@ same corner: tap it to close the lyrics again.
 
 From now playing. Pick a time, or let the current song finish. **Wind down** swaps everything after the current
 song for a path from that song to calmer music, long enough to fill the timer, so the music gets calmer and quieter
-as you fall asleep. Without a timer, Wind down queues a number of calm songs (**Settings › Radios & mixes › Wind down**:
+as you fall asleep. Without a timer, Wind down queues a number of calm songs (**Settings › Mixes › Wind down**:
 10, 20 or 30) and the music ends with them.
 
 ## Casting (Chromecast and DLNA)
 
 The device button in now playing shows TVs and speakers on the same Wi-Fi: Chromecast and Google TV, and DLNA
 ones (most smart TVs, Sonos, AV receivers). They play straight from your server: a Chromecast gets your music
-lossless (see **Chromecast sound quality** below), a DLNA one Opus 320 kbit/s if it lists Ogg among the formats it
+lossless (see **Chromecast sound quality** below), a DLNA one Opus 320 kbit/s if it lists Opus among the formats it
 plays, otherwise MP3 320, unless you ask for the original files.
 Stopping the cast brings the music back to the phone, paused. If the TV's Siansa screen closes by itself, the phone
 joins the TV again straight away and the music carries on there (at most once in two minutes; if it keeps closing,
@@ -385,8 +429,9 @@ format; other songs are still converted. Better sound, and no tiny gap between s
 setting is kept for each device, shows which formats the device says it plays, and isn't offered when it only
 plays MP3. It applies from the next song.
 
-**Opus on DLNA.** Songs converted for a DLNA TV or speaker go as Opus 320 kbit/s (in Ogg) when the device lists Ogg or
-Opus among the formats it plays, and as MP3 320 when it doesn't. If it doesn't start an Opus song after all, Siansa
+**Opus on DLNA.** Songs converted for a DLNA TV or speaker go as Opus 320 kbit/s (in Ogg) when the device lists Opus
+among the formats it plays, and as MP3 320 when it doesn't. A device that lists only Ogg gets MP3: many play only
+Vorbis in Ogg, and some (a JBL Bar 800) say they're playing an Opus song with no sound. If it doesn't start an Opus song after all, Siansa
 sends that song again as MP3 320, and that device gets MP3 until you restart the app.
 
 ## Android Auto
@@ -395,7 +440,9 @@ Siansa shows up in Android Auto as a music app. On the car's screen you can brow
 
 - **Home**: your newest mix of each vibe, the mood radios (when AudioMuse-AI is set up) and **Recently played**,
   the albums, playlists, mixes and artists you last played on the phone.
-- **Playlists**, **Albums** and **Artists**: each opens to its songs. An artist's songs are grouped by album.
+- **Playlists** and **Albums**: each opens to its songs; tapping one never starts it by itself.
+- **Artists**: each opens to **Play all** (its songs album by album), **Shuffle**, then its albums, each opening to
+  its songs.
 - **Search**, by typing (when parked) or by voice: "Play Radiohead on Siansa". A name that matches an artist or
   album exactly plays that artist or album; otherwise the songs found play. "Play music on Siansa" plays your newest
   mix.

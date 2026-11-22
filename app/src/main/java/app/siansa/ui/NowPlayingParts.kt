@@ -12,6 +12,22 @@ import androidx.compose.material.icons.rounded.Star
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.util.VelocityTracker
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.Velocity
+import kotlinx.coroutines.launch
 import app.siansa.net.soundReady
 import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.ui.graphics.drawscope.clipPath
@@ -468,14 +484,22 @@ fun AboutSongCard(song: Song, surface: Color, stars: Int? = null, playing: Playi
 }
 
 /**
- * File → Playing in About this song (issue #1038): the file as it is on the server at the left, an arrow, and what is
- * really playing at the right, lit in the accent colour only when that isn't the file as it is (converted to Opus, or
- * an Opus download).
+ * File → Playing in About this song (issue #1038): one box (the owner, 16 Nov: "one continuous box for all this info,
+ * slightly smaller, tidier"), the file as it is on the server at the left, an arrow, and what is really playing at the
+ * right, its first line in the accent colour only when that isn't the file as it is (converted to Opus, or an Opus
+ * download).
  */
 @Composable
 internal fun StreamPath(file: Pair<String, String?>, playing: PlayingAs) {
+    // The Flow pad's curve, with room inside it so no word meets the curve.
     Row(
-        Modifier.fillMaxWidth().height(IntrinsicSize.Min).testTag("streamPath"),
+        Modifier
+            .fillMaxWidth()
+            .testTag("streamPath")
+            .clip(RoundedCornerShape(STREAM_CORNER))
+            .background(Color.White.copy(alpha = 0.06f))
+            .padding(horizontal = Space.Page, vertical = Space.Small)
+            .height(IntrinsicSize.Min),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Space.Small),
     ) {
@@ -488,19 +512,10 @@ internal fun StreamPath(file: Pair<String, String?>, playing: PlayingAs) {
 
 @Composable
 private fun StreamEnd(label: String, title: String, detail: String?, lit: Boolean, modifier: Modifier) {
-    // The Flow pad's curve (the owner, 16 Nov: "a bit more pill shaped"), with room inside it so no word meets the
-    // curve. Both boxes start at the top, so their labels and their first lines sit on one line each.
-    val shape = RoundedCornerShape(STREAM_CORNER)
-    Column(
-        modifier
-            .clip(shape)
-            .background(if (lit) Accent.copy(alpha = 0.13f) else Color.White.copy(alpha = 0.06f))
-            .then(if (lit) Modifier.border(1.dp, Accent.copy(alpha = 0.4f), shape) else Modifier)
-            .padding(horizontal = Space.Page, vertical = Space.Medium),
-        verticalArrangement = Arrangement.Top,
-    ) {
+    // Both sides start at the top, so their labels and their first lines sit on one line each.
+    Column(modifier, verticalArrangement = Arrangement.Top) {
         Text(label, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.45f), letterSpacing = 0.4.sp, maxLines = 1)
-        Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = if (lit) Accent else Color.Unspecified, maxLines = 2, overflow = TextOverflow.Ellipsis)
         if (detail != null) Text(detail, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.72f), maxLines = 3, overflow = TextOverflow.Ellipsis)
     }
 }
@@ -592,9 +607,68 @@ fun LyricsScreen(song: Song?, tint: Color, onClose: () -> Unit, menu: () -> Unit
     val position by rememberPosition()
     val lyrics by loadState("lyrics-${song?.id}") { song?.let { graph.source.lyrics(it) } }
     val colors = LyricsTextColors
+    // Pulling down closes the lyrics only, never the whole player under them (the owner, 16 Nov): once the lines
+    // are back at their top the panel follows the finger, and nothing of the pull or its fling is left for the player.
+    val scope = rememberCoroutineScope()
+    val close by rememberUpdatedState(onClose)
+    var pulled by remember { mutableFloatStateOf(0f) }
+    var height by remember { mutableFloatStateOf(1f) }
+    fun settle(speed: Float) {
+        if (pullCloses(pulled, height, speed)) {
+            close()
+        } else if (pulled > 0f) {
+            val from = pulled
+            scope.launch { animate(from, 0f, animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) { v, _ -> pulled = v } }
+        }
+    }
+    val pull = remember {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (pulled > 0f && available.y < 0f) {
+                    val used = max(available.y, -pulled)
+                    pulled += used
+                    return Offset(0f, used)
+                }
+                return Offset.Zero
+            }
+
+            override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+                if (available.y > 0f && source == NestedScrollSource.UserInput) pulled += available.y
+                return available  // what the lines didn't use stops here
+            }
+
+            override suspend fun onPreFling(available: Velocity): Velocity {
+                if (pulled > 0f) {
+                    settle(available.y)
+                    return available
+                }
+                return Velocity.Zero
+            }
+
+            override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity = available
+        }
+    }
     Column(
         Modifier
             .fillMaxSize()
+            .onSizeChanged { height = it.height.toFloat().coerceAtLeast(1f) }
+            .graphicsLayer { translationY = pulled }
+            .testTag("lyricsScreen")
+            .nestedScroll(pull)
+            .pointerInput(Unit) {
+                // Drags on the parts that don't scroll (the heading, the controls' edges).
+                val tracker = VelocityTracker()
+                var total = 0f
+                detectVerticalDragGestures(
+                    onDragStart = { total = 0f; tracker.resetTracking() },
+                    onDragEnd = { settle(tracker.calculateVelocity().y) },
+                    onDragCancel = { settle(0f) },
+                ) { change, dy ->
+                    total += dy
+                    tracker.addPosition(change.uptimeMillis, Offset(0f, total))
+                    pulled = (pulled + dy).coerceAtLeast(0f)
+                }
+            }
             .background(Brush.verticalGradient(lyricsBackground(tint)))
             // Covers the player completely: touches don't reach it.
             .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { }

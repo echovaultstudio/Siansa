@@ -80,6 +80,12 @@ class SelectorStore(context: Context) {
     }
 }
 
+/** The mixes still in their days on [today]: [Mix.keepDays] from their date, or [MIX_KEEP_DAYS]. */
+fun keptMixes(mixes: List<Mix>, today: LocalDate): List<Mix> =
+    mixes.filter { it.date >= today.minusDays((if (it.keepDays > 0) it.keepDays else MIX_KEEP_DAYS).toLong()).toString() }
+
+const val MIX_KEEP_DAYS = 14
+
 class MixStore(context: Context) {
     private val json = JsonFile(
         File(context.filesDir, Users.scoped("mixes.json")),
@@ -93,12 +99,9 @@ class MixStore(context: Context) {
     /** The mix, whatever the source filter showed when it was made (issue #486). */
     suspend fun get(id: String): Mix? = all().firstOrNull { it.id == id }
 
-    /** Saves a mix and drops mixes older than two weeks. */
+    /** Saves a mix and drops mixes past their days: two weeks, or as long as Siansa Beats keeps its own. */
     suspend fun save(mix: Mix) {
-        val cutoff = LocalDate.now().minusDays(14).toString()
-        json.update { list ->
-            (listOf(mix) + list.filterNot { it.id == mix.id }).filter { it.date >= cutoff }
-        }
+        json.update { list -> keptMixes(listOf(mix) + list.filterNot { it.id == mix.id }, LocalDate.now()) }
     }
 
     /** Songs in this selector's mixes from the last [days] days, so mixes don't repeat. */

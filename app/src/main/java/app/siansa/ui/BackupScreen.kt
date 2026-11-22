@@ -91,13 +91,13 @@ fun BackupScreen(nav: NavController) {
         }
     }
 
-    Screen(title = "Backup & restore", nav = nav) { padding ->
+    Screen(title = "Backup", nav = nav) { padding ->
         Column(
             Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState()).padding(Space.Page),
             verticalArrangement = Arrangement.spacedBy(Space.Medium),
         ) {
             Hint(
-                "A backup holds your settings, vibes, mixes, play history and layout. Passwords, tokens and API keys are never included: enter them again under Settings › Connections after restoring.",
+                "A backup holds your settings, vibes, mixes, play history and layout. Passwords, tokens and API keys are never included: enter them again under Settings › Your server and Settings › Services after restoring.",
             )
             Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
                 Button(enabled = !busy, onClick = { saver.launch("siansa-backup-${stamp()}.json") }) {

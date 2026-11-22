@@ -19,7 +19,9 @@ import kotlinx.serialization.json.JsonObject
  *
  * Only the songs about to play are asked for, a few at a time, and kept in memory (about 100 bytes each).
  * Songs the plugin hasn't analysed are asked for again after [RETRY_MISSING_MS]; after a failed request,
- * nothing is asked for [BACK_OFF_MS], so a missing or broken plugin costs one request now and then.
+ * nothing is asked for a while ([backOffMs]: half a minute after the first failure, growing to [BACK_OFF_MS]), so a
+ * missing or broken service costs one request now and then, and a restart of Siansa Beats costs half a minute (the
+ * owner, 18 Nov: it was down for a moment, five minutes of a Flow mix had no beat grids, and its blends clashed).
  *
  * [get] does a GET of the plugin's path and query, answered by Siansa Beats or the plugin
  * ([app.siansa.AppGraph.siansaBeats]); [beats] asks Siansa Beats what it can do, for [check].
@@ -38,6 +40,8 @@ class ProfileStore(
     /** When each cached profile is to be asked for again ([refreshAfter]). */
     private val freshUntil = HashMap<String, Long>()
     private var backOffUntil = 0L
+    /** Failed requests in a row; a request that works starts again from none. */
+    private var failures = 0
     private val fetching = Mutex()
 
     /** Why the last request failed, or null when it worked. */
@@ -108,14 +112,20 @@ class ProfileStore(
             if (missingUntil.size > MAX_CACHED) missingUntil.entries.removeAll { it.value <= time }
         }
         problem = null
+        synchronized(lock) { failures = 0 }
         val measured = profiles.count { it.refLufs != null }
         AppLog.i("Loudness", "$source profiles: ${profiles.size} of ${batch.size} songs ($measured with loudness)")
         return true
     }
 
     private fun fail(why: String) {
-        synchronized(lock) { backOffUntil = now() + BACK_OFF_MS }
-        if (problem != why) AppLog.w("Loudness", "${why.trimEnd('.')}. Trying again in ${BACK_OFF_MS / 60_000} minutes; until then song tags are used")
+        val wait = synchronized(lock) {
+            failures++
+            backOffMs(failures).also { backOffUntil = now() + it }
+        }
+        if (problem != why || failures > 1) {
+            AppLog.w("Loudness", "${why.trimEnd('.')}. Trying again in ${waitWords(wait)}; until then song tags are used")
+        }
         problem = why
     }
 
@@ -126,7 +136,7 @@ class ProfileStore(
             synchronized(lock) { backOffUntil = 0L }
             return checkBeats(s)
         }
-        if (!s.audioMuseReady) return CheckResult(false, "Set up Siansa Beats or AudioMuse-AI in Settings › Connections first")
+        if (!s.audioMuseReady) return CheckResult(false, "Set up Siansa Beats or AudioMuse-AI in Settings › Services first")
         synchronized(lock) { backOffUntil = 0L }
         return try {
             val health = get(HEALTH_PATH) as? JsonObject
@@ -195,6 +205,16 @@ class ProfileStore(
         const val RETRY_MISSING_MS = 30 * 60_000L
         const val BACK_OFF_MS = 5 * 60_000L
 
+        /** How long to wait after [failures] failed requests in a row: 30 s, 1, 2, then 5 minutes at most. */
+        fun backOffMs(failures: Int): Long = when {
+            failures <= 1 -> 30_000L
+            failures == 2 -> 60_000L
+            failures == 3 -> 2 * 60_000L
+            else -> BACK_OFF_MS
+        }
+
+        internal fun waitWords(ms: Long): String = if (ms < 60_000L) "${ms / 1000} seconds" else if (ms == 60_000L) "a minute" else "${ms / 60_000} minutes"
+
         /**
          * What Siansa Beats' [caps] say for the Test button and the DJ check: working when it speaks this app's API and
          * has beat grids, for songs of this kind of server ([kind]: it reads Navidrome, Emby and Jellyfin since 0.23,
@@ -214,7 +234,7 @@ class ProfileStore(
             return when {
                 app.siansa.net.AudioMuseErrors.PLUGIN_MISSING in text || "HTTP 404" in text -> app.siansa.net.AudioMuseErrors.PLUGIN_MISSING
                 // Without a login, AudioMuse sends its login page instead of an answer.
-                "isn't JSON" in text || "needs a login" in text -> "AudioMuse-AI wants a login for the plugin: check the AudioMuse-AI login in Settings › Connections"
+                "isn't JSON" in text || "needs a login" in text -> "AudioMuse-AI wants a login for the plugin: check the AudioMuse-AI login in Settings › Services"
                 text.isBlank() -> "Couldn't reach the Siansa plugin"
                 else -> text
             }

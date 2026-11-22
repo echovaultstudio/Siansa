@@ -1,11 +1,17 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+
 package app.siansa.screenshots
 
+import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.Radio
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.SwapVert
 import androidx.compose.material.icons.rounded.Dns
 import androidx.compose.material.icons.rounded.Equalizer
+import androidx.compose.material.icons.rounded.Explore
+import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import android.app.Application
 import androidx.compose.foundation.background
@@ -93,6 +99,7 @@ import app.siansa.ui.icon
 import app.siansa.ui.playerColors
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.material3.Text
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.graphics.lerp
@@ -318,13 +325,288 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                 )
                 val dots = (0 until 24).map { app.siansa.mix.PadDot(0.12f + (it * 7 % 11) / 22f, 0.1f + (it * 5 % 9) / 18f) }
                 Column(Modifier.padding(Space.Page)) {
-                    app.siansa.ui.MoodShaper(tuning, app.siansa.ui.MoodLook(-0.5f, 0.5f), app.siansa.ui.MoodHold(), onChange = {}, dots = dots, picker = {})
+                    app.siansa.ui.MoodShaper(tuning, app.siansa.ui.MoodLook(-0.5f, 0.5f), app.siansa.ui.MoodHold(), onChange = {}, dots = dots, traits = false, picker = {})
                 }
             },
             // The same before anything is set (Flow), and at the pad's four corners: every mood's colour and name.
             Scene("mood_shaper_unset") {
                 Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Section)) {
-                    app.siansa.ui.MoodShaper(app.siansa.mix.VibeTuning(), app.siansa.ui.MoodLook(0f, 0f), app.siansa.ui.MoodHold(), onChange = {}, padNote = app.siansa.ui.FLOW_PAD_NOTE, picker = {})
+                    app.siansa.ui.MoodShaper(app.siansa.mix.VibeTuning(), app.siansa.ui.MoodLook(0f, 0f), app.siansa.ui.MoodHold(), onChange = {}, padNote = app.siansa.ui.FLOW_PAD_NOTE, traits = false, picker = {})
+                }
+            },
+            // Siansa Beats' mixes on Home as records in a crate (the owner, 17 Nov): the one in front with its record slid
+            // out, its neighbours leaning back; a long name; no covers (the sleeves' colours show).
+            // Siansa Beats' mixes as tiles (the owner, 17 Nov): four covers each, two by two, and what's in it.
+            Scene("beats_mix_tiles") {
+                fun record(key: String, name: String, caption: String) = app.siansa.ui.CrateRecord(key, name, caption, emptyList(), emptyList(), {})
+                app.siansa.ui.Shelf("More of you", listOf(
+                    record("repeat", "On repeat", "Your most played, lately"),
+                    record("rediscover", "Rediscover", "Old favourites, back again"),
+                    record("new", "New for you", "Fresh finds near your taste"),
+                ), key = { it.key }) { app.siansa.ui.MixMosaicTile(it) }
+            },
+            // Siansa Beats' mix settings (the owner, 17 Nov): switches, a number, names left out, how long they're kept.
+            Scene("beats_mix_settings") {
+                val on = { name: String, label: String, v: Boolean -> app.siansa.net.BeatsMixSettings.Setting(name, app.siansa.net.BeatsMixSettings.Kind.ON, label, 0, 0, app.siansa.net.BeatsMixSettings.Value(on = v)) }
+                val number = { name: String, label: String, low: Int, high: Int -> app.siansa.net.BeatsMixSettings.Setting(name, app.siansa.net.BeatsMixSettings.Kind.NUMBER, label, low, high, app.siansa.net.BeatsMixSettings.Value()) }
+                val settings = listOf(
+                    on("now", "For now: mixes for this part of the day", true), number("now_count", "How many For now mixes", 1, 6),
+                    on("daily", "Made for you: the kinds of music you play most", false), number("daily_count", "How many Made for you mixes", 1, 8),
+                    number("size", "Songs in a mix", 10, 100), number("fresh_days", "Leave out songs you played in the last … days", 0, 180),
+                    app.siansa.net.BeatsMixSettings.Setting("leave_genres", app.siansa.net.BeatsMixSettings.Kind.WORDS, "Genres to leave out", 0, 0, app.siansa.net.BeatsMixSettings.Value()),
+                    on("ai_names", "Names and lines from the AI service", true),
+                )
+                val values = mapOf(
+                    "now" to app.siansa.net.BeatsMixSettings.Value(on = true), "now_count" to app.siansa.net.BeatsMixSettings.Value(number = 4),
+                    "daily" to app.siansa.net.BeatsMixSettings.Value(on = false), "size" to app.siansa.net.BeatsMixSettings.Value(number = 40),
+                    "fresh_days" to app.siansa.net.BeatsMixSettings.Value(number = 45),
+                    "leave_genres" to app.siansa.net.BeatsMixSettings.Value(words = listOf("Christmas", "Neo-Classical Downtempo With Field Recordings")),
+                    "ai_names" to app.siansa.net.BeatsMixSettings.Value(on = true),
+                )
+                Column(Modifier.padding(Space.Page)) {
+                    // After a change: Make the mixes again beside As they come, the note under them (the owner, 20 Nov).
+                    app.siansa.ui.MixSettingsBody(app.siansa.net.BeatsMixSettings.Settings("max", settings, values, 7), "Saved. Make the mixes again to see them now.", emptyList(),
+                        save = { _, _ -> }, again = {})
+                }
+            },
+            // The foot of Mix settings, which the scene above can't reach: after a change, Make the mixes again.
+            Scene("beats_mix_settings_again") {
+                Column(Modifier.padding(Space.Page)) {
+                    app.siansa.ui.MixSettingsBody(app.siansa.net.BeatsMixSettings.Settings("max", emptyList(), emptyMap(), 7), "Saved. Make the mixes again to see them now.", emptyList(),
+                        save = { _, _ -> }, again = {})
+                }
+            },
+            Scene("record_crate") {
+                fun record(key: String, name: String, caption: String) = app.siansa.ui.CrateRecord(key, name, caption, emptyList(), emptyList(), {})
+                Column(Modifier.padding(vertical = Space.Page)) {
+                    app.siansa.ui.SectionTitle("For now", top = 0.dp)
+                    app.siansa.ui.RecordCrate(
+                        listOf(
+                            record("now-1", "Velvet Undertow", "Slow synths and hazy voices"),
+                            record("now-2", "Neo-Classical Downtempo Drift", "Strings, soft beats and field recordings drifting by"),
+                            record("now-3", "Driving Post-Punk", "Wiry guitars and restless drums"),
+                        ),
+                    )
+                }
+            },
+            // The carousel with each name and its line on the cover (the owner, 19 Nov): long names keep whole words,
+            // a long line ends with "…", all over a soft fade at the sleeve's foot.
+            Scene("record_crate_on_cover") {
+                fun record(key: String, name: String, caption: String) = app.siansa.ui.CrateRecord(key, name, caption, emptyList(), emptyList(), {})
+                Column(Modifier.padding(vertical = Space.Page)) {
+                    app.siansa.ui.SectionTitle("Made for you", top = 0.dp)
+                    app.siansa.ui.RecordCrate(
+                        listOf(
+                            record("made-1", "Velvet Undertow", "Slow synths and hazy voices"),
+                            record("made-2", "Neo-Classical Downtempo With Field Recordings", "Strings, soft beats and field recordings drifting by on a rainy afternoon"),
+                            record("made-3", "Driving Post-Punk", "Wiry guitars and restless drums"),
+                        ),
+                        namesOnCover = true,
+                    )
+                }
+            },
+            // The compact carousel (the owner, 20 Nov): three sleeves whole in view, names under the row or on each cover.
+            Scene("record_crate_compact") {
+                fun record(key: String, name: String, caption: String) = app.siansa.ui.CrateRecord(key, name, caption, emptyList(), emptyList(), {})
+                val records = listOf(
+                    record("compact-1", "Velvet Undertow", "Slow synths and hazy voices"),
+                    record("compact-2", "Neo-Classical Downtempo With Field Recordings", "Strings, soft beats and field recordings drifting by on a rainy afternoon"),
+                    record("compact-3", "Driving Post-Punk", "Wiry guitars and restless drums"),
+                    record("compact-4", "Night Drive", "Synths and long roads"),
+                )
+                Column(Modifier.padding(vertical = Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Section)) {
+                    app.siansa.ui.SectionTitle("For now", top = 0.dp)
+                    app.siansa.ui.RecordCrate(records, size = app.siansa.data.CrateSize.COMPACT)
+                    app.siansa.ui.RecordCrate(records, size = app.siansa.data.CrateSize.COMPACT, namesOnCover = true)
+                }
+            },
+            // Shortcuts in each layout (the owner, 20 Nov): three a row, big tiles, pill chips, with long names.
+            Scene("shortcut_layouts") {
+                fun tiles(variant: app.siansa.data.LookVariant?) = listOf(
+                    app.siansa.ui.GridTile("s1", "Liked songs", null, androidx.compose.ui.graphics.Color(0xFF4B2BD6) to androidx.compose.ui.graphics.Color(0xFF8FD3C8), Icons.Rounded.Favorite, {}, subtitle = "Your hearts"),
+                    app.siansa.ui.GridTile("s2", "Neo-Classical Downtempo With Field Recordings", null, app.siansa.ui.tileColors("s2"), null, {}, subtitle = "Mix"),
+                    app.siansa.ui.GridTile("s3", "Kinetic Flow State", null, app.siansa.ui.tileColors("s3"), null, {}, subtitle = "Mix"),
+                    app.siansa.ui.GridTile("s4", "Rediscover", null, app.siansa.ui.tileColors("s4"), null, {}, subtitle = "Mix"),
+                    app.siansa.ui.GridTile("s5", "Night Drive", null, app.siansa.ui.tileColors("s5"), Icons.Rounded.Radio, {}, subtitle = "Radio"),
+                    app.siansa.ui.GridTile("s6", "In Verses", null, app.siansa.ui.tileColors("s6"), null, {}, subtitle = "Album"),
+                )
+                Column(Modifier.padding(vertical = Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Section)) {
+                    for (v in listOf(app.siansa.data.LookVariant.THREE, app.siansa.data.LookVariant.BIG, app.siansa.data.LookVariant.CHIPS)) {
+                        app.siansa.ui.ShortcutTiles(tiles(v).take(if (v == app.siansa.data.LookVariant.BIG) 4 else 6), v, Modifier.padding(horizontal = Space.Page))
+                    }
+                }
+            },
+            // A cover grid with one featured, and a banner as a hero (the owner, 20 Nov), with long names.
+            Scene("featured_and_hero") {
+                fun item(key: String, name: String, line: String) = app.siansa.ui.HomeItem(key, name, line, open = {})
+                val items = listOf(
+                    item("f1", "Neo-Classical Downtempo With Field Recordings", "Strings, soft beats and field recordings drifting by on a rainy afternoon"),
+                    item("f2", "Kinetic Flow State", "Driving beats"), item("f3", "Forest path, dappled light", "Soft folk"),
+                    item("f4", "Night Drive", "Synths"), item("f5", "Velvet Undertow", "Hazy voices"), item("f6", "Ethereal Shadow", "Dark ambient"),
+                )
+                Column(verticalArrangement = Arrangement.spacedBy(Space.Section)) {
+                    app.siansa.ui.HomeHero("Made for you", items.first(), play = {}, rowSongs = emptyList()) { _, _ -> }
+                    app.siansa.ui.HomeFeaturedGrid("Made for you", items)
+                }
+            },
+            // A card's picture in each style (the owner, 20 Nov), with covers drawn as colours: no server here.
+            Scene("card_pictures") {
+                val fakes = mapOf(
+                    "a" to (Color(0xFFE8D44D) to Color(0xFFB8860B)), "b" to (Color(0xFF1F6F78) to Color(0xFF0B2B30)),
+                    "c" to (Color(0xFFF2F2F3) to Color(0xFF9A9AA0)), "d" to (Color(0xFFC2185B) to Color(0xFF4A0A24)),
+                )
+                val draw: app.siansa.ui.CoverDraw = { id, _, modifier, shape, filter ->
+                    val c = fakes[id] ?: (Color.DarkGray to Color.Black)
+                    Box(modifier.clip(shape).drawBehind { drawRect(Brush.linearGradient(listOf(c.first, c.second)), colorFilter = filter) })
+                }
+                val covers = listOf("b", "b", "b", "a", "c", "d")
+                androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalCoverDraw provides draw) {
+                    androidx.compose.foundation.layout.FlowRow(Modifier.padding(Space.Page), horizontalArrangement = Arrangement.spacedBy(Space.Medium), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
+                        for (style in app.siansa.data.PictureStyle.entries) {
+                            Column(Modifier.width(104.dp), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
+                                app.siansa.ui.CardPicture(covers, null, Color(0xFF5B2A86) to Color(0xFF1E1E22), "Neo-Classical Downtempo Velvet Undertow",
+                                    Modifier.size(104.dp), style = style, showName = true, artists = "Sleep Token, Deftones, Loathe")
+                                Text(style.label, style = MaterialTheme.typography.labelMedium)
+                            }
+                        }
+                        Column(Modifier.width(104.dp), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
+                            app.siansa.ui.CardPicture(emptyList(), null, Color(0xFF5B2A86) to Color(0xFF1E1E22), "No covers yet", Modifier.size(104.dp), style = app.siansa.data.PictureStyle.GLOW, showName = true)
+                            Text("No covers", style = MaterialTheme.typography.labelMedium)
+                        }
+                    }
+                }
+            },
+            // Each set of picture colours on a Colour picture and a sticker pile (the owner, 20 Nov).
+            Scene("picture_colours") {
+                val fakes = mapOf("a" to Color(0xFFE8D44D), "b" to Color(0xFF1F6F78), "c" to Color(0xFFF2F2F3), "d" to Color(0xFFC2185B))
+                val draw: app.siansa.ui.CoverDraw = { id, _, modifier, shape, filter ->
+                    val c = fakes[id] ?: Color.DarkGray
+                    Box(modifier.clip(shape).drawBehind { drawRect(Brush.linearGradient(listOf(c, Color.Black)), colorFilter = filter) })
+                }
+                androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalCoverDraw provides draw) {
+                    androidx.compose.foundation.layout.FlowRow(Modifier.padding(Space.Page), horizontalArrangement = Arrangement.spacedBy(Space.Medium), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
+                        for (set in app.siansa.data.PictureColours.entries - app.siansa.data.PictureColours.MOOD) {
+                            androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalPictureColours provides set) {
+                                Column(Modifier.width(104.dp), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
+                                    app.siansa.ui.CardPicture(listOf("b", "a", "c", "d"), null, Color(0xFF6B5E4E) to Color(0xFF3B3328), "Dusty Roads",
+                                        Modifier.size(104.dp), style = app.siansa.data.PictureStyle.AURA, showName = true)
+                                    Text(set.label, style = MaterialTheme.typography.labelMedium)
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            Scene("picture_colours_choice") {
+                Column(Modifier.padding(Space.Page)) { app.siansa.ui.PictureColoursChoice(app.siansa.data.PictureColours.MOOD) {} }
+            },
+            Scene("picture_choice") {
+                Column(Modifier.padding(Space.Page)) { app.siansa.ui.PictureChoice(app.siansa.data.PictureStyle.FROST) {} }
+            },
+            // The small carousel (the owner, 20 Nov): a strip of squares, names under each or on each.
+            Scene("record_crate_small") {
+                fun record(key: String, name: String, caption: String) = app.siansa.ui.CrateRecord(key, name, caption, emptyList(), emptyList(), {})
+                val records = listOf(
+                    record("small-1", "Velvet Undertow", "Slow synths and hazy voices"),
+                    record("small-2", "Neo-Classical Downtempo With Field Recordings", "Strings, soft beats and field recordings drifting by on a rainy afternoon"),
+                    record("small-3", "Driving Post-Punk", "Wiry guitars and restless drums"),
+                    record("small-4", "Night Drive", "Synths and long roads"),
+                )
+                Column(Modifier.padding(vertical = Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Section)) {
+                    app.siansa.ui.SectionTitle("Made for you", top = 0.dp)
+                    app.siansa.ui.RecordCrate(records, size = app.siansa.data.CrateSize.SMALL)
+                    app.siansa.ui.RecordCrate(records, size = app.siansa.data.CrateSize.SMALL, namesOnCover = true)
+                }
+            },
+            Scene("crate_size_choice") {
+                Column(Modifier.padding(Space.Page)) { app.siansa.ui.CrateSizeChoice(app.siansa.data.CrateSize.SMALL) {} }
+            },
+            // Under the row's cog: where its cards' names go, the same for every look with pictures (the owner, 21 Nov).
+            // Holding an album's cover: its card (the owner, 21 Nov), with a long name.
+            Scene("album_cover_sheet") {
+                app.siansa.ui.AlbumCoverChoices("Grand Theft Auto VI: The Album (Original Soundtrack, Deluxe Edition)") {}
+            },
+            Scene("card_names_choice") {
+                Column(Modifier.padding(Space.Page)) { app.siansa.ui.NamesChoice(app.siansa.data.CardNames.ON) {} }
+            },
+            // Tiles at each Size (the owner, 21 Nov: Size for tiles too, not only the carousel).
+            Scene("tile_sizes") {
+                Row(Modifier.padding(Space.Page), horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
+                    for (size in app.siansa.data.CrateSize.entries) {
+                        Column(Modifier.width(app.siansa.ui.tileWidth(size))) {
+                            app.siansa.ui.CardPicture(emptyList(), null, Color(0xFF6B5E4E) to Color(0xFF3B3328), "Steady Alternative Rock Anthems",
+                                Modifier.fillMaxWidth().size(app.siansa.ui.tileWidth(size)), style = app.siansa.data.PictureStyle.AURA, names = false)
+                            app.siansa.ui.TileNames("Steady Alternative Rock Anthems", "Steady alternative rock, mostly sung")
+                        }
+                    }
+                }
+            },
+            // Names on the picture for pictures without their own (a fade of its colour), and Aura's own.
+            Scene("names_on_pictures") {
+                val draw: app.siansa.ui.CoverDraw = { id, _, modifier, shape, filter ->
+                    Box(modifier.clip(shape).drawBehind { drawRect(Brush.linearGradient(listOf(Color(0xFFE9D9B8), Color(0xFFC9B38A))), colorFilter = filter) })
+                }
+                androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalCoverDraw provides draw) {
+                    Row(Modifier.padding(Space.Page), horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
+                        for (style in listOf(app.siansa.data.PictureStyle.MOSAIC, app.siansa.data.PictureStyle.COVER, app.siansa.data.PictureStyle.AURA)) {
+                            app.siansa.ui.CardPicture(listOf("a", "b", "c", "d"), null, Color(0xFF6B5E4E) to Color(0xFF3B3328), "Steady Alternative Rock Anthems",
+                                Modifier.size(140.dp), style = style, names = true, line = "Steady alternative rock, mostly sung")
+                        }
+                    }
+                }
+            },
+            // Arrange Home with Siansa Beats' rows: the line under a name wraps instead of being cut (the owner, 19 Nov).
+            Scene("arrange_home_beats_rows") {
+                app.siansa.ui.ArrangeHomeSheet(
+                    order = listOf(app.siansa.data.HomeSection.CAROUSEL, app.siansa.data.HomeSection.MADE_FOR_YOU, app.siansa.data.HomeSection.MORE_OF_YOU, app.siansa.data.HomeSection.PODCASTS),
+                    hidden = emptySet(), onChange = {}, onHiddenChange = {}, onDismiss = {}, asPage = true,
+                    holds = app.siansa.ui.beatsRows(true),
+                    looks = mapOf(app.siansa.data.HomeSection.MORE_OF_YOU to app.siansa.data.HomeLook.TILES, app.siansa.data.HomeSection.PODCASTS to app.siansa.data.HomeLook.COVER_ROWS),
+                )
+            },
+            // Every row has the same cog (#1261): Your cards say their looks are their own; Shortcuts has a colour.
+            Scene("arrange_home_every_row") {
+                app.siansa.ui.ArrangeHomeSheet(
+                    order = listOf(app.siansa.data.HomeSection.QUICK, app.siansa.data.HomeSection.CARDS, app.siansa.data.HomeSection.MORE_OF_YOU),
+                    hidden = emptySet(), onChange = {}, onHiddenChange = {}, onDismiss = {}, asPage = true,
+                    holds = app.siansa.ui.beatsRows(true),
+                    looks = mapOf(app.siansa.data.HomeSection.MORE_OF_YOU to app.siansa.data.HomeLook.COVER_ROWS),
+                    cardLooks = mapOf(app.siansa.data.HomeSection.QUICK to app.siansa.data.CardLook.SOFT),
+                )
+            },
+            // A row as a cover grid (#1263): 3 columns with names (round artists among them, a long name), then 5 without.
+            Scene("home_cover_grid") {
+                val items = (1..15).map { i ->
+                    app.siansa.ui.HomeItem("k$i", if (i == 2) "An Extraordinarily Long Album Name" else "Album $i", round = i % 3 == 0, open = {})
+                }
+                Column {
+                    app.siansa.ui.HomeCoverGrid("Recently added", items, app.siansa.data.CoverGridSize(3, 2))
+                    app.siansa.ui.HomeCoverGrid("Favourite artists", items, app.siansa.data.CoverGridSize(5, 3))
+                }
+            },
+            Scene("cover_grid_size") {
+                Column(Modifier.padding(Space.Page)) { app.siansa.ui.CoverGridSteppers(app.siansa.data.CoverGridSize(5, 3)) {} }
+            },
+            // Shortcut tiles in their row's own colour (#1261), a long name among them; plain without one.
+            Scene("shortcut_tiles_coloured") {
+                Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
+                    for (look in listOf(null, app.siansa.data.CardLook.VIVID, app.siansa.data.CardLook.SOFT)) {
+                        androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalShortcutLook provides look) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+                                app.siansa.ui.QuickTile("Liked songs", null, Color(0xFF4B2BD6) to Color(0xFF8FD3C8), {}, Modifier.weight(1f))
+                                app.siansa.ui.QuickTile("Extraordinarily Long Playlist Name", null, null, {}, Modifier.weight(1f))
+                            }
+                        }
+                    }
+                }
+            },
+            // With Siansa Beats' moods: the picks' heading and the + name them too (the owner, 17 Nov).
+            Scene("mood_shaper_moods") {
+                Column(Modifier.padding(Space.Page)) {
+                    app.siansa.ui.MoodShaper(
+                        app.siansa.mix.VibeTuning(sounds = listOf(app.siansa.mix.SoundDial("Female vocals", 3, trait = true))), app.siansa.ui.MoodLook(0f, 0f), app.siansa.ui.MoodHold(),
+                        onChange = {}, traits = true, picker = {},
+                    )
                 }
             },
             // The list to pick from: sounds (one picked, one found by typing has no count), and genres with a vibe's own
@@ -342,6 +624,16 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                         app.siansa.mix.VibeTuning(sounds = listOf("a", "b", "c", "d", "e", "Drone").map { app.siansa.mix.SoundDial(it, 3, genre = true) }), look,
                         sounds = emptyList(), genres = genres, heard = false, inMix = listOf(app.siansa.mix.MixSound("Drone", 9), app.siansa.mix.MixSound("Ambient", 4)),
                         onChange = {}, onDone = {}, modifier = Modifier.height(460.dp), startTab = 1,
+                    )
+                }
+            },
+            // Siansa Beats' traits (0.51): the third list, Moods, under its headings (Voice, Mood, Style), with one picked.
+            Scene("mood_picker_traits") {
+                Column(Modifier.padding(Space.Page)) {
+                    app.siansa.ui.MoodPicker(
+                        app.siansa.mix.VibeTuning(sounds = listOf(app.siansa.mix.SoundDial("Female vocals", 3, trait = true))), app.siansa.ui.MoodLook(-0.5f, 0.5f),
+                        sounds = emptyList(), genres = emptyList(), heard = true, inMix = emptyList(),
+                        onChange = {}, onDone = {}, modifier = Modifier.height(720.dp), startTab = 2, traits = true,
                     )
                 }
             },
@@ -849,7 +1141,7 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     }
                 }
             },
-            // Settings › Style › Now playing: the play button slides, each way and what it does.
+            // Settings › Style › Player: the play button slides, each way and what it does.
             Scene("play_slides_settings") {
                 Column(Modifier.padding(Space.Page)) {
                     app.siansa.ui.PlaySlidesSettings(app.siansa.ui.PlaySlides(left = app.siansa.ui.PlaySlide.START_A_MIX)) {}
@@ -890,12 +1182,12 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                         health[app.siansa.ui.ServiceHealth.SERVER],
                     ) {}
                     app.siansa.ui.ServicesCard(s, health) {}
-                    app.siansa.ui.HubGroupLabel("Playing")
+                    app.siansa.ui.HubGroupLabel("Music")
                     app.siansa.ui.HubTiles(listOf(
-                        app.siansa.ui.HubTile(androidx.compose.material.icons.Icons.Rounded.Equalizer, "Sound", "a"),
-                        app.siansa.ui.HubTile(androidx.compose.material.icons.Icons.Rounded.Schedule, "Radios & mixes", "b"),
-                        app.siansa.ui.HubTile(androidx.compose.material.icons.Icons.Rounded.SwapVert, "Streaming & storage", "c"),
-                        app.siansa.ui.HubTile(androidx.compose.material.icons.Icons.AutoMirrored.Rounded.MenuBook, "Audiobooks & podcasts", "d"),
+                        app.siansa.ui.HubTile(androidx.compose.material.icons.Icons.Rounded.Equalizer, "Playback", "a"),
+                        app.siansa.ui.HubTile(androidx.compose.material.icons.Icons.Rounded.Schedule, "Mixes", "b"),
+                        app.siansa.ui.HubTile(androidx.compose.material.icons.Icons.Rounded.Explore, "Discovery", "c"),
+                        app.siansa.ui.HubTile(androidx.compose.material.icons.Icons.Rounded.GraphicEq, "Scrobbling", "d"),
                     )) {}
                 }
             },
@@ -1021,6 +1313,24 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                 }
             },
             // Custom card editor: a rule (issue #663).
+            // Add to playlist (issue #1235): a red number beside a playlist that has the song already; a long name gives way.
+            Scene("playlist_already_in") {
+                Column(Modifier.width(300.dp).padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
+                    app.siansa.ui.PlaylistNameWithBadge("Acoustic Relax Radio", 1)
+                    app.siansa.ui.PlaylistNameWithBadge("An unbelievably long playlist name for a long evening", 12)
+                    app.siansa.ui.PlaylistNameWithBadge("Core Radio", 0)
+                }
+            },
+            // A notice of your own's icon (the owner, 18 Nov): the picker in its editor, and pills with chosen icons.
+            Scene("notice_icons") {
+                Column(Modifier.width(360.dp).padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
+                    app.siansa.ui.NoticeIconPicker("fire") {}
+                    Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+                        app.siansa.ui.NoticePillContent(app.siansa.ui.NoticeIcons.of("fire")!!, "103 Test")
+                        app.siansa.ui.NoticePillContent(app.siansa.ui.NoticeIcons.of("album")!!, "12 new releases")
+                    }
+                }
+            },
             Scene("card_rule") {
                 Column(Modifier.padding(Space.Page)) {
                     RuleCard(CardRule(RuleField.LABEL, RuleOp.CONTAINS, "Ninja Tune"), suggestions = listOf("Ninja Tune", "Warp", "Hospital Records"), onChange = {}, onRemove = {})

@@ -1,6 +1,9 @@
 package app.siansa.net
 
 import app.siansa.data.AppSettings
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 /**
  * What Siansa Beats answers about how songs sound (Siansa Beats 0.25, the owner, 11 Nov): songs like a song, song
@@ -49,6 +52,65 @@ object BeatsSound {
         onChanged?.invoke(paths, kept)
     }
 
+    /**
+     * Whether Siansa Beats has each song's voice and moods (its traits, 0.51), as its capabilities last said. Kept, so
+     * Flow offers them at once: asked for when the list was opened, the answer took seconds and the third list came
+     * late (the owner, 17 Nov: "it doesn't show mood until I click on genres").
+     */
+    private val hasTraits = MutableStateFlow(false)
+    val traits: StateFlow<Boolean> = hasTraits.asStateFlow()
+
+    @Volatile
+    var onTraits: ((Boolean) -> Unit)? = null
+
+    /** What Siansa Beats' capabilities just said of its traits. */
+    fun traits(has: Boolean) {
+        if (hasTraits.value == has) return
+        hasTraits.value = has
+        onTraits?.invoke(has)
+    }
+
+    fun restoreTraits(has: Boolean) {
+        hasTraits.value = has
+    }
+
+    /** Whether Siansa Beats makes mixes from the listening (0.53), as its capabilities last said; kept as [traits] is. */
+    private val hasMixes = MutableStateFlow(false)
+    val mixes: StateFlow<Boolean> = hasMixes.asStateFlow()
+
+    @Volatile
+    var onMixes: ((Boolean) -> Unit)? = null
+
+    fun mixes(has: Boolean) {
+        if (hasMixes.value == has) return
+        hasMixes.value = has
+        onMixes?.invoke(has)
+    }
+
+    fun restoreMixes(has: Boolean) {
+        hasMixes.value = has
+    }
+
+    /**
+     * Whether Siansa Beats plans the app's playlists with its own AI (0.57, `POST /api/v1/plan`: the owner, 18 Nov), as
+     * its capabilities last said; kept as [traits] is. While it does, the phone's own AI isn't used ([beatsPlansReady]).
+     */
+    private val hasPlans = MutableStateFlow(false)
+    val plans: StateFlow<Boolean> = hasPlans.asStateFlow()
+
+    @Volatile
+    var onPlans: ((Boolean) -> Unit)? = null
+
+    fun plans(has: Boolean) {
+        if (hasPlans.value == has) return
+        hasPlans.value = has
+        onPlans?.invoke(has)
+    }
+
+    fun restorePlans(has: Boolean) {
+        hasPlans.value = has
+    }
+
     fun restore(paths: Set<String>, own: Map<String, String> = emptyMap()) {
         answers = paths
         where = own
@@ -66,11 +128,24 @@ object BeatsSound {
  * Whether what's found from how songs sound can be asked for: of AudioMuse-AI when it's set up, or of Siansa Beats
  * once it has the songs' sound. The search by words is [wordsReady].
  */
-val AppSettings.soundReady: Boolean get() = audioMuseReady || (beatsReady && BeatsSound.available)
+val AppSettings.soundReady: Boolean get() = audioMuseReady || (beatsSoundReady && BeatsSound.available)
 
 /**
  * Whether music can be found by describing it in words (mixes from a description, the mood radios, vibes and their
  * sliders, cards made from a sound, the sound search): AudioMuse-AI does it, and Siansa Beats from 0.26, with the
  * same models, once it has the songs' vectors for it.
  */
-val AppSettings.wordsReady: Boolean get() = audioMuseReady || (beatsReady && BeatsSound.answers(BeatsSound.WORDS))
+val AppSettings.wordsReady: Boolean get() = audioMuseReady || (beatsSoundReady && BeatsSound.answers(BeatsSound.WORDS))
+
+/**
+ * Whether the playlists' plans (the title and sound search of a vibe, Today's mix, Flow's words and the mood radios)
+ * come from Siansa Beats' AI (0.57, the owner, 18 Nov: "if beats is selected and configured then AI on the phone can be
+ * auto disabled"). While they do, the phone's AI is switched off by itself and not listed.
+ */
+val AppSettings.beatsPlansReady: Boolean get() = beatsReady && BeatsSound.plans.value
+
+/**
+ * Whether a playlist can be planned by an AI: Siansa Beats' when it plans them, else the phone's own (for AudioMuse-AI
+ * without Siansa Beats, or a Siansa Beats without an AI set up).
+ */
+val AppSettings.plansReady: Boolean get() = beatsPlansReady || aiReady

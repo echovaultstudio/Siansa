@@ -1,5 +1,12 @@
 package app.siansa.ui
 
+import app.siansa.data.carouselSize
+import app.siansa.data.cardNames
+import androidx.compose.material.icons.rounded.Remove
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
@@ -7,6 +14,7 @@ import androidx.compose.foundation.layout.Arrangement
 import app.siansa.data.CardLook
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.FilterChip
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -73,11 +81,11 @@ import app.siansa.data.moved
 import app.siansa.data.movesFirstVisible
 
 /**
- * Home's settings panel with the saved settings, from Home's button or Settings › Home page (issue #780): Sources
- * ([startOnSources]) or Arrange. Your cards' cog closes it and opens Settings › Home page › Cards.
+ * Home's settings panel with the saved settings, from Home's button or Settings › Home (issue #780): Sources
+ * ([startOnSources]) or Arrange. Your cards' cog closes it and opens Settings › Home › Cards.
  */
 @Composable
-fun HomeSettingsSheet(nav: androidx.navigation.NavController, startOnSources: Boolean, onDismiss: () -> Unit) {
+fun HomeSettingsSheet(nav: androidx.navigation.NavController, startOnSources: Boolean, asPage: Boolean = false, onDismiss: () -> Unit) {
     // Sources is a sheet of its own (the owner, 12 Nov): Arrange isn't part of it.
     if (startOnSources) {
         SourcesSheet(onDismiss)
@@ -85,18 +93,23 @@ fun HomeSettingsSheet(nav: androidx.navigation.NavController, startOnSources: Bo
     }
     val graph = LocalGraph.current
     val s by graph.settings.state.collectAsStateWithLifecycle()
-    // The notices are the top of Home (issue #872), not a section to move: shown or not in Settings › Home page › Top of Home.
-    ArrangeHomeSheet(s.homeOrder - HomeSection.NOTICES, s.homeHidden, gap = s.homeGap, onGapChange = {
+    val beatsMakesMixes by app.siansa.net.BeatsSound.mixes.collectAsStateWithLifecycle()
+    // The notices are the top of Home (issue #872), not a section to move: shown or not in Settings › Home › Top of Home.
+    val beatsRows = beatsRows(beatsMakesMixes && s.beatsFor(app.siansa.data.BeatsUse.MIXES))
+    // More of you is Siansa Beats' alone: listed only while its mixes are on.
+    val offered = if (HomeSection.MORE_OF_YOU in beatsRows) emptySet() else setOf(HomeSection.NOTICES, HomeSection.MORE_OF_YOU)
+    ArrangeHomeSheet(s.homeOrder - offered - HomeSection.NOTICES, s.homeHidden, holds = beatsRows,
+        sections = HomeSection.default - HomeSection.NOTICES - offered, gap = s.homeGap, onGapChange = {
         AppLog.i("Home", "Spacing: ${homeGapLabel(it)}")
         graph.settings.setHomeGap(it)
     }, onChange = {
-        val order = listOf(HomeSection.NOTICES) + (it - HomeSection.NOTICES)
+        val order = keepUnlisted(listOf(HomeSection.NOTICES) + (it - HomeSection.NOTICES), s.homeOrder)
         AppLog.i("Home", "Arranged: ${HomeSection.format(order)}")
         graph.settings.setHomeOrder(order)
     }, onHiddenChange = {
         AppLog.i("Home", "Hidden: ${HomeSection.formatHidden(it).ifEmpty { "none" }}")
         graph.settings.setHomeHidden(it)
-    }, onDismiss = onDismiss,
+    }, onDismiss = onDismiss, asPage = asPage,
         looks = s.homeLooks,
         untitled = s.homeUntitled,
         onTitleShownChange = { section, shown ->
@@ -108,9 +121,39 @@ fun HomeSettingsSheet(nav: androidx.navigation.NavController, startOnSources: Bo
             graph.settings.setHomeLook(section, look)
         },
         gridSizes = s.homeGridSizes,
+        cardNames = HomeSection.entries.associateWith { s.cardNames(it) },
+        carouselSizes = HomeSection.entries.associateWith { s.carouselSize(it) },
+        onCarouselSizeChange = { section, size ->
+            AppLog.i("Home", "${section.id} carousel: ${size.label}")
+            graph.settings.setHomeCarouselSize(section, size)
+        },
+        onCardNamesChange = { section, names ->
+            AppLog.i("Home", "${section.label}: names ${names.label}")
+            graph.settings.setHomeNames(section, names)
+        },
         onGridSizeChange = { section, size ->
             AppLog.i("Home", "${section.label}: $size tiles in its grid")
             graph.settings.setHomeGridSize(section, size)
+        },
+        coverGrids = s.homeCoverGrids,
+        pictures = s.homePictures,
+        pictureColours = s.homePictureColours,
+        onPictureColoursChange = { section, colours ->
+            AppLog.i("Home", "${section.label}: picture colours ${colours.label}")
+            graph.settings.setHomePictureColours(section, colours)
+        },
+        onPictureChange = { section, style ->
+            AppLog.i("Home", "${section.label}: pictures as ${style.label}")
+            graph.settings.setHomePicture(section, style)
+        },
+        variants = s.homeVariants,
+        onVariantChange = { section, variant ->
+            AppLog.i("Home", "${section.label}: ${variant.look.label} as ${variant.label}")
+            graph.settings.setHomeVariant(section, variant)
+        },
+        onCoverGridChange = { section, size ->
+            AppLog.i("Home", "${section.label}: a cover grid of ${size.columns} columns and ${size.rows} rows")
+            graph.settings.setHomeCoverGrid(section, size)
         },
         onResetLooks = {
             AppLog.i("Home", "Every row back in its own look, every card in Home's colour")
@@ -147,11 +190,15 @@ fun ArrangeHomeSheet(
     onChange: (List<HomeSection>) -> Unit,
     onHiddenChange: (Set<HomeSection>) -> Unit,
     onDismiss: () -> Unit,
+    // Drawn as a page of its own (Settings › Home › Arrange Home) rather than a sheet.
+    asPage: Boolean = false,
+    // What another service puts in a row instead of its own (Siansa Beats' mixes, the owner, 17 Nov), said under it.
+    holds: Map<HomeSection, String> = emptyMap(),
     // The gap between Home's sections, a step of the spacing scale (#554).
     gap: Int = AppSettings.HOME_GAP_DEFAULT,
     onGapChange: (Int) -> Unit = {},
-    // Each row's look (issue #655), changed with its cog; Your cards' cog opens Settings › Home page › Cards, and
-    // Notices' cog Settings › Home page › Top of Home (issue #784).
+    // Each row's look (issue #655), changed with its cog; Your cards' cog opens Settings › Home › Cards, and
+    // Notices' cog Settings › Home › Top of Home (issue #784).
     looks: Map<HomeSection, HomeLook> = emptyMap(),
     // Each row's title shown or hidden (issue #961), in the same dialog as its look.
     untitled: Set<HomeSection> = emptySet(),
@@ -160,7 +207,21 @@ fun ArrangeHomeSheet(
     onResetLooks: () -> Unit = {},
     // Tiles of a row shown as the shortcut grid (the owner, 10 Nov), picked in its look's dialog.
     gridSizes: Map<HomeSection, Int> = emptyMap(),
+    cardNames: Map<HomeSection, app.siansa.data.CardNames> = emptyMap(),
+    onCardNamesChange: (HomeSection, app.siansa.data.CardNames) -> Unit = { _, _ -> },
+    carouselSizes: Map<HomeSection, app.siansa.data.CrateSize> = emptyMap(),
+    onCarouselSizeChange: (HomeSection, app.siansa.data.CrateSize) -> Unit = { _, _ -> },
     onGridSizeChange: (HomeSection, Int) -> Unit = { _, _ -> },
+    // Each cover grid's columns and rows (#1263).
+    coverGrids: Map<HomeSection, app.siansa.data.CoverGridSize> = emptyMap(),
+    onCoverGridChange: (HomeSection, app.siansa.data.CoverGridSize) -> Unit = { _, _ -> },
+    variants: Map<HomeSection, app.siansa.data.LookVariant> = emptyMap(),
+    onVariantChange: (HomeSection, app.siansa.data.LookVariant) -> Unit = { _, _ -> },
+    // How each row's card pictures show (the owner, 20 Nov).
+    pictures: Map<HomeSection, app.siansa.data.PictureStyle> = emptyMap(),
+    onPictureChange: (HomeSection, app.siansa.data.PictureStyle) -> Unit = { _, _ -> },
+    pictureColours: Map<HomeSection, app.siansa.data.PictureColours> = emptyMap(),
+    onPictureColoursChange: (HomeSection, app.siansa.data.PictureColours) -> Unit = { _, _ -> },
     onOpenSettings: (HomeSection) -> Unit = {},
     // The sections listed here, in Reset's order: all but the notices, which are the top of Home (issue #872).
     sections: List<HomeSection> = HomeSection.default - HomeSection.NOTICES,
@@ -177,10 +238,24 @@ fun ArrangeHomeSheet(
             titleShown = section !in untitled,
             onTitleShown = { onTitleShownChange(section, it) },
             // The grid stays open, so how many tiles it has can be picked there.
-            onPick = { onLookChange(section, it); if (it != HomeLook.GRID) picking = null },
+            onPick = { onLookChange(section, it); if (it != HomeLook.GRID && it != HomeLook.CAROUSEL && it != HomeLook.COVER_GRID && it != HomeLook.BANNER && !(section == HomeSection.QUICK && it == HomeLook.AS_IS)) picking = null },
             onDismiss = { picking = null },
+            // Your cards each have their own look, chosen in Settings › Home › Cards: a way there.
+            onOpenSettings = if (section.lookable) null else { { picking = null; onOpenSettings(section) } },
             gridSize = gridSizes[section] ?: HomeLook.GRID_MOST,
             onGridSize = { onGridSizeChange(section, it) },
+            coverGrid = coverGrids[section] ?: app.siansa.data.CoverGridSize.DEFAULT,
+            onCoverGrid = { onCoverGridChange(section, it) },
+            variant = variants[section],
+            onVariant = { onVariantChange(section, it) },
+            picture = pictures[section] ?: app.siansa.data.PictureStyle.AUTO,
+            onPicture = { onPictureChange(section, it) },
+            pictureColours = pictureColours[section] ?: app.siansa.data.PictureColours.COVERS,
+            onPictureColours = { onPictureColoursChange(section, it) },
+            names = cardNames[section] ?: app.siansa.data.CardNames.AUTO,
+            onNames = { onCardNamesChange(section, it) },
+            crateSize = carouselSizes[section] ?: app.siansa.data.CrateSize.BIG,
+            onCrateSize = { onCarouselSizeChange(section, it) },
             cardLook = cardLooks[section] ?: CardLook.AS_HOME,
             homeCardLook = cardLook,
             onCardLook = { onSectionCardLookChange(section, it) },
@@ -244,11 +319,12 @@ fun ArrangeHomeSheet(
         }
     }
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+    SheetOrPage(asPage, onDismiss) {
         Column(Modifier.navigationBarsPadding().padding(bottom = Space.Small)) {
             Row(Modifier.fillMaxWidth().padding(start = Space.Page, end = Space.Small), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("Arrange Home", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    // As a page, its title is the page's (the owner, 17 Nov: Arrange Home has its own page in Home page).
+                    if (!asPage) Text("Arrange Home", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     Text(
                         "What's on Home, in what order, and how its cards look.",
                         style = MaterialTheme.typography.bodySmall,
@@ -315,7 +391,8 @@ fun ArrangeHomeSheet(
                                 )
                             },
                     ) {
-                        Row(Modifier.height(52.dp).padding(start = Space.Small).then(if (!lifted && section != items.first()) Modifier.hairlineAbove() else Modifier), verticalAlignment = Alignment.CenterVertically) {
+                        // At least a row's height, taller when the line under the name wraps (the owner, 19 Nov: it was cut off).
+                        Row(Modifier.heightIn(min = 52.dp).padding(start = Space.Small).then(if (!lifted && section != items.first()) Modifier.hairlineAbove() else Modifier), verticalAlignment = Alignment.CenterVertically) {
                             // The handle moves straight away, without the hold.
                             Icon(
                                 Icons.Rounded.DragIndicator,
@@ -334,15 +411,14 @@ fun ArrangeHomeSheet(
                                     .size(24.dp),
                             )
                             // Hidden rows stay in the list, dimmed, so they keep their place and can come back.
-                            Column(Modifier.weight(1f).padding(start = Space.Tight).alpha(if (isHidden) 0.6f else 1f)) {
+                            Column(Modifier.weight(1f).padding(start = Space.Tight, top = Space.Small, bottom = Space.Small).alpha(if (isHidden) 0.6f else 1f)) {
                                 Text(
                                     section.label,
                                     style = MaterialTheme.typography.bodyLarge,
                                     color = if (isHidden) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
                                 )
-                                // A row in another look says which (issue #655), and its cards' own colour; a hidden one says so.
-                                val line = if (isHidden) "Hidden" else listOfNotNull(looks[section]?.label, cardLooks[section]?.label).joinToString(" · ").ifEmpty { null }
-                                if (line != null) Text(line, style = MaterialTheme.typography.bodySmall, color = if (isHidden) MaterialTheme.colorScheme.onSurfaceVariant else Accent, modifier = Modifier.testTag("homeLookLabel"))
+                                // Only "Hidden" under a name: what a row holds and how it looks are under its cog (the owner, 20 Nov).
+                                if (isHidden) Text("Hidden", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.testTag("homeLookLabel"))
                             }
                             IconButton(onClick = {
                                 hiddenItems = if (isHidden) hiddenItems - section else hiddenItems + section
@@ -355,16 +431,13 @@ fun ArrangeHomeSheet(
                                 )
                             }
                             IconButton(
-                                onClick = { if (section.lookable) picking = section else onOpenSettings(section) },
+                                // Every row's cog opens the same choices (#1261), Your cards' too.
+                                onClick = { if (section != HomeSection.NOTICES) picking = section else onOpenSettings(section) },
                                 modifier = Modifier.testTag("homeLookCog"),
                             ) {
                                 Icon(
                                     Icons.Rounded.Settings,
-                                    contentDescription = when {
-                                        section.lookable -> "Look of ${section.label}"
-                                        section == HomeSection.NOTICES -> "Notices in Settings"
-                                        else -> "Your cards in Settings"
-                                    },
+                                    contentDescription = if (section == HomeSection.NOTICES) "Notices in Settings" else "Look of ${section.label}",
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
@@ -387,47 +460,92 @@ private fun HomeLookDialog(
     onDismiss: () -> Unit,
     gridSize: Int = HomeLook.GRID_MOST,
     onGridSize: (Int) -> Unit = {},
+    coverGrid: app.siansa.data.CoverGridSize = app.siansa.data.CoverGridSize.DEFAULT,
+    onCoverGrid: (app.siansa.data.CoverGridSize) -> Unit = {},
+    // Its look's own layout (the owner, 20 Nov): shortcut tiles, a featured cover grid, a hero banner.
+    variant: app.siansa.data.LookVariant? = null,
+    onVariant: (app.siansa.data.LookVariant) -> Unit = {},
+    // How its cards' pictures show (the owner, 20 Nov).
+    picture: app.siansa.data.PictureStyle = app.siansa.data.PictureStyle.AUTO,
+    onPicture: (app.siansa.data.PictureStyle) -> Unit = {},
+    // Where its pictures' colours come from (the owner, 20 Nov).
+    pictureColours: app.siansa.data.PictureColours = app.siansa.data.PictureColours.COVERS,
+    onPictureColours: (app.siansa.data.PictureColours) -> Unit = {},
     // Its cards' colour (the owner, 13 Nov): its own, or [CardLook.AS_HOME], which is [homeCardLook].
     cardLook: CardLook = CardLook.AS_HOME,
     homeCardLook: CardLook = CardLook.DEFAULT,
     onCardLook: (CardLook) -> Unit = {},
+    // Your cards: each card's look is its own, chosen in Settings; this opens it (null: the row's looks are listed).
+    onOpenSettings: (() -> Unit)? = null,
+    // As a carousel, each name and its details on the cover or under the row (the owner, 19 Nov).
+    // Where its cards show their names (the owner, 21 Nov): the same choice for every look with pictures.
+    names: app.siansa.data.CardNames = app.siansa.data.CardNames.AUTO,
+    onNames: (app.siansa.data.CardNames) -> Unit = {},
+    // As a carousel, big, compact or small (the owner, 20 Nov).
+    crateSize: app.siansa.data.CrateSize = app.siansa.data.CrateSize.BIG,
+    onCrateSize: (app.siansa.data.CrateSize) -> Unit = {},
 ) {
     // The switch shows its change at once: the dialog stays open for the look.
     var shown by remember(section) { mutableStateOf(titleShown) }
     var look by remember(section) { mutableStateOf(current) }
     var tiles by remember(section) { mutableStateOf(gridSize) }
+    var coverGridSize by remember(section) { mutableStateOf(coverGrid) }
+    var layout by remember(section) { mutableStateOf(variant) }
+    var pictureStyle by remember(section) { mutableStateOf(picture) }
+    var pictureColour by remember(section) { mutableStateOf(pictureColours) }
+    var cardNames by remember(section) { mutableStateOf(names) }
+    var size by remember(section) { mutableStateOf(crateSize) }
     var colour by remember(section) { mutableStateOf(cardLook) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(section.label) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()).testTag("homeLookDialog")) {
-                if (section != HomeSection.QUICK) {
-                    // One card in the chosen colour, then the choice: As Home follows Arrange Home's.
-                    CardLookSample(if (colour == CardLook.AS_HOME) homeCardLook else colour, Modifier.fillMaxWidth(), big = true)
-                    Spacer(Modifier.height(Space.Medium))
-                    Text("Colour", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.Small), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
-                        CardLook.entries.forEach { option ->
-                            FilterChip(
-                                selected = option == colour,
-                                onClick = { colour = option; onCardLook(option) },
-                                label = { Text(if (option == CardLook.AS_HOME) "As Home (${homeCardLook.label})" else option.label) },
-                                modifier = Modifier.testTag("cardLook-${option.id}"),
-                            )
-                        }
+                // Every row has a colour (#1261), Shortcuts too: its tiles stay plain until it has one of its own.
+                val asHome = asHomeCardLook(section, homeCardLook)
+                // One card in the chosen colour, then the choice: As Home follows Arrange Home's.
+                CardLookSample(if (colour == CardLook.AS_HOME) asHome else colour, Modifier.fillMaxWidth(), big = true)
+                Spacer(Modifier.height(Space.Medium))
+                Text("Colour", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.Small), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
+                    CardLook.entries.forEach { option ->
+                        FilterChip(
+                            selected = option == colour,
+                            onClick = { colour = option; onCardLook(option) },
+                            label = { Text(if (option == CardLook.AS_HOME) "As Home (${asHome.label})" else option.label) },
+                            modifier = Modifier.testTag("cardLook-${option.id}"),
+                        )
                     }
-                    Text("Just this card. As Home follows the choice in Arrange Home.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    HorizontalDivider(Modifier.padding(vertical = Space.Small))
                 }
+                Text(
+                    if (section == HomeSection.QUICK) "Just these tiles. As Home keeps them plain." else "Just this card. As Home follows the choice in Arrange Home.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                HorizontalDivider(Modifier.padding(vertical = Space.Small))
                 // Its title on Home (issue #961): off leaves only the gap above the section.
                 SectionTitleSwitch(shown) {
                     shown = it
                     onTitleShown(it)
                 }
                 HorizontalDivider(Modifier.padding(vertical = Space.Small))
-                // Shortcuts is the grid already: its size is set in Settings › Home page.
-                HomeLook.entries.filter { it != HomeLook.GRID || section != HomeSection.QUICK }.forEach { option ->
+                if (onOpenSettings == null) {
+                    PictureChoice(pictureStyle) { pictureStyle = it; onPicture(it) }
+                    Spacer(Modifier.height(Space.Medium))
+                    PictureColoursChoice(pictureColour) { pictureColour = it; onPictureColours(it) }
+                    if (look in HomeLook.NAMED) {
+                        Spacer(Modifier.height(Space.Medium))
+                        NamesChoice(cardNames) { cardNames = it; onNames(it) }
+                    }
+                    HorizontalDivider(Modifier.padding(vertical = Space.Small))
+                }
+                if (onOpenSettings != null) {
+                    // Your cards: each is its own row in its own look, set where the card is made.
+                    Text("Look", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Each of your cards has its own look, set with the card.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    TextButton(onClick = onOpenSettings, modifier = Modifier.testTag("homeLookCardsSettings")) { Text("Your cards in Settings") }
+                }
+                // Every look for every row (#1261): Siansa Beats' rows and Shortcuts too.
+                if (onOpenSettings == null) HomeLook.entries.forEach { option ->
                     Row(
                         Modifier.fillMaxWidth().clickable { look = option; onPick(option) }.padding(vertical = Space.Small).testTag("homeLook-${option.id}"),
                         verticalAlignment = Alignment.CenterVertically,
@@ -439,14 +557,62 @@ private fun HomeLookDialog(
                             Text(option.hint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
+                    // Shortcuts' own look is its shortcut grid: its tiles can be laid out the same ways.
+                    val gridLike = option == HomeLook.GRID || (section == HomeSection.QUICK && option == HomeLook.AS_IS)
+                    if (gridLike && look == option) {
+                        VariantChips("Tiles", HomeLook.GRID, layout, Modifier.padding(start = Space.Section, bottom = Space.Small)) { layout = it; onVariant(it) }
+                    }
                     if (option == HomeLook.GRID && look == HomeLook.GRID) {
                         GridSizeChips(tiles, Modifier.padding(start = Space.Section, bottom = Space.Small)) { tiles = it; onGridSize(it) }
+                    }
+                    if (option == HomeLook.COVER_GRID && look == HomeLook.COVER_GRID) {
+                        VariantChips("Layout", HomeLook.COVER_GRID, layout, Modifier.padding(start = Space.Section, bottom = Space.Small)) { layout = it; onVariant(it) }
+                        // One featured has its own six; the columns and rows are for an even grid.
+                        if (layout != app.siansa.data.LookVariant.FEATURED) {
+                            CoverGridSteppers(coverGridSize, Modifier.padding(start = Space.Section, bottom = Space.Small)) { coverGridSize = it; onCoverGrid(it) }
+                        }
+                    }
+                    if (option == HomeLook.BANNER && look == HomeLook.BANNER) {
+                        VariantChips("Style", HomeLook.BANNER, layout, Modifier.padding(start = Space.Section, bottom = Space.Small)) { layout = it; onVariant(it) }
+                    }
+                    if (option == look && look in HomeLook.SIZED) {
+                        CrateSizeChoice(size, Modifier.padding(start = Space.Section, bottom = Space.Small)) { size = it; onCrateSize(it) }
                     }
                 }
             }
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
     )
+}
+
+/**
+ * A cover grid's columns and rows (#1263): each with − and +, columns 2 to 6, rows 1 to 6. Names show under the
+ * pictures up to three columns.
+ */
+@Composable
+internal fun CoverGridSteppers(size: app.siansa.data.CoverGridSize, modifier: Modifier = Modifier, onChange: (app.siansa.data.CoverGridSize) -> Unit) {
+    Column(modifier.testTag("coverGridSize")) {
+        GridStepper("Columns", size.columns, app.siansa.data.CoverGridSize.COLUMNS, "coverGridColumns") { onChange(size.copy(columns = it)) }
+        GridStepper("Rows", size.rows, app.siansa.data.CoverGridSize.ROWS, "coverGridRows") { onChange(size.copy(rows = it)) }
+        Text(
+            if (size.named) "${size.count} covers, with their names." else "${size.count} covers; names show up to ${app.siansa.data.CoverGridSize.NAMED_COLUMNS} columns.",
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun GridStepper(label: String, value: Int, range: IntRange, tag: String, onChange: (Int) -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        IconButton(onClick = { onChange(value - 1) }, enabled = value > range.first, modifier = Modifier.testTag("$tag-less")) {
+            Icon(androidx.compose.material.icons.Icons.Rounded.Remove, contentDescription = "Fewer ${label.lowercase()}")
+        }
+        Text("$value", style = MaterialTheme.typography.titleMedium, modifier = Modifier.testTag(tag))
+        IconButton(onClick = { onChange(value + 1) }, enabled = value < range.last, modifier = Modifier.testTag("$tag-more")) {
+            Icon(androidx.compose.material.icons.Icons.Rounded.Add, contentDescription = "More ${label.lowercase()}")
+        }
+    }
 }
 
 /** A small capital label over a part of the sheet ("CARDS"), with a quiet note after it when given. */
@@ -538,6 +704,134 @@ internal fun SectionTitleSwitch(shown: Boolean, onChange: (Boolean) -> Unit) {
     }
 }
 
+/**
+ * The ways [look] can lay its row out ([LookVariant], the owner, 20 Nov), under [label]: the one chosen, else the
+ * first (how it looked before there was a choice).
+ */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+internal fun VariantChips(label: String, look: HomeLook, chosen: app.siansa.data.LookVariant?, modifier: Modifier = Modifier, onPick: (app.siansa.data.LookVariant) -> Unit) {
+    val options = app.siansa.data.LookVariant.of(look)
+    val current = chosen?.takeIf { it in options } ?: options.first()
+    Column(modifier.testTag("lookVariant"), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
+        Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+            for (option in options) {
+                FilterChip(
+                    selected = current == option,
+                    onClick = { onPick(option) },
+                    label = { Text(option.label) },
+                    modifier = Modifier.testTag("lookVariant-${option.id}"),
+                )
+            }
+        }
+    }
+}
+
+/**
+ * How a row's card pictures show (the owner, 20 Nov: "some do not look good with the cover mosaic"): each choice, and
+ * what the one chosen does.
+ */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+internal fun PictureChoice(style: app.siansa.data.PictureStyle, modifier: Modifier = Modifier, onPick: (app.siansa.data.PictureStyle) -> Unit) {
+    Column(modifier.testTag("pictureStyle"), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
+        Text("Pictures", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+            for (option in app.siansa.data.PictureStyle.entries) {
+                FilterChip(
+                    selected = style == option,
+                    onClick = { onPick(option) },
+                    label = { Text(option.label) },
+                    modifier = Modifier.testTag("pictureStyle-${option.id}"),
+                )
+            }
+        }
+        Text(style.blurb + ".", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+/**
+ * Where a row's picture colours come from (the owner, 20 Nov): its covers', its songs' moods, or a set. Each chip
+ * shows its colours.
+ */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+internal fun PictureColoursChoice(colours: app.siansa.data.PictureColours, modifier: Modifier = Modifier, onPick: (app.siansa.data.PictureColours) -> Unit) {
+    Column(modifier.testTag("pictureColours"), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
+        Text("Picture colours", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+            for (option in app.siansa.data.PictureColours.entries) {
+                FilterChip(
+                    selected = colours == option,
+                    onClick = { onPick(option) },
+                    label = { Text(option.label) },
+                    leadingIcon = { ColoursSwatch(option) },
+                    modifier = Modifier.testTag("pictureColours-${option.id}"),
+                )
+            }
+        }
+        Text(
+            when (colours) {
+                app.siansa.data.PictureColours.COVERS -> "Its covers' colours, made brighter."
+                app.siansa.data.PictureColours.MOOD -> "Its songs' moods, from Siansa Beats or AudioMuse-AI. Brighter the more energetic."
+                else -> "Each card takes one pair of the set."
+            },
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/** A small round swatch of [colours]: a wheel of its colours. */
+@Composable
+private fun ColoursSwatch(colours: app.siansa.data.PictureColours) {
+    val swatch = remember(colours) { swatchOf(colours) }
+    Box(
+        Modifier.size(SWATCH).clip(androidx.compose.foundation.shape.CircleShape)
+            .background(if (swatch.size > 2) androidx.compose.ui.graphics.Brush.sweepGradient(swatch + swatch.first()) else androidx.compose.ui.graphics.Brush.linearGradient(swatch)),
+    )
+}
+
+private val SWATCH = 18.dp
+
+/** How big a carousel's sleeves or a row's tiles are (the owner, 20 and 21 Nov): big, compact or small. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+internal fun CrateSizeChoice(size: app.siansa.data.CrateSize, modifier: Modifier = Modifier, onPick: (app.siansa.data.CrateSize) -> Unit) {
+    Column(modifier.testTag("crateSize"), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
+        Text("Size", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+            for (option in app.siansa.data.CrateSize.entries) {
+                FilterChip(
+                    selected = size == option,
+                    onClick = { onPick(option) },
+                    label = { Text(option.label) },
+                    modifier = Modifier.testTag("crateSize-" + option.name.lowercase()),
+                )
+            }
+        }
+    }
+}
+
+/** Where a row's cards show their names (the owner, 21 Nov): as the look does, under the picture, or on it. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+internal fun NamesChoice(names: app.siansa.data.CardNames, modifier: Modifier = Modifier, onPick: (app.siansa.data.CardNames) -> Unit) {
+    Column(modifier.testTag("cardNames"), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
+        Text("Names", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+            for (option in app.siansa.data.CardNames.entries) {
+                FilterChip(
+                    selected = names == option,
+                    onClick = { onPick(option) },
+                    label = { Text(option.label) },
+                    modifier = Modifier.testTag("cardNames-${option.id}"),
+                )
+            }
+        }
+    }
+}
+
 /** How many tiles a shortcut grid has (the owner, 10 Nov): 2, 4, 6 or 8, two to a row. */
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
@@ -550,6 +844,63 @@ internal fun GridSizeChips(size: Int, modifier: Modifier = Modifier, onPick: (In
                 label = { Text("$n tiles") },
                 modifier = Modifier.testTag("gridSize-$n"),
             )
+        }
+    }
+}
+
+/**
+ * The rows of Arrange Home that show Siansa Beats' mixes while they're on (the owner, 17 Nov: their look is the row's),
+ * and which of them: said under each row, so it's clear which cog changes them.
+ */
+/**
+ * The look a row of Siansa Beats' mixes shows for [saved]: the carousel as its own look, else the one chosen. Every look
+ * (#1261, the owner, 19 Nov: every row gets every option; it was the carousel and Tiles only, 17 Nov).
+ */
+internal fun beatsLook(saved: HomeLook?): HomeLook = if (saved == null || saved == HomeLook.AS_IS) HomeLook.CAROUSEL else saved
+
+/** What "As Home" means for [section]'s colour: Home's choice, but Shortcuts' tiles are plain unless given their own. */
+internal fun asHomeCardLook(section: HomeSection, homeCardLook: CardLook): CardLook =
+    if (section == HomeSection.QUICK) CardLook.PLAIN else homeCardLook
+
+internal fun beatsRows(on: Boolean): Map<HomeSection, String> =
+    if (!on) emptyMap() else mapOf(
+        // The rows are named as on Siansa Beats' Mixes page (the owner, 20 Nov), so this only says where they come from.
+        HomeSection.CAROUSEL to "From Siansa Beats",
+        HomeSection.MADE_FOR_YOU to "From Siansa Beats",
+        HomeSection.MORE_OF_YOU to "From Siansa Beats: On repeat, Rediscover, New for you",
+    )
+
+/**
+ * [arranged] with the sections it doesn't list (More of you while Siansa Beats' mixes are off) back where they were in
+ * [before], after the same section, so a row hidden from the list keeps its place for when it's back.
+ */
+internal fun keepUnlisted(arranged: List<HomeSection>, before: List<HomeSection>): List<HomeSection> {
+    val out = arranged.toMutableList()
+    for (section in before) {
+        if (section in out) continue
+        val after = before.subList(0, before.indexOf(section)).lastOrNull { it in out }
+        out.add(if (after == null) 0 else out.indexOf(after) + 1, section)
+    }
+    return out
+}
+
+/** A sheet over the page, or the same as a page of its own ([asPage]). */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SheetOrPage(asPage: Boolean, onDismiss: () -> Unit, content: @Composable () -> Unit) {
+    if (asPage) content()
+    else ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) { content() }
+}
+
+/**
+ * Settings › Home › Arrange Home (the owner, 17 Nov: a page of its own in Home settings, not a link): the same as
+ * the sheet behind Home's button, the order, what shows, each row's look and title, the cards' colours and the spacing.
+ */
+@Composable
+fun ArrangeHomePage(nav: androidx.navigation.NavController) {
+    Screen(title = "Arrange Home", nav = nav) { padding ->
+        Box(Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().testTag("arrangeHomePage")) {
+            HomeSettingsSheet(nav, startOnSources = false, onDismiss = { nav.popBackStack() }, asPage = true)
         }
     }
 }

@@ -63,7 +63,30 @@ class BeatsSoundTest {
     private val audioMuseOnly = AppSettings(audioMuseUrl = "http://am.local:8000", audioMuseToken = "t")
     private val everything = setOf("/api/similar_tracks", "/api/mood_centroids", "/api/find_path", "/api/alchemy", "/api/sonic_fingerprint/generate", "/api/sync")
 
-    @After fun forget() = BeatsSound.heard(emptySet())
+    @After fun forget() {
+        BeatsSound.heard(emptySet())
+        BeatsSound.onTraits = null
+        BeatsSound.restoreTraits(false)
+    }
+
+    /**
+     * Whether Siansa Beats has each song's voice and moods is remembered from its last answer and saved once per
+     * change, so Flow's list of them is there as it opens (the owner, 17 Nov: it came seconds late).
+     */
+    @Test fun whetherSiansaBeatsHasMoodsIsRemembered() {
+        val saved = mutableListOf<Boolean>()
+        BeatsSound.onTraits = { saved += it }
+        assertFalse(BeatsSound.traits.value)
+        BeatsSound.traits(true)
+        BeatsSound.traits(true)
+        assertTrue(BeatsSound.traits.value)
+        BeatsSound.traits(false)
+        assertEquals(listOf(true, false), saved)
+        // At the app's start, what was saved is put back without being saved again.
+        BeatsSound.restoreTraits(true)
+        assertTrue(BeatsSound.traits.value)
+        assertEquals(2, saved.size)
+    }
 
     @Test fun siansaBeatsIsAskedFirstAtAudioMusesOwnPaths() = runBlocking {
         BeatsSound.heard(everything)
@@ -198,14 +221,14 @@ class BeatsSoundTest {
     /** From the same log: with AudioMuse-AI's address cleared, Song path and the mix slides said "not available". */
     @Test fun theSoundFeaturesArentHeldBackByAudioMuseBeingOff() {
         val connection = ConnectionState(network = true, server = true, audioMuse = null)
-        assertEquals("Siansa Beats or AudioMuse-AI isn't set up. Add it in Settings › Connections.", connection.soundProblem(beatsOnly))
+        assertEquals("Siansa Beats or AudioMuse-AI isn't set up. Add it in Settings › Services.", connection.soundProblem(beatsOnly))
         BeatsSound.heard(everything)
         assertEquals(null, connection.soundProblem(beatsOnly))
         assertEquals(null, ConnectionState(audioMuse = false).soundProblem(both))  // AudioMuse-AI down: Siansa Beats answers
         assertEquals("You're offline.", ConnectionState(network = false).soundProblem(beatsOnly))
         assertEquals("Only downloaded music is on.", connection.soundProblem(beatsOnly.copy(downloadedOnly = true)))
         // The search by words is still AudioMuse-AI's, and says so plainly.
-        assertEquals("Describing music in words needs Siansa Beats 0.26 or newer, or AudioMuse-AI (Settings › Connections).", connection.aiProblem(beatsOnly))
+        assertEquals("Describing music in words needs Siansa Beats 0.26 or newer, or AudioMuse-AI (Settings › Services).", connection.aiProblem(beatsOnly))
         assertEquals(null, connection.aiProblem(both))
         // Without Siansa Beats, as before.
         assertEquals("AudioMuse-AI isn't answering.", ConnectionState(audioMuse = false).soundProblem(audioMuseOnly))

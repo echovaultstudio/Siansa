@@ -11,7 +11,7 @@ import kotlinx.serialization.json.put
 
 /**
  * The song change last made, for the "Bad blend" button (the owner, 9 Nov): one tap sends it, with how it was made,
- * to Siansa Beats' list, and writes it to the log. Only while the button is turned on ([enabled], Settings › Help & feedback),
+ * to Siansa Beats' list, and writes it to the log. Only while the button is turned on ([enabled], Settings › Help),
  * and only for DJ playback's blends ([Report.dj]).
  */
 object LastBlend {
@@ -19,7 +19,7 @@ object LastBlend {
     val onByDefault: Boolean get() = BuildConfig.BUILD_TYPE == "dev"
 
     /**
-     * Whether blends are noted and the button shows: Settings › Help & feedback's "Bad blend button" (the owner, 12 Nov), set
+     * Whether blends are noted and the button shows: Settings › Help's "Bad blend button" (the owner, 12 Nov), set
      * when the app starts and when the switch is moved.
      */
     @Volatile
@@ -48,6 +48,11 @@ object LastBlend {
         val speed: Float? = null,
         val fromLockMs: Double? = null,
         val toLockMs: Double? = null,
+        /** The grid check (siansa-dev #63): how far each song's kicks landed off its grid (ms), when enough were heard. */
+        val fromGridOffMs: Long? = null,
+        val toGridOffMs: Long? = null,
+        /** How the blend rode the EQ ([EqStyle]): "glide", "bass swap on the bar"… */
+        val eqStyle: String? = null,
     ) {
         /** What goes to Siansa Beats: the plugin's `POST /api/bad-blends` body. */
         fun toJson(): JsonObject = buildJsonObject {
@@ -58,6 +63,7 @@ object LastBlend {
                 put("at_ms", atMs)
                 put("overlap_ms", overlapMs)
                 put("why", why)
+                eqStyle?.let { put("eq_style", it) }
                 bars?.let { put("bars", it) }
                 fromBpm?.let { put("from_bpm", JsonPrimitive(Math.round(it * 10) / 10.0)) }
                 toBpm?.let { put("to_bpm", JsonPrimitive(Math.round(it * 10) / 10.0)) }
@@ -66,6 +72,8 @@ object LastBlend {
                 speed?.let { put("speed", it) }
                 fromLockMs?.let { put("from_lock_ms", it) }
                 toLockMs?.let { put("to_lock_ms", it) }
+                fromGridOffMs?.let { put("from_grid_off_ms", it) }
+                toGridOffMs?.let { put("to_grid_off_ms", it) }
             })
         }
     }
@@ -77,6 +85,18 @@ object LastBlend {
     fun record(fromId: String, toId: String, atMs: Long, plan: FadePlan, dj: Boolean, now: Long = SystemClock.elapsedRealtime()) {
         if (!enabled) return
         last.value = of(fromId, toId, atMs, plan, dj, now)
+    }
+
+    /** The grid check of the blend just over ([GridCheck]): kept with it, so a bad blend marked says it. */
+    /** The EQ style the blend just over was mixed with: kept with its report. */
+    fun eqStyle(label: String) {
+        val now = last.value ?: return
+        last.value = now.copy(eqStyle = label)
+    }
+
+    fun gridChecked(from: GridCheck.Side, to: GridCheck.Side) {
+        val now = last.value ?: return
+        last.value = now.copy(fromGridOffMs = from.offMs.takeIf { from.sure }, toGridOffMs = to.offMs.takeIf { to.sure })
     }
 
     /** The report of a blend ([record] without keeping it): for tests. */
@@ -120,7 +140,8 @@ object LastBlend {
             "Crossfade",
             "Bad blend marked: ${report.fromId} into ${report.toId} (${report.technique}) · ${report.why} · " +
                 "started at ${report.atMs / 1000} s of the old song" +
-                (report.fromRhythm?.let { " · confidence out %.2f, in %.2f".format(java.util.Locale.ROOT, it, report.toRhythm ?: 0f) }.orEmpty()),
+                (report.fromRhythm?.let { " · confidence out %.2f, in %.2f".format(java.util.Locale.ROOT, it, report.toRhythm ?: 0f) }.orEmpty()) +
+                (if (report.fromGridOffMs != null || report.toGridOffMs != null) " · kicks off the grid: out ${report.fromGridOffMs?.let { "$it ms" } ?: "?"}, in ${report.toGridOffMs?.let { "$it ms" } ?: "?"}" else ""),
             event = "crossfade.bad_blend", fields = mapOf("technique" to report.technique, "bars" to report.bars),
         )
         return try {

@@ -190,7 +190,7 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
             LyricsShortcut.pending.value = false
         }
     }
-    // Settings › Now playing › Buttons: off brings back the look before the lyrics button (issue #346).
+    // Settings › Player › Buttons: off brings back the look before the lyrics button (issue #346).
     val style by graph.settings.state.collectAsStateWithLifecycle()
     val classic = !style.nowPlayingLyricsButton
     var menuOpen by remember { mutableStateOf(false) }
@@ -392,11 +392,20 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                         PlayerTop(
                             topGap = playerTopGapDp(LocalConfiguration.current.screenHeightDp).dp,
                             row = {
-                                // A Flow mix is named at the top, and opens its own page from there (the owner, 15 Nov).
+                                // A Flow mix is named at the top, and opens its own page from there (the owner, 15 Nov); so
+                                // is any mix, playlist or radio it was played from (the owner, 18 Nov), else the song's album.
                                 val mix = graph.flow.live(state)
+                                val fromState by graph.playingFrom.state.collectAsStateWithLifecycle()
+                                val from = if (mix == null) graph.playingFrom.live(state.hasMedia, fromState) else null
                                 TopRow(
-                                    song, mix?.name, onClose = onClose,
-                                    onAlbum = { if (mix != null) { onClose(); nav.navigate("vibe/${mix.vibeId}") } else openAlbum() },
+                                    song, from?.kind?.label ?: playingFromLabel(mix?.name), mix?.name ?: from?.title, onClose = onClose,
+                                    onAlbum = {
+                                        when {
+                                            mix != null -> { onClose(); nav.navigate("vibe/${mix.vibeId}") }
+                                            from != null -> { onClose(); nav.navigate(from.route) }
+                                            else -> openAlbum()
+                                        }
+                                    },
                                     onMenu = { menuOpen = true }, onSleep = { sleepOpen = true },
                                 )
                             },
@@ -563,7 +572,7 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                 var queueY by remember { mutableFloatStateOf(0f) }
                 var panelHeight by remember { mutableFloatStateOf(1f) }
                 fun settle(speed: Float) {
-                    if (queueY > panelHeight * 0.2f || (queueY > 30f && speed > 1200f)) {
+                    if (pullCloses(queueY, panelHeight, speed)) {
                         queueOpen = false
                     } else if (queueY > 0f) {
                         val from = queueY
@@ -735,13 +744,13 @@ internal fun PlayerTop(
 }
 
 @Composable
-private fun TopRow(song: Song?, mix: String?, onClose: () -> Unit, onAlbum: () -> Unit, onMenu: () -> Unit, onSleep: () -> Unit) {
+private fun TopRow(song: Song?, label: String, mix: String?, onClose: () -> Unit, onAlbum: () -> Unit, onMenu: () -> Unit, onSleep: () -> Unit) {
     val timerRunning = LocalGraph.current.sleepTimer.state.collectAsStateWithLifecycle().value != null
     Row(Modifier.fillMaxWidth().testTag("playerTopRow"), verticalAlignment = Alignment.CenterVertically) {
         IconButton(onClick = onClose) { Icon(Icons.Rounded.KeyboardArrowDown, "Close", Modifier.size(32.dp)) }
         if (timerRunning) Spacer(Modifier.size(48.dp))  // spacing: exact (the width of the button it balances)
         Column(Modifier.weight(1f).clickable(enabled = mix != null || song?.albumId != null, onClick = onAlbum), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(playingFromLabel(mix), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f), modifier = Modifier.testTag("playingFrom"))
+            Text(label, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f), modifier = Modifier.testTag("playingFrom"))
             Text(
                 mix ?: song?.album.orEmpty(),
                 style = MaterialTheme.typography.labelLarge,
@@ -1281,6 +1290,13 @@ private class PlayerSettle(
         return 0f
     }
 }
+
+/**
+ * Whether a panel over the player (the queue, the lyrics) closes when it's let go, pulled down [pulledPx] of its
+ * [heightPx] at [speed] px a second: a fifth of the way, or a quick flick.
+ */
+internal fun pullCloses(pulledPx: Float, heightPx: Float, speed: Float): Boolean =
+    pulledPx > heightPx * 0.2f || (pulledPx > 30f && speed > 1200f)
 
 /** In the classic now playing style, how much of the lyrics card shows under the player before scrolling (issue #346). */
 private val PLAYER_PEEK = 44.dp

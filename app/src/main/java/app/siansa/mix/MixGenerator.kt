@@ -1,39 +1,41 @@
 package app.siansa.mix
 
-import app.siansa.net.wordsReady
-import app.siansa.net.soundReady
-import app.siansa.data.daysLabel
-
-import app.siansa.data.fittingSelector
-
 import android.content.Context
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import app.siansa.AppGraph
 import app.siansa.data.AppJson
+import app.siansa.data.BeatsUse
 import app.siansa.data.LibraryRepository
 import app.siansa.data.Mix
 import app.siansa.data.Selector
 import app.siansa.data.Song
+import app.siansa.data.daysLabel
+import app.siansa.data.fittingSelector
 import app.siansa.log.AppLog
+import app.siansa.net.BeatsSound
 import app.siansa.net.ClapHit
 import app.siansa.net.Steer
-import app.siansa.situation.Situation
+import app.siansa.net.soundReady
 import app.siansa.net.str
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withPermit
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
-import kotlinx.serialization.json.jsonObject
+import app.siansa.net.beatsPlansReady
+import app.siansa.net.plansReady
+import app.siansa.net.wordsReady
+import app.siansa.situation.Situation
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.TextStyle
 import java.util.Locale
 import kotlin.math.max
 import kotlin.random.Random
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
+import kotlinx.serialization.json.jsonObject
 
 class MixException(message: String) : Exception(message)
 
@@ -154,7 +156,7 @@ class MixGenerator(private val graph: AppGraph) {
 
         // The moment the mix is made in, as far as the Vibes panel allows (issue #247): read once, here.
         val situation = graph.situation.read(settings.situation)
-        val plan = if (selector.useAi && settings.aiReady) {
+        val plan = if (selector.useAi && settings.plansReady) {
             runCatching { aiPlan(selector, situation) }
                 .onFailure { AppLog.w("Mix", "AI plan rejected, using the vibe's own search: ${it.message}") }
                 .getOrNull() ?: fallbackPlan(selector, situation)
@@ -343,7 +345,15 @@ class MixGenerator(private val graph: AppGraph) {
         return Plan(title, query, description.ifBlank { selector.guidance }, ai = true, steering = steeringOf(obj, concepts))
     }
 
+    /**
+     * A plan for [user] (the brief): from Siansa Beats' AI when it plans them (0.57, the owner, 18 Nov), so the phone
+     * needs no AI of its own; otherwise from the phone's AI. Both answer `{"title", "query", "description", "steer"}`.
+     */
     private suspend fun askPlan(user: String): kotlinx.serialization.json.JsonObject {
+        if (graph.settings.current.beatsPlansReady) {
+            AppLog.d("Mix", "Plan asked of Siansa Beats' AI")
+            return graph.beats.plan(user)
+        }
         val raw = graph.ai.complete(SYSTEM_PROMPT, user)
         val start = raw.indexOf('{')
         val end = raw.lastIndexOf('}')
@@ -479,7 +489,7 @@ class MixGenerator(private val graph: AppGraph) {
         if (text.length < 3) throw MixException("Describe your mood in a few words")
         if (!graph.settings.current.wordsReady) throw MixException("Set up AudioMuse-AI in Settings first")
         var plan = Plan(text.replaceFirstChar { it.uppercase() }, text, "From your description", ai = false)
-        if (graph.settings.current.aiReady) {
+        if (graph.settings.current.plansReady) {
             runCatching { aiMoodPlan(text) }
                 .onSuccess { plan = it }
                 .onFailure { AppLog.w("Mood", "AI couldn't interpret the mood, searching the words directly: ${it.message}") }
@@ -518,7 +528,7 @@ class MixGenerator(private val graph: AppGraph) {
         }
         if (words.length < 3) throw MixException("Describe your aura in a few words")
         var plan = Plan(words.replaceFirstChar { it.uppercase() }, words, "From your description", ai = false)
-        if (graph.settings.current.aiReady) {
+        if (graph.settings.current.plansReady) {
             runCatching { aiMoodPlan(words) }
                 .onSuccess { plan = it }
                 .onFailure { AppLog.w("Vibe", "AI couldn't interpret the vibe, searching the words directly: ${it.message}") }
@@ -566,10 +576,15 @@ class MixGenerator(private val graph: AppGraph) {
      * The songs for a vibe: AudioMuse's sound search for [query] steered by the sound dials (or the AI's
      * concepts while no dial is set), re-ranked by the energy, tempo and familiar sliders (issue #339).
      */
-    suspend fun vibeSongs(query: String, aiSteering: List<Steer>, tuning: VibeTuning, size: Int = 50): List<Song> {
+    suspend fun vibeSongs(words: String, aiSteering: List<Steer>, set: VibeTuning, size: Int = 50): List<Song> {
+        // The traits the words ask for by name ("female vocals", "instrumental", "sad"), as if picked (Siansa Beats 0.51,
+        // the owner, 16 Nov), unless they're picked already; and the words of the traits picked, added to the search.
+        // Typed words ask for moods only while Siansa Beats gives them and they're switched on under its card.
+        val tuning = if (BeatsSound.traits.value && graph.settings.current.beatsFor(BeatsUse.MOODS)) withAskedTraits(set, words) else set
+        val query = withTraitWords(words, tuning)
         val dials = tuning.steering()
         // The dials start at the AI's concepts, so once any is shown they say everything; before that, the AI's.
-        val steering = if (tuning.sounds.isNotEmpty()) dials else aiSteering
+        val steering = if (set.sounds.isNotEmpty()) dials else aiSteering
         // A genre picked comes first (the owner, 15 Nov: "more progressive metal" on a calm search got a downtempo song,
         // as the genre only re-ordered what the search had found): the mix is drawn from that genre's songs, the ones
         // the search likes best first, and a genre picked as "less" is left out altogether.
@@ -596,7 +611,8 @@ class MixGenerator(private val graph: AppGraph) {
         }
         if (found.hits.isEmpty()) throw MixException("AudioMuse-AI found nothing for that vibe")
         val hits = hitsToPick(found)
-        val features = if (tuning.energy != 0 || tuning.tempo != 0) {
+        val traitsSet = tuning.sounds.any { it.trait && it.value != 0 }
+        val features = if (tuning.energy != 0 || tuning.tempo != 0 || traitsSet) {
             runCatching { graph.audioMuse.features(hits.map { it.id }).associateBy { it.id } }
                 .onFailure { AppLog.w("Vibe", "Couldn't load energy and tempo, leaving them out: ${it.message}") }
                 .getOrDefault(emptyMap())
@@ -621,7 +637,8 @@ class MixGenerator(private val graph: AppGraph) {
         AppLog.i(
             "Vibe",
             "Search \"$query\" · ${tuning.summary().ifEmpty { "no sliders moved" }} · ${hits.size} found, " +
-                "${features.size} with energy/tempo, ${genres.size} with genres, ${picked.size} picked",
+                "${features.size} with energy/tempo, ${genres.size} with genres, " +
+                (if (traitsSet) "${features.values.count { it.traits.isNotEmpty() }} with traits, " else "") + "${picked.size} picked",
         )
         return spreadArtists(songsFor(picked, found)).ifEmpty { throw MixException(NOT_ON_THIS_SERVER) }
     }
@@ -680,11 +697,7 @@ class MixGenerator(private val graph: AppGraph) {
             if (recent.isNotEmpty()) appendLine("Recently played: ${recent.joinToString("; ")}")
             if (concepts.isNotEmpty()) appendLine("Sound concepts the search understands well: ${concepts.joinToString(", ")}")
         }
-        val raw = graph.ai.complete(SYSTEM_PROMPT, user)
-        val start = raw.indexOf('{')
-        val end = raw.lastIndexOf('}')
-        if (start < 0 || end <= start) throw MixException("The AI didn't answer with JSON")
-        val obj = AppJson.parseToJsonElement(raw.substring(start, end + 1)).jsonObject
+        val obj = askPlan(user)
         val title = obj.str("title")?.trim()?.trim('"')?.take(60).orEmpty()
         val query = obj.str("query")?.trim()?.take(300).orEmpty()
         val description = obj.str("description")?.trim()?.take(200).orEmpty()
@@ -863,7 +876,7 @@ fun parseSteering(element: kotlinx.serialization.json.JsonElement?, concepts: Li
  * What a vibe or mood playlist says when none of AudioMuse's songs could be found on this server, instead of an
  * empty list (beta testers #40). The AudioMuse test in Settings says which case it is.
  */
-const val NOT_ON_THIS_SERVER = "None of the songs AudioMuse-AI found are on this server. Test AudioMuse-AI in Settings › Connections to see why."
+const val NOT_ON_THIS_SERVER = "None of the songs AudioMuse-AI found are on this server. Test AudioMuse-AI in Settings › Services to see why."
 
 /**
  * A sound search's [hits], and which of them are songs here ([here], by AudioMuse's id); [foreign] when none of

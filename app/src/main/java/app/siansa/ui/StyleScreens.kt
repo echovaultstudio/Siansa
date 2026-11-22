@@ -112,7 +112,7 @@ internal fun TopBarChoice(selected: app.siansa.data.TopBarStyle, edge: androidx.
 }
 
 /**
- * Settings › Now playing (the owner, 13 Nov; Now Playing Style, DJ Mix Bar and Mini Player before, issue #346): the
+ * Settings › Player (the owner, 13 Nov; Now Playing Style, DJ Mix Bar and Mini Player before, issue #346): the
  * buttons under the controls, the play button's slides and grooves, the order of the DJ mix bar's places, and the
  * mini player's buttons.
  */
@@ -120,7 +120,7 @@ internal fun TopBarChoice(selected: app.siansa.data.TopBarStyle, edge: androidx.
 fun NowPlayingStyleScreen(nav: NavController) {
     val graph = LocalGraph.current
     val settings by graph.settings.state.collectAsStateWithLifecycle()
-    Screen(title = "Now playing", nav = nav) { padding ->
+    Screen(title = "Player", nav = nav) { padding ->
         Column(
             Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState()).padding(Space.Page),
             verticalArrangement = Arrangement.spacedBy(Space.Medium),
@@ -326,7 +326,7 @@ fun NavBarStyleScreen(nav: NavController) {
         graph.settings.setNavTabs(tabs)
     }
     Screen(
-        title = "Bottom bar",
+        title = "Navigation",
         nav = nav,
         actions = { TextButton(onClick = { save(NavTab.default) }, enabled = shown != NavTab.default) { Text("Reset") } },
     ) { padding ->

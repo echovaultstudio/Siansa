@@ -58,6 +58,8 @@ data class FadePlan(
     val buildUp: Boolean = false,
     /** Where the next song starts (its own ms) when it comes in after the old song ([coldEnd]): an echo out's downbeat. */
     val incomingFromMs: Long = 0L,
+    /** A beat-matched blend's three-band EQ: how the mids and highs move, and where the voices swap ([VocalRule]). */
+    val eq: BlendEq? = null,
 )
 
 /**
@@ -87,6 +89,14 @@ object Crossfade {
      */
     const val SOFT_DB = -6
     const val SOFT_END_MS = 5_000L
+
+    /**
+     * Whether a Smart blend with a song whose beat isn't known could clash: a song isn't known ([currentKnown],
+     * [nextKnown]) and the one that is (if either is) isn't known to be without a beat ([currentBeatless],
+     * [nextBeatless]). Two unknown songs could be two drum and bass tracks.
+     */
+    fun unknownBeatClashes(currentKnown: Boolean, currentBeatless: Boolean, nextKnown: Boolean, nextBeatless: Boolean): Boolean =
+        (!currentKnown || !nextKnown) && !(currentKnown && currentBeatless) && !(nextKnown && nextBeatless)
     const val SOFT_BLEND_MAX_MS = 12_000L
 
     /**
@@ -322,6 +332,11 @@ object Crossfade {
         noRoom: Boolean = false,
         /** The technique of the last blend, so Smart doesn't use the same twice running when another fits. */
         lastTechnique: Technique? = null,
+        /**
+         * Songs' profiles come from Siansa Beats or the plugin, so one without is a song not analysed (or not asked):
+         * its beat isn't known, and Smart blends it short. Without them (song tags), Smart is the crossfade length.
+         */
+        profilesUsed: Boolean = false,
     ): FadePlan? {
         if (mode == CrossfadeMode.OFF || maxMs <= 0) return null
         // An album playing in order stays gapless, Smart or Fixed (the owner, 9 Nov).
@@ -369,10 +384,16 @@ object Crossfade {
         val fromBeats = outro?.lockMs != null && intro?.lockMs != null
         val choice = if (mode == CrossfadeMode.SMART && matchable && beatMatch && speed != null && fromBeats) {
             TechniquePicker.pick(outro!!, intro!!, speed, TechniquePicker.keys(currentProfile, nextProfile), nextProfile?.dropsMs.orEmpty(),
-                mix = currentMix || nextMix, noRoom = noRoom, last = lastTechnique)
+                mix = currentMix, mixIn = nextMix && !currentMix, noRoom = noRoom, last = lastTechnique,
+                vocals = TechniquePicker.vocalRoom(currentProfile?.vocals, nextProfile?.vocals))
         } else null
-        val matched = if (matchable && beatMatch && currentDurationMs > 0) {
-            val bars = BeatMatch.barsFor(outro!!, intro!!, choice?.bars ?: blendBars).let { if (currentMix || nextMix) minOf(it, BeatMatch.MIX_TRACK_BARS) else it }
+        val matched = if (matchable && beatMatch && currentDurationMs > 0 && currentMix) {
+            // The song going out is a mixed CD's track: its end holds the CD's own blend, so a short swap at its very end,
+            // downbeat on downbeat (the owner, 20 Nov). A CD's track coming in after a normal song is blended from its lock.
+            BeatMatch.mixSwap(outro!!, intro!!, endMs, outBarFound = currentProfile?.outro?.barMs != null,
+                inBarFound = nextProfile?.intro?.barMs != null, incomingMix = nextMix)
+        } else if (matchable && beatMatch && currentDurationMs > 0) {
+            val bars = BeatMatch.barsFor(outro!!, intro!!, choice?.bars ?: blendBars).let { if (nextMix) minOf(it, BeatMatch.MIX_TRACK_BARS) else it }
             // A drop swap: the next song comes in [bars] before its drop, so the drop lands where the blend ends.
             val into = choice?.dropAtMs?.let { drop ->
                 val start = drop - bars * intro.beatLengthMs * BeatMatch.BEATS_PER_BAR
@@ -432,9 +453,12 @@ object Crossfade {
             val lockCut = songEnd - endMs
             val how = if (choice != null) "smart: ${technique!!.label} (${if (technique == choice.technique) choice.why else "the drop didn't fit"}) · " else ""
             val (swapFrom, swapTo) = swapSpan(technique!!)
-            FadePlan(matched.overlapMs, matched.overlapMs, how + matched.why + (if (lockCut > 0) ", let go where its beat stops locking (%.1f s before its end)".format(java.util.Locale.ROOT, (lockCut + cut) / 1000.0) else ""),
+            // The three-band EQ (the owner, 19 Nov): never two voices at once, from where Siansa Beats heard them.
+            val eq = VocalRule.eq(currentProfile?.vocals, nextProfile?.vocals, matched.startMs, matched.incomingStartMs, matched.overlapMs, matched.speed, matched.bars)
+            FadePlan(matched.overlapMs, matched.overlapMs, how + matched.why + (if (lockCut > 0) ", let go where its beat stops locking (%.1f s before its end)".format(java.util.Locale.ROOT, (lockCut + cut) / 1000.0) else "") +
+                " · EQ: " + eq.describe(),
                 cut + lockCut + matched.cutMs, matched, technique = technique, swapFrom = swapFrom, swapTo = swapTo,
-                filterHz = if (technique == Technique.FILTER_FADE) FILTER_FADE_HZ else 0.0)
+                filterHz = if (technique == Technique.FILTER_FADE) FILTER_FADE_HZ else 0.0, eq = eq)
         } else if (mode == CrossfadeMode.SMART && currentProfile != null && nextProfile != null) run {
             val tail = ((currentProfile.quietForLastMs(QUIET_DB) ?: 0L) - cut).coerceAtLeast(0L)
             val head = nextProfile.reachesAfterMs(QUIET_DB) ?: 0L
@@ -499,6 +523,13 @@ object Crossfade {
             // blend would clash for its whole length (20 and 30 s of two beats, issue #796), so a short one.
             val overlap = min(maxMs, BeatMatch.CLASH_MS)
             FadePlan(overlap, overlap, "smart: the next song's beat isn't known, so a short blend", cut)
+        } else if (mode == CrossfadeMode.SMART && profilesUsed && unknownBeatClashes(currentProfile != null, BeatMatch.beatless(outro), nextProfile != null, BeatMatch.beatless(intro))) {
+            // A song's beat isn't known (Siansa Beats hasn't analysed it, or couldn't be asked: the owner, 18 Nov, a Flow
+            // mix of drum and bass blended blind for 20 s and clashed): it can't be laid on the other's, so a short blend,
+            // unless the one that is known has no beat to clash with.
+            val overlap = min(maxMs, BeatMatch.CLASH_MS)
+            val which = if (currentProfile == null && nextProfile == null) "neither song's beat is known" else if (currentProfile == null) "the song going out's beat isn't known" else "the next song's beat isn't known"
+            FadePlan(overlap, overlap, "smart: $which, so a short blend", cut)
         } else {
             FadePlan(maxMs, maxMs, if (mode == CrossfadeMode.SMART) "smart without profiles: fixed ${maxMs} ms" else "fixed ${maxMs} ms", cut)
         }

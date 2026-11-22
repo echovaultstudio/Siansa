@@ -321,7 +321,7 @@ fun themeScheme(
 ): ColorScheme {
     val context = LocalContext.current
     val base = when {
-        colours == ThemeColours.YOURS -> remember(seed, dark) { ThemeTones.scheme(seed, dark, mono = ThemeTones.isGrey(seed)).toScheme(dark) }
+        colours == ThemeColours.YOURS -> remember(seed, dark) { ThemeTones.scheme(seed, dark, mono = ThemeTones.isGrey(seed), ink = ThemeTones.isGrey(seed)).toScheme(dark) }
         colours == ThemeColours.SIANSA -> if (dark) SiansaDark else SiansaLight
         colours == ThemeColours.WALLPAPER && ThemeColours.wallpaperAvailable ->
             if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)

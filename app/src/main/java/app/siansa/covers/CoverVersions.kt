@@ -25,6 +25,20 @@ object CoverVersions {
     /** The id to cache [id] under: itself, or with its album's cover version when it has none of its own. */
     fun cacheId(id: String): String = cacheIdFor(id) { stamps[it] }
 
+    /**
+     * [id] as the album's cover is now: an album cover id kept from before its picture changed on the server
+     * (`al-<album>_<old stamp>`, in a shortcut or recent play) becomes the current one, so the new picture shows there
+     * too (the owner, 21 Nov). Every other id stays as it is.
+     */
+    fun current(id: String): String = currentFor(id) { stamps[it] }
+
+    internal fun currentFor(id: String, albumStamp: (String) -> String?): String {
+        if (!id.startsWith("al-") || !id.contains('_')) return id
+        val album = id.removePrefix("al-").substringBefore('_')
+        val stamp = albumStamp(album) ?: return id
+        return if (stampOf(id) == stamp) id else "al-${album}_$stamp"
+    }
+
     /** The `_<stamp>` ending of a cover id, or null when it has none. */
     internal fun stampOf(cover: String?): String? = cover?.substringAfter('_', "")?.takeIf { it.isNotEmpty() }
 

@@ -176,6 +176,7 @@ fun CollectionPage(
     fun notePlayed() {
         val r = route ?: return
         val cover = if (shortcutCover) songs?.firstOrNull()?.cover else null
+        graph.playingFrom.note(r, title)
         graph.scope.launch { graph.recentPlays.note(r, title, cover) }
     }
     val listState = rememberLazyListState()

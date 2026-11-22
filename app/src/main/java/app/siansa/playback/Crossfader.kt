@@ -221,6 +221,7 @@ internal class Crossfader(
                 nextProfile = profiles.cached(next.id),
                 beatMatch = beatMatch,
                 blendBars = blending.blendBars,
+                profilesUsed = profiles.active,
             )
             if (planned == null || planned.coldEnd) {
                 // A cold end's pause needs the new audio engine (issue #826): here the two songs play back to back.
@@ -459,6 +460,10 @@ internal class Crossfader(
                         if (Blending.of(settings()).bassSwap) {
                             mainDeck.shelfDb = DeckFilter.SHELF_START_DB
                             AppLog.d("Crossfade", "Bass swap over the first ${SWAP_FRACTION_PERCENT} % of the blend: next song's bass held back ${-DeckFilter.SHELF_START_DB.toInt()} dB, old song's cut up to ${DeckFilter.LOW_CUT_HZ.toInt()} Hz")
+                            planned.eq?.let { eq ->
+                                eq.apply(0f, null, mainDeck)
+                                AppLog.d("Crossfade", "EQ: ${eq.describe()}")
+                            }
                         }
                         // The new song comes in at the matched speed, where it should be right now against the old
                         // song's beats (the old song's position is the tail's).
@@ -483,7 +488,10 @@ internal class Crossfader(
                 t.volume = if (tailDone) 0f else tailBase * sleep * Crossfade.fadeOut(out)
                 val beat = planned.beat
                 if (beat != null && reverb != null) echo(t, planned, beat, tailDone, tailBase * sleep)
-                if (beat != null && Blending.of(settings()).bassSwap) swapBass(out)
+                if (beat != null && Blending.of(settings()).bassSwap) {
+                    swapBass(out)
+                    planned.eq?.apply(out, tailDeck, mainDeck)
+                }
                 val heard = if (main.currentMediaItemIndex == incomingIndex) (main.currentPosition - (beat?.incomingStartMs ?: 0L)).coerceAtLeast(0L) else 0L
                 val fadedIn = (heard.toFloat() / planned.fadeInMs).coerceIn(0f, 1f)
                 level = if (planned.buildUp) Crossfade.buildIn(fadedIn) else Crossfade.fadeIn(fadedIn)

@@ -26,6 +26,8 @@ class MixCore(val outRate: Int) {
         /** The echo at the end of a blend (the deck going out), once the engine made one for it ([MixCore.echoOf]). */
         @Volatile var echo: Echo? = null
             internal set
+        /** Listens for the kicks in this deck's sound while a DJ blend plays (the grid check); null otherwise. */
+        @Volatile var kicks: KickListener? = null
         internal val streams = CopyOnWriteArrayList<DeckStream>()
 
         private class Mark(val inputFrame: Long, val mediaUs: Long)
@@ -217,7 +219,9 @@ class MixCore(val outRate: Int) {
         var started: MutableList<DeckStream>? = null
         if (echoIn.size < frames * 2) echoIn = FloatArray(frames * 2)
         for (deck in decks) {
-            val filtering = deck.filter.prepare(outRate, 2)
+            var filtering = deck.filter.prepare(outRate, 2)
+            // A blend laid on the bars ([app.siansa.playback.EqStyle]): its bands follow the mixer's own frames.
+            val booked = deck.filter.isBooked
             val echo = deck.echo?.takeIf { it.ringing }
             if (echo != null) java.util.Arrays.fill(echoIn, 0, frames * 2, 0f)
             for (stream in deck.streams) {
@@ -234,6 +238,8 @@ class MixCore(val outRate: Int) {
                     stream.becameAudible = false
                     (started ?: mutableListOf<DeckStream>().also { started = it }).add(stream)
                 }
+                // The kicks are heard before the volume and the filter: a fading song, its bass swapped out, still has its beat.
+                if (stream === deck.current) deck.kicks?.feed(scratch, frames, mixStart)
                 // The echo takes the song before its volume (a send before the fader): it rings on as the song goes.
                 if (echo != null) for (i in 0 until frames * 2) echoIn[i] += scratch[i]
                 val g0 = stream.gainNow
@@ -244,6 +250,10 @@ class MixCore(val outRate: Int) {
                     val g = g0 + (g1 - g0) * (i + 1).toFloat() / frames
                     var l = (scratch[i * 2] * g).toDouble()
                     var r = (scratch[i * 2 + 1] * g).toDouble()
+                    if (booked && i % app.siansa.playback.DeckFilter.FOLLOW_FRAMES == 0) {
+                        deck.filter.follow(mixStart + i)
+                        filtering = true
+                    }
                     if (filtering) {
                         l = deck.filter.process(l, 0)
                         r = deck.filter.process(r, 1)

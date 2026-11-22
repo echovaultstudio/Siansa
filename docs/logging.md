@@ -1,13 +1,13 @@
 # Diagnostic log
 
-Settings › Help & feedback › **Debug logs** turns it on. Nothing is written while it's off, and nothing leaves the phone
+Settings › Help › **Debug logs** turns it on. Nothing is written while it's off, and nothing leaves the phone
 unless you share it. Code: `app/src/main/java/app/siansa/log/` (issue #237, building on #180).
 
 ## What's kept
 
 | File (in the app's private storage, `logs/`) | What | Limit |
 |---|---|---|
-| `siansa.log`, `siansa.1.log` | The readable log shown under Settings › Help & feedback › Show the log | 2 parts of 15 MB |
+| `siansa.log`, `siansa.1.log` | The readable log shown under Settings › Help › Show the log | 2 parts of 15 MB |
 | `events.jsonl`, `events.1.jsonl`, `events.2.jsonl` | The same entries as JSON, one per line | 3 parts of 10 MB |
 | `crash-last.jsonl` | The last 500 entries before the last crash (kept even with logging off, never sent) | one crash |
 

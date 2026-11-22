@@ -29,8 +29,6 @@ object BeatMatch {
      * beat comes in at 1:37).
      */
     const val LATE_LOCK_MS = 8_000.0
-    /** A blend into or out of a track cut from a mixed CD is kept to this many bars, inside its lock. */
-    const val MIX_TRACK_BARS = 8
     /** …and steady enough at this [BeatEnd.steady]. */
     const val MIN_STEADY = 0.5f
     /** A song is played at most this much faster or slower to match (DJ decks go to ±8 %). */
@@ -289,6 +287,62 @@ object BeatMatch {
         return Plan(start.roundToLong(), overlap.roundToLong(), incomingStart.roundToLong(), speed, wholeBars(overlap, bar), onBars, outgoing, incoming,
             chosen = chosen)
     }
+
+    /**
+     * A track cut from a mixed CD (the owner, 20 Nov: "Giro" into "System (Mixed)" was a mess): its end already holds
+     * the CD's own blend into its next record, and its start the tail of the one before, so a 15-bar blend laid four
+     * records on each other. Instead the swap is at the very end of the song going out, [MIX_SWAP_BARS] bars long, the
+     * next song coming in on its first downbeat on a downbeat of the old one: beat 1 on beat 1, never beat 3.
+     *
+     * The downbeats are Siansa Beats' (its lock is a bar line of its grid: [BeatEnd.lockMs]) or ones it found
+     * ([outBarFound], [inBarFound]); bars only assumed from a song's first beat aren't trusted (a CD's slice rarely starts
+     * on bar 1). Without a downbeat at both ends it's a cut on the beat: the old song to its last beat, the next on its
+     * first downbeat (or beat) on the very next beat, a beat apart, so there's no gap and no two bars laid on each other.
+     * The next song, when it's a CD's slice too, starts at its lock, after the CD's last record. Null when the two can't
+     * be matched or not even a beat fits.
+     */
+    fun mixSwap(outgoing: BeatEnd, incoming: BeatEnd, endMs: Long, outBarFound: Boolean, inBarFound: Boolean, incomingMix: Boolean): Plan? {
+        if (!outgoing.matchable || !incoming.matchableAsIntro || endMs <= 0) return null
+        val speed = speed(outgoing, incoming) ?: return null
+        val beat = outgoing.beatLengthMs
+        val bar = beat * BEATS_PER_BAR
+        // A downbeat of each song that can be trusted.
+        val outBar = (if (outBarFound) outgoing.barMs else null) ?: outgoing.lockMs
+        val inBar = when {
+            incomingMix && incoming.lockMs != null -> incoming.lockMs
+            inBarFound && incoming.barMs != null -> incoming.barMs
+            else -> incoming.lockMs
+        }
+        if (outBar != null && inBar != null) {
+            // The last downbeat that leaves [MIX_SWAP_BARS] whole bars to the end (one when two don't fit).
+            for (bars in MIX_SWAP_BARS downTo 1) {
+                val start = outBar + floor((endMs - bars * bar - outBar) / bar) * bar
+                if (start > 0 && endMs - start >= bars * bar - beat / 10) {
+                    val overlap = endMs - start
+                    return Plan(start.roundToLong(), overlap.roundToLong(), inBar.coerceAtLeast(0.0).roundToLong(), speed, wholeBars(overlap, bar),
+                        onBars = true, outgoing, incoming,
+                        chosen = "a mixed CD's track: swapped in its last ${if (bars == 1) "bar" else "$bars bars"}, downbeat on downbeat (the CD did the blending)")
+                }
+            }
+            return null
+        }
+        // A cut on the beat: the old song's last beat, the next song a beat later.
+        val start = outgoing.beatMs + floor((endMs - beat - outgoing.beatMs) / beat) * beat
+        if (start <= 0 || endMs - start < beat - beat / 10) return null
+        val into = (if (inBarFound) incoming.barMs else null) ?: incoming.beatMs
+        val overlap = endMs - start
+        return Plan(start.roundToLong(), overlap.roundToLong(), into.coerceAtLeast(0.0).roundToLong(), speed, 0, onBars = false, outgoing, incoming,
+            chosen = "a mixed CD's track: cut on the beat at its end (no downbeat to trust at ${if (outBar == null) "the old song's end" else "the new song's start"})")
+    }
+
+    /**
+     * A blend into a track cut from a mixed CD (the song going out a normal one) is kept to at most this many bars, from
+     * the new song's lock: fewer when there isn't room. 8 until 16 Nov, when the owner chose to try 16.
+     */
+    const val MIX_TRACK_BARS = 16
+
+    /** A mixed CD's track swaps in this many bars at its very end ([mixSwap]). */
+    const val MIX_SWAP_BARS = 2
 
     /** A place in a song for the log: "4:45.0". */
     internal fun clock(ms: Long): String = "%d:%04.1f".format(java.util.Locale.ROOT, ms / 60_000, (ms % 60_000) / 1000.0)

@@ -16,8 +16,23 @@ class TechniqueTest {
 
     private fun pick(
         out: BeatEnd = outro, inn: BeatEnd = intro, keys: Double? = 1.0, drops: List<Long> = emptyList(),
-        mix: Boolean = false, noRoom: Boolean = false, last: Technique? = null,
-    ) = TechniquePicker.pick(out, inn, BeatMatch.speed(out, inn) ?: speed, keys, drops, mix, noRoom, last)
+        mix: Boolean = false, noRoom: Boolean = false, last: Technique? = null, vocals: Int? = null, mixIn: Boolean = false,
+    ) = TechniquePicker.pick(out, inn, BeatMatch.speed(out, inn) ?: speed, keys, drops, mix, mixIn, noRoom, last, vocals)
+
+    /** Siansa Beats' vocals (0.60): a long blend only where no two voices meet; both singing to the change, a quick swap. */
+    @Test fun theVocalsSteerTheBlend() {
+        assertEquals(Technique.LONG_BLEND, pick(inn = intro.copy(bassBars = 16), vocals = 40).technique)
+        assertEquals(Technique.BASS_SWAP, pick(inn = intro.copy(bassBars = 16), vocals = 12).technique)
+        val quick = pick(vocals = 2)
+        assertEquals(Technique.QUICK_SWAP, quick.technique)
+        assertEquals("both sing right up to the change: the voices swap within 4 bars", quick.why)
+        assertEquals(Technique.BASS_SWAP, pick(vocals = null).technique)  // not known: as before
+        val sung = SongVocals(none = false, introFreeBars = 8, outroFreeBars = 6)
+        assertEquals(14, TechniquePicker.vocalRoom(sung, sung))
+        assertEquals(Int.MAX_VALUE, TechniquePicker.vocalRoom(sung, SongVocals(none = true)))
+        assertNull(TechniquePicker.vocalRoom(null, sung))
+        assertNull(TechniquePicker.vocalRoom(sung.copy(outroFreeBars = null), sung))
+    }
 
     @Test fun theUsualIsTheBassSwapOverSixteenBars() {
         val usual = pick()
@@ -58,7 +73,10 @@ class TechniqueTest {
     @Test fun aMixTrackIsShortWhateverElse() {
         val mix = pick(inn = intro.copy(bassBars = 16), mix = true)
         assertEquals(Technique.BASS_SWAP, mix.technique)
-        assertEquals(BeatMatch.MIX_TRACK_BARS, mix.bars)
+        assertEquals(BeatMatch.MIX_SWAP_BARS, mix.bars)
+        assertEquals("a track from a mixed CD: swapped at its very end", mix.why)
+        val into = pick(inn = intro.copy(bassBars = 16), mixIn = true)
+        assertEquals(BeatMatch.MIX_TRACK_BARS, into.bars)
     }
 
     @Test fun aDropSixteenBarsOrMoreInLandsWhereTheOldSongGoes() {

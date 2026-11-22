@@ -75,10 +75,12 @@ object TechniquePicker {
         keys: Double?,
         incomingDrops: List<Long> = emptyList(),
         mix: Boolean = false,
+        mixIn: Boolean = false,
         noRoom: Boolean = false,
         last: Technique? = null,
+        vocals: Int? = null,
     ): TechniqueChoice {
-        val options = options(outgoing, incoming, speed, keys, incomingDrops, mix, noRoom)
+        val options = options(outgoing, incoming, speed, keys, incomingDrops, mix, mixIn, noRoom, vocals)
         // The first is the best fit; a change of technique only among the ones that fit as well (not a forced one).
         val first = options.first()
         if (first.technique == last && !first.forced) options.drop(1).firstOrNull { !it.forced && it.technique != last }?.let { return it.choice }
@@ -96,7 +98,9 @@ object TechniquePicker {
         keys: Double?,
         drops: List<Long>,
         mix: Boolean,
+        mixIn: Boolean,
         noRoom: Boolean,
+        vocals: Int?,
     ): List<Option> {
         val sure = minOf(outgoing.rhythm, incoming.rhythm)
         val shift = abs(speed - 1.0)
@@ -105,7 +109,8 @@ object TechniquePicker {
         fun fits(t: Technique, bars: Int, why: String, dropAt: Long? = null) = out.add(Option(TechniqueChoice(t, bars, why, dropAt), forced = false))
         // Cases that leave no choice.
         if (noRoom) forced(Technique.QUICK_SWAP, 4, "no room left for a longer blend")
-        if (mix) forced(Technique.BASS_SWAP, BeatMatch.MIX_TRACK_BARS, "a track from a mixed CD: short, inside its lock")
+        if (mix) forced(Technique.BASS_SWAP, BeatMatch.MIX_SWAP_BARS, "a track from a mixed CD: swapped at its very end")
+        if (mixIn) forced(Technique.BASS_SWAP, BeatMatch.MIX_TRACK_BARS, "the next song is from a mixed CD: from its lock, kept short")
         if (keys != null && keys < KEYS_CLASH) forced(Technique.QUICK_SWAP, 4, "the keys clash")
         if (sure < UNSURE) forced(Technique.QUICK_SWAP, 4, "the beat is only %.0f %% sure".format(java.util.Locale.ROOT, sure * 100))
         if (out.isNotEmpty()) return out
@@ -118,8 +123,16 @@ object TechniquePicker {
         val keysMix = keys == null || keys >= KEYS_MIX
         val roomy = (outgoing.bassBars ?: 0) >= ROOMY_BARS || (incoming.bassBars ?: 0) >= ROOMY_BARS
         val cooling = (incoming.energyDb ?: 0.0) <= (outgoing.energyDb ?: 0.0) - COOLING_DB
-        if (shift <= LONG_SHIFT && keysMix && sure >= SURE && roomy) {
-            fits(Technique.LONG_BLEND, LONGEST_BARS, "close tempos, keys that mix, and room without bass at an end")
+        // Where both songs sing right up to the change (Siansa Beats' vocals, 0.60), a DJ keeps it short: the voices swap
+        // within a few bars instead of being cut off one under the other for long.
+        if (vocals != null && vocals < SINGING_EDGES_BARS) {
+            fits(Technique.QUICK_SWAP, 4, "both sing right up to the change: the voices swap within 4 bars")
+        }
+        // A long blend only where the two voices won't meet in it (unknown: as before).
+        val voicesFit = vocals == null || vocals >= LONGEST_BARS
+        if (shift <= LONG_SHIFT && keysMix && sure >= SURE && roomy && voicesFit) {
+            fits(Technique.LONG_BLEND, LONGEST_BARS, "close tempos, keys that mix, and room without bass at an end" +
+                if (vocals != null) ", with no two voices at once" else "")
         }
         if (drop != null && !cooling) {
             fits(Technique.DROP_SWAP, drop.first, "the next song's drop lands where the old one goes", drop.second)
@@ -130,6 +143,22 @@ object TechniquePicker {
         fits(Technique.BASS_SWAP, 16, "the usual")
         if (!cooling && keysMix) fits(Technique.FILTER_FADE, 16, "for a change")
         return out
+    }
+
+    /** Fewer bars than this without a voice, both ends together: both sing right up to the change. */
+    const val SINGING_EDGES_BARS = 4
+
+    /**
+     * The bars without a voice where two songs meet ([SongVocals]): the old song's after its last vocals and the next
+     * song's before its first, together; [Int.MAX_VALUE] when either has none (no two voices can meet); null when it
+     * isn't known for both.
+     */
+    fun vocalRoom(outgoing: SongVocals?, incoming: SongVocals?): Int? {
+        if (outgoing == null || incoming == null) return null
+        if (outgoing.none || incoming.none) return Int.MAX_VALUE
+        val out = outgoing.outroFreeBars ?: return null
+        val inc = incoming.introFreeBars ?: return null
+        return out + inc
     }
 
     /** How well two songs' keys (AudioMuse-AI's) mix, or null when either isn't known. */

@@ -290,7 +290,7 @@ fun DownloadsScreen(nav: NavController) {
             item {
                 Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
                     HorizontalDivider()
-                    // How music downloads and the covers kept on the phone are in Settings › Streaming & storage (v1.0, the owner).
+                    // How music downloads and the covers kept on the phone are in Settings › Storage (v1.0, the owner).
                     PageLink(
                         "Download settings",
                         "${if (settings.downloadWifiOnly) "Wi-Fi only" else "Any connection"} · ${qualityLabel(settings.downloadKbps)} · " +
@@ -408,7 +408,7 @@ fun DownloadPickerScreen(nav: NavController) {
                 is Load.Ok -> {
                     if (o.value.isEmpty()) item {
                         Text(
-                            "Nothing here yet. Sync your library first (Settings › Connections, under your server).",
+                            "Nothing here yet. Sync your library first (Settings › Your server, under your server).",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(Space.Page),
@@ -613,7 +613,7 @@ private fun StopAllButton(onStop: () -> Unit) {
 internal fun DownloadControlForTest() = DownloadControl(Icons.Rounded.Pause, "Pause") { }
 
 /**
- * Settings › Streaming & storage's downloads (v1.0, the owner: everything Downloads had in Settings): the music kept on the phone
+ * Settings › Storage's downloads (v1.0, the owner: everything Downloads had in Settings): the music kept on the phone
  * (opening Downloads to see, add or remove it), on which connections and at what quality it downloads, the storage
  * limit, Remove all downloads, and the covers kept on the phone (Download all covers and the image cache).
  */
@@ -699,7 +699,7 @@ internal fun ImageCacheSlider(selected: Int, onPick: (Int) -> Unit) {
 }
 
 /**
- * Download all covers (issue #302), in Settings › Streaming & storage's Covers on the phone: the switch, when it may run, a
+ * Download all covers (issue #302), in Settings › Storage's Covers on the phone: the switch, when it may run, a
  * network check, and its progress with Stop or Download covers now.
  */
 @Composable
@@ -725,7 +725,7 @@ private fun CoverDownloadSection() {
         CoverDownload.schedule(context, graph.settings.current)
         if (on) CoverDownload.startNow(context, graph) else CoverDownload.stop(context)
     }
-    SwitchRow("Download on Wi-Fi only", settings.coverDownloadWifiOnly) { on ->
+    SwitchRow("Download covers on Wi-Fi only", settings.coverDownloadWifiOnly) { on ->
         graph.settings.setCoverDownload(settings.coverDownload, wifiOnly = on)
         refresh++
     }

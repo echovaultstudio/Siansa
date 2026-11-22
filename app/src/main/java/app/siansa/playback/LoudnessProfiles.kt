@@ -151,6 +151,8 @@ data class TrackProfile(
     /** AudioMuse-AI's key and scale (Siansa Beats (dev) plugin 0.3.0), for blends in key. */
     val key: String? = null,
     val scale: String? = null,
+    /** Siansa Beats 0.60: where the vocals are at the ends (separated), or that it has none; null while not known. */
+    val vocals: SongVocals? = null,
 ) {
     /** Siansa Beats has its grid for this song (a lock at either end), not only the plugin's own reading. */
     val fromBeats: Boolean get() = intro?.lockMs != null || outro?.lockMs != null
@@ -246,8 +248,29 @@ object PluginProfiles {
             breakdownsMs = times(p, "breakdowns_ms"),
             key = p.str("key")?.takeIf { it.isNotBlank() },
             scale = p.str("scale")?.takeIf { it.isNotBlank() },
+            vocals = vocals(p),
         )
     }
+
+    /** Siansa Beats' vocals (0.60): `vocals` "none", or "separated" with its sections and what was heard. */
+    private fun vocals(p: JsonObject): SongVocals? = when (p.str("vocals")) {
+        "none" -> SongVocals(none = true)
+        "separated" -> SongVocals(
+            none = false,
+            sections = spans(p, "vocal_sections_ms"),
+            heard = spans(p, "vocal_heard_ms"),
+            introFreeBars = p.dbl("intro_vocal_free_bars")?.takeIf { it.isFinite() && it >= 0 }?.toInt(),
+            outroFreeBars = p.dbl("outro_vocal_free_bars")?.takeIf { it.isFinite() && it >= 0 }?.toInt(),
+        )
+        else -> null
+    }
+
+    /** `[[from, to], …]` in ms as ranges; pairs that aren't two numbers, or run backwards, are left out. */
+    private fun spans(p: JsonObject, key: String): List<LongRange> =
+        ((p[key] as? kotlinx.serialization.json.JsonArray) ?: return emptyList()).mapNotNull { pair ->
+            val two = (pair as? kotlinx.serialization.json.JsonArray)?.mapNotNull { (it as? kotlinx.serialization.json.JsonPrimitive)?.content?.toDoubleOrNull() }
+            if (two == null || two.size != 2 || !two[0].isFinite() || !two[1].isFinite() || two[1] < two[0]) null else two[0].toLong()..two[1].toLong()
+        }
 
     /** The `<prefix>_bpm`, `_beat_ms`, `_bar_ms`, `_rhythm` and `_steady` fields of one end, or null without them. */
     private fun beatEnd(p: JsonObject, prefix: String): BeatEnd? {

@@ -59,6 +59,31 @@ class DeckFilterTest {
         assertFalse(deck.prepare(48_000, 2))
     }
 
+    @Test fun theHighShelfTakesTheHighsAndKeepsTheRest() {
+        val f = Biquad.highShelf(2_500.0, -26.0, 48_000)
+        assertEquals(-26.0, f.responseDb(16_000.0, 48_000), 1.0)
+        assertEquals(0.0, f.responseDb(100.0, 48_000), 0.2)
+    }
+
+    /** The three-band EQ (the owner, 19 Nov): the mids cut evenly with the lows and highs kept, the highs on their own. */
+    @Test fun theMidsAndTheHighsAreCutOnTheirOwn() {
+        val deck = DeckFilter()
+        deck.midDb = DeckFilter.KILL_DB
+        repeat(60) { deck.prepare(48_000, 2) }  // glided all the way
+        assertTrue("1 kHz: ${amplitude(deck, 1_000.0)}", amplitude(deck, 1_000.0) < 0.12)
+        assertTrue("600 Hz: ${amplitude(deck, 600.0)}", amplitude(deck, 600.0) < 0.2)
+        assertTrue("40 Hz: ${amplitude(deck, 40.0)}", amplitude(deck, 40.0) > 0.7)
+        assertTrue("12 kHz: ${amplitude(deck, 12_000.0)}", amplitude(deck, 12_000.0) > 0.7)
+        deck.reset()
+        deck.highDb = DeckFilter.KILL_DB
+        repeat(60) { deck.prepare(48_000, 2) }
+        assertTrue(amplitude(deck, 12_000.0) < 0.12)
+        assertTrue(amplitude(deck, 500.0) > 0.9)
+        assertEquals("low cut 0 Hz, bass +0 dB, mids +0 dB, highs -26 dB", deck.describe())
+        deck.reset()
+        assertTrue(deck.idle)
+    }
+
     /** The steady amplitude of a [hz] sine through [deck], mono. */
     private fun amplitude(deck: DeckFilter, hz: Double): Double {
         deck.prepare(48_000, 2)

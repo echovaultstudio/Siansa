@@ -304,10 +304,10 @@ class SpacingSettingsTest : SpacingCheck() {
             SiansaTheme {
                 Column(Modifier.padding(Space.Page)) {
                     app.siansa.ui.HubTiles(listOf(
-                        app.siansa.ui.HubTile(Icons.Rounded.Palette, "Sound", "a"),
-                        app.siansa.ui.HubTile(Icons.Rounded.Palette, "Radios & mixes", "b"),
-                        app.siansa.ui.HubTile(Icons.Rounded.Palette, "Streaming & storage", "c"),
-                        app.siansa.ui.HubTile(Icons.Rounded.Palette, "Audiobooks & podcasts", "d"),
+                        app.siansa.ui.HubTile(Icons.Rounded.Palette, "Playback", "a"),
+                        app.siansa.ui.HubTile(Icons.Rounded.Palette, "Mixes", "b"),
+                        app.siansa.ui.HubTile(Icons.Rounded.Palette, "Discovery", "c"),
+                        app.siansa.ui.HubTile(Icons.Rounded.Palette, "Scrobbling", "d"),
                     )) { }
                 }
             }

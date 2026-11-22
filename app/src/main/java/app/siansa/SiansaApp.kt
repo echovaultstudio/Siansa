@@ -1,5 +1,6 @@
 package app.siansa
 
+import app.siansa.net.beatsPlansReady
 import android.app.Application
 import app.siansa.log.AppLog
 import app.siansa.log.Diagnostics
@@ -40,6 +41,8 @@ class SiansaApp : Application(), SingletonImageLoader.Factory {
         graph.mixResume.watch()
         // The cover colours kept on the phone, so pages seen before have theirs in their first frame (CoverToneStore).
         Thread({ app.siansa.ui.CoverToneStore.load(this) }, "cover-tones").start()
+        // Mixes' colours by mood, kept the same way (MoodColourStore).
+        Thread({ app.siansa.ui.MoodColourStore.load(this) }, "mood-colours").start()
         // A step count each time the app comes to the front, so the next mix can tell walking from sitting
         // (issue #247): one reading, only while movement is switched on for the vibes.
         registerActivityLifecycleCallbacks(object : Application.ActivityLifecycleCallbacks {
@@ -174,7 +177,7 @@ class SiansaApp : Application(), SingletonImageLoader.Factory {
             "Android ${android.os.Build.VERSION.RELEASE} (SDK ${android.os.Build.VERSION.SDK_INT}) on ${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}",
             "memory class ${am?.memoryClass ?: "?"} MB",
             network,
-            "Navidrome ${if (s.navidromeReady) "set" else "not set"}, AudioMuse-AI ${if (s.audioMuseReady) "set" else "not set"}, AI ${if (s.aiReady) "on" else "off"}",
+            "Navidrome ${if (s.navidromeReady) "set" else "not set"}, AudioMuse-AI ${if (s.audioMuseReady) "set" else "not set"}, AI ${if (s.beatsPlansReady) "by Siansa Beats" else if (s.aiReady) "on" else "off"}",
             "quality Wi-Fi ${if (s.transcodeWifiKbps > 0) "Opus ${s.transcodeWifiKbps}" else "original"}, mobile ${if (s.transcodeMobileKbps > 0) "Opus ${s.transcodeMobileKbps}" else "original"}",
             "ReplayGain ${s.replayGain.label}",
             // How songs blend, so a DJ session's log says what it was set to (0.52.0-dev).

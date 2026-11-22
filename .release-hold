@@ -1,1 +1,1 @@
-Releases are on hold (the owner, 15 Nov): no more releases for now. Merges to main keep collecting their notes in changelog.d/. Delete this file in a pull request to publish everything collected as one release.
+Releases are on hold (the owner, 18 Nov 2026, after 1.6.0): no more releases for now. Merges to main keep collecting their notes in changelog.d/. Delete this file in a pull request to publish everything collected as one release.
