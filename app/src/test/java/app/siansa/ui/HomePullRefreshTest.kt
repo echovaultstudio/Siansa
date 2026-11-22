@@ -26,4 +26,13 @@ class HomePullRefreshTest {
         assertEquals(0.5f, logoSize(0.5f))
         assertEquals(1f, logoSize(1.7f))
     }
+
+    @Test fun theHalfCirclesGoRoundWithTheFinger() {
+        // The owner, 22 Nov: "when pulling down the echo waves should move around also in same speed as the swipe".
+        assertEquals(0f, pulledTurn(0f))
+        assertEquals(90f, pulledTurn(0.5f))
+        assertEquals(180f, pulledTurn(1f)) // a whole pull: half a turn, which looks as at rest, so nothing jumps
+        assertEquals(216f, pulledTurn(1.2f)) // pulled past: still with the finger
+        assertEquals(0f, pulledTurn(-0.1f))
+    }
 }
