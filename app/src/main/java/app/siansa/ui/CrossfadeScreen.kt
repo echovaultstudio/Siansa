@@ -72,7 +72,12 @@ fun CrossfadeScreen(nav: NavController) {
             Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState()).padding(Space.Page),
             verticalArrangement = Arrangement.spacedBy(CROSSFADE_GAP),
         ) {
-            PageLink("Equaliser", if (eq.enabled) "On · ${eq.preset.label}" else "Off", "soundEqualiser") { nav.navigate("settings/equaliser") }
+            // What the server sends, then how the phone plays it, together (the owner, 22 Nov).
+            Heading("Sound quality")
+            StreamingQualitySection(settings, graph)
+            SwitchRow("Untouched playback", UNTOUCHED_HINT, settings.untouchedPlayback, tag = "untouchedPlayback") { graph.settings.setUntouchedPlayback(it) }
+            HorizontalDivider()
+            PageLink("Equaliser", equaliserSummary(settings, eq.enabled, eq.preset.label), "soundEqualiser") { nav.navigate("settings/equaliser") }
             HorizontalDivider()
             Heading("Where loudness and fades come from")
             LoudnessSourceRow(settings.loudnessSource, beats = settings.beatsReady) {
@@ -131,6 +136,11 @@ fun CrossfadeScreen(nav: NavController) {
             }
             HorizontalDivider()
             FoldSection("Crossfade & DJ blends", crossfadeFoldSummary(settings)) {
+                // Untouched, a song goes straight to the phone's output: there's nothing to blend it with.
+                if (settings.untouchedPlayback) {
+                    Hint("Untouched playback is on, so songs play back to back with nothing blended. Switch it off above to use crossfades and DJ blends.")
+                    return@FoldSection
+                }
                 CrossfadeModeRow(settings.crossfade) { graph.settings.setCrossfade(mode = it) }
                 Hint(crossfadeHint(settings))
                 // Smart decides every change; only Fixed has a length and bars to set (the owner, 9 Nov).
@@ -189,7 +199,18 @@ internal fun crossfadeLengthHint(s: AppSettings): String? =
         " and for a quiet intro without a beat in DJ blends."
 
 /** The section's summary: Smart has nothing to set; Fixed says its length and bars. */
-internal fun crossfadeFoldSummary(s: AppSettings): String = when (s.crossfade) {
+/** What Untouched playback does, and what it switches off. */
+internal const val UNTOUCHED_HINT = "Plays each song at its own sample rate and bit depth, straight to your phone's sound output. " +
+    "Crossfades, DJ blends and the equaliser are off while it's on. Switching it pauses the song for a moment."
+
+/** The Equaliser's line on the Playback page: it can't work on sound that goes out untouched. */
+internal fun equaliserSummary(s: AppSettings, on: Boolean, preset: String): String = when {
+    s.untouchedPlayback -> "Off while Untouched playback is on"
+    on -> "On · $preset"
+    else -> "Off"
+}
+
+internal fun crossfadeFoldSummary(s: AppSettings): String = if (s.untouchedPlayback) "Off while Untouched playback is on" else when (s.crossfade) {
     CrossfadeMode.OFF -> "Off"
     CrossfadeMode.SMART -> "Smart"
     CrossfadeMode.FIXED -> "Fixed · ${s.crossfadeSeconds} s" + if (s.loudnessSource == LoudnessSource.PLUGIN) " · ${s.blendBars} bars" else ""

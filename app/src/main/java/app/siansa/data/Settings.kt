@@ -270,6 +270,11 @@ data class AppSettings(
     /** The loudness, in LUFS, that measured levelling brings songs towards. */
     val loudnessTarget: Int = DEFAULT_LOUDNESS_TARGET,
     val crossfade: CrossfadeMode = CrossfadeMode.OFF,
+    /**
+     * Untouched playback (the owner, 22 Nov): each song goes straight to the phone's output at its own sample rate and
+     * bit depth, past Siansa's mixer and equaliser. Nothing can be blended then: crossfades and DJ blends are off.
+     */
+    val untouchedPlayback: Boolean = false,
     /** How far a song radio may wander from its first song (issue #256). */
     val radioDrift: RadioDrift = RadioDrift.SOME,
     /** What plays when the queue is about to end (issue #337): nothing, songs like the last one, or a DJ-ordered set. */
@@ -580,6 +585,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         loudnessSource = LoudnessSource.parse(prefs.getString("loudness_source", null)),
         loudnessTarget = prefs.getInt("loudness_target", AppSettings.DEFAULT_LOUDNESS_TARGET),
         crossfade = CrossfadeMode.parse(prefs.getString("crossfade", null)),
+        untouchedPlayback = prefs.getBoolean("untouched_playback", false),
         radioDrift = RadioDrift.parse(prefs.getString("radio_drift", null)),
         continuousPlay = ContinuousMode.parse(prefs.getString("continuous_play", null)),
         windDownSongs = prefs.getInt("wind_down_songs", AppSettings.DEFAULT_WIND_DOWN_SONGS)
@@ -1061,6 +1067,12 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
      */
     private fun noteBlend(what: String, before: Any, after: Any) {
         if (before != after) app.siansa.log.AppLog.i("Settings", "$what: $before → $after")
+    }
+
+    fun setUntouchedPlayback(on: Boolean) {
+        AppLog.i("Settings", "Untouched playback: " + if (on) "on (crossfades, DJ blends and the equaliser are off)" else "off")
+        prefs.edit().putBoolean("untouched_playback", on).apply()
+        _state.value = _state.value.copy(untouchedPlayback = on)
     }
 
     fun setCrossfade(mode: CrossfadeMode = _state.value.crossfade, seconds: Int = _state.value.crossfadeSeconds) {
