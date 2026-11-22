@@ -16,6 +16,7 @@ import kotlinx.serialization.json.put
  * should be contained or left out from the mixes. Make settings or toggles for everything that is currently
  * automatically chosen"). Kept by Siansa Beats for each listener, and changed the same from its own Mixes page. Each
  * setting comes described by Siansa Beats (what kind it is, its limits, its words), so a new one shows here by itself.
+ * The settings are drawn in [PARTS], as its Mix settings page draws them (0.63).
  */
 class BeatsMixSettings(
     private val get: suspend (pathAndQuery: String) -> JsonElement,
@@ -32,15 +33,60 @@ class BeatsMixSettings(
     data class Settings(val user: String, val settings: List<Setting>, val values: Map<String, Value>, val keepDays: Int) {
         fun value(name: String): Value? = values[name]
 
-        /** The settings in groups, as Siansa Beats' page has them; any not in one come last, under "More". */
-        fun grouped(): List<Pair<String, List<Setting>>> {
-            val byName = settings.associateBy { it.name }
-            val listed = GROUPS.flatMap { it.second }.toSet()
-            return (GROUPS + ("More" to settings.map { it.name }.filter { it !in listed }))
-                .map { (title, names) -> title to names.mapNotNull { byName[it] } }
-                .filter { it.second.isNotEmpty() }
+        /**
+         * The settings in parts of one line each, as Siansa Beats' Mix settings page has them (0.63; the owner, 22 Nov:
+         * "100% organised and not bloated and easy to understand"): only the lines with a setting Siansa Beats has,
+         * and any setting without a line last, under "More".
+         */
+        fun parts(): List<Part> {
+            val known = settings.map { it.name }.toSet()
+            val placed = PARTS.flatMap { it.lines }.flatMap { listOfNotNull(it.on) + it.more }.toSet()
+            val rest = settings.map { it.name }.filter { it !in placed }
+            val more = if (rest.isEmpty()) emptyList() else listOf(Part("More", "", listOf(Line("more", "More", null, rest))))
+            return (PARTS + more).map { part ->
+                part.copy(lines = part.lines.map { it.copy(on = it.on?.takeIf { n -> n in known }, more = it.more.filter { n -> n in known }) }
+                    .filter { it.on != null || it.more.isNotEmpty() })
+            }.filter { it.lines.isNotEmpty() }
+        }
+
+        /** The settings under [line], in its order. */
+        fun under(line: Line): List<Setting> = line.more.mapNotNull { name -> settings.firstOrNull { it.name == name } }
+
+        /** Whether anything under [line] isn't as it comes. */
+        fun tuned(line: Line): Boolean = under(line).any { (values[it.name] ?: it.default) != it.default }
+
+        /** [line] in a few words: what's chosen under it. */
+        fun note(line: Line): String {
+            fun n(name: String) = values[name]?.number ?: 0
+            fun on(name: String) = values[name]?.on == true
+            fun words(name: String) = values[name]?.words.orEmpty().size
+            fun count(n: Int, one: String, many: String) = "$n ${if (n == 1) one else many}"
+            return when (line.key) {
+                "now" -> "${count(n("now_count"), "mix", "mixes")} · for this part of the day"
+                "daily" -> "${count(n("daily_count"), "mix", "mixes")} · the kinds of music you play most"
+                "repeat" -> "Your most played · the last ${n("repeat_days")} days"
+                "rediscover" -> "Old favourites · not played for ${n("forgotten_days")} days"
+                "new" -> "Fresh finds near your taste"
+                "in" -> "${n("size")} songs · ${n("familiar")}% you know · ${n("per_artist")} by one artist"
+                "out" -> listOfNotNull(
+                    "Played in the last ${n("fresh_days")} days".takeIf { n("fresh_days") > 0 },
+                    count(words("leave_genres"), "genre", "genres").takeIf { words("leave_genres") > 0 },
+                    count(words("leave_artists"), "artist", "artists").takeIf { words("leave_artists") > 0 },
+                ).joinToString(" · ").ifEmpty { "Nothing" }
+                "around" -> listOfNotNull("Time of day".takeIf { on("time_of_day") }, "weekends".takeIf { on("weekend_apart") },
+                    "daylight".takeIf { on("daylight") }, "season".takeIf { on("season") }).joinToString(" · ").ifEmpty { "Your listening alone" }
+                "siansa" -> (if (on("together")) "One row of ${n("together_count")}" else "Each group its own row") +
+                    " · " + (if (on("ai_names")) "names from AI" else "Siansa Beats' own names")
+                else -> count(line.more.size, "setting", "settings")
+            }
         }
     }
+
+    /** A named part of the settings: its lines. */
+    data class Part(val title: String, val about: String, val lines: List<Line>)
+
+    /** One line: a mix with its switch ([on]) or something every mix shares, and the settings that open under it. */
+    data class Line(val key: String, val name: String, val on: String?, val more: List<String>)
 
     suspend fun load(user: String): Settings =
         parse(get("/api/v1/mixes/settings?user=" + java.net.URLEncoder.encode(user, "UTF-8")) as? JsonObject
@@ -70,12 +116,34 @@ class BeatsMixSettings(
     }
 
     companion object {
-        val GROUPS = listOf(
-            "Which mixes" to listOf("now", "now_count", "daily", "daily_count", "repeat", "rediscover", "new"),
-            "On Home" to listOf("together", "together_count"),
-            "What's in each" to listOf("size", "familiar", "per_artist", "fresh_days", "leave_genres", "leave_artists"),
-            "What they're made from" to listOf("time_of_day", "weekend_apart", "daylight", "season", "half_life", "repeat_days", "forgotten_days"),
-            "Names" to listOf("ai_names"),
+        val PARTS = listOf(
+            Part("Mixes", "Made for the moment", listOf(
+                Line("now", "For now", "now", listOf("now_count")),
+                Line("daily", "Made for you", "daily", listOf("daily_count")),
+            )),
+            Part("Your sound", "From your own listening", listOf(
+                Line("repeat", "On repeat", "repeat", listOf("repeat_days")),
+                Line("rediscover", "Rediscover", "rediscover", listOf("forgotten_days")),
+                Line("new", "New for you", "new", emptyList()),
+            )),
+            Part("For all mixes", "", listOf(
+                Line("in", "What's in a mix", null, listOf("size", "familiar", "per_artist")),
+                Line("out", "Leave out", null, listOf("fresh_days", "leave_genres", "leave_artists")),
+                Line("around", "Made around", null, listOf("time_of_day", "weekend_apart", "daylight", "season", "half_life")),
+                Line("siansa", "In Siansa", null, listOf("together", "together_count", "ai_names")),
+            )),
+        )
+
+        /** A setting's few words under its line (its line says the rest); without one here, Siansa Beats' own words. */
+        val WORDS = mapOf(
+            "now_count" to "How many", "daily_count" to "How many", "repeat_days" to "Looks back … days",
+            "forgotten_days" to "Not played for … days", "size" to "Songs in a mix", "familiar" to "Songs you know, in %",
+            "per_artist" to "By one artist, at most", "fresh_days" to "Songs played in the last … days",
+            "leave_genres" to "Genres", "leave_artists" to "Artists", "time_of_day" to "The part of the day you listen in",
+            "weekend_apart" to "Weekends apart from weekdays", "daylight" to "Calmer when it's dark outside",
+            "season" to "This time of year counts more", "half_life" to "Listening counts half after … days",
+            "together" to "All in one row on Home", "together_count" to "Cards in that row, at most",
+            "ai_names" to "Names and lines from the AI service",
         )
 
         internal fun json(v: Value, kind: Kind): JsonElement = when (kind) {

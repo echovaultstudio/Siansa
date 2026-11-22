@@ -345,35 +345,18 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     record("new", "New for you", "Fresh finds near your taste"),
                 ), key = { it.key }) { app.siansa.ui.MixMosaicTile(it) }
             },
-            // Siansa Beats' mix settings (the owner, 17 Nov): switches, a number, names left out, how long they're kept.
+            // Siansa Beats' mix settings (the owner, 22 Nov: "a total revamp… 100% organised and not bloated"): three parts
+            // of one line each, AUTO or TUNED on a mix's line; then with lines open: a number, names left out with a long
+            // one, how long mixes are kept, and Back to automatic.
             Scene("beats_mix_settings") {
-                val on = { name: String, label: String, v: Boolean -> app.siansa.net.BeatsMixSettings.Setting(name, app.siansa.net.BeatsMixSettings.Kind.ON, label, 0, 0, app.siansa.net.BeatsMixSettings.Value(on = v)) }
-                val number = { name: String, label: String, low: Int, high: Int -> app.siansa.net.BeatsMixSettings.Setting(name, app.siansa.net.BeatsMixSettings.Kind.NUMBER, label, low, high, app.siansa.net.BeatsMixSettings.Value()) }
-                val settings = listOf(
-                    on("now", "For now: mixes for this part of the day", true), number("now_count", "How many For now mixes", 1, 6),
-                    on("daily", "Made for you: the kinds of music you play most", false), number("daily_count", "How many Made for you mixes", 1, 8),
-                    number("size", "Songs in a mix", 10, 100), number("fresh_days", "Leave out songs you played in the last … days", 0, 180),
-                    app.siansa.net.BeatsMixSettings.Setting("leave_genres", app.siansa.net.BeatsMixSettings.Kind.WORDS, "Genres to leave out", 0, 0, app.siansa.net.BeatsMixSettings.Value()),
-                    on("ai_names", "Names and lines from the AI service", true),
-                )
-                val values = mapOf(
-                    "now" to app.siansa.net.BeatsMixSettings.Value(on = true), "now_count" to app.siansa.net.BeatsMixSettings.Value(number = 4),
-                    "daily" to app.siansa.net.BeatsMixSettings.Value(on = false), "size" to app.siansa.net.BeatsMixSettings.Value(number = 40),
-                    "fresh_days" to app.siansa.net.BeatsMixSettings.Value(number = 45),
-                    "leave_genres" to app.siansa.net.BeatsMixSettings.Value(words = listOf("Christmas", "Neo-Classical Downtempo With Field Recordings")),
-                    "ai_names" to app.siansa.net.BeatsMixSettings.Value(on = true),
-                )
                 Column(Modifier.padding(Space.Page)) {
-                    // After a change: Make the mixes again beside As they come, the note under them (the owner, 20 Nov).
-                    app.siansa.ui.MixSettingsBody(app.siansa.net.BeatsMixSettings.Settings("max", settings, values, 7), "Saved. Make the mixes again to see them now.", emptyList(),
-                        save = { _, _ -> }, again = {})
+                    app.siansa.ui.MixSettingsBody(mixSettingsScene(), null, emptyList(), save = { _, _ -> }, again = {})
                 }
             },
-            // The foot of Mix settings, which the scene above can't reach: after a change, Make the mixes again.
-            Scene("beats_mix_settings_again") {
+            Scene("beats_mix_settings_open") {
                 Column(Modifier.padding(Space.Page)) {
-                    app.siansa.ui.MixSettingsBody(app.siansa.net.BeatsMixSettings.Settings("max", emptyList(), emptyMap(), 7), "Saved. Make the mixes again to see them now.", emptyList(),
-                        save = { _, _ -> }, again = {})
+                    app.siansa.ui.MixSettingsBody(mixSettingsScene(), "Saved. Make the mixes again to see them now.", emptyList(),
+                        save = { _, _ -> }, again = {}, opened = setOf("now", "out", "siansa"))
                 }
             },
             Scene("record_crate") {
@@ -1373,4 +1356,23 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
             },
         )
     }
+}
+
+/** Siansa Beats' mix settings for the scenes: every setting it has, For now tuned to 3 mixes, Made for you off, two genres left out. */
+private fun mixSettingsScene(): app.siansa.net.BeatsMixSettings.Settings {
+    fun on(name: String, v: Boolean = true) = app.siansa.net.BeatsMixSettings.Setting(name, app.siansa.net.BeatsMixSettings.Kind.ON, name, 0, 0, app.siansa.net.BeatsMixSettings.Value(on = v))
+    fun number(name: String, low: Int, high: Int, default: Int) = app.siansa.net.BeatsMixSettings.Setting(name, app.siansa.net.BeatsMixSettings.Kind.NUMBER, name, low, high, app.siansa.net.BeatsMixSettings.Value(number = default))
+    fun words(name: String) = app.siansa.net.BeatsMixSettings.Setting(name, app.siansa.net.BeatsMixSettings.Kind.WORDS, name, 0, 0, app.siansa.net.BeatsMixSettings.Value())
+    val settings = listOf(
+        on("now"), number("now_count", 1, 6, 4), on("daily"), number("daily_count", 1, 8, 5), on("repeat"), on("rediscover"), on("new"),
+        on("together", false), number("together_count", 1, 20, 6), number("size", 10, 100, 40), number("familiar", 0, 100, 40),
+        number("per_artist", 1, 5, 2), number("fresh_days", 0, 180, 45), words("leave_genres"), words("leave_artists"),
+        on("time_of_day"), on("weekend_apart"), on("daylight"), on("season"), number("half_life", 14, 730, 120),
+        number("repeat_days", 7, 90, 30), number("forgotten_days", 30, 730, 180), on("ai_names"),
+    )
+    val values = settings.associate { it.name to it.default } + mapOf(
+        "now_count" to app.siansa.net.BeatsMixSettings.Value(number = 3), "daily" to app.siansa.net.BeatsMixSettings.Value(on = false),
+        "leave_genres" to app.siansa.net.BeatsMixSettings.Value(words = listOf("Christmas", "Neo-Classical Downtempo With Field Recordings")),
+    )
+    return app.siansa.net.BeatsMixSettings.Settings("max", settings, values, 7)
 }
