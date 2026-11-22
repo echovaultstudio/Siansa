@@ -28,7 +28,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
@@ -68,19 +67,23 @@ internal fun pulledDown(refreshing: Boolean, fraction: Float): Float = if (refre
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun PullLogo(state: PullToRefreshState, refreshing: Boolean, modifier: Modifier) {
-    val fraction = pulledDown(refreshing, state.distanceFraction)
-    // While it loads its half circles turn round the bars like a record, as the TV's logo does while a DJ mix plays
-    // (the owner, 22 Nov), at 33⅓; let go of, they wind on to the next half turn, where they look as at rest.
+    // The half circles go round the bars with the finger while pulling (the owner, 22 Nov: "when pulling down the echo
+    // waves should move around also in same speed as the swipe"), carry on from where the finger left them, turning
+    // like a record while Home loads (as the TV's logo does while a DJ mix plays, at 33⅓), then wind on to the next half
+    // turn, where they look as at rest.
     val turn = remember { Animatable(0f) }
     LaunchedEffect(refreshing) {
         if (refreshing) {
+            turn.snapTo(pulledTurn(state.distanceFraction))
             while (true) turn.animateTo(turn.value + FULL_TURN, tween(RECORD_TURN_MS, easing = LinearEasing))
         } else {
             turn.animateTo(restingTurn(turn.value), tween(RECORD_STOP_MS, easing = FastOutSlowInEasing))
             turn.snapTo(0f)
         }
     }
-    if (fraction <= 0f) return
+    // Nothing here is read while composing: the pull and the turn are read where the layers are placed, so a pull or a
+    // turning logo moves two layers on the GPU and nothing is composed, measured or drawn again (the owner: "no lag or
+    // heaviness for the app"). The half circles are drawn once and their layer turned.
     Box(
         modifier.windowInsetsPadding(WindowInsets.statusBars).padding(top = Space.Small).size(PULL_HEADER)
             .semantics { contentDescription = if (refreshing) "Loading Home again" else "Pull to load Home again" }
@@ -91,6 +94,7 @@ private fun PullLogo(state: PullToRefreshState, refreshing: Boolean, modifier: M
             Modifier.size(PULL_LOGO).graphicsLayer {
                 // Only ever in the room the page has given it (the owner, 22 Nov: "the logo appears in the notice
                 // pills"): as big as that room, in its middle, and seen once there's enough of it.
+                val fraction = pulledDown(refreshing, state.distanceFraction)
                 val grow = logoSize(fraction)
                 scaleX = grow
                 scaleY = grow
@@ -98,17 +102,25 @@ private fun PullLogo(state: PullToRefreshState, refreshing: Boolean, modifier: M
                 translationY = -PULL_HEADER.toPx() * (1f - fraction) / 2f
             },
         ) {
-            // The launcher icon's bars, and its half circles drawn here so they can turn round the bars while it loads.
             Image(painterResource(R.drawable.logo_bars), contentDescription = null, modifier = Modifier.matchParentSize())
-            Canvas(Modifier.matchParentSize()) {
+            Canvas(
+                Modifier.matchParentSize().graphicsLayer {
+                    rotationZ = if (refreshing) turn.value else turn.value + pulledTurn(state.distanceFraction)
+                },
+            ) {
                 val unit = size.width / LOGO_VIEW
-                rotate(turn.value, pivot = Offset(LOGO_MIDDLE * unit, LOGO_MIDDLE * unit)) {
-                    PULL_RINGS.forEach { drawRing(it, unit) }
-                }
+                PULL_RINGS.forEach { drawRing(it, unit) }
             }
         }
     }
 }
+
+/**
+ * How far the half circles have gone round for a pull of [fraction] of the way (past all of it too): half a turn for a
+ * whole pull, about what a wheel their size would roll under the finger. Half a turn looks as none does (both sides
+ * are alike), so nothing jumps when the loading turn takes over or hands back.
+ */
+internal fun pulledTurn(fraction: Float): Float = HALF_TURN * fraction.coerceAtLeast(0f)
 
 /** The logo's size as a share of its own, for a page pulled [fraction] of the way: never taller than the room given. */
 internal fun logoSize(fraction: Float): Float = fraction.coerceIn(0f, 1f)
