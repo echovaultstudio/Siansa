@@ -166,6 +166,17 @@ object CoverStore {
         return freed
     }
 
+    /** Removes cover [id]'s kept animated original and still, so it downloads again (CoverCache.clearAll). */
+    @Synchronized
+    fun forget(id: String) {
+        if (!::dir.isInitialized) return
+        val key = resolve(id)
+        originalFile(key).delete()
+        stillFile(key).delete()
+        versions.remove(key)
+        app.siansa.data.QuietWrites.save(prefs()) { remove("v:$key") }
+    }
+
     fun clear() {
         dir.listFiles()?.forEach { it.delete() }
         aliases.clear()

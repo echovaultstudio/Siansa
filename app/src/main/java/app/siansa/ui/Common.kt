@@ -335,6 +335,8 @@ fun Cover(
     size: Int?,
     modifier: Modifier = Modifier,
     shape: Shape = RoundedCornerShape(8.dp),
+    // A colour filter over the cover; null draws it as it is.
+    colorFilter: androidx.compose.ui.graphics.ColorFilter? = null,
 ) {
     val graph = LocalGraph.current
     // An artist's picture as looked up this run (ArtistPhotos), wherever it shows: their page, Fans also like, Home,
@@ -342,12 +344,15 @@ fun Cover(
     // new one shows as soon as it's known, without the page being opened again (the owner, 10 Nov).
     val freshArtists by graph.artistPhotos.covers.collectAsStateWithLifecycle()
     @Suppress("NAME_SHADOWING")
-    val coverId = coverId?.let { app.siansa.data.freshArtistCover(it, freshArtists) }
+    val coverId = coverId?.let { app.siansa.covers.CoverVersions.current(app.siansa.data.freshArtistCover(it, freshArtists)) }
     val context = LocalContext.current
     val loader = SingletonImageLoader.get(context)
     // A stand-in showing here is asked for again when its time comes (StandIns: soon the first times), without the
     // cover having to leave the screen and come back (the owner, 12 Nov: a song's row kept the blue disc).
     var again by remember(coverId) { androidx.compose.runtime.mutableIntStateOf(0) }
+    // Cleared by hand (hold an album's cover): fetched fresh here at once, wherever it shows (the owner, 21 Nov).
+    val clearedAll by app.siansa.covers.CoverCache.cleared.collectAsStateWithLifecycle()
+    val cleared = coverId?.let { clearedAll[app.siansa.covers.CoverVersions.cacheId(it)] } ?: 0
     LaunchedEffect(coverId) {
         val id = coverId ?: return@LaunchedEffect
         val cacheId = app.siansa.covers.CoverVersions.cacheId(id)
@@ -361,7 +366,7 @@ fun Cover(
             }
         }
     }
-    val cached = remember(coverId, size, again) {
+    val cached = remember(coverId, size, again, cleared) {
         coverId?.let {
             // The server's stand-in, shown a while ago, is dropped here, so the cover is asked for again.
             app.siansa.covers.CoverCache.askAgain(loader, it)
@@ -373,7 +378,7 @@ fun Cover(
         if (cached != null || coverId == null) null
         else coverFallbackKeys(coverId, size).firstNotNullOfOrNull { loader.memoryCache?.get(MemoryCache.Key(it))?.image }
     }
-    val request = remember(coverId, size, again) { coverId?.let { coverRequest(context, graph, it, size) } }
+    val request = remember(coverId, size, again, cleared) { coverId?.let { coverRequest(context, graph, it, size) } }
     // Its colours, worked out in the background while it shows (CoverToneStore): the page it opens has them in its
     // first frame. A cover only scrolled past isn't read.
     LaunchedEffect(coverId) {
@@ -389,6 +394,7 @@ fun Cover(
                 painter = remember(cached) { cached.asPainter(context) },
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
+                colorFilter = colorFilter,
                 modifier = Modifier.fillMaxSize(),
             )
             request != null -> {
@@ -397,6 +403,7 @@ fun Cover(
                         painter = remember(standIn) { standIn.asPainter(context) },
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
+                colorFilter = colorFilter,
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
@@ -405,6 +412,7 @@ fun Cover(
                     model = request,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
+                colorFilter = colorFilter,
                     modifier = Modifier.fillMaxSize(),
                 )
             }

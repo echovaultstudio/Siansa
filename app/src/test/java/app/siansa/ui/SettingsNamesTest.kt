@@ -15,7 +15,7 @@ class SettingsNamesTest {
     }
 
     /**
-     * Settings › Home page has the top of Home, the menu, Arrange Home as a page of its own and Your cards (the owner,
+     * Settings › Home has the top of Home, the menu, Arrange Home as a page of its own and Your cards (the owner,
      * 17 Nov); the source filter is only behind Home's own button.
      */
     @Test fun homeSettingsLeaveTheFilterToHome() {
@@ -23,8 +23,8 @@ class SettingsNamesTest {
         val home = pages.substringAfter("fun HomeSettingsScreen(").substringBefore("fun NoticeKinds(")
         assertTrue(home.contains("PageLink(\"Your cards\""))
         assertTrue("Arrange Home isn't a page of Home settings", home.contains("nav.navigate(\"settings/home/arrange\")"))
-        assertFalse("Settings › Home page still links the source filter", home.contains("\"Source filter\""))
-        assertFalse("Settings › Home page still opens Home's panel", home.contains("HomeSettingsSheet"))
+        assertFalse("Settings › Home still links the source filter", home.contains("\"Source filter\""))
+        assertFalse("Settings › Home still opens Home's panel", home.contains("HomeSettingsSheet"))
     }
 
     @Test fun noArrowsOnSettingsPages() {
@@ -44,11 +44,11 @@ class SettingsNamesTest {
         assertTrue("Services has no For the best Siansa", services.contains("FOR THE BEST SIANSA"))
     }
 
-    /** Help & feedback and About are the last two tiles, in that order. */
+    /** Help and About are the last two tiles, in that order. */
     @Test fun helpAndAboutAreLast() {
         val hub = File(ui, "SettingsHub.kt").readText()
         val tiles = Regex("""HubTile\(Icons\.Rounded\.(\w+), "([^"]+)"""").findAll(hub).map { it.groupValues[1] to it.groupValues[2] }.toList()
         assertTrue("No tiles found", tiles.isNotEmpty())
-        assertTrue("Help & feedback and About aren't last: ${tiles.takeLast(2)}", tiles.takeLast(2) == listOf("BugReport" to "Help & feedback", "Info" to "About"))
+        assertTrue("Help and About aren't last: ${tiles.takeLast(2)}", tiles.takeLast(2) == listOf("BugReport" to "Help", "Info" to "About"))
     }
 }

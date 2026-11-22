@@ -2,7 +2,7 @@
 
 ## Streaming quality
 
-**Settings › Storage & downloads › Streaming quality**, set separately **On Wi-Fi** and **On mobile data**:
+**Settings › Storage › Streaming quality**, set separately **On Wi-Fi** and **On mobile data**:
 
 - **Original**: the file as it is on your server. Best on Wi-Fi.
 - **Opus 96–320 kbit/s**: converted by your server, to save data. Navidrome uses its "opus" transcoding profile;
@@ -17,10 +17,10 @@ Siansa always plays the quality you chose; it never switches by itself. Changes 
 
 ## Song cache and loading ahead
 
-- **Song cache** (**Settings › Storage & downloads**, 2 GB by default): songs are kept on the phone as they play, so replays
+- **Song cache** (**Settings › Storage**, 2 GB by default): songs are kept on the phone as they play, so replays
   and skips start at once and survive a bad connection. Only original-quality streams are cached. **Off** keeps
   no song once it has played (the songs already cached are removed); it applies from the next song.
-- **Load songs ahead** (**Settings › Storage & downloads**): while a song plays, Siansa loads the next ones, one at a time, so
+- **Load songs ahead** (**Settings › Storage**): while a song plays, Siansa loads the next ones, one at a time, so
   they start at once and keep playing if the connection drops. 2 on Wi-Fi and 1 on mobile data by default, up to
   5. Only original files are loaded ahead. This works with the song cache off too, for up to 3 songs: each is held
   only until it has played.
@@ -29,7 +29,7 @@ Siansa always plays the quality you chose; it never switches by itself. Changes 
 
 ## Downloads
 
-**Settings › Storage & downloads › Downloads** (or the download button on an album or playlist): music you download stays on the phone
+**Settings › Storage › Downloads** (or the download button on an album or playlist): music you download stays on the phone
 and plays without a connection. It isn't part of the song cache and is never removed by itself.
 
 - **Download on Wi-Fi only** (on by default).
@@ -46,7 +46,7 @@ size, so they stay gapless too.
 
 ## Levelling (even loudness)
 
-**Settings › Sound & playback**:
+**Settings › Playback**:
 
 - **Levelling**: **Track** plays every song at the same level. **Album** keeps an album's loud and quiet songs
   apart. **Off** plays songs as they are.
@@ -248,7 +248,7 @@ one, or while the sleep timer lets a song finish.
 
 ## Equaliser
 
-**Settings › Sound & playback › Equaliser**: ten bands, presets, and a pre-amp. Songs stay as loud as with the equaliser
+**Settings › Playback › Equaliser**: ten bands, presets, and a pre-amp. Songs stay as loud as with the equaliser
 off; the pre-amp makes everything louder or quieter on top, and peaks that would distort are smoothed. Moving a
 band saves it as your Custom preset. Not used while casting.
 
@@ -279,7 +279,7 @@ choice: its icon beside the button, and its name in the middle of the cover, whi
 hides it. Until you're far enough the name is faint and says "Slide a little further"; then it lights up in your
 colour, says "Let go to start" and the phone clicks, and letting go there starts it. Everything else on the page dims while you
 slide, and going down, Play on makes way. Slide back to the middle to change your mind. A tap still plays and pauses, and pressing
-and holding still stops. What each way does can be changed, or the slides switched off, under **Settings › Now playing ›
+and holding still stops. What each way does can be changed, or the slides switched off, under **Settings › Player ›
 Play button**. While a DJ mix plays, the play button has record grooves in its colour, with a glint that turns as it
 plays.
 
@@ -292,7 +292,7 @@ queue does: the next songs change; the mix's shape now has a ring in your colour
 the place under your finger lights up (Stop in white, the rest in your colour) and the phone clicks at each one, while
 the cover shows its name, what it does and "Let go to start", "Let go to stop" or "Let go to reshape". Slide back down
 to change your mind. An album's or playlist's DJ mix plays its own songs, so its bar has only **Stop**. Put the places
-in your own order under **Settings › Now playing › DJ mix bar**.
+in your own order under **Settings › Player › DJ mix bar**.
 
 Swipe the mini player left for the next song or right for the one before: the title and artist follow your finger
 while the cover stays, and changes with the song. The phone gives a short buzz as the song
@@ -328,11 +328,11 @@ format and bit rate) and, beside it, what is really playing and where it comes f
 - **On** a TV or speaker's name while you cast.
 
 Offline, a downloaded song still shows how it plays, with the file type the library knows. Turn it off in **Settings ›
-Now playing › About this song**.
+Player › About this song**.
 
 ## Star ratings
 
-Turn on **Settings › Now playing › Star ratings** to rate songs from one to five stars. Tap a star to give that many;
+Turn on **Settings › Player › Star ratings** to rate songs from one to five stars. Tap a star to give that many;
 tap the rating again to take it off. The stars show in **About this song**, in the lower part of now playing, and
 under the title as well if you switch that on. A song's **⋮** menu has **Rate** too, in now playing and in every list.
 
@@ -353,14 +353,14 @@ same corner: tap it to close the lyrics again.
 
 From now playing. Pick a time, or let the current song finish. **Wind down** swaps everything after the current
 song for a path from that song to calmer music, long enough to fill the timer, so the music gets calmer and quieter
-as you fall asleep. Without a timer, Wind down queues a number of calm songs (**Settings › Mixes & radios › Wind down**:
+as you fall asleep. Without a timer, Wind down queues a number of calm songs (**Settings › Mixes › Wind down**:
 10, 20 or 30) and the music ends with them.
 
 ## Casting (Chromecast and DLNA)
 
 The device button in now playing shows TVs and speakers on the same Wi-Fi: Chromecast and Google TV, and DLNA
 ones (most smart TVs, Sonos, AV receivers). They play straight from your server: a Chromecast gets your music
-lossless (see **Chromecast sound quality** below), a DLNA one Opus 320 kbit/s if it lists Ogg among the formats it
+lossless (see **Chromecast sound quality** below), a DLNA one Opus 320 kbit/s if it lists Opus among the formats it
 plays, otherwise MP3 320, unless you ask for the original files.
 Stopping the cast brings the music back to the phone, paused. If the TV's Siansa screen closes by itself, the phone
 joins the TV again straight away and the music carries on there (at most once in two minutes; if it keeps closing,
@@ -430,8 +430,9 @@ format; other songs are still converted. Better sound, and no tiny gap between s
 setting is kept for each device, shows which formats the device says it plays, and isn't offered when it only
 plays MP3. It applies from the next song.
 
-**Opus on DLNA.** Songs converted for a DLNA TV or speaker go as Opus 320 kbit/s (in Ogg) when the device lists Ogg or
-Opus among the formats it plays, and as MP3 320 when it doesn't. If it doesn't start an Opus song after all, Siansa
+**Opus on DLNA.** Songs converted for a DLNA TV or speaker go as Opus 320 kbit/s (in Ogg) when the device lists Opus
+among the formats it plays, and as MP3 320 when it doesn't. A device that lists only Ogg gets MP3: many play only
+Vorbis in Ogg, and some (a JBL Bar 800) say they're playing an Opus song with no sound. If it doesn't start an Opus song after all, Siansa
 sends that song again as MP3 320, and that device gets MP3 until you restart the app.
 
 ## Android Auto

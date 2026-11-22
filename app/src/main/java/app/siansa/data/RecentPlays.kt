@@ -25,6 +25,10 @@ fun notedPlay(list: List<RecentPlay>, play: RecentPlay, max: Int = RecentPlays.M
  * The albums, playlists, mixes and other pages last played from (issue #271), newest first, for the shortcuts at
  * the top of Home. Noted when Play, Shuffle or a song on such a page starts playback.
  */
+/** [list] with every shortcut to [route] showing [cover]. */
+fun withCover(list: List<RecentPlay>, route: String, cover: String): List<RecentPlay> =
+    list.map { if (it.route == route) it.copy(cover = cover) else it }
+
 class RecentPlays(context: Context) {
     private val json = JsonFile(File(context.filesDir, Users.scoped("recent_plays.json")), ListSerializer(RecentPlay.serializer())) { emptyList() }
 
@@ -35,6 +39,16 @@ class RecentPlays(context: Context) {
     suspend fun note(route: String, title: String, cover: String?) {
         if (route.isBlank()) return
         json.update { notedPlay(it, RecentPlay(route, title, cover, System.currentTimeMillis())) }
+    }
+
+    /**
+     * Gives the shortcut to [route] the cover [cover] (the album's own now), returning the cover it had: one kept from
+     * before its picture changed on the server kept showing the old picture (the owner, 21 Nov).
+     */
+    suspend fun refreshCover(route: String, cover: String?): List<String> {
+        val old = all().filter { it.route == route }.mapNotNull { it.cover }
+        if (cover != null) json.update { withCover(it, route, cover) }
+        return old
     }
 
     companion object {

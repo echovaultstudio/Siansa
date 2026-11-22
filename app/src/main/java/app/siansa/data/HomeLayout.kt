@@ -9,14 +9,16 @@ enum class HomeSection(val id: String, val label: String) {
     NOTICES("notices", "Notices"),
     QUICK("quick", "Shortcuts"),
     TODAY("today", "Today's mix"),
-    CAROUSEL("carousel", "Your mixes carousel"),
+    // "For now", as Siansa Beats' Mixes page calls its mixes for this part of the day (the owner, 20 Nov: the same
+    // names in both). Its id stays "carousel", so saved orders and looks keep it.
+    CAROUSEL("carousel", "For now"),
     /** Audiobookshelf's books and podcasts (issue #521); only with a server set up. */
     BOOKS("books", "Your books"),
     PODCASTS("podcasts", "Your podcasts"),
     MADE_FOR_YOU("made", "Made for you"),
     /** Siansa Beats' On repeat, Rediscover and New for you (the owner, 17 Nov: its own row); empty without them. */
     MORE_OF_YOU("more_of_you", "More of you"),
-    /** Custom cards pinned to Home (issue #622); each shows in its own look, in the order set in Settings › Home page › Cards. */
+    /** Custom cards pinned to Home (issue #622); each shows in its own look, in the order set in Settings › Home › Cards. */
     CARDS("cards", "Your cards"),
     REDISCOVER("rediscover", "Rediscover"),
     RADIOS("radios", "Radios"),
@@ -27,7 +29,7 @@ enum class HomeSection(val id: String, val label: String) {
     GENRES("genres", "Your genres"),
     RANDOM("random", "Random picks");
 
-    /** Its look can be changed under Arrange Home (issue #655); Your cards each have their own, in Settings › Home page › Cards. */
+    /** Its look can be changed under Arrange Home (issue #655); Your cards each have their own, in Settings › Home › Cards. */
     val lookable: Boolean get() = this != CARDS && this != NOTICES
 
     companion object {
@@ -87,6 +89,11 @@ enum class HomeLook(val id: String, val label: String, val hint: String) {
     COVER_GRID("cover_grid", "Cover grid", "Covers in a grid across the screen: choose its columns and rows");
 
     companion object {
+        /** The looks with a Size choice under the row's cog (the owner, 21 Nov: tiles too, not only the carousel). */
+        val SIZED = setOf(CAROUSEL, TILES)
+        /** The looks whose cards have pictures with names, so the Names choice is theirs (the owner, 21 Nov). */
+        val NAMED = setOf(AS_IS, TILES, CAROUSEL, COVER_GRID)
+
         /** Reads the saved looks ("recent:list,added:banner"); unknown sections and looks are dropped. */
         fun parse(saved: String?): Map<HomeSection, HomeLook> {
             if (saved.isNullOrBlank()) return emptyMap()
@@ -236,5 +243,94 @@ enum class LookVariant(val id: String, val label: String, val look: HomeLook) {
 
         fun format(variants: Map<HomeSection, LookVariant>): String =
             HomeSection.entries.mapNotNull { s -> variants[s]?.let { "${s.id}:${it.id}" } }.joinToString(",")
+    }
+}
+
+/**
+ * How a card's picture shows (the owner, 20 Nov: "some do not look good with the cover mosaic"), per row, under its cog
+ * in Arrange Home. [AUTO] is how it was: four covers two by two, now only when they sit well together.
+ */
+enum class PictureStyle(val id: String, val label: String, val blurb: String) {
+    AUTO("auto", "Auto", "Mosaic when its covers sit well together, else one cover"),
+    MOSAIC("mosaic", "Mosaic", "Four covers"),
+    COVER("cover", "One cover", "Its top album"),
+    // The sleek ones (the owner, 20 Nov: the loud colour cards "don't suit the sleek style of the app"): black first,
+    // its colour as a hint. Ink keeps Colour's id, so a row set to Colour shows Ink.
+    // Round three (the owner, 21 Nov: "more outstanding and dynamic", after Apple Music and Tidal). Aura keeps
+    // Colour's id, so a row set to Colour or Ink shows Aura; a row set to Line goes back to Auto.
+    AURA("colour", "Aura", "Its colours drifting, slow for a calm mix, quicker for a loud one"),
+    FROST("frost", "Frost", "Its cover blurred and breathing, its name on glass"),
+    POSTER("poster", "Poster", "Its covers washed in one bold colour, its name in heavy type"),
+    GLOW("glow", "Glow", "One cover on its own light"),
+    PILE("pile", "Stickers", "Its covers stuck on at angles"),
+    TAPED("taped", "Taped", "Its covers taped on paper"),
+    CUTOUTS("cutouts", "Cut-outs", "Circles and squares, like a scrapbook");
+
+    companion object {
+        /** Reads the saved styles ("made_for_you:glow,quick:colour"); unknown sections and styles are dropped. */
+        fun parse(saved: String?): Map<HomeSection, PictureStyle> {
+            if (saved.isNullOrBlank()) return emptyMap()
+            return saved.split(',').mapNotNull { pair ->
+                val (section, id) = pair.split(':').takeIf { it.size == 2 } ?: return@mapNotNull null
+                val s = HomeSection.entries.firstOrNull { it.id == section.trim() } ?: return@mapNotNull null
+                val v = entries.firstOrNull { it.id == id.trim() } ?: return@mapNotNull null
+                s to v
+            }.toMap()
+        }
+
+        fun format(styles: Map<HomeSection, PictureStyle>): String =
+            HomeSection.entries.mapNotNull { s -> styles[s]?.takeIf { it != AUTO }?.let { "${s.id}:${it.id}" } }.joinToString(",")
+    }
+}
+
+/**
+ * Where a row's picture colours come from (the owner, 20 Nov: "it doesn't always need to come from the covers"): its
+ * covers' own, made brighter; the moods of its songs; or a set of colours. Each card of a set takes one of its pairs.
+ */
+enum class PictureColours(val id: String, val label: String) {
+    COVERS("covers", "From covers"),
+    MOOD("mood", "By mood"),
+    SIANSA("siansa", "Siansa"),
+    MONO("mono", "Mono");
+
+    companion object {
+        /** Reads the saved choices ("made_for_you:mood,quick:neon"); unknown sections and sets are dropped. */
+        fun parse(saved: String?): Map<HomeSection, PictureColours> {
+            if (saved.isNullOrBlank()) return emptyMap()
+            return saved.split(',').mapNotNull { pair ->
+                val (section, id) = pair.split(':').takeIf { it.size == 2 } ?: return@mapNotNull null
+                val s = HomeSection.entries.firstOrNull { it.id == section.trim() } ?: return@mapNotNull null
+                val v = entries.firstOrNull { it.id == id.trim() } ?: return@mapNotNull null
+                s to v
+            }.toMap()
+        }
+
+        fun format(chosen: Map<HomeSection, PictureColours>): String =
+            HomeSection.entries.mapNotNull { s -> chosen[s]?.takeIf { it != COVERS }?.let { "${s.id}:${it.id}" } }.joinToString(",")
+    }
+}
+
+/**
+ * Where a row's cards show their names (the owner, 21 Nov: the same choice for every kind of card): [AUTO] as each look
+ * does by itself, under the picture, or on it.
+ */
+enum class CardNames(val id: String, val label: String) {
+    AUTO("auto", "Auto"),
+    UNDER("under", "Under the picture"),
+    ON("on", "On the picture");
+
+    companion object {
+        fun parse(saved: String?): Map<HomeSection, CardNames> {
+            if (saved.isNullOrBlank()) return emptyMap()
+            return saved.split(',').mapNotNull { pair ->
+                val (section, id) = pair.split(':').takeIf { it.size == 2 } ?: return@mapNotNull null
+                val s = HomeSection.entries.firstOrNull { it.id == section.trim() } ?: return@mapNotNull null
+                val v = entries.firstOrNull { it.id == id.trim() } ?: return@mapNotNull null
+                s to v
+            }.toMap()
+        }
+
+        fun format(chosen: Map<HomeSection, CardNames>): String =
+            HomeSection.entries.mapNotNull { s -> chosen[s]?.takeIf { it != AUTO }?.let { "${s.id}:${it.id}" } }.joinToString(",")
     }
 }

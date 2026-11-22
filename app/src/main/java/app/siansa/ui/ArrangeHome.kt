@@ -1,6 +1,7 @@
 package app.siansa.ui
 
 import app.siansa.data.carouselSize
+import app.siansa.data.cardNames
 import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -80,8 +81,8 @@ import app.siansa.data.moved
 import app.siansa.data.movesFirstVisible
 
 /**
- * Home's settings panel with the saved settings, from Home's button or Settings › Home page (issue #780): Sources
- * ([startOnSources]) or Arrange. Your cards' cog closes it and opens Settings › Home page › Cards.
+ * Home's settings panel with the saved settings, from Home's button or Settings › Home (issue #780): Sources
+ * ([startOnSources]) or Arrange. Your cards' cog closes it and opens Settings › Home › Cards.
  */
 @Composable
 fun HomeSettingsSheet(nav: androidx.navigation.NavController, startOnSources: Boolean, asPage: Boolean = false, onDismiss: () -> Unit) {
@@ -93,7 +94,7 @@ fun HomeSettingsSheet(nav: androidx.navigation.NavController, startOnSources: Bo
     val graph = LocalGraph.current
     val s by graph.settings.state.collectAsStateWithLifecycle()
     val beatsMakesMixes by app.siansa.net.BeatsSound.mixes.collectAsStateWithLifecycle()
-    // The notices are the top of Home (issue #872), not a section to move: shown or not in Settings › Home page › Top of Home.
+    // The notices are the top of Home (issue #872), not a section to move: shown or not in Settings › Home › Top of Home.
     val beatsRows = beatsRows(beatsMakesMixes && s.beatsFor(app.siansa.data.BeatsUse.MIXES))
     // More of you is Siansa Beats' alone: listed only while its mixes are on.
     val offered = if (HomeSection.MORE_OF_YOU in beatsRows) emptySet() else setOf(HomeSection.NOTICES, HomeSection.MORE_OF_YOU)
@@ -120,21 +121,31 @@ fun HomeSettingsSheet(nav: androidx.navigation.NavController, startOnSources: Bo
             graph.settings.setHomeLook(section, look)
         },
         gridSizes = s.homeGridSizes,
-        carouselOnCover = s.homeCarouselOnCover,
+        cardNames = HomeSection.entries.associateWith { s.cardNames(it) },
         carouselSizes = HomeSection.entries.associateWith { s.carouselSize(it) },
         onCarouselSizeChange = { section, size ->
             AppLog.i("Home", "${section.id} carousel: ${size.label}")
             graph.settings.setHomeCarouselSize(section, size)
         },
-        onCarouselOnCoverChange = { section, onCover ->
-            AppLog.i("Home", "${section.id} carousel: names ${if (onCover) "on the cover" else "under the row"}")
-            graph.settings.setHomeCarouselOnCover(section, onCover)
+        onCardNamesChange = { section, names ->
+            AppLog.i("Home", "${section.label}: names ${names.label}")
+            graph.settings.setHomeNames(section, names)
         },
         onGridSizeChange = { section, size ->
             AppLog.i("Home", "${section.label}: $size tiles in its grid")
             graph.settings.setHomeGridSize(section, size)
         },
         coverGrids = s.homeCoverGrids,
+        pictures = s.homePictures,
+        pictureColours = s.homePictureColours,
+        onPictureColoursChange = { section, colours ->
+            AppLog.i("Home", "${section.label}: picture colours ${colours.label}")
+            graph.settings.setHomePictureColours(section, colours)
+        },
+        onPictureChange = { section, style ->
+            AppLog.i("Home", "${section.label}: pictures as ${style.label}")
+            graph.settings.setHomePicture(section, style)
+        },
         variants = s.homeVariants,
         onVariantChange = { section, variant ->
             AppLog.i("Home", "${section.label}: ${variant.look.label} as ${variant.label}")
@@ -179,15 +190,15 @@ fun ArrangeHomeSheet(
     onChange: (List<HomeSection>) -> Unit,
     onHiddenChange: (Set<HomeSection>) -> Unit,
     onDismiss: () -> Unit,
-    // Drawn as a page of its own (Settings › Home page › Arrange Home) rather than a sheet.
+    // Drawn as a page of its own (Settings › Home › Arrange Home) rather than a sheet.
     asPage: Boolean = false,
     // What another service puts in a row instead of its own (Siansa Beats' mixes, the owner, 17 Nov), said under it.
     holds: Map<HomeSection, String> = emptyMap(),
     // The gap between Home's sections, a step of the spacing scale (#554).
     gap: Int = AppSettings.HOME_GAP_DEFAULT,
     onGapChange: (Int) -> Unit = {},
-    // Each row's look (issue #655), changed with its cog; Your cards' cog opens Settings › Home page › Cards, and
-    // Notices' cog Settings › Home page › Top of Home (issue #784).
+    // Each row's look (issue #655), changed with its cog; Your cards' cog opens Settings › Home › Cards, and
+    // Notices' cog Settings › Home › Top of Home (issue #784).
     looks: Map<HomeSection, HomeLook> = emptyMap(),
     // Each row's title shown or hidden (issue #961), in the same dialog as its look.
     untitled: Set<HomeSection> = emptySet(),
@@ -196,8 +207,8 @@ fun ArrangeHomeSheet(
     onResetLooks: () -> Unit = {},
     // Tiles of a row shown as the shortcut grid (the owner, 10 Nov), picked in its look's dialog.
     gridSizes: Map<HomeSection, Int> = emptyMap(),
-    carouselOnCover: Set<HomeSection> = emptySet(),
-    onCarouselOnCoverChange: (HomeSection, Boolean) -> Unit = { _, _ -> },
+    cardNames: Map<HomeSection, app.siansa.data.CardNames> = emptyMap(),
+    onCardNamesChange: (HomeSection, app.siansa.data.CardNames) -> Unit = { _, _ -> },
     carouselSizes: Map<HomeSection, app.siansa.data.CrateSize> = emptyMap(),
     onCarouselSizeChange: (HomeSection, app.siansa.data.CrateSize) -> Unit = { _, _ -> },
     onGridSizeChange: (HomeSection, Int) -> Unit = { _, _ -> },
@@ -206,6 +217,11 @@ fun ArrangeHomeSheet(
     onCoverGridChange: (HomeSection, app.siansa.data.CoverGridSize) -> Unit = { _, _ -> },
     variants: Map<HomeSection, app.siansa.data.LookVariant> = emptyMap(),
     onVariantChange: (HomeSection, app.siansa.data.LookVariant) -> Unit = { _, _ -> },
+    // How each row's card pictures show (the owner, 20 Nov).
+    pictures: Map<HomeSection, app.siansa.data.PictureStyle> = emptyMap(),
+    onPictureChange: (HomeSection, app.siansa.data.PictureStyle) -> Unit = { _, _ -> },
+    pictureColours: Map<HomeSection, app.siansa.data.PictureColours> = emptyMap(),
+    onPictureColoursChange: (HomeSection, app.siansa.data.PictureColours) -> Unit = { _, _ -> },
     onOpenSettings: (HomeSection) -> Unit = {},
     // The sections listed here, in Reset's order: all but the notices, which are the top of Home (issue #872).
     sections: List<HomeSection> = HomeSection.default - HomeSection.NOTICES,
@@ -224,7 +240,7 @@ fun ArrangeHomeSheet(
             // The grid stays open, so how many tiles it has can be picked there.
             onPick = { onLookChange(section, it); if (it != HomeLook.GRID && it != HomeLook.CAROUSEL && it != HomeLook.COVER_GRID && it != HomeLook.BANNER && !(section == HomeSection.QUICK && it == HomeLook.AS_IS)) picking = null },
             onDismiss = { picking = null },
-            // Your cards each have their own look, chosen in Settings › Home page › Cards: a way there.
+            // Your cards each have their own look, chosen in Settings › Home › Cards: a way there.
             onOpenSettings = if (section.lookable) null else { { picking = null; onOpenSettings(section) } },
             gridSize = gridSizes[section] ?: HomeLook.GRID_MOST,
             onGridSize = { onGridSizeChange(section, it) },
@@ -232,8 +248,12 @@ fun ArrangeHomeSheet(
             onCoverGrid = { onCoverGridChange(section, it) },
             variant = variants[section],
             onVariant = { onVariantChange(section, it) },
-            namesOnCover = section in carouselOnCover,
-            onNamesOnCover = { onCarouselOnCoverChange(section, it) },
+            picture = pictures[section] ?: app.siansa.data.PictureStyle.AUTO,
+            onPicture = { onPictureChange(section, it) },
+            pictureColours = pictureColours[section] ?: app.siansa.data.PictureColours.COVERS,
+            onPictureColours = { onPictureColoursChange(section, it) },
+            names = cardNames[section] ?: app.siansa.data.CardNames.AUTO,
+            onNames = { onCardNamesChange(section, it) },
             crateSize = carouselSizes[section] ?: app.siansa.data.CrateSize.BIG,
             onCrateSize = { onCarouselSizeChange(section, it) },
             cardLook = cardLooks[section] ?: CardLook.AS_HOME,
@@ -445,6 +465,12 @@ private fun HomeLookDialog(
     // Its look's own layout (the owner, 20 Nov): shortcut tiles, a featured cover grid, a hero banner.
     variant: app.siansa.data.LookVariant? = null,
     onVariant: (app.siansa.data.LookVariant) -> Unit = {},
+    // How its cards' pictures show (the owner, 20 Nov).
+    picture: app.siansa.data.PictureStyle = app.siansa.data.PictureStyle.AUTO,
+    onPicture: (app.siansa.data.PictureStyle) -> Unit = {},
+    // Where its pictures' colours come from (the owner, 20 Nov).
+    pictureColours: app.siansa.data.PictureColours = app.siansa.data.PictureColours.COVERS,
+    onPictureColours: (app.siansa.data.PictureColours) -> Unit = {},
     // Its cards' colour (the owner, 13 Nov): its own, or [CardLook.AS_HOME], which is [homeCardLook].
     cardLook: CardLook = CardLook.AS_HOME,
     homeCardLook: CardLook = CardLook.DEFAULT,
@@ -452,8 +478,9 @@ private fun HomeLookDialog(
     // Your cards: each card's look is its own, chosen in Settings; this opens it (null: the row's looks are listed).
     onOpenSettings: (() -> Unit)? = null,
     // As a carousel, each name and its details on the cover or under the row (the owner, 19 Nov).
-    namesOnCover: Boolean = false,
-    onNamesOnCover: (Boolean) -> Unit = {},
+    // Where its cards show their names (the owner, 21 Nov): the same choice for every look with pictures.
+    names: app.siansa.data.CardNames = app.siansa.data.CardNames.AUTO,
+    onNames: (app.siansa.data.CardNames) -> Unit = {},
     // As a carousel, big, compact or small (the owner, 20 Nov).
     crateSize: app.siansa.data.CrateSize = app.siansa.data.CrateSize.BIG,
     onCrateSize: (app.siansa.data.CrateSize) -> Unit = {},
@@ -464,7 +491,9 @@ private fun HomeLookDialog(
     var tiles by remember(section) { mutableStateOf(gridSize) }
     var coverGridSize by remember(section) { mutableStateOf(coverGrid) }
     var layout by remember(section) { mutableStateOf(variant) }
-    var onCover by remember(section) { mutableStateOf(namesOnCover) }
+    var pictureStyle by remember(section) { mutableStateOf(picture) }
+    var pictureColour by remember(section) { mutableStateOf(pictureColours) }
+    var cardNames by remember(section) { mutableStateOf(names) }
     var size by remember(section) { mutableStateOf(crateSize) }
     var colour by remember(section) { mutableStateOf(cardLook) }
     AlertDialog(
@@ -499,6 +528,16 @@ private fun HomeLookDialog(
                     onTitleShown(it)
                 }
                 HorizontalDivider(Modifier.padding(vertical = Space.Small))
+                if (onOpenSettings == null) {
+                    PictureChoice(pictureStyle) { pictureStyle = it; onPicture(it) }
+                    Spacer(Modifier.height(Space.Medium))
+                    PictureColoursChoice(pictureColour) { pictureColour = it; onPictureColours(it) }
+                    if (look in HomeLook.NAMED) {
+                        Spacer(Modifier.height(Space.Medium))
+                        NamesChoice(cardNames) { cardNames = it; onNames(it) }
+                    }
+                    HorizontalDivider(Modifier.padding(vertical = Space.Small))
+                }
                 if (onOpenSettings != null) {
                     // Your cards: each is its own row in its own look, set where the card is made.
                     Text("Look", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -536,9 +575,8 @@ private fun HomeLookDialog(
                     if (option == HomeLook.BANNER && look == HomeLook.BANNER) {
                         VariantChips("Style", HomeLook.BANNER, layout, Modifier.padding(start = Space.Section, bottom = Space.Small)) { layout = it; onVariant(it) }
                     }
-                    if (option == HomeLook.CAROUSEL && look == HomeLook.CAROUSEL) {
+                    if (option == look && look in HomeLook.SIZED) {
                         CrateSizeChoice(size, Modifier.padding(start = Space.Section, bottom = Space.Small)) { size = it; onCrateSize(it) }
-                        CrateNamesChoice(onCover, Modifier.padding(start = Space.Section, bottom = Space.Small)) { onCover = it; onNamesOnCover(it) }
                     }
                 }
             }
@@ -690,7 +728,73 @@ internal fun VariantChips(label: String, look: HomeLook, chosen: app.siansa.data
     }
 }
 
-/** How big a carousel's sleeves are (the owner, 20 Nov): big, compact with three in view, or a small strip. */
+/**
+ * How a row's card pictures show (the owner, 20 Nov: "some do not look good with the cover mosaic"): each choice, and
+ * what the one chosen does.
+ */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+internal fun PictureChoice(style: app.siansa.data.PictureStyle, modifier: Modifier = Modifier, onPick: (app.siansa.data.PictureStyle) -> Unit) {
+    Column(modifier.testTag("pictureStyle"), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
+        Text("Pictures", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+            for (option in app.siansa.data.PictureStyle.entries) {
+                FilterChip(
+                    selected = style == option,
+                    onClick = { onPick(option) },
+                    label = { Text(option.label) },
+                    modifier = Modifier.testTag("pictureStyle-${option.id}"),
+                )
+            }
+        }
+        Text(style.blurb + ".", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+/**
+ * Where a row's picture colours come from (the owner, 20 Nov): its covers', its songs' moods, or a set. Each chip
+ * shows its colours.
+ */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+internal fun PictureColoursChoice(colours: app.siansa.data.PictureColours, modifier: Modifier = Modifier, onPick: (app.siansa.data.PictureColours) -> Unit) {
+    Column(modifier.testTag("pictureColours"), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
+        Text("Picture colours", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+            for (option in app.siansa.data.PictureColours.entries) {
+                FilterChip(
+                    selected = colours == option,
+                    onClick = { onPick(option) },
+                    label = { Text(option.label) },
+                    leadingIcon = { ColoursSwatch(option) },
+                    modifier = Modifier.testTag("pictureColours-${option.id}"),
+                )
+            }
+        }
+        Text(
+            when (colours) {
+                app.siansa.data.PictureColours.COVERS -> "Its covers' colours, made brighter."
+                app.siansa.data.PictureColours.MOOD -> "Its songs' moods, from Siansa Beats or AudioMuse-AI. Brighter the more energetic."
+                else -> "Each card takes one pair of the set."
+            },
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/** A small round swatch of [colours]: a wheel of its colours. */
+@Composable
+private fun ColoursSwatch(colours: app.siansa.data.PictureColours) {
+    val swatch = remember(colours) { swatchOf(colours) }
+    Box(
+        Modifier.size(SWATCH).clip(androidx.compose.foundation.shape.CircleShape)
+            .background(if (swatch.size > 2) androidx.compose.ui.graphics.Brush.sweepGradient(swatch + swatch.first()) else androidx.compose.ui.graphics.Brush.linearGradient(swatch)),
+    )
+}
+
+private val SWATCH = 18.dp
+
+/** How big a carousel's sleeves or a row's tiles are (the owner, 20 and 21 Nov): big, compact or small. */
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 internal fun CrateSizeChoice(size: app.siansa.data.CrateSize, modifier: Modifier = Modifier, onPick: (app.siansa.data.CrateSize) -> Unit) {
@@ -709,19 +813,19 @@ internal fun CrateSizeChoice(size: app.siansa.data.CrateSize, modifier: Modifier
     }
 }
 
-/** Where a carousel shows each name and its details (the owner, 19 Nov): under the row, or on the cover. */
+/** Where a row's cards show their names (the owner, 21 Nov): as the look does, under the picture, or on it. */
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
-internal fun CrateNamesChoice(onCover: Boolean, modifier: Modifier = Modifier, onPick: (Boolean) -> Unit) {
-    Column(modifier.testTag("crateNames"), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
-        Text("Name and details", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+internal fun NamesChoice(names: app.siansa.data.CardNames, modifier: Modifier = Modifier, onPick: (app.siansa.data.CardNames) -> Unit) {
+    Column(modifier.testTag("cardNames"), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
+        Text("Names", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
-            for ((value, label) in listOf(false to "Under the covers", true to "On the cover")) {
+            for (option in app.siansa.data.CardNames.entries) {
                 FilterChip(
-                    selected = onCover == value,
-                    onClick = { onPick(value) },
-                    label = { Text(label) },
-                    modifier = Modifier.testTag(if (value) "crateNames-cover" else "crateNames-under"),
+                    selected = names == option,
+                    onClick = { onPick(option) },
+                    label = { Text(option.label) },
+                    modifier = Modifier.testTag("cardNames-${option.id}"),
                 )
             }
         }
@@ -760,9 +864,10 @@ internal fun asHomeCardLook(section: HomeSection, homeCardLook: CardLook): CardL
 
 internal fun beatsRows(on: Boolean): Map<HomeSection, String> =
     if (!on) emptyMap() else mapOf(
-        HomeSection.CAROUSEL to "Siansa Beats: For now",
-        HomeSection.MADE_FOR_YOU to "Siansa Beats: Made for you",
-        HomeSection.MORE_OF_YOU to "Siansa Beats: On repeat, Rediscover, New for you",
+        // The rows are named as on Siansa Beats' Mixes page (the owner, 20 Nov), so this only says where they come from.
+        HomeSection.CAROUSEL to "From Siansa Beats",
+        HomeSection.MADE_FOR_YOU to "From Siansa Beats",
+        HomeSection.MORE_OF_YOU to "From Siansa Beats: On repeat, Rediscover, New for you",
     )
 
 /**
@@ -788,7 +893,7 @@ private fun SheetOrPage(asPage: Boolean, onDismiss: () -> Unit, content: @Compos
 }
 
 /**
- * Settings › Home page › Arrange Home (the owner, 17 Nov: a page of its own in Home settings, not a link): the same as
+ * Settings › Home › Arrange Home (the owner, 17 Nov: a page of its own in Home settings, not a link): the same as
  * the sheet behind Home's button, the order, what shows, each row's look and title, the cards' colours and the spacing.
  */
 @Composable

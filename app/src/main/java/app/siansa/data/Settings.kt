@@ -194,7 +194,7 @@ data class AppSettings(
     /** Opus kbit/s for downloads, or 0 for the original file. */
     val downloadKbps: Int = 0,
     val homeOrder: List<HomeSection> = HomeSection.default,
-    /** Settings › Now playing and Bottom bar (issue #346): the mini player's buttons, the bottom bar's tabs, and now playing's lyrics button. */
+    /** Settings › Player and Navigation (issue #346): the mini player's buttons, the bottom bar's tabs, and now playing's lyrics button. */
     val miniButtons: List<MiniButton> = MiniButton.default,
     val navTabs: List<NavTab> = NavTab.default,
     /** Home's menu, top to bottom (issue #872). */
@@ -221,6 +221,8 @@ data class AppSettings(
     val homeUntitled: Set<HomeSection> = emptySet(),
     /** Rows shown as a carousel with each mix's name and details on its cover, not under the row (the owner, 19 Nov). */
     val homeCarouselOnCover: Set<HomeSection> = emptySet(),
+    /** Where each row's cards show their names (the owner, 21 Nov); see [cardNames]. */
+    val homeNames: Map<HomeSection, CardNames> = emptyMap(),
     /** Rows shown as the compact carousel: smaller sleeves, three in view (the owner, 20 Nov), not the big one. */
     val homeCarouselCompact: Set<HomeSection> = emptySet(),
     /** Rows shown as the small carousel: a strip of squares, each named under it (the owner, 20 Nov). */
@@ -232,6 +234,10 @@ data class AppSettings(
     val homeCoverGrids: Map<HomeSection, CoverGridSize> = emptyMap(),
     /** Each row's way of laying out its look ([LookVariant], the owner, 20 Nov): shortcut tiles, featured, hero. */
     val homeVariants: Map<HomeSection, LookVariant> = emptyMap(),
+    /** How each row's card pictures show (the owner, 20 Nov); a row not in it is [PictureStyle.AUTO]. */
+    val homePictures: Map<HomeSection, PictureStyle> = emptyMap(),
+    /** Where each row's picture colours come from (the owner, 20 Nov); a row not in it takes its covers'. */
+    val homePictureColours: Map<HomeSection, PictureColours> = emptyMap(),
     /** The gap between Home's sections (#554), as a step of the spacing scale: 0 tight … 4 airy. 2 is the default. */
     val homeGap: Int = HOME_GAP_DEFAULT,
     /** Show only music on the phone, across the whole app (issue #141). */
@@ -240,7 +246,7 @@ data class AppSettings(
     val timeMachineMissing: Boolean = true,
     /**
      * Now playing shows "Bad blend" during a DJ blend and for a minute after it, to mark a change that sounded wrong
-     * (Settings › Help & feedback; the owner, 12 Nov). On by default in Siansa Dev only.
+     * (Settings › Help; the owner, 12 Nov). On by default in Siansa Dev only.
      */
     val badBlendButton: Boolean = app.siansa.playback.LastBlend.onByDefault,
     /** How each kind of notice on Home shows (issue #784): pinned, automatic (the default) or off. */
@@ -546,9 +552,12 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         homeCardLooks = CardLook.parse(prefs.getString("home_card_looks", null)),
         homeCoverGrids = CoverGridSize.parse(prefs.getString("home_cover_grid_sizes", null)),
         homeVariants = LookVariant.parse(prefs.getString("home_variants", null)),
+        homePictures = PictureStyle.parse(prefs.getString("home_pictures", null)),
+        homePictureColours = PictureColours.parse(prefs.getString("home_picture_colours", null)),
         homeGridSizes = HomeLook.parseGridSizes(prefs.getString("home_grid_sizes", null)),
         homeUntitled = HomeSection.parseHidden(prefs.getString("home_untitled", null)),
         homeCarouselOnCover = HomeSection.parseHidden(prefs.getString("home_carousel_on_cover", null)),
+        homeNames = CardNames.parse(prefs.getString("home_names", null)),
         homeCarouselCompact = HomeSection.parseHidden(prefs.getString("home_carousel_compact", null)),
         homeCarouselSmall = HomeSection.parseHidden(prefs.getString("home_carousel_small", null)),
         homeGap = prefs.getInt("home_gap", AppSettings.HOME_GAP_DEFAULT).coerceIn(0, AppSettings.HOME_GAP_MAX),
@@ -825,6 +834,17 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         _state.value = _state.value.copy(homeCarouselOnCover = set)
     }
 
+    /**
+     * Where [section]'s cards show their names (the owner, 21 Nov). It takes over a carousel's older "on the cover", so
+     * that is cleared for it.
+     */
+    fun setHomeNames(section: HomeSection, names: CardNames) {
+        val chosen = _state.value.homeNames + (section to names)
+        val onCover = _state.value.homeCarouselOnCover - section
+        prefs.edit().putString("home_names", CardNames.format(chosen)).putString("home_carousel_on_cover", HomeSection.formatHidden(onCover)).apply()
+        _state.value = _state.value.copy(homeNames = chosen - chosen.filterValues { it == CardNames.AUTO }.keys, homeCarouselOnCover = onCover)
+    }
+
     /** [section]'s carousel: big, compact or small (the owner, 20 Nov). */
     fun setHomeCarouselSize(section: HomeSection, size: CrateSize) {
         val compact = if (size == CrateSize.COMPACT) _state.value.homeCarouselCompact + section else _state.value.homeCarouselCompact - section
@@ -910,6 +930,20 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         _state.value = _state.value.copy(homeVariants = variants)
     }
 
+    /** How [section]'s card pictures show (the owner, 20 Nov). */
+    fun setHomePicture(section: HomeSection, style: PictureStyle) {
+        val styles = _state.value.homePictures + (section to style)
+        prefs.edit().putString("home_pictures", PictureStyle.format(styles)).apply()
+        _state.value = _state.value.copy(homePictures = styles - styles.filterValues { it == PictureStyle.AUTO }.keys)
+    }
+
+    /** Where [section]'s picture colours come from (the owner, 20 Nov). */
+    fun setHomePictureColours(section: HomeSection, colours: PictureColours) {
+        val chosen = _state.value.homePictureColours + (section to colours)
+        prefs.edit().putString("home_picture_colours", PictureColours.format(chosen)).apply()
+        _state.value = _state.value.copy(homePictureColours = chosen - chosen.filterValues { it == PictureColours.COVERS }.keys)
+    }
+
     /** The columns and rows of [section] as a cover grid (#1263). */
     fun setHomeCoverGrid(section: HomeSection, size: CoverGridSize) {
         val sizes = _state.value.homeCoverGrids + (section to size)
@@ -919,8 +953,8 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
 
     /** Every row back in its own look, and every card in Home's colour. */
     fun resetHomeLooks() {
-        prefs.edit().remove("home_looks").remove("home_grid_sizes").remove("home_card_look").remove("home_card_looks").remove("home_carousel_on_cover").remove("home_carousel_compact").remove("home_carousel_small").remove("home_cover_grid_sizes").remove("home_variants").apply()
-        _state.value = _state.value.copy(homeLooks = emptyMap(), homeGridSizes = emptyMap(), homeCardLook = CardLook.DEFAULT, homeCardLooks = emptyMap(), homeCarouselOnCover = emptySet(), homeCarouselCompact = emptySet(), homeCarouselSmall = emptySet(), homeCoverGrids = emptyMap(), homeVariants = emptyMap())
+        prefs.edit().remove("home_looks").remove("home_grid_sizes").remove("home_card_look").remove("home_card_looks").remove("home_carousel_on_cover").remove("home_carousel_compact").remove("home_carousel_small").remove("home_cover_grid_sizes").remove("home_variants").remove("home_pictures").remove("home_picture_colours").remove("home_names").apply()
+        _state.value = _state.value.copy(homeLooks = emptyMap(), homeGridSizes = emptyMap(), homeCardLook = CardLook.DEFAULT, homeCardLooks = emptyMap(), homeCarouselOnCover = emptySet(), homeCarouselCompact = emptySet(), homeCarouselSmall = emptySet(), homeCoverGrids = emptyMap(), homeVariants = emptyMap(), homePictures = emptyMap(), homePictureColours = emptyMap(), homeNames = emptyMap())
     }
 
     /** How every coloured card on Home is painted (the owner, 13 Nov). */
@@ -1098,3 +1132,7 @@ fun AppSettings.carouselSize(section: HomeSection): CrateSize = when (section) {
     in homeCarouselCompact -> CrateSize.COMPACT
     else -> CrateSize.BIG
 }
+
+/** Where [section]'s cards show their names: its own choice, a carousel's older "on the cover", or Auto. */
+fun AppSettings.cardNames(section: HomeSection): CardNames =
+    homeNames[section] ?: if (section in homeCarouselOnCover) CardNames.ON else CardNames.AUTO

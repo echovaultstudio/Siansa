@@ -30,7 +30,29 @@ enum class Sky(val words: String) {
     }
 }
 
-data class Weather(val sky: Sky, val celsius: Double, val isDay: Boolean, val minutesToSunset: Int?)
+data class Weather(val sky: Sky, val celsius: Double, val isDay: Boolean, val minutesToSunset: Int?) {
+    /**
+     * The word Siansa Beats takes for its names of the mixes of now (Beats 0.61, the owner, 21 Nov: names "taking
+     * weather, location, season etc into consideration"): very hot or cold first, else the sky.
+     */
+    val forBeats: String get() = when {
+        celsius >= HOT -> "hot"
+        celsius <= COLD -> "cold"
+        else -> when (sky) {
+            Sky.CLEAR -> "clear"
+            Sky.CLOUDY -> "cloudy"
+            Sky.FOG -> "fog"
+            Sky.DRIZZLE, Sky.RAIN -> "rain"
+            Sky.SNOW -> "snow"
+            Sky.STORM -> "storm"
+        }
+    }
+
+    companion object {
+        const val HOT = 28.0
+        const val COLD = -10.0
+    }
+}
 
 enum class Movement(val words: String) { STILL("sitting still"), WALKING("walking"), RUNNING("running") }
 

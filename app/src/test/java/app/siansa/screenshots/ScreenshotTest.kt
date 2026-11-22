@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+
 package app.siansa.screenshots
 
 import androidx.compose.material.icons.rounded.Favorite
@@ -97,6 +99,7 @@ import app.siansa.ui.icon
 import app.siansa.ui.playerColors
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.material3.Text
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.graphics.lerp
@@ -446,6 +449,60 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     app.siansa.ui.HomeFeaturedGrid("Made for you", items)
                 }
             },
+            // A card's picture in each style (the owner, 20 Nov), with covers drawn as colours: no server here.
+            Scene("card_pictures") {
+                val fakes = mapOf(
+                    "a" to (Color(0xFFE8D44D) to Color(0xFFB8860B)), "b" to (Color(0xFF1F6F78) to Color(0xFF0B2B30)),
+                    "c" to (Color(0xFFF2F2F3) to Color(0xFF9A9AA0)), "d" to (Color(0xFFC2185B) to Color(0xFF4A0A24)),
+                )
+                val draw: app.siansa.ui.CoverDraw = { id, _, modifier, shape, filter ->
+                    val c = fakes[id] ?: (Color.DarkGray to Color.Black)
+                    Box(modifier.clip(shape).drawBehind { drawRect(Brush.linearGradient(listOf(c.first, c.second)), colorFilter = filter) })
+                }
+                val covers = listOf("b", "b", "b", "a", "c", "d")
+                androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalCoverDraw provides draw) {
+                    androidx.compose.foundation.layout.FlowRow(Modifier.padding(Space.Page), horizontalArrangement = Arrangement.spacedBy(Space.Medium), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
+                        for (style in app.siansa.data.PictureStyle.entries) {
+                            Column(Modifier.width(104.dp), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
+                                app.siansa.ui.CardPicture(covers, null, Color(0xFF5B2A86) to Color(0xFF1E1E22), "Neo-Classical Downtempo Velvet Undertow",
+                                    Modifier.size(104.dp), style = style, showName = true, artists = "Sleep Token, Deftones, Loathe")
+                                Text(style.label, style = MaterialTheme.typography.labelMedium)
+                            }
+                        }
+                        Column(Modifier.width(104.dp), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
+                            app.siansa.ui.CardPicture(emptyList(), null, Color(0xFF5B2A86) to Color(0xFF1E1E22), "No covers yet", Modifier.size(104.dp), style = app.siansa.data.PictureStyle.GLOW, showName = true)
+                            Text("No covers", style = MaterialTheme.typography.labelMedium)
+                        }
+                    }
+                }
+            },
+            // Each set of picture colours on a Colour picture and a sticker pile (the owner, 20 Nov).
+            Scene("picture_colours") {
+                val fakes = mapOf("a" to Color(0xFFE8D44D), "b" to Color(0xFF1F6F78), "c" to Color(0xFFF2F2F3), "d" to Color(0xFFC2185B))
+                val draw: app.siansa.ui.CoverDraw = { id, _, modifier, shape, filter ->
+                    val c = fakes[id] ?: Color.DarkGray
+                    Box(modifier.clip(shape).drawBehind { drawRect(Brush.linearGradient(listOf(c, Color.Black)), colorFilter = filter) })
+                }
+                androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalCoverDraw provides draw) {
+                    androidx.compose.foundation.layout.FlowRow(Modifier.padding(Space.Page), horizontalArrangement = Arrangement.spacedBy(Space.Medium), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
+                        for (set in app.siansa.data.PictureColours.entries - app.siansa.data.PictureColours.MOOD) {
+                            androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalPictureColours provides set) {
+                                Column(Modifier.width(104.dp), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
+                                    app.siansa.ui.CardPicture(listOf("b", "a", "c", "d"), null, Color(0xFF6B5E4E) to Color(0xFF3B3328), "Dusty Roads",
+                                        Modifier.size(104.dp), style = app.siansa.data.PictureStyle.AURA, showName = true)
+                                    Text(set.label, style = MaterialTheme.typography.labelMedium)
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            Scene("picture_colours_choice") {
+                Column(Modifier.padding(Space.Page)) { app.siansa.ui.PictureColoursChoice(app.siansa.data.PictureColours.MOOD) {} }
+            },
+            Scene("picture_choice") {
+                Column(Modifier.padding(Space.Page)) { app.siansa.ui.PictureChoice(app.siansa.data.PictureStyle.FROST) {} }
+            },
             // The small carousel (the owner, 20 Nov): a strip of squares, names under each or on each.
             Scene("record_crate_small") {
                 fun record(key: String, name: String, caption: String) = app.siansa.ui.CrateRecord(key, name, caption, emptyList(), emptyList(), {})
@@ -464,9 +521,39 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
             Scene("crate_size_choice") {
                 Column(Modifier.padding(Space.Page)) { app.siansa.ui.CrateSizeChoice(app.siansa.data.CrateSize.SMALL) {} }
             },
-            // Under the row's cog: where the carousel's names go (the owner, 19 Nov).
-            Scene("crate_names_choice") {
-                Column(Modifier.padding(Space.Page)) { app.siansa.ui.CrateNamesChoice(onCover = true) {} }
+            // Under the row's cog: where its cards' names go, the same for every look with pictures (the owner, 21 Nov).
+            // Holding an album's cover: its card (the owner, 21 Nov), with a long name.
+            Scene("album_cover_sheet") {
+                app.siansa.ui.AlbumCoverChoices("Grand Theft Auto VI: The Album (Original Soundtrack, Deluxe Edition)") {}
+            },
+            Scene("card_names_choice") {
+                Column(Modifier.padding(Space.Page)) { app.siansa.ui.NamesChoice(app.siansa.data.CardNames.ON) {} }
+            },
+            // Tiles at each Size (the owner, 21 Nov: Size for tiles too, not only the carousel).
+            Scene("tile_sizes") {
+                Row(Modifier.padding(Space.Page), horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
+                    for (size in app.siansa.data.CrateSize.entries) {
+                        Column(Modifier.width(app.siansa.ui.tileWidth(size))) {
+                            app.siansa.ui.CardPicture(emptyList(), null, Color(0xFF6B5E4E) to Color(0xFF3B3328), "Steady Alternative Rock Anthems",
+                                Modifier.fillMaxWidth().size(app.siansa.ui.tileWidth(size)), style = app.siansa.data.PictureStyle.AURA, names = false)
+                            app.siansa.ui.TileNames("Steady Alternative Rock Anthems", "Steady alternative rock, mostly sung")
+                        }
+                    }
+                }
+            },
+            // Names on the picture for pictures without their own (a fade of its colour), and Aura's own.
+            Scene("names_on_pictures") {
+                val draw: app.siansa.ui.CoverDraw = { id, _, modifier, shape, filter ->
+                    Box(modifier.clip(shape).drawBehind { drawRect(Brush.linearGradient(listOf(Color(0xFFE9D9B8), Color(0xFFC9B38A))), colorFilter = filter) })
+                }
+                androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalCoverDraw provides draw) {
+                    Row(Modifier.padding(Space.Page), horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
+                        for (style in listOf(app.siansa.data.PictureStyle.MOSAIC, app.siansa.data.PictureStyle.COVER, app.siansa.data.PictureStyle.AURA)) {
+                            app.siansa.ui.CardPicture(listOf("a", "b", "c", "d"), null, Color(0xFF6B5E4E) to Color(0xFF3B3328), "Steady Alternative Rock Anthems",
+                                Modifier.size(140.dp), style = style, names = true, line = "Steady alternative rock, mostly sung")
+                        }
+                    }
+                }
             },
             // Arrange Home with Siansa Beats' rows: the line under a name wraps instead of being cut (the owner, 19 Nov).
             Scene("arrange_home_beats_rows") {
@@ -1033,7 +1120,7 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     }
                 }
             },
-            // Settings › Style › Now playing: the play button slides, each way and what it does.
+            // Settings › Style › Player: the play button slides, each way and what it does.
             Scene("play_slides_settings") {
                 Column(Modifier.padding(Space.Page)) {
                     app.siansa.ui.PlaySlidesSettings(app.siansa.ui.PlaySlides(left = app.siansa.ui.PlaySlide.START_A_MIX)) {}
@@ -1074,12 +1161,12 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                         health[app.siansa.ui.ServiceHealth.SERVER],
                     ) {}
                     app.siansa.ui.ServicesCard(s, health) {}
-                    app.siansa.ui.HubGroupLabel("Playing")
+                    app.siansa.ui.HubGroupLabel("Music")
                     app.siansa.ui.HubTiles(listOf(
-                        app.siansa.ui.HubTile(androidx.compose.material.icons.Icons.Rounded.Equalizer, "Sound & playback", "a"),
-                        app.siansa.ui.HubTile(androidx.compose.material.icons.Icons.Rounded.Schedule, "Mixes & radios", "b"),
+                        app.siansa.ui.HubTile(androidx.compose.material.icons.Icons.Rounded.Equalizer, "Playback", "a"),
+                        app.siansa.ui.HubTile(androidx.compose.material.icons.Icons.Rounded.Schedule, "Mixes", "b"),
                         app.siansa.ui.HubTile(androidx.compose.material.icons.Icons.Rounded.Explore, "Discovery", "c"),
-                        app.siansa.ui.HubTile(androidx.compose.material.icons.Icons.Rounded.GraphicEq, "Listening", "d"),
+                        app.siansa.ui.HubTile(androidx.compose.material.icons.Icons.Rounded.GraphicEq, "Scrobbling", "d"),
                     )) {}
                 }
             },

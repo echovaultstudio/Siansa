@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
@@ -234,21 +235,18 @@ private fun Sleeve(record: CrateRecord, nameOnIt: Boolean, compact: Boolean, mod
             .background(Brush.linearGradient(listOf(colors.first, colors.second)))
             .testTag("crateSleeve"),
     ) {
-        val covers = record.covers.filterNotNull().distinct()
-        when {
-            covers.size >= 4 -> Column(Modifier.fillMaxSize()) {
-                for (row in 0..1) Row(Modifier.weight(1f).fillMaxWidth()) {
-                    for (col in 0..1) Cover(covers[row * 2 + col], 300, Modifier.weight(1f).fillMaxSize(), RoundedCornerShape(0.dp))
-                }
-            }
-            covers.isNotEmpty() -> Cover(covers.first(), 600, Modifier.fillMaxSize(), RoundedCornerShape(0.dp))
-        }
-        if (nameOnIt) {
+        val ids = remember(record.songs) { record.songs.map { it.id } }
+        CardPicture(record.covers, null, colors, record.name, Modifier.fillMaxSize(), RectangleShape, 600, nameOver = nameOnIt, songIds = ids,
+            // Names under the row, as the row's Names says: none on the sleeve then (the owner, 21 Nov).
+            names = if (LocalCardNames.current == app.siansa.data.CardNames.UNDER) false else null,
+            artists = remember(record.songs) { artistLine(record.songs) }) { paint ->
+            if (!nameOnIt) return@CardPicture
             Column(
                 Modifier
                     .align(Alignment.BottomStart)
                     .fillMaxWidth()
-                    .background(Brush.verticalGradient(0f to Color.Transparent, 0.35f to Color.Black.copy(alpha = 0.45f), 1f to Color.Black.copy(alpha = 0.85f)))
+                    // Its own deep shade, easing in (the owner, 20 Nov: not a grey-black fade with a line).
+                    .background(nameFade(paint.deep))
                     .padding(
                         start = if (compact) Space.Small else Space.Medium, end = if (compact) Space.Small else Space.Medium,
                         top = if (compact) Space.Section else Space.Large, bottom = if (compact) Space.Small else Space.Medium,

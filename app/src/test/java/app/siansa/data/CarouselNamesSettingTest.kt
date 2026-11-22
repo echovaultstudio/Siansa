@@ -34,4 +34,28 @@ class CarouselNamesSettingTest {
         assertEquals(emptySet<HomeSection>(), settings().state.value.homeCarouselCompact)
         assertEquals(emptySet<HomeSection>(), settings().state.value.homeCarouselSmall)
     }
+
+    @Test fun namesAreOneChoiceForEveryLook() {
+        // The owner, 21 Nov: Names for every look with pictures; a carousel's older "on the cover" reads as On.
+        fun settings() = SettingsRepository(ApplicationProvider.getApplicationContext())
+        settings().setHomeCarouselOnCover(HomeSection.CAROUSEL, true)
+        assertEquals(CardNames.ON, settings().state.value.cardNames(HomeSection.CAROUSEL))
+        settings().setHomeNames(HomeSection.CAROUSEL, CardNames.UNDER)
+        settings().setHomeNames(HomeSection.MADE_FOR_YOU, CardNames.ON)
+        assertEquals(CardNames.UNDER, settings().state.value.cardNames(HomeSection.CAROUSEL))
+        assertEquals(CardNames.ON, settings().state.value.cardNames(HomeSection.MADE_FOR_YOU))
+        assertEquals(CardNames.AUTO, settings().state.value.cardNames(HomeSection.QUICK))
+        assertEquals(mapOf(HomeSection.QUICK to CardNames.ON), CardNames.parse("quick:on,nowhere:under,made_for_you:sideways"))
+        settings().resetHomeLooks()
+        assertEquals(CardNames.AUTO, settings().state.value.cardNames(HomeSection.MADE_FOR_YOU))
+    }
+
+    @Test fun tilesHaveASizeToo() {
+        // The owner, 21 Nov: every option for every card type; Big is the size tiles have always had.
+        assertEquals(setOf(HomeLook.CAROUSEL, HomeLook.TILES), HomeLook.SIZED)
+        assertEquals(140f, app.siansa.ui.tileWidth(CrateSize.BIG).value, 0f)
+        val widths = CrateSize.entries.map { app.siansa.ui.tileWidth(it).value }
+        assertEquals(widths.sortedDescending(), widths)
+        assertEquals(3, widths.toSet().size)
+    }
 }
