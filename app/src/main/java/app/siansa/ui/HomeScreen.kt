@@ -295,8 +295,25 @@ fun HomeScreen(nav: NavController) {
     ) { albums.drop(1).take(PLAY_ALBUMS - 1).flatMap { a -> runCatching { graph.source.album(a.id).songs }.getOrDefault(emptyList()) } }
 
     // The gap between sections, from Arrange Home's spacing slider (#554).
+    // Pulled down (the owner, 22 Nov): everything on Home loads again, Siansa Beats' mixes asked afresh, with the logo
+    // above until that's done.
+    var pulling by remember { mutableStateOf(false) }
+    val pull: () -> Unit = {
+        if (!pulling) {
+            pulling = true
+            scope.launch {
+                val started = System.currentTimeMillis()
+                AppLog.i("Home", "Pulled down: loading Home again")
+                graph.library.bump()
+                if (graph.beatsMixes.on) runCatching { graph.beatsMixes.refresh(force = true) }
+                    .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
+                kotlinx.coroutines.delay((PULL_SHOWN_MS - (System.currentTimeMillis() - started)).coerceAtLeast(0))
+                pulling = false
+            }
+        }
+    }
     CompositionLocalProvider(LocalSectionGap provides homeGap(homeSettings.homeGap), LocalPictureMotion provides homeStill) {
-    Box(Modifier.fillMaxSize()) {
+    HomePullToRefresh(refreshing = pulling, onRefresh = pull) {
     LazyColumn(
         Modifier.fillMaxSize().aboveKeyboard(),
         state = listState,
@@ -714,6 +731,9 @@ private fun albumItem(album: Album, subtitle: String, play: (() -> Unit)? = null
 )
 
 /** A row of albums played as one plays this many of them, in order. */
+/** The least time the logo shows after a pull, so a quick load still reads as one. */
+private const val PULL_SHOWN_MS = 900L
+
 private const val PLAY_ALBUMS = 10
 
 @Composable

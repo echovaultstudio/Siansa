@@ -8,6 +8,10 @@ The top of Home is the row of notices (see [Notices](#notices)) with a round men
 the chips and the same height. When there are more chips than fit, they scroll and fade out just before the button.
 With no notices, or notices turned off, the button sits on its own.
 
+**Pull to load again.** At the top of Home, pull the page down: the Siansa logo grows above it, and when you let go
+Home loads everything again (Siansa Beats' mixes too, asked afresh). The page stays down with the logo breathing above
+it until that's done.
+
 ## Home's menu
 
 The round button opens the menu in the top row itself: the notice chips shrink and fade away and four pills of their
