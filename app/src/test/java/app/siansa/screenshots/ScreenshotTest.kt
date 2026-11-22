@@ -437,6 +437,25 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                 }
             },
             // A cover grid with one featured, and a banner as a hero (the owner, 20 Nov), with long names.
+            // A hero with the row's next cards at its foot (the owner, 22 Nov): three, then four, with long names and lines.
+            Scene("hero_cards") {
+                fun item(key: String, name: String, line: String) = app.siansa.ui.HomeItem(key, name, line, open = {})
+                val items = listOf(
+                    item("h1", "Clear-sky mix", "High-energy music, sung · 50 songs"),
+                    item("h2", "Smoky Metalcore", "Calm metalcore"), item("h3", "Lively mix", "High-energy music"),
+                    item("h4", "Easy Alternative Rock", "Steady alternative rock, sung"), item("h5", "Velvet Undertow", "Calm ambient, mostly instrumental"),
+                )
+                app.siansa.ui.HomeHero("For now", items.first(), play = {}, rowSongs = emptyList(), under = items.drop(1).take(3)) { _, _ -> }
+            },
+            Scene("hero_four_cards") {
+                fun item(key: String, name: String, line: String) = app.siansa.ui.HomeItem(key, name, line, open = {})
+                val items = listOf(
+                    item("h1", "Clear-sky mix", "High-energy music, sung · 50 songs"),
+                    item("h2", "Smoky Metalcore", "Calm metalcore"), item("h3", "Lively mix", "High-energy music"),
+                    item("h4", "Easy Alternative Rock", "Steady alternative rock, sung"), item("h5", "Velvet Undertow", "Calm ambient, mostly instrumental"),
+                )
+                app.siansa.ui.HomeHero("For now", items.first(), play = {}, rowSongs = emptyList(), under = items.drop(1).take(4)) { _, _ -> }
+            },
             Scene("featured_and_hero") {
                 fun item(key: String, name: String, line: String) = app.siansa.ui.HomeItem(key, name, line, open = {})
                 val items = listOf(
@@ -446,9 +465,6 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                 )
                 Column(verticalArrangement = Arrangement.spacedBy(Space.Section)) {
                     app.siansa.ui.HomeHero("Made for you", items.first(), play = {}, rowSongs = emptyList()) { _, _ -> }
-                    // With the row's next cards at its foot (the owner, 22 Nov): three, then four.
-                    app.siansa.ui.HomeHero("For now", items.first(), play = {}, rowSongs = emptyList(), under = items.drop(1).take(3)) { _, _ -> }
-                    app.siansa.ui.HomeHero("For now", items.first(), play = {}, rowSongs = emptyList(), under = items.drop(1).take(4)) { _, _ -> }
                     app.siansa.ui.HomeFeaturedGrid("Made for you", items)
                 }
             },
