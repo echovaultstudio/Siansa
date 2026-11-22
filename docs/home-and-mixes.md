@@ -8,7 +8,7 @@ The top of Home is the row of notices (see [Notices](#notices)) with a round men
 the chips and the same height. When there are more chips than fit, they scroll and fade out just before the button.
 With no notices, or notices turned off, the button sits on its own.
 
-**Pull to load again.** At the top of Home, pull the page down: the Siansa logo grows above it, its half circles going round with your finger, and when you let go
+**Pull to load again.** At the top of Home, pull the page down: the Siansa logo grows above it, its half circles going round with your finger. Pulled far enough they lock in place with a short buzz, and when you let go
 Home loads everything again (Siansa Beats' mixes too, asked afresh). The page stays down with the logo's half circles turning
 round its bars above it, like the TV's logo while a DJ mix plays, until that's done.
 

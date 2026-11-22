@@ -21,6 +21,7 @@ import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -31,6 +32,8 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -38,6 +41,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import app.siansa.R
+import kotlinx.coroutines.flow.distinctUntilChanged
 
 /**
  * Pull Home down to load it again (the owner, 22 Nov: "a pull down to refresh on home page, with an animated Siansa
@@ -88,6 +92,14 @@ private fun PullLogo(state: PullToRefreshState, refreshing: Boolean, modifier: M
             turn.snapTo(0f)
         }
     }
+    // The pull locks where it's far enough to load Home again (the owner, 22 Nov: "you can over extend the swipe. I
+    // would rather it lock in place with a short vibrate"): one short buzz as it gets there, each time it does.
+    val haptics = LocalHapticFeedback.current
+    LaunchedEffect(state) {
+        snapshotFlow { pullLocked(state.distanceFraction) }.distinctUntilChanged().collect { locked ->
+            if (locked && !held.carried) haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+        }
+    }
     // Nothing here is read while composing: the pull and the turn are read where the layers are placed, so a pull or a
     // turning logo moves two layers on the GPU and nothing is composed, measured or drawn again (the owner: "no lag or
     // heaviness for the app"). The half circles are drawn once and their layer turned.
@@ -129,11 +141,15 @@ private fun PullLogo(state: PullToRefreshState, refreshing: Boolean, modifier: M
 private class HeldTurn(var angle: Float = 0f, var carried: Boolean = false)
 
 /**
- * How far the half circles have gone round for a pull of [fraction] of the way (past all of it too): half a turn for a
- * whole pull, about what a wheel their size would roll under the finger. Half a turn looks as none does (both sides
- * are alike), so nothing jumps when the loading turn takes over or hands back.
+ * How far the half circles have gone round for a pull of [fraction] of the way: half a turn for a whole pull, about
+ * what a wheel their size would roll under the finger, and no further however far the finger goes on (the owner,
+ * 22 Nov: they lock there, so the loading turn always carries on from the same place). Half a turn looks as none does
+ * (both sides are alike), so nothing jumps when the loading turn takes over or hands back.
  */
-internal fun pulledTurn(fraction: Float): Float = HALF_TURN * fraction.coerceAtLeast(0f)
+internal fun pulledTurn(fraction: Float): Float = HALF_TURN * fraction.coerceIn(0f, 1f)
+
+/** Whether a pull of [fraction] of the way has locked: far enough that letting go loads Home again. */
+internal fun pullLocked(fraction: Float): Boolean = fraction >= 1f
 
 /** The logo's size as a share of its own, for a page pulled [fraction] of the way: never taller than the room given. */
 internal fun logoSize(fraction: Float): Float = fraction.coerceIn(0f, 1f)

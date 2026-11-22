@@ -32,7 +32,11 @@ class HomePullRefreshTest {
         assertEquals(0f, pulledTurn(0f))
         assertEquals(90f, pulledTurn(0.5f))
         assertEquals(180f, pulledTurn(1f)) // a whole pull: half a turn, which looks as at rest, so nothing jumps
-        assertEquals(216f, pulledTurn(1.2f), 0.01f) // pulled past: still with the finger
+        assertEquals(180f, pulledTurn(1.2f)) // pulled past: locked, so loading always carries on from the same place
+        assertEquals(180f, pulledTurn(2f))
+        assertEquals(false, pullLocked(0.99f))
+        assertEquals(true, pullLocked(1f))
+        assertEquals(true, pullLocked(1.6f))
         assertEquals(0f, pulledTurn(-0.1f))
     }
 }
