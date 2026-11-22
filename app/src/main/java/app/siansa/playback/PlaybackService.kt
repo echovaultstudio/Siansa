@@ -909,11 +909,14 @@ class PlaybackService : MediaLibraryService() {
         private var listenedMs = 0L
         private var playingSince: Long? = null
 
-        fun finishCurrent() {
+        /** [movedOn]: the listener went on to another song by hand (next, previous, one picked from the queue). */
+        fun finishCurrent(movedOn: Boolean = false) {
             val song = current ?: return
             playingSince?.let { listenedMs += SystemClock.elapsedRealtime() - it }
             playingSince = null
             graph.scrobbler.finished(song, startedAtMs, listenedMs)
+            // Left for another song before it counted: a skip, for Siansa Beats' mixes (the owner, 22 Nov).
+            if (movedOn) graph.scrobbler.skipped(song, startedAtMs, listenedMs)
             // The player has moved on by now: how long it was heard stands in for where it stopped.
             graph.scrobbler.stopped(song, listenedMs)
             handler.removeCallbacks(timelineTick)
@@ -947,7 +950,8 @@ class PlaybackService : MediaLibraryService() {
             precacheJob?.cancel()
             precachedFor = null
             dropPlayedSongs(player)
-            finishCurrent()
+            // A seek to another song is the listener's own doing; a song that ran out, or a queue swapped for another, isn't.
+            finishCurrent(movedOn = reason == Player.MEDIA_ITEM_TRANSITION_REASON_SEEK && mediaItem != null && mediaItem.mediaId != current?.id)
             val song = mediaItem?.toSong() ?: return
             current = song
             startedAtMs = System.currentTimeMillis()

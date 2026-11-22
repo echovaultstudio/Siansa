@@ -1367,7 +1367,7 @@ private fun mixSettingsScene(): app.siansa.net.BeatsMixSettings.Settings {
         on("now"), number("now_count", 1, 6, 4), on("daily"), number("daily_count", 1, 8, 5), on("repeat"), on("rediscover"), on("new"),
         on("together", false), number("together_count", 1, 20, 6), number("size", 10, 100, 40), number("familiar", 0, 100, 40),
         number("per_artist", 1, 5, 2), number("fresh_days", 0, 180, 45), words("leave_genres"), words("leave_artists"),
-        on("time_of_day"), on("weekend_apart"), on("daylight"), on("season"), number("half_life", 14, 730, 120),
+        on("time_of_day"), on("weekend_apart"), on("daylight"), on("season"), on("skips"), number("half_life", 14, 730, 120),
         number("repeat_days", 7, 90, 30), number("forgotten_days", 30, 730, 180), on("ai_names"),
     )
     val values = settings.associate { it.name to it.default } + mapOf(

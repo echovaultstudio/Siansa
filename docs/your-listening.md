@@ -48,6 +48,11 @@ same faint, see-through white everywhere, so they read on any picture.
   Siansa reads it back from there for **Time Machine**, **Your month and your year**, **Rediscover** and the taste
   your mixes are made from, so Koito or Last.fm needn't be set up for those.
   A listen reaches it by the same rules as everywhere else: **When a song counts**, and **Users**.
+  **Skips** go to it too (Siansa Beats 0.64 or newer): a song you leave for another one, with Next, Previous or a pick
+  from the queue, after hearing a second or more of it and before it counts. Siansa Beats keeps which song and when.
+  Its mixes then weigh a song you skip less, and don't bring it back as a new find for a while (see
+  [Home and mixes](home-and-mixes.md)). A song that ends by itself, or that you leave by playing something else
+  entirely, is no skip. Skips go nowhere else.
   Its **Listening** page shows any month or year: your top songs, artists and albums, hours, when you listen. You
   can bring in an export of Koito or Last.fm there, and have it send your listens on to Last.fm; turn **Last.fm**
   off here then, or plays count twice.

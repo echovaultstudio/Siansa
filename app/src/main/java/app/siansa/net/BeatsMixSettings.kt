@@ -74,7 +74,7 @@ class BeatsMixSettings(
                     count(words("leave_artists"), "artist", "artists").takeIf { words("leave_artists") > 0 },
                 ).joinToString(" · ").ifEmpty { "Nothing" }
                 "around" -> listOfNotNull("Time of day".takeIf { on("time_of_day") }, "weekends".takeIf { on("weekend_apart") },
-                    "daylight".takeIf { on("daylight") }, "season".takeIf { on("season") }).joinToString(" · ").ifEmpty { "Your listening alone" }
+                    "daylight".takeIf { on("daylight") }, "season".takeIf { on("season") }, "skips".takeIf { on("skips") }).joinToString(" · ").ifEmpty { "Your listening alone" }
                 "siansa" -> (if (on("together")) "One row of ${n("together_count")}" else "Each group its own row") +
                     " · " + (if (on("ai_names")) "names from AI" else "Siansa Beats' own names")
                 else -> count(line.more.size, "setting", "settings")
@@ -129,7 +129,7 @@ class BeatsMixSettings(
             Part("For all mixes", "", listOf(
                 Line("in", "What's in a mix", null, listOf("size", "familiar", "per_artist")),
                 Line("out", "Leave out", null, listOf("fresh_days", "leave_genres", "leave_artists")),
-                Line("around", "Made around", null, listOf("time_of_day", "weekend_apart", "daylight", "season", "half_life")),
+                Line("around", "Made around", null, listOf("time_of_day", "weekend_apart", "daylight", "season", "skips", "half_life")),
                 Line("siansa", "In Siansa", null, listOf("together", "together_count", "ai_names")),
             )),
         )
@@ -141,7 +141,7 @@ class BeatsMixSettings(
             "per_artist" to "By one artist, at most", "fresh_days" to "Songs played in the last … days",
             "leave_genres" to "Genres", "leave_artists" to "Artists", "time_of_day" to "The part of the day you listen in",
             "weekend_apart" to "Weekends apart from weekdays", "daylight" to "Calmer when it's dark outside",
-            "season" to "This time of year counts more", "half_life" to "Listening counts half after … days",
+            "season" to "This time of year counts more", "skips" to "Songs you skip count for less", "half_life" to "Listening counts half after … days",
             "together" to "All in one row on Home", "together_count" to "Cards in that row, at most",
             "ai_names" to "Names and lines from the AI service",
         )

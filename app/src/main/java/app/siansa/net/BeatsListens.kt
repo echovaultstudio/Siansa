@@ -21,6 +21,9 @@ object BeatsListens {
     const val NOW = "/api/v1/listens/now"
     const val LOVES = "/api/v1/loves"
 
+    /** Songs left before they counted as a listen (Siansa Beats 0.64; the owner, 22 Nov: "skips need to be registered by Beats"). */
+    const val SKIPS = "/api/v1/skips"
+
     /** The listener's name for Siansa Beats: the music server's user name (none with an API key alone). */
     fun listener(settings: AppSettings): String = settings.navidromeUser.trim()
 
@@ -40,6 +43,21 @@ object BeatsListens {
                 if (song.album.isNotBlank()) put("album", song.album)
                 if (!albumArtist.isNullOrBlank()) put("album_artist", albumArtist)
                 if (song.durationSec > 0) put("duration", song.durationSec)
+            }
+        }
+    }.toString()
+
+    /**
+     * One song left for another after [heardSec] seconds, before it counted as a listen, started at [startedAtSec].
+     * Siansa Beats keeps only which song and when: its mixes weigh a skipped song less and don't bring it as a new find.
+     */
+    fun skip(user: String, song: Song, startedAtSec: Long, heardSec: Long): String = buildJsonObject {
+        put("user", user)
+        putJsonArray("skips") {
+            addJsonObject {
+                put("id", song.id)
+                put("at", startedAtSec)
+                put("heard", heardSec)
             }
         }
     }.toString()
@@ -67,6 +85,9 @@ object BeatsListens {
 
 /** Whether Siansa Beats is set up and takes listens (0.29 or newer), so the switch is offered. */
 val AppSettings.beatsTakesListens: Boolean get() = beatsReady && BeatsSound.answers(BeatsListens.PATH)
+
+/** Whether skips go to Siansa Beats with the listens: switched on, and it takes them (0.64 or newer). */
+val AppSettings.beatsSkipsReady: Boolean get() = beatsScrobbleReady && BeatsSound.answers(BeatsListens.SKIPS)
 
 /** Whether listens go to Siansa Beats: switched on, and it takes them. */
 val AppSettings.beatsScrobbleReady: Boolean get() = scrobbleBeats && beatsTakesListens
