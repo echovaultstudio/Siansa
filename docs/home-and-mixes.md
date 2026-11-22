@@ -223,7 +223,7 @@ zone). Three shelves, the same as on Siansa Beats' page:
 - **Made for you**: the kinds of music you play most, each with more like it.
 - **More of you**: On repeat, Rediscover and New for you.
 
-If you'd rather have them together, **Mix settings › On Home › All in one row** (Siansa Beats 0.62) puts every mix in one row, in For now's place, and **How many cards** says how many it has at most. The other two rows then stay away.
+If you'd rather have them together, **Mix settings › In Siansa › All in one row** (Siansa Beats 0.62) puts every mix in one row, in For now's place, and **How many cards** says how many it has at most. The other two rows then stay away.
 
 Each shelf is a row of mixes: the one in the middle is sharp, the ones beside it smaller and blurred. Swipe to flick through,
 and tap the front one to open it and play it from there. Under it is its name and a few words on what's in it ("Wiry guitars and
@@ -245,13 +245,21 @@ its name. Move or hide them as any other; their cog picks any look: **As it is**
 flick through), **Tiles** is a row of tiles each with four of the mix's covers, and the others are as for any section
 (Play in a banner or the play button card plays the first mix).
 
-**Mix settings** (Settings › Mixes, under **Home's mixes**; Siansa Beats 0.56 or newer) choose
-what goes into them: which mixes are made and how many, songs in a mix, how many of them you know, songs by one artist,
-how long a song you played stays out, genres and artists to leave out, whether the part of the day, weekends, the dark
-and this time of year count, how far back your listening counts, On repeat's and Rediscover's spans, names from the AI
-service, and how long a mix is kept. Siansa Beats keeps them, and its own Mixes page changes the same. **As they come**
-puts every one back. Once you've changed one, **Make the mixes again** makes them again now, a new pick from the same
-songs and settings, and puts them on Home; press it again for another (Siansa Beats 0.60.4 or newer).
+**Mix settings** (Settings › Mixes, under **Home's mixes**; Siansa Beats 0.56 or newer). Siansa Beats makes your
+mixes by itself, from what you play, the time of day, the season and the light outside: change only what you want.
+The page has three parts, one line each:
+
+- **Mixes**: For now and Made for you. **Your sound**: On repeat, Rediscover and New for you. Each line has a switch
+  and says **AUTO** while it's as it comes, **TUNED** once you've changed something of it.
+- **For all mixes**: **What's in a mix** (songs in a mix, how many you know, songs by one artist), **Leave out**
+  (songs played lately, genres, artists), **Made around** (the part of the day, weekends, the dark, this time of year,
+  how far back your listening counts) and **In Siansa** (all in one row, names from the AI service, how long a mix is
+  kept).
+
+Tap a line to open its choices under it; each line says what's chosen in a few words. **Back to automatic** puts that
+line back, **All back to automatic** every one. **Make the mixes again** makes them again now, a new pick from the same
+songs and settings, and puts them on Home; press it again for another (Siansa Beats 0.60.4 or newer). Siansa Beats
+keeps the settings, and its own Mix settings page changes the same.
 
 ## For now
 

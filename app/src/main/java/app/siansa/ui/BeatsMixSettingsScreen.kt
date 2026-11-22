@@ -6,15 +6,24 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.InputChip
 import androidx.compose.material3.MaterialTheme
@@ -22,6 +31,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SuggestionChip
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -31,11 +41,15 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import app.siansa.log.AppLog
@@ -59,8 +73,6 @@ fun BeatsMixSettingsScreen(nav: NavController) {
     var loaded by remember { mutableStateOf<BeatsMixSettings.Settings?>(null) }
     var problem by remember { mutableStateOf<String?>(null) }
     var note by remember { mutableStateOf<String?>(null) }
-    // Shown once a setting is changed (the owner, 20 Nov): the mixes made again now, a new pick.
-    var changed by remember { mutableStateOf(false) }
     var making by remember { mutableStateOf(false) }
     val listener = BeatsListens.listener(s)
     LaunchedEffect(listener) {
@@ -79,7 +91,6 @@ fun BeatsMixSettingsScreen(nav: NavController) {
             runCatching { graph.beatsMixSettings.save(listener, changes, now.settings.associate { it.name to it.kind }, keepDays) }
                 .onSuccess {
                     loaded = it
-                    changed = true
                     note = "Saved. Make the mixes again to see them now."
                     AppLog.i("Beats", "Mix settings: ${changes.keys.joinToString()}${keepDays?.let { d -> ", kept $d days" }.orEmpty()}")
                     graph.beatsMixes.refresh(force = true)
@@ -93,13 +104,13 @@ fun BeatsMixSettingsScreen(nav: NavController) {
                 .testTag("beatsMixSettings"),
             verticalArrangement = Arrangement.spacedBy(Space.Medium),
         ) {
-            Hint("What goes into the mixes Siansa Beats makes for you. Siansa Beats keeps these, and its own Mixes page changes the same.")
+            Hint("Siansa Beats makes your mixes by itself, from what you play, the time of day, the season and the light outside. Change only what you want.")
             val d = loaded
             when {
                 problem != null -> Text(problem.orEmpty(), color = MaterialTheme.colorScheme.error)
                 d == null -> Hint("Loading…")
                 else -> MixSettingsBody(d, note, graph.beatsGenres.saved().orEmpty().map { it.name }, ::save,
-                    again = if (!changed) null else ({
+                    again = ({
                         if (!making) {
                             making = true
                             note = "Making them again…"
@@ -123,51 +134,118 @@ fun BeatsMixSettingsScreen(nav: NavController) {
     }
 }
 
-/** The settings themselves, in their groups; how long mixes are kept; and "As they come". */
+/**
+ * The settings themselves, as Siansa Beats' own Mix settings page has them (the owner, 22 Nov: "a total revamp…
+ * 100% organised and not bloated and easy to understand"): three parts of one line each. A mix's line has its switch
+ * and says AUTO while it's as it comes, TUNED once something of it is changed; a tap opens its choices under it.
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun MixSettingsBody(
     d: BeatsMixSettings.Settings, note: String?, genres: List<String>, save: (Map<String, Value>, Int?) -> Unit,
-    // After a change: makes the mixes again now (null: not shown).
+    // Makes the mixes again now (null: not shown).
     again: (() -> Unit)? = null,
+    // The lines open at first: for the screenshot test.
+    opened: Set<String> = emptySet(),
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
-        d.grouped().forEach { (title, settings) ->
-            HorizontalDivider()
-            Heading(title)
-            settings.filter { shown(it.name, d) }.forEach { setting ->
-                val v = d.value(setting.name) ?: setting.default
-                when (setting.kind) {
-                    Kind.ON -> SwitchRow(setting.label, v.on) { save(mapOf(setting.name to Value(on = it)), null) }
-                    Kind.NUMBER -> NumberRow(setting, v.number) { save(mapOf(setting.name to Value(number = it)), null) }
-                    Kind.WORDS -> WordsRow(setting, v.words, if (setting.name == "leave_genres") genres else emptyList()) {
-                        save(mapOf(setting.name to Value(words = it)), null)
+    var open by rememberSaveable { mutableStateOf(opened) }
+    Column {
+        d.parts().forEachIndexed { index, part ->
+            if (index > 0) Spacer(Modifier.height(Space.Small))
+            SheetPart(part.title)
+            if (part.about.isNotEmpty()) Hint(part.about)
+            Spacer(Modifier.height(Space.Small))
+            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surfaceContainer).padding(horizontal = Space.Page)) {
+                part.lines.forEachIndexed { at, line ->
+                    if (at > 0) SheetRule()
+                    val under = d.under(line).filter { shown(it.name, d) }
+                    val keeps = line.key == "siansa"
+                    val isOpen = line.key in open && (under.isNotEmpty() || keeps)
+                    MixLine(line, d, isOpen, opens = under.isNotEmpty() || keeps,
+                        onSwitch = { on -> line.on?.let { save(mapOf(it to Value(on = on)), null) } },
+                        onOpen = { open = if (line.key in open) open - line.key else open + line.key })
+                    if (isOpen) {
+                        Column(Modifier.padding(bottom = Space.Medium), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
+                            under.forEach { given ->
+                                val setting = given.copy(label = BeatsMixSettings.WORDS[given.name] ?: given.label)
+                                val v = d.value(setting.name) ?: setting.default
+                                when (setting.kind) {
+                                    Kind.ON -> SwitchRow(setting.label, v.on) { save(mapOf(setting.name to Value(on = it)), null) }
+                                    Kind.NUMBER -> NumberRow(setting, v.number) { save(mapOf(setting.name to Value(number = it)), null) }
+                                    Kind.WORDS -> WordsRow(setting, v.words, if (setting.name == "leave_genres") genres else emptyList()) {
+                                        save(mapOf(setting.name to Value(words = it)), null)
+                                    }
+                                }
+                            }
+                            if (keeps) {
+                                Text("Keep a mix playable for", style = MaterialTheme.typography.bodyLarge)
+                                Hint("How long a mix you played still plays from your shortcuts. For every listener.")
+                                FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+                                    KEEP_DAYS.forEach { days ->
+                                        FilterChip(selected = d.keepDays == days, onClick = { save(emptyMap(), days) },
+                                            label = { Text(if (days == 1) "1 day" else "$days days") }, modifier = Modifier.testTag("mixKeep-$days"))
+                                    }
+                                }
+                            }
+                            if (d.tuned(line)) {
+                                TextButton(onClick = { save(d.under(line).associate { it.name to it.default }, null) }, modifier = Modifier.testTag("mixLineAuto-${line.key}")) {
+                                    Text("Back to automatic")
+                                }
+                            }
+                        }
                     }
                 }
             }
         }
-        HorizontalDivider()
-        Heading("Keep mixes for")
-        Hint("How long a mix you played still plays from your shortcuts. For every listener.")
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
-            KEEP_DAYS.forEach { days ->
-                FilterChip(selected = d.keepDays == days, onClick = { save(emptyMap(), days) },
-                    label = { Text(if (days == 1) "1 day" else "$days days") }, modifier = Modifier.testTag("mixKeep-$days"))
-            }
-        }
-        HorizontalDivider()
+        Spacer(Modifier.height(Space.Section))
         // The two buttons wrap onto two lines rather than squeeze one onto two lines of its own.
         FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.Medium), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
-            OutlinedButton(onClick = { save(d.settings.associate { it.name to it.default }, null) }, modifier = Modifier.testTag("mixSettingsReset")) {
-                Text("As they come")
-            }
             if (again != null) {
                 Button(onClick = again, modifier = Modifier.testTag("mixSettingsAgain")) { Text("Make the mixes again") }
             }
+            OutlinedButton(onClick = { save(d.settings.associate { it.name to it.default }, null) }, modifier = Modifier.testTag("mixSettingsReset")) {
+                Text("All back to automatic")
+            }
         }
-        note?.let { Hint(it) }
+        note?.let { Spacer(Modifier.height(Space.Small)); Hint(it) }
     }
 }
+
+/** One line of the settings: its name (with AUTO or TUNED for a mix), what's chosen in a few words, its switch, and whether it opens. */
+@Composable
+private fun MixLine(line: BeatsMixSettings.Line, d: BeatsMixSettings.Settings, open: Boolean, opens: Boolean, onSwitch: (Boolean) -> Unit, onOpen: () -> Unit) {
+    val tuned = d.tuned(line)
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = MIX_LINE)
+            .then(if (opens) Modifier.clickable(onClickLabel = if (open) "Close ${line.name}" else "Open ${line.name}", onClick = onOpen) else Modifier)
+            .testTag("mixLine-${line.key}"),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f).padding(vertical = Space.Small)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+                Text(line.name, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f, fill = false), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (line.on != null) {
+                    val colour = if (tuned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                    Text(
+                        if (tuned) "TUNED" else "AUTO", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = colour,
+                        modifier = Modifier.border(1.dp, colour.copy(alpha = if (tuned) 1f else 0.5f), RoundedCornerShape(6.dp)).padding(horizontal = Space.Tight).testTag("mixLineTag-${line.key}"),
+                    )
+                }
+            }
+            Text(d.note(line), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        if (line.on != null) {
+            Spacer(Modifier.width(Space.Medium))
+            Switch(checked = d.value(line.on)?.on == true, onCheckedChange = onSwitch, modifier = Modifier.testTag("mixLineSwitch-${line.key}"))
+        }
+        Spacer(Modifier.width(Space.Small))
+        if (opens) Icon(if (open) Icons.Rounded.ExpandLess else Icons.Rounded.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        else Spacer(Modifier.width(MIX_ICON))
+    }
+}
+
+private val MIX_LINE = 56.dp
+private val MIX_ICON = 24.dp
 
 /** A setting that only matters while another is on (how many For now mixes, while For now is made). */
 internal fun shown(name: String, d: BeatsMixSettings.Settings): Boolean {
@@ -175,10 +253,7 @@ internal fun shown(name: String, d: BeatsMixSettings.Settings): Boolean {
     return d.value(needs)?.on != false
 }
 
-private val NEEDS = mapOf(
-    "now_count" to "now", "together_count" to "together", "daily_count" to "daily", "repeat_days" to "repeat", "forgotten_days" to "rediscover",
-    "weekend_apart" to "time_of_day",
-)
+private val NEEDS = mapOf("together_count" to "together", "weekend_apart" to "time_of_day")
 
 private val KEEP_DAYS = listOf(1, 3, 7, 14, 30, 90)
 

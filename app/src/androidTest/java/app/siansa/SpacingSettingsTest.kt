@@ -400,4 +400,24 @@ class SpacingSettingsTest : SpacingCheck() {
         val count = compose.onNodeWithTag("homeShortcutsCount").getBoundsInRoot()
         assertEven("Count above and below", count.top - slider.top, slider.bottom - count.bottom, 2.dp)
     }
+
+    /** Mix settings (the owner, 22 Nov): the mixes' lines one height, each with the same margin left and right of its part. */
+    @Test fun mixSettingsLinesAreEven() {
+        fun on(name: String) = app.siansa.net.BeatsMixSettings.Setting(name, app.siansa.net.BeatsMixSettings.Kind.ON, name, 0, 0, app.siansa.net.BeatsMixSettings.Value(on = true))
+        val settings = listOf("now", "daily", "repeat", "rediscover", "new").map(::on)
+        compose.setContent {
+            SiansaTheme {
+                Column(Modifier.padding(Space.Page)) {
+                    app.siansa.ui.MixSettingsBody(app.siansa.net.BeatsMixSettings.Settings("max", settings, settings.associate { it.name to it.default }, 7), null, emptyList(), save = { _, _ -> })
+                }
+            }
+        }
+        val screen = compose.onRoot().getBoundsInRoot()
+        val lines = listOf("now", "daily", "repeat", "rediscover", "new").map { compose.onNodeWithTag("mixLine-$it").getBoundsInRoot() }
+        val height = lines[0].bottom - lines[0].top
+        lines.forEach {
+            assertEven("Mix settings: each line as tall as the first", it.bottom - it.top, height, 1.dp)
+            assertEven("Mix settings: a line's margins", it.left - screen.left, screen.right - it.right, 1.dp)
+        }
+    }
 }

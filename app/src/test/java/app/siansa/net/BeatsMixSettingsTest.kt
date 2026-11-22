@@ -35,14 +35,25 @@ class BeatsMixSettingsTest {
         val got = BeatsMixSettings.parse(AppJson.parseToJsonElement(answer).jsonObject)
         assertEquals("max", got.user)
         assertEquals(7, got.keepDays)
-        assertEquals(listOf("Which mixes", "What's in each", "Names", "More"), got.grouped().map { it.first })
-        assertEquals(listOf("later"), got.grouped().last().second.map { it.name })  // a new one shows by itself
+        // In parts of one line each, as Siansa Beats' Mix settings page (0.63): only the lines it has settings for.
+        val parts = got.parts()
+        assertEquals(listOf("Mixes", "For all mixes", "More"), parts.map { it.title })
+        assertEquals(listOf("For now", "Made for you"), parts.first().lines.map { it.name })
+        assertEquals(listOf("later"), parts.last().lines.single().more)  // a new one shows by itself
+        val now = parts.first().lines.first()
+        assertEquals("now", now.on)
+        assertEquals(listOf("now_count"), got.under(now).map { it.name })
+        // A line says what's chosen, and whether anything under it isn't as it comes.
+        assertEquals("4 mixes · for this part of the day", got.note(now))
+        assertFalse(got.tuned(now))
+        val out = parts[1].lines.first { it.key == "out" }
+        assertEquals("1 genre", got.note(out))
+        assertTrue(got.tuned(out))
+        assertTrue(got.copy(values = got.values + ("now_count" to Value(number = 1))).let { it.tuned(now) && it.note(now).startsWith("1 mix ·") })
         assertFalse("a kind it can't draw is left out", got.settings.any { it.name == "odd" })
         assertEquals(Value(words = listOf("Metal")), got.value("leave_genres"))
         assertEquals(1 to 6, got.settings.first { it.name == "now_count" }.let { it.low to it.high })
-        // How many Made for you mixes shows only while they're made.
         assertTrue(app.siansa.ui.shown("now_count", got))
-        assertFalse(app.siansa.ui.shown("daily_count", got))
         assertTrue(app.siansa.ui.shown("size", got))
     }
 
