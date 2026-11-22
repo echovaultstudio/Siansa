@@ -457,7 +457,9 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                 )
                 androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalCardLines provides false, app.siansa.ui.LocalLookVariant provides app.siansa.data.LookVariant.HERO_THREE) {
                     Column {
-                        app.siansa.ui.HomeLookRow(app.siansa.data.HomeLook.BANNER, "now", "For now", items)
+                        // The hero drawn as the row draws it without lines (HomeLookRow's banner needs the app's player).
+                        val bare = items.map { it.copy(subtitle = "", meta = "") }
+                        app.siansa.ui.HomeHero("For now", bare.first(), play = {}, rowSongs = emptyList(), under = bare.drop(1)) { _, _ -> }
                         app.siansa.ui.HomeLookRow(app.siansa.data.HomeLook.TILES, "made", "Made for you", items)
                     }
                 }
