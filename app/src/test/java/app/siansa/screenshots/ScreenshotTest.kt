@@ -347,6 +347,21 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
             },
             // Siansa Beats' mix settings (the owner, 22 Nov: "a total revamp… 100% organised and not bloated"): three parts
             // of one line each, AUTO or TUNED on a mix's line; then with lines open: a number, names left out with a long
+            // Untouched playback on the Playback page (the owner, 22 Nov): its switch with what it does in a few lines,
+            // and the fades' section saying why it's off.
+            Scene("untouched_playback") {
+                Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
+                    app.siansa.ui.Heading("Sound quality")
+                    app.siansa.ui.SwitchRow("Untouched playback", app.siansa.ui.UNTOUCHED_HINT, true, tag = "untouchedPlayback") {}
+                    androidx.compose.material3.HorizontalDivider()
+                    val on = app.siansa.data.AppSettings(untouchedPlayback = true, crossfade = app.siansa.playback.CrossfadeMode.SMART)
+                    app.siansa.ui.PageLink("Equaliser", app.siansa.ui.equaliserSummary(on, on = true, preset = "Rock"), "soundEqualiser") {}
+                    androidx.compose.material3.HorizontalDivider()
+                    app.siansa.ui.FoldSection("Crossfade & DJ blends", app.siansa.ui.crossfadeFoldSummary(on), startOpen = true) {
+                        app.siansa.ui.Hint("Untouched playback is on, so songs play back to back with nothing blended. Switch it off above to use crossfades and DJ blends.")
+                    }
+                }
+            },
             // one, how long mixes are kept, and Back to automatic.
             Scene("beats_mix_settings") {
                 Column(Modifier.padding(Space.Page)) {

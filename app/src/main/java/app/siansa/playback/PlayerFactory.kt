@@ -40,6 +40,8 @@ object PlayerFactory {
         val deck: DeckFilter,
         /** Its deck in the mixer (issue #826), when it plays through the [AudioEngine]. */
         val mix: MixCore.Deck? = null,
+        /** Its sink's two ways out, when it has both (Untouched playback). */
+        val switch: app.siansa.playback.engine.SwitchSink? = null,
     )
 
     /** [kbpsFor] picks, per song id, Opus kbit/s or 0 for the original file. */
@@ -56,6 +58,12 @@ object PlayerFactory {
         mixDeck: MixCore.Deck? = null,
         /** The TV app's main player (issue #860): Dolby and DTS songs may go to the receiver as a bitstream. */
         passthrough: Boolean = false,
+        /**
+         * Whether this player's sound should go straight to an output of its own, each song at its own rate, instead of
+         * through the mixer (Untouched playback, [SwitchSink]): asked each time the player lets go of its sink. Null
+         * for a player that only ever plays through the mixer (a fade's second player).
+         */
+        untouched: (() -> Boolean)? = null,
     ): Built {
         // Streams use their own HTTP queue and connections (graph.streamHttp), so covers and API calls never
         // hold them up, and report their size and arrival speed to StreamStats.
@@ -106,10 +114,11 @@ object PlayerFactory {
         // Float output stays off: with it, media3 1.9 sends hi-res and float audio (everything FFmpeg
         // decodes) straight out and skips the equaliser.
         val equaliser = EqualiserProcessor { graph.equaliser.state.value }
+        var switchSink: app.siansa.playback.engine.SwitchSink? = null
         val renderers = object : DefaultRenderersFactory(context) {
             override fun buildAudioSink(context: Context, enableFloatOutput: Boolean, enableAudioOutputPlaybackParams: Boolean): AudioSink =
                 if (engine != null && mixDeck != null) {
-                    MixSink(
+                    val mixed = MixSink(
                         DefaultAudioSink.Builder(context)
                             .setEnableFloatOutput(enableFloatOutput)
                             .setEnableAudioOutputPlaybackParameters(true)
@@ -118,6 +127,15 @@ object PlayerFactory {
                             .build(),
                         mixDeck,
                     )
+                    if (untouched == null) mixed else {
+                        // The other way out: float, so 24-bit songs keep every bit, at the song's own rate. With float
+                        // Media3 passes the sound by its processors, the equaliser among them: untouched means that too.
+                        val direct = DefaultAudioSink.Builder(context)
+                            .setEnableFloatOutput(true)
+                            .setEnableAudioOutputPlaybackParameters(enableAudioOutputPlaybackParams)
+                            .build()
+                        app.siansa.playback.engine.SwitchSink(mixed, direct, untouched).also { switchSink = it }
+                    }
                 } else {
                     DefaultAudioSink.Builder(context)
                         .setEnableFloatOutput(enableFloatOutput)
@@ -161,7 +179,7 @@ object PlayerFactory {
             .setHandleAudioBecomingNoisy(true)
             .setWakeMode(C.WAKE_MODE_NETWORK)
             .build()
-        return Built(player, cacheFactory, mixDeck?.filter ?: equaliser.deck, mixDeck)
+        return Built(player, cacheFactory, mixDeck?.filter ?: equaliser.deck, mixDeck, switchSink)
     }
 
     /** How much of a song (and then of the next) is loaded ahead: a minute, more than the longest blend. */

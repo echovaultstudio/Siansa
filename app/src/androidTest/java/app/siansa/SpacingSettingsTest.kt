@@ -420,4 +420,20 @@ class SpacingSettingsTest : SpacingCheck() {
             assertEven("Mix settings: a line's margins", it.left - screen.left, screen.right - it.right, 1.dp)
         }
     }
+
+    /** Playback's Sound quality part (the owner, 22 Nov): Untouched playback's switch row starts where its heading does and spans the page. */
+    @Test fun untouchedPlaybackSitsInThePagesMargins() {
+        compose.setContent {
+            SiansaTheme {
+                Column(Modifier.padding(Space.Page).testTag("soundQuality")) {
+                    app.siansa.ui.Heading("Sound quality")
+                    app.siansa.ui.SwitchRow("Untouched playback", app.siansa.ui.UNTOUCHED_HINT, true, tag = "untouchedPlayback") {}
+                }
+            }
+        }
+        val screen = compose.onRoot().getBoundsInRoot()
+        val row = compose.onNodeWithTag("untouchedPlayback").getBoundsInRoot()
+        assertEven("Untouched playback: the margins left and right", row.left - screen.left, screen.right - row.right, 1.dp)
+        assertEven("Untouched playback: the page's margin", row.left - screen.left, Space.Page, 1.dp)
+    }
 }

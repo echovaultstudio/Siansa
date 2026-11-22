@@ -508,6 +508,22 @@ internal fun PreloadRow(label: String, value: Int, tag: String, choices: IntRang
     }
 }
 
+/**
+ * Streaming quality: the original file or Opus, on Wi-Fi and on mobile data. On the Playback page since the owner
+ * found it "buried in storage" (22 Nov), next to Untouched playback: what the server sends, then how the phone plays it.
+ */
+@Composable
+internal fun StreamingQualitySection(settings: app.siansa.data.AppSettings, graph: app.siansa.AppGraph) {
+    // A TV has no mobile data (the owner, 12 Nov): only the Wi-Fi quality, without "On Wi-Fi".
+    val tv = app.siansa.BuildConfig.TV_APP
+    FoldSection("Streaming quality", if (tv) qualityLabel(settings.transcodeWifiKbps) else "Wi-Fi ${qualityLabel(settings.transcodeWifiKbps)} · mobile ${qualityLabel(settings.transcodeMobileKbps)}") {
+        Hint(ServerWords.streamingHint(settings.sourceKind))
+        ChoicePicker(if (tv) "Quality" else "On Wi-Fi", settings.transcodeWifiKbps, qualities, "quality-wifi", ::qualityLabel) { graph.settings.save(graph.settings.current.copy(transcodeWifiKbps = it)) }
+        if (!tv) ChoicePicker("On mobile data", settings.transcodeMobileKbps, qualities, "quality-mobile", ::qualityLabel) { graph.settings.save(graph.settings.current.copy(transcodeMobileKbps = it)) }
+        Hint(if (tv) "Siansa always plays the quality chosen here; it never switches on its own." else "Siansa always plays the quality chosen here; it never switches on its own. On a slow connection, pick Opus for mobile data.")
+    }
+}
+
 internal val qualities = listOf(0, 96, 128, 160, 192, 256, 320)
 
 /** "Original" or "Opus 128", for a folded section's summary. */
@@ -554,13 +570,6 @@ fun StreamingDataScreen(nav: NavController) {
             // Each section folds (issue #776); open by default, folded ones stay folded (issue #780).
             // A TV has no mobile data (the owner, 12 Nov): only the Wi-Fi quality, without "On Wi-Fi".
             val tv = app.siansa.BuildConfig.TV_APP
-            FoldSection("Streaming quality", if (tv) qualityLabel(settings.transcodeWifiKbps) else "Wi-Fi ${qualityLabel(settings.transcodeWifiKbps)} · mobile ${qualityLabel(settings.transcodeMobileKbps)}") {
-                Hint(ServerWords.streamingHint(settings.sourceKind))
-                ChoicePicker(if (tv) "Quality" else "On Wi-Fi", settings.transcodeWifiKbps, qualities, "quality-wifi", ::qualityLabel) { graph.settings.save(graph.settings.current.copy(transcodeWifiKbps = it)) }
-                if (!tv) ChoicePicker("On mobile data", settings.transcodeMobileKbps, qualities, "quality-mobile", ::qualityLabel) { graph.settings.save(graph.settings.current.copy(transcodeMobileKbps = it)) }
-                Hint(if (tv) "Siansa always plays the quality chosen here; it never switches on its own." else "Siansa always plays the quality chosen here; it never switches on its own. On a slow connection, pick Opus for mobile data.")
-            }
-            HorizontalDivider()
             val u = usage.valueOrNull()
             val preloadChoices = Preload.choices(settings)
             FoldSection("Load songs ahead", "Wi-Fi ${settings.preloadWifi.coerceIn(preloadChoices)} · mobile ${settings.preloadMobile.coerceIn(preloadChoices)}") {

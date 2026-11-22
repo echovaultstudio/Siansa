@@ -63,6 +63,8 @@ How music sounds and plays.
 
 | Setting | What it does |
 |---|---|
+| **Streaming quality** | Original or Opus 96–320 kbit/s, on Wi-Fi and on mobile data, each from a drop-down. |
+| **Untouched playback** | Plays each song at its own sample rate and bit depth, straight to the phone's sound output. Crossfades, DJ blends and the equaliser are off while it's on. See [Playback](playback.md#untouched-playback). |
 | **Equaliser** | Ten bands, presets and a pre-amp, on its own page. |
 | **Where loudness and fades come from** | The songs' tags, or Siansa Beats (the Siansa plugin on AudioMuse-AI before it). |
 | **Levelling** | Track, Album or Off, and the target (−18 or −14 LUFS). |
@@ -92,7 +94,6 @@ What you hear over the network, what it costs in data, and how well Siansa plays
 
 | Setting | What it does |
 |---|---|
-| **Streaming quality** | Original or Opus 96–320 kbit/s, on Wi-Fi and on mobile data, each from a drop-down. |
 | **Load songs ahead** | How many songs to load ahead, on Wi-Fi and on mobile data (0–5). |
 | **Song cache** | Keeps songs as they play, up to the size chosen, with **Clear song cache**. **Off** keeps no song once it has played (from the next song); then up to 3 songs are loaded ahead, each held only until it plays. A new size applies after a restart. |
 | **Downloads** | **Your downloads** (what's on the phone, opening the list to add or remove music), **Download on Wi-Fi only**, the download quality (a drop-down), the storage limit and **Remove all downloads**. See [Playback](playback.md#downloads). |

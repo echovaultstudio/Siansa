@@ -77,9 +77,16 @@ class SettingsLayoutTest {
         // Discovery: genres, similar music and moods, each Siansa Beats' switch.
         val discovery = source("DiscoveryScreen.kt")
         for (use in listOf("GENRES", "SOUND", "MOODS")) assertTrue("Discovery misses $use", discovery.contains("BeatsUseSwitch(graph, BeatsUse.$use)"))
-        // Streaming & storage: the quality (as drop-downs), loading ahead, the caches and the downloads.
+        // Storage: loading ahead, the caches and the downloads. The streaming quality (as drop-downs) is on the Playback
+        // page since the owner found it "buried in storage" (22 Nov), with Untouched playback.
         val streaming = source("SettingsHub.kt").substringAfter("fun StreamingDataScreen(").substringBefore("fun restartApp(")
-        for (part in listOf("FoldSection(\"Streaming quality\"", "ChoicePicker(", "\"Load songs ahead\"", "\"Song cache\"", "DownloadSettings(nav)")) assertTrue("Streaming & storage misses $part", streaming.contains(part))
+        assertFalse("Streaming quality is still on the Storage page", streaming.contains("\"Streaming quality\""))
+        val quality = source("SettingsHub.kt").substringAfter("fun StreamingQualitySection(").substringBefore("internal val qualities")
+        for (part in listOf("FoldSection(\"Streaming quality\"", "ChoicePicker(")) assertTrue("Streaming quality misses $part", quality.contains(part))
+        val playback = source("CrossfadeScreen.kt")
+        for (part in listOf("Heading(\"Sound quality\")", "StreamingQualitySection(settings, graph)", "SwitchRow(\"Untouched playback\"")) assertTrue("Playback misses $part", playback.contains(part))
+        assertTrue("Sound quality isn't first on the Playback page", playback.indexOf("Heading(\"Sound quality\")") < playback.indexOf("PageLink(\"Equaliser\""))
+        for (part in listOf("\"Load songs ahead\"", "\"Song cache\"", "DownloadSettings(nav)")) assertTrue("Streaming & storage misses $part", streaming.contains(part))
         val downloads = source("DownloadsScreens.kt").substringAfter("fun DownloadSettings(").substringBefore("\n}\n")
         for (part in listOf("\"Download on Wi-Fi only\"", "ChoicePicker(\"Download quality\"", "\"Storage limit\"", "\"Remove all downloads\"", "CoverDownloadSection()", "ImageCacheSection()", "nav.navigate(\"downloads\")")) {
             assertTrue("The downloads miss $part", downloads.contains(part))

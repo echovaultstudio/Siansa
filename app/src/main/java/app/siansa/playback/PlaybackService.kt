@@ -116,6 +116,28 @@ class PlaybackService : MediaLibraryService() {
     private var crossfader: Fader? = null
     /** The new audio engine (issue #826), in Siansa Dev: one output every music player is mixed into. */
     private var engine: AudioEngine? = null
+    /** The main player's sink with its two ways out: through the mixer, or straight to the phone's output (Untouched playback). */
+    private var soundSwitch: app.siansa.playback.engine.SwitchSink? = null
+
+    /**
+     * Untouched playback was switched: the player lets go of its sink and takes it up again, which is when the sink
+     * changes its way out ([app.siansa.playback.engine.SwitchSink]). The song carries on from where it was after a
+     * short pause; a fade under way is given up first, as nothing can be blended on the phone's own output.
+     */
+    private fun onSoundPathChanged() {
+        val switch = soundSwitch ?: return
+        val want = graph.settings.current.untouchedPlayback
+        if (switch.isDirect == want) return
+        crossfader?.cancel("Untouched playback was switched " + if (want) "on" else "off")
+        if (exo.playbackState == Player.STATE_IDLE) {
+            // Nothing prepared, so the player holds no sink: it changes here, and the next song starts on it.
+            switch.reset()
+            return
+        }
+        AppLog.i("Player", "Untouched playback ${if (want) "on" else "off"}: the song starts again where it is, at ${exo.currentPosition} ms")
+        exo.stop()
+        exo.prepare()
+    }
     private var cacheFactory: CacheDataSource.Factory? = null
     private var precacheJob: Job? = null
     private var precacheWriter: CacheWriter? = null
@@ -148,8 +170,11 @@ class PlaybackService : MediaLibraryService() {
         engine = mixer
         val mainMix = mixer?.deck("main")
         val tailMix = mixer?.deck("tail")
-        val built = PlayerFactory.build(this, graph, ::kbpsFor, engine = mixer, mixDeck = mainMix, passthrough = BuildConfig.TV_APP)
+        val built = PlayerFactory.build(this, graph, ::kbpsFor, engine = mixer, mixDeck = mainMix, passthrough = BuildConfig.TV_APP,
+            untouched = { graph.settings.current.untouchedPlayback })
         exo = built.player
+        soundSwitch = built.switch
+        if (built.switch?.isDirect == true) AppLog.i("Player", "Untouched playback is on: each song goes out at its own rate, nothing is blended")
         val player = ServerSeekPlayer(
             exo,
             converted = { id -> !OutsideMedia.isOutside(id) && graph.downloads.fileFor(id) == null && !keepsOriginal(id) && (chosenKbps[id] ?: Streaming.bitrate(this, graph.settings.current)) > 0 },
@@ -170,9 +195,12 @@ class PlaybackService : MediaLibraryService() {
             levelOf = { song -> Levelling.songVolume(song, graph.settings.current, graph.profiles.cached(song.id)) },
             sleepLevel = { sleepLevel },
             // A Dolby or DTS song going to the receiver as a bitstream can't be mixed (issue #860): no blend into or out of it.
-            allowed = { session?.player === phone && !exo.pauseAtEndOfMediaItems && graph.sleepTimer.state.value?.finishing != true && !passthroughNearby() },
+            allowed = { session?.player === phone && !exo.pauseAtEndOfMediaItems && graph.sleepTimer.state.value?.finishing != true && !passthroughNearby() &&
+                // Nor can a song that goes straight to the phone's output (Untouched playback).
+                soundSwitch?.isDirect != true },
             onLevel = { if (session?.player === phone) applyVolume(phone) },
-            bitstream = { Passthrough.pastTheMix(bitstreamOut, exo.audioFormat?.sampleMimeType) },
+            // Past the mix by design too: untouched, the mix is silent while the song plays, and that's no fault.
+            bitstream = { soundSwitch?.isDirect == true || Passthrough.pastTheMix(bitstreamOut, exo.audioFormat?.sampleMimeType) },
             inDjRadio = { djPlayback(exo) },
         ).also { it.start() } else Crossfader(
             main = exo,
@@ -184,7 +212,9 @@ class PlaybackService : MediaLibraryService() {
             levelOf = { song -> Levelling.songVolume(song, graph.settings.current, graph.profiles.cached(song.id)) },
             sleepLevel = { sleepLevel },
             // A Dolby or DTS song going to the receiver as a bitstream can't be mixed (issue #860): no blend into or out of it.
-            allowed = { session?.player === phone && !exo.pauseAtEndOfMediaItems && graph.sleepTimer.state.value?.finishing != true && !passthroughNearby() },
+            allowed = { session?.player === phone && !exo.pauseAtEndOfMediaItems && graph.sleepTimer.state.value?.finishing != true && !passthroughNearby() &&
+                // Nor can a song that goes straight to the phone's output (Untouched playback).
+                soundSwitch?.isDirect != true },
             onLevel = { if (session?.player === phone) applyVolume(phone) },
             inDjRadio = { djPlayback(exo) },
         ).also { it.start() }
@@ -314,6 +344,15 @@ class PlaybackService : MediaLibraryService() {
                 .distinctUntilChanged()
                 .drop(1)
                 .collect { withContext(Dispatchers.Main) { onQualitySettingsChanged() } }
+        }
+
+        // Untouched playback switched in Settings › Playback: the sound takes its other way out now.
+        scope.launch {
+            graph.settings.state
+                .map { it.untouchedPlayback }
+                .distinctUntilChanged()
+                .drop(1)
+                .collect { withContext(Dispatchers.Main) { onSoundPathChanged() } }
         }
 
         // Levelling changed in Settings (ReplayGain, or where loudness comes from): applies to this song too.
