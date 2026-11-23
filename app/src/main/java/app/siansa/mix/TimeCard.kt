@@ -17,7 +17,14 @@ enum class TimeListKind(val id: String) {
     LAST_YEAR("last_year"),
     TWO_YEARS("two_years"),
     FIVE_YEARS("five_years"),
+
+    /** Not a look back, but a list all the same (issue #1343): the last 30 days' most played, and all time's. */
+    HOT("hot"),
+    TOP("top"),
 }
+
+/** A song with how often it was played in a list's days. */
+data class PlayedSong(val song: Song, val plays: Int)
 
 /**
  * One list the card may show: its [title], the small date [tag] on its picture ("NOV 2025", "23 NOV"), the [line] that
@@ -75,6 +82,54 @@ fun timeCardPlans(today: LocalDate, locale: Locale = Locale.getDefault()): List<
     )
 }
 
+/** The last [HOT_DAYS] days, today among them: "Hot now" (the owner, 23 Nov: "last 30 days"). */
+const val HOT_DAYS = 30
+
+/** Hot now: the most played of the last [HOT_DAYS] days. Asked again every day, so never kept for good. */
+fun hotPlan(today: LocalDate): TimeListPlan {
+    val from = today.minusDays(HOT_DAYS - 1L)
+    return TimeListPlan(TimeListKind.HOT, "Hot now", "", "Last $HOT_DAYS days", TimeWindow(from, today.plusDays(1), "the last $HOT_DAYS days"), "hot-$today", today.year, today.monthValue, 1)
+}
+
+/** Top songs: the most played of all time, up to today. */
+fun topPlan(today: LocalDate): TimeListPlan =
+    TimeListPlan(TimeListKind.TOP, "Top songs", "", "All time", TimeWindow(LocalDate.of(TIME_MACHINE_FIRST_YEAR, 1, 1), today.plusDays(1), "all time"), "top-$today", today.year, null, 1)
+
+/** This year so far, for its artists and genres: under the Time Machine's own key for the year. */
+fun yearPlan(today: LocalDate): TimeListPlan =
+    TimeListPlan(TimeListKind.LAST_YEAR, "${today.year}", "", "${today.year}", TimeWindow(today.withDayOfYear(1), today.plusDays(1), "${today.year}"), "${today.year}-all", today.year, null, 1)
+
+/** An artist on the card: its name and plays, and where its page and picture are when it's in the library. */
+@Serializable
+data class CardArtist(val name: String, val plays: Int, val id: String? = null, val coverArt: String? = null, val imageUrl: String? = null)
+
+/** A genre on the card, with its share of the year's plays in percent. */
+@Serializable
+data class CardGenre(val name: String, val share: Int)
+
+/** How many artists and genres the card shows, and how many of the year's songs its genres are counted from. */
+const val CARD_ARTISTS = 4
+const val CARD_GENRES = 4
+const val GENRE_SONGS = 200
+
+/**
+ * The genres of [songs] by their plays, most played first, each with its share in percent of the plays that have a
+ * genre: [genresOf] says which genres a song is in (Siansa Beats' by its sound, else its tag), the first counted.
+ */
+fun topGenres(songs: List<PlayedSong>, most: Int = CARD_GENRES, genresOf: (Song) -> List<String>): List<CardGenre> {
+    val plays = LinkedHashMap<String, Int>()
+    for (p in songs) {
+        val name = genresOf(p.song).firstOrNull { it.isNotBlank() }?.trim() ?: continue
+        plays[name] = (plays[name] ?: 0) + p.plays.coerceAtLeast(1)
+    }
+    val all = plays.values.sum()
+    if (all == 0) return emptyList()
+    return plays.entries.sortedByDescending { it.value }.take(most).map { CardGenre(it.key, Math.round(it.value * 100f / all)) }
+}
+
+/** A song's genres from its tag: "Rock; Metal" is two. */
+fun tagGenres(song: Song): List<String> = song.genre.orEmpty().split(';').map { it.trim() }.filter { it.isNotEmpty() }
+
 /** One list as it's kept on the phone: what the card draws and plays, with no need to ask anyone again. */
 @Serializable
 data class TimeCardList(
@@ -83,6 +138,8 @@ data class TimeCardList(
     val tag: String,
     val line: String,
     val songIds: List<String>,
+    /** How often each of [songIds] was played in its days, in their order; empty from a card made before they were kept. */
+    val plays: List<Int> = emptyList(),
     /** Its first few covers, for its picture. */
     val covers: List<String> = emptyList(),
     val year: Int,
@@ -91,14 +148,33 @@ data class TimeCardList(
 
 /** The card as kept on the phone: the [day] it was made for (ISO), and its lists, the big one first. */
 @Serializable
-data class TimeCard(val day: String, val lists: List<TimeCardList>)
+data class TimeCard(
+    val day: String,
+    val lists: List<TimeCardList>,
+    /** Which make of card this is: one of another make is made again ([TIME_CARD_MAKE]). */
+    val make: Int = 0,
+    /** Your listening's other pages (issue #1343): hot now, top songs, this year's artists and genres. */
+    val hot: TimeCardList? = null,
+    val top: TimeCardList? = null,
+    val artists: List<CardArtist> = emptyList(),
+    val genres: List<CardGenre> = emptyList(),
+) {
+    /** The list of [kind] (a [TimeListKind.id]), wherever on the card it is. */
+    fun list(kind: String): TimeCardList? = (listOfNotNull(hot, top) + lists).firstOrNull { it.kind == kind }
+
+    /** Nothing to show: no history yet. */
+    val empty: Boolean get() = lists.isEmpty() && hot == null && top == null && artists.isEmpty() && genres.isEmpty()
+}
+
+/** The make of card this version keeps: 2 has Your listening's pages and each song's plays. */
+const val TIME_CARD_MAKE = 2
 
 /** What's in the card's file: nothing until it was first made. */
 @Serializable
 data class TimeCardKept(val card: TimeCard? = null)
 
 /** Whether the card must be made again: there's none, or it was made for another day ("this day last year" moved on). */
-fun timeCardStale(card: TimeCard?, today: LocalDate): Boolean = card?.day != today.toString()
+fun timeCardStale(card: TimeCard?, today: LocalDate): Boolean = card?.day != today.toString() || card.make != TIME_CARD_MAKE
 
 /**
  * The card for [today] from [plans], asking [songsOf] for each list's songs in the library (null: its plays couldn't
@@ -106,7 +182,7 @@ fun timeCardStale(card: TimeCard?, today: LocalDate): Boolean = card?.day != tod
  * of lists because of it: then the one already on the phone stays, and it's tried again later. A card with no lists
  * (no history yet) is a card: Home shows nothing for it.
  */
-suspend fun buildTimeCard(today: LocalDate, plans: List<TimeListPlan>, songsOf: suspend (TimeListPlan) -> List<Song>?): TimeCard? {
+suspend fun buildTimeCard(today: LocalDate, plans: List<TimeListPlan>, songsOf: suspend (TimeListPlan) -> List<PlayedSong>?): TimeCard? {
     val lists = ArrayList<TimeCardList>()
     var failed = false
     for (plan in plans) {
@@ -114,14 +190,49 @@ suspend fun buildTimeCard(today: LocalDate, plans: List<TimeListPlan>, songsOf: 
         val songs = songsOf(plan)
         if (songs == null) { failed = true; continue }
         if (songs.size < plan.fewest) continue
-        val kept = songs.take(TIME_LIST_SONGS)
-        lists += TimeCardList(plan.kind.id, plan.title, plan.tag, plan.line, kept.map { it.id }, kept.mapNotNull { it.coverArt }.distinct().take(TIME_CARD_COVERS), plan.year, plan.month)
+        lists += keptList(plan, songs)
     }
-    return if (failed && lists.size < TIME_CARD_LISTS) null else TimeCard(today.toString(), lists)
+    return if (failed && lists.size < TIME_CARD_LISTS) null else TimeCard(today.toString(), lists, TIME_CARD_MAKE)
+}
+
+private fun keptList(plan: TimeListPlan, songs: List<PlayedSong>): TimeCardList {
+    val kept = songs.take(TIME_LIST_SONGS)
+    return TimeCardList(plan.kind.id, plan.title, plan.tag, plan.line, kept.map { it.song.id }, kept.map { it.plays },
+        kept.mapNotNull { it.song.coverArt }.distinct().take(TIME_CARD_COVERS), plan.year, plan.month)
+}
+
+/**
+ * Your listening's whole card for [today] (issue #1343): the look back lists ([buildTimeCard]), hot now, top songs,
+ * and this year's artists ([artistsOf]) and genres (counted from the year's [GENRE_SONGS] most played, by [genresOf]).
+ * [songsOf] is asked with how many songs are wanted. Null when any of it couldn't be fetched: the card on the phone
+ * stays, and it's tried again later.
+ */
+suspend fun buildListeningCard(
+    today: LocalDate,
+    plans: List<TimeListPlan>,
+    songsOf: suspend (TimeListPlan, Int) -> List<PlayedSong>?,
+    artistsOf: suspend (TimeWindow) -> List<CardArtist>?,
+    genresOf: suspend (List<Song>) -> ((Song) -> List<String>),
+): TimeCard? {
+    val back = buildTimeCard(today, plans) { songsOf(it, TIME_LIST_SONGS) } ?: return null
+    val hot = songsOf(hotPlan(today), TIME_LIST_SONGS) ?: return null
+    val top = songsOf(topPlan(today), TIME_LIST_SONGS) ?: return null
+    val year = yearPlan(today)
+    val yearSongs = songsOf(year, GENRE_SONGS) ?: return null
+    val artists = artistsOf(year.window) ?: return null
+    val genres = topGenres(yearSongs, genresOf = genresOf(yearSongs.map { it.song }))
+    return back.copy(
+        hot = hot.takeIf { it.isNotEmpty() }?.let { keptList(hotPlan(today), it) },
+        top = top.takeIf { it.isNotEmpty() }?.let { keptList(topPlan(today), it) },
+        artists = artists.take(CARD_ARTISTS), genres = genres,
+    )
 }
 
 /** How many covers a list keeps for its picture. */
 const val TIME_CARD_COVERS = 6
+
+/** The page of one of the card's lists ([TimeListKind.id]): its songs, Play and Create memory. */
+fun timeListRoute(kind: String): String = "timelist/$kind"
 
 /** The Time Machine's page at a list's month or year: month 0 is the whole year. */
 fun timeMachineRoute(year: Int, month: Int?): String = "timemachine?year=$year&month=${month ?: 0}"

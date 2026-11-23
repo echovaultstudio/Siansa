@@ -2,7 +2,10 @@ package app.siansa.mix
 
 import app.siansa.data.HomeSection
 import app.siansa.data.Song
-import app.siansa.ui.timeCardUnder
+import app.siansa.ui.ListenPage
+import app.siansa.ui.genreBar
+import app.siansa.ui.listenPages
+import app.siansa.ui.timeListAsTimeMachine
 import app.siansa.ui.timeMachineStart
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -17,7 +20,7 @@ import java.util.Locale
 class TimeCardTest {
     private val today = LocalDate.of(2026, 11, 23)
     private val plans = timeCardPlans(today, Locale.ENGLISH)
-    private fun songs(n: Int, tag: String = "s") = (1..n).map { Song(id = "$tag$it", title = "Song $it", coverArt = "c${it % 3}") }
+    private fun songs(n: Int, tag: String = "s") = (1..n).map { PlayedSong(Song(id = "$tag$it", title = "Song $it", coverArt = "c${it % 3}"), n - it + 1) }
 
     @Test fun theListsInTheOrderTheyAreTried() {
         assertEquals(listOf("This time last year", "This day last year", "Last month", "Your 2025", "Two years ago", "Five years ago"), plans.map { it.title })
@@ -65,7 +68,8 @@ class TimeCardTest {
         assertEquals(TIME_LIST_SONGS, card.lists.first().songIds.size)
         assertEquals(listOf("c1", "c2", "c0"), card.lists.first().covers)
         assertEquals(2025 to null, card.lists[1].year to card.lists[1].month)
-        assertEquals(TimeListKind.entries.toList(), asked)
+        assertEquals(listOf(60, 59, 58), card.lists.first().plays.take(3))
+        assertEquals(TimeListKind.entries.toList() - TimeListKind.HOT - TimeListKind.TOP, asked)
     }
 
     @Test fun itStopsAskingOnceItHasFour() = runBlocking {
@@ -88,17 +92,85 @@ class TimeCardTest {
     }
 
     @Test fun itIsMadeAgainOnAnotherDay() {
-        val card = TimeCard("2026-11-23", emptyList())
+        val card = TimeCard("2026-11-23", emptyList(), TIME_CARD_MAKE)
         assertTrue(timeCardStale(null, today))
+        // A card from before Your listening's pages is made again the same day.
+        assertTrue(timeCardStale(card.copy(make = 0), today))
         assertFalse(timeCardStale(card, today))
         assertTrue(timeCardStale(card, today.plusDays(1)))
     }
 
-    @Test fun theOthersAreAtItsFootInOrder() {
-        fun list(kind: String) = TimeCardList(kind, kind, "", "", emptyList(), year = 2025)
-        val card = TimeCard("2026-11-23", listOf(list("year_ago"), list("day"), list("last_month"), list("last_year")))
-        assertEquals(listOf("day", "last_month", "last_year"), timeCardUnder(card, "year_ago").map { it.kind })
-        assertEquals(listOf("year_ago", "day", "last_year"), timeCardUnder(card, "last_month").map { it.kind })
+    /** Your listening (issue #1343): hot now is the last 30 days with today, top songs all time, the year so far for artists and genres. */
+    @Test fun hotNowTopSongsAndTheYear() {
+        val hot = hotPlan(today)
+        assertEquals(LocalDate.of(2026, 10, 25) to LocalDate.of(2026, 11, 24), hot.window.from to hot.window.to)
+        assertEquals("Last 30 days", hot.line)
+        val top = topPlan(today)
+        assertEquals(LocalDate.of(TIME_MACHINE_FIRST_YEAR, 1, 1) to LocalDate.of(2026, 11, 24), top.window.from to top.window.to)
+        assertEquals("All time", top.line)
+        val year = yearPlan(today)
+        assertEquals(LocalDate.of(2026, 1, 1) to LocalDate.of(2026, 11, 24), year.window.from to year.window.to)
+        // The year so far is under the Time Machine's own key for it.
+        assertEquals("2026-all", year.key)
+    }
+
+    @Test fun genresByTheirShareOfThePlays() {
+        fun played(id: String, genre: String?, plays: Int) = PlayedSong(Song(id = id, title = id, genre = genre), plays)
+        val songs = listOf(played("a", "Metal", 50), played("b", "Folk; Irish", 30), played("c", "Metal", 10), played("d", null, 99), played("e", "Ambient", 10))
+        val genres = topGenres(songs, genresOf = ::tagGenres)
+        assertEquals(listOf(CardGenre("Metal", 60), CardGenre("Folk", 30), CardGenre("Ambient", 10)), genres)
+        assertEquals(listOf("Metal"), topGenres(songs, most = 1, genresOf = ::tagGenres).map { it.name })
+        // Siansa Beats' genre for a song, where it has one, comes before the tag's.
+        assertEquals("Progressive metal", topGenres(songs) { if (it.id == "a") listOf("Progressive metal") else tagGenres(it) }.first().name)
+        assertTrue(topGenres(listOf(played("d", null, 9)), genresOf = ::tagGenres).isEmpty())
+        // The most played genre's bar is full; the others are their share of it, and never nothing.
+        assertEquals(1f, genreBar(60, 60), 0f)
+        assertEquals(0.5f, genreBar(30, 60), 0f)
+        assertEquals(0.04f, genreBar(0, 60), 0f)
+    }
+
+    @Test fun theWholeCard() = runBlocking {
+        val artists = listOf("One", "Two", "Three", "Four", "Five").mapIndexed { i, n -> CardArtist(n, 50 - i, "id$i") }
+        val asked = ArrayList<Pair<TimeListKind, Int>>()
+        val card = buildListeningCard(today, plans,
+            songsOf = { plan, limit -> asked += plan.kind to limit; songs(if (limit == GENRE_SONGS) 120 else 60, plan.kind.id) },
+            artistsOf = { artists }, genresOf = { { listOf("Metal") } })!!
+        assertEquals(4, card.lists.size)
+        assertEquals("hot" to "Last 30 days", card.hot!!.kind to card.hot!!.line)
+        assertEquals(TIME_LIST_SONGS, card.top!!.songIds.size)
+        assertEquals(listOf("One", "Two", "Three", "Four"), card.artists.map { it.name })
+        assertEquals(listOf(CardGenre("Metal", 100)), card.genres)
+        assertEquals(TIME_CARD_MAKE, card.make)
+        // The year's songs are asked for in full, for the genres.
+        assertEquals(TimeListKind.LAST_YEAR to GENRE_SONGS, asked.last())
+        // Any list of the card by its kind, for its page of songs.
+        assertEquals("Top songs", card.list("top")!!.title)
+        assertEquals("This day last year", card.list("day")!!.title)
+        assertNull(card.list("nothing"))
+        assertEquals(ListenPage.entries.toList(), listenPages(card))
+    }
+
+    /** Anything that couldn't be fetched keeps the card on the phone; nothing played yet is a card with no pages. */
+    @Test fun theWholeCardOrTheOldOne() = runBlocking {
+        assertNull(buildListeningCard(today, plans, { plan, _ -> if (plan.kind == TimeListKind.HOT) null else songs(10) }, { emptyList() }, { { emptyList() } }))
+        assertNull(buildListeningCard(today, plans, { _, _ -> songs(10) }, { null }, { { emptyList() } }))
+        val none = buildListeningCard(today, plans, { _, _ -> emptyList() }, { emptyList() }, { { emptyList() } })!!
+        assertTrue(none.empty)
+        assertTrue(listenPages(none).isEmpty())
+        // Only the pages with something on them.
+        val some = buildListeningCard(today, plans, { plan, _ -> if (plan.kind == TimeListKind.TOP) songs(10) else emptyList() }, { emptyList() }, { { emptyList() } })!!
+        assertEquals(listOf(ListenPage.SONGS), listenPages(some))
+        assertFalse(some.empty)
+    }
+
+    /** A list's page of songs: the ones still in the library, each with its plays, named by when it's from. */
+    @Test fun aListAsAPageOfSongs() {
+        val list = TimeCardList("day", "This day last year", "23 NOV", "23 November 2025", listOf("a", "b", "c"), listOf(9, 6, 2), year = 2025, month = 11)
+        val tm = timeListAsTimeMachine(list, listOf(Song(id = "a", title = "A", artist = "X"), Song(id = "c", title = "C", artist = "Y")))
+        assertEquals("23 November 2025", tm.label)
+        assertEquals(listOf("A" to 9L, "C" to 2L), tm.tracks.map { it.title to it.plays })
+        assertEquals("Time Machine - 23 November 2025", memoryName(tm.label))
+        assertEquals("timelist/day", timeListRoute("day"))
     }
 
     @Test fun theTimeMachineOpensWhereAsked() {
@@ -110,9 +182,11 @@ class TimeCardTest {
         assertEquals(2025 to 11, timeMachineStart(2030, 3, today))
     }
 
-    /** In Arrange Home it's a row like any other, after More of you; its look is fixed, so it has no cog. */
+    /** In Arrange Home it's a row like any other, after More of you, named Your listening; its look is fixed, so it has no cog. */
     @Test fun itIsARowOfHomeWithAFixedLook() {
         assertTrue(HomeSection.TIME_MACHINE.fixed)
+        assertEquals("Your listening", HomeSection.TIME_MACHINE.label)
+        assertEquals("time_machine", HomeSection.TIME_MACHINE.id)
         assertFalse(HomeSection.TIME_MACHINE.lookable)
         assertEquals(listOf(HomeSection.TIME_MACHINE), HomeSection.entries.filter { it.fixed })
         // A saved order from before it existed gets it after More of you.
