@@ -95,6 +95,7 @@ import java.time.LocalDate
 import java.time.LocalTime
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -130,6 +131,13 @@ fun HomeScreen(nav: NavController) {
     val homeSettings by graph.settings.state.collectAsStateWithLifecycle()
     val homeOrder = homeSettings.homeOrder
     val homeHidden = homeSettings.homeHidden
+    // Home's Time Machine card (issue #1341): what's on the phone at once, made again in the background when it's
+    // from another day.
+    val timeCard by graph.timeCards.card.collectAsStateWithLifecycle(initialValue = null)
+    val timeCardShown = HomeSection.TIME_MACHINE !in homeHidden
+    LaunchedEffect(timeCardShown) {
+        if (timeCardShown) withContext(Dispatchers.IO) { runCatching { graph.timeCards.refresh() } }
+    }
     // The Home settings panel, open on Sources (true) or Arrange (false); null while closed.
     var panel by remember { mutableStateOf<Boolean?>(null) }
     // Home's menu (Roll the dice, Play on…, Sources, Arrange Home) and the Play on sheet it opens.
@@ -642,6 +650,14 @@ fun HomeScreen(nav: NavController) {
                                 onClick = { nav.openGenreRadio(genre.name) },
                             )
                         }
+                    }
+                }
+                // The Time Machine card (issue #1341): from the phone at once; nothing without a listening history.
+                HomeSection.TIME_MACHINE -> timeCard?.takeIf { it.lists.isNotEmpty() && homeSettings.navidromeReady }?.let { card ->
+                    item(key = "time-machine", contentType = "time-machine") {
+                        TimeMachineCard(card, songsOf = { ids -> graph.library.songs(ids) },
+                            play = { list, shuffle -> graph.player.play(list, shuffle = shuffle) },
+                            open = { nav.navigate(app.siansa.mix.timeMachineRoute(it.year, it.month)) })
                     }
                 }
                 // Siansa Beats' More of you, a row of its own (the owner, 17 Nov); nothing without its mixes.

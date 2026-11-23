@@ -99,17 +99,19 @@ internal val TIME_MACHINE_GAP: Dp = Space.Medium
  * "Create memory" makes the library ones a playlist with a picture.
  */
 @Composable
-fun TimeMachineScreen(nav: NavController) {
-    SiansaDarkTheme { TimeMachinePage(nav) }
+fun TimeMachineScreen(nav: NavController, year: Int? = null, month: Int? = null) {
+    SiansaDarkTheme { TimeMachinePage(nav, year, month) }
 }
 
 @Composable
-private fun TimeMachinePage(nav: NavController) {
+private fun TimeMachinePage(nav: NavController, startYear: Int? = null, startMonth: Int? = null) {
     val graph = LocalGraph.current
     val today = remember { LocalDate.now() }
     // A year ago by default: the most likely time to want to go back to.
-    var year by rememberSaveable { mutableIntStateOf(today.year - 1) }
-    var month by rememberSaveable { mutableStateOf<Int?>(today.monthValue) }
+    // Or where it was asked to open (Home's Time Machine card, issue #1341): a month, or month 0 for the whole year.
+    val start = remember { timeMachineStart(startYear, startMonth, today) }
+    var year by rememberSaveable { mutableIntStateOf(start.first) }
+    var month by rememberSaveable { mutableStateOf(start.second) }
     // A new year or month shows the spinner straight away, not the last list (issue #189). Then what's already
     // there shows, and each service's plays are added as they arrive (issue #319).
     val result by produceState<Load<TimeMachine>>(Load.Loading, year, month) {
@@ -564,4 +566,13 @@ private fun CreateMemory(tm: TimeMachine, nav: NavController, onDone: () -> Unit
             }
         }
     }
+}
+
+/**
+ * The year and month (null: the whole year) the Time Machine opens at: [year] and [month] when asked for and not in
+ * the future (month 0 is the whole year), else this month a year ago.
+ */
+internal fun timeMachineStart(year: Int?, month: Int?, today: LocalDate): Pair<Int, Int?> {
+    if (year == null || year !in TIME_MACHINE_FIRST_YEAR..today.year) return today.year - 1 to today.monthValue
+    return year to month?.takeIf { it in monthsAvailable(year, today) }
 }

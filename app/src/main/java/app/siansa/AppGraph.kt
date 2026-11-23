@@ -58,6 +58,7 @@ import app.siansa.mix.DjReady
 import app.siansa.mix.FlowMix
 import app.siansa.mix.GenreRadio
 import app.siansa.mix.Insights
+import app.siansa.mix.TimeCards
 import app.siansa.mix.MadeForYouCards
 import app.siansa.mix.MixGenerator
 import app.siansa.mix.MixResume
@@ -473,6 +474,8 @@ class AppGraph(val app: Application) {
     /** The mix Flow is playing, and what's set on the Flow page (the owner, 15 Nov). */
     val flow: FlowMix by lazy { FlowMix(this) }
     val insights = Insights(this)
+    /** Home's Time Machine card, kept on the phone and made again once a day (issue #1341). */
+    val timeCards = TimeCards(this)
     val radios = Radios(this)
     val suggestions = ArtistSuggestions(this)
     val notices = NoticeStore(app)

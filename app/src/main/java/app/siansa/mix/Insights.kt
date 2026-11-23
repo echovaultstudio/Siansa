@@ -453,16 +453,17 @@ class Insights(private val graph: AppGraph) {
         kotlinx.serialization.builtins.MapSerializer(String.serializer(), kotlinx.serialization.builtins.ListSerializer(Played.serializer())),
     ) { emptyMap() }
 
-    private fun playsKey(source: String, year: Int, month: Int?) = "$source|$year-${month ?: "all"}"
+    /** The key a month's or a year's plays are kept under; a day's is its date ([TimeListPlan.key]). */
+    private fun periodKey(year: Int, month: Int?) = "$year-${month ?: "all"}"
 
-    private suspend fun kept(source: String, year: Int, month: Int?, finished: Boolean): List<Played>? {
-        val key = playsKey(source, year, month)
+    private suspend fun kept(source: String, period: String, finished: Boolean): List<Played>? {
+        val key = "$source|$period"
         if (finished) keptPlays.read()[key]?.let { return it }
         return recentPlays[key]?.takeIf { System.currentTimeMillis() - it.first < 15 * 60_000L }?.second
     }
 
-    private suspend fun keep(source: String, year: Int, month: Int?, finished: Boolean, plays: List<Played>) {
-        val key = playsKey(source, year, month)
+    private suspend fun keep(source: String, period: String, finished: Boolean, plays: List<Played>) {
+        val key = "$source|$period"
         if (finished) keptPlays.update { it + (key to plays) } else recentPlays[key] = System.currentTimeMillis() to plays
     }
 
@@ -472,18 +473,30 @@ class Insights(private val graph: AppGraph) {
      * service's plays are added (the higher count for each song). From Siansa Beats, Koito and Last.fm, whichever are set up,
      * else Siansa's own history. Songs not in your library are listed without a song (issue #234), up to [limit] in it.
      */
-    fun timeMachineUpdates(year: Int, month: Int?, limit: Int = 50): Flow<TimeMachine> = channelFlow {
+    fun timeMachineUpdates(year: Int, month: Int?, limit: Int = 50): Flow<TimeMachine> =
+        topUpdates(timeWindow(year, month), periodKey(year, month), limit, lasting = true, beatsAlone = false)
+
+    /**
+     * Your most played songs in [window], once, for Home's Time Machine card (issue #1341): from Siansa Beats' history
+     * alone when that's set up (the owner, 23 Nov: "best to get the data from a beats call"), else Koito and Last.fm,
+     * else Siansa's own history. [period] is the key its plays are kept under; [lasting] false keeps a finished
+     * period's plays for a quarter of an hour only (a single day: a new one every day would fill the phone).
+     */
+    suspend fun topOnce(window: TimeWindow, period: String, limit: Int = 50, lasting: Boolean = true): TimeMachine =
+        topUpdates(window, period, limit, lasting, beatsAlone = true).last()
+
+    private fun topUpdates(window: TimeWindow, period: String, limit: Int, lasting: Boolean, beatsAlone: Boolean): Flow<TimeMachine> = channelFlow {
         val started = System.currentTimeMillis()
         val s = graph.settings.current
-        val window = timeWindow(year, month)
         val fromSec = window.from.atStartOfDay(zone).toEpochSecond()
         val toSec = window.to.atStartOfDay(zone).toEpochSecond()
         // More than shown, as songs not in your library are left out.
         val fetch = limit * 3
         val koitoOn = s.listenBrainzReady && graph.historyApi.isKoito(s.listenBrainzUrl)
         val lastFmOn = s.lastFmEnabled && s.lastFmApiKey.isNotBlank() && s.lastFmUser.isNotBlank()
-        val sources = listOfNotNull(BEATS.takeIf { graph.beatsHistory.on }, KOITO.takeIf { koitoOn }, LAST_FM.takeIf { lastFmOn })
-        val finished = periodFinished(window, LocalDate.now())
+        val sources = if (beatsAlone && graph.beatsHistory.on) listOf(BEATS)
+            else listOfNotNull(BEATS.takeIf { graph.beatsHistory.on }, KOITO.takeIf { koitoOn }, LAST_FM.takeIf { lastFmOn })
+        val finished = lasting && periodFinished(window, LocalDate.now())
         val times = java.util.concurrent.ConcurrentHashMap<String, String>()
         if (sources.isEmpty()) {
             send(fromHistory(window, fromSec, toSec, limit, "Scrobble to Siansa Beats, Koito or Last.fm under Scrobbling & history for your full history", complete = true))
@@ -491,7 +504,7 @@ class Insights(private val graph: AppGraph) {
         }
         val got = java.util.concurrent.ConcurrentHashMap<String, List<Played>>()
         val failed = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
-        sources.forEach { src -> kept(src, year, month, finished)?.let { got[src] = it; times[src] = "from the phone" } }
+        sources.forEach { src -> kept(src, period, finished)?.let { got[src] = it; times[src] = "from the phone" } }
         val emitLock = kotlinx.coroutines.sync.Mutex()
         suspend fun show(final: Boolean) = emitLock.withLock {
             val used = sources.filter { got.containsKey(it) }
@@ -520,7 +533,7 @@ class Insights(private val graph: AppGraph) {
                         times[src] = "${System.currentTimeMillis() - askStarted}ms"
                         if (plays == null) failed += src else {
                             got[src] = plays
-                            keep(src, year, month, finished, plays)
+                            keep(src, period, finished, plays)
                         }
                         // Another service still on its way: show this one's plays now.
                         if (plays != null && missing.any { !got.containsKey(it) && it !in failed }) show(final = false)

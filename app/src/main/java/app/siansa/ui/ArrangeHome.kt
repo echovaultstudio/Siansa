@@ -468,7 +468,9 @@ fun ArrangeHomeSheet(
                                     tint = if (isHidden) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurface,
                                 )
                             }
-                            IconButton(
+                            // A row whose look is fixed has no cog (the Time Machine card, issue #1341): a gap as wide
+                            // keeps every row's eye in one line.
+                            if (section.fixed) Spacer(Modifier.size(FIXED_ROW_COG)) else IconButton(
                                 // Every row's cog opens the same choices (#1261), Your cards' too.
                                 onClick = { if (section != HomeSection.NOTICES) picking = section else onOpenSettings(section) },
                                 modifier = Modifier.testTag("homeLookCog"),
@@ -930,3 +932,6 @@ fun ArrangeHomePage(nav: androidx.navigation.NavController) {
     }
 }
 
+
+/** As wide as a row's cog button, where a row has none. */
+private val FIXED_ROW_COG = 48.dp

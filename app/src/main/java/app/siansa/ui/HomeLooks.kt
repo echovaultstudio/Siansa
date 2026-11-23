@@ -69,6 +69,8 @@ data class HomeItem(
     val songs: List<Song> = emptyList(),
     /** Its songs' ids, for its colours by mood (the owner, 20 Nov); its [songs]' when not given. */
     val songIdList: List<String> = emptyList(),
+    /** A small tag on its picture in a hero ("NOV 2025", "23 NOV"): the Time Machine card's dates (issue #1341). */
+    val tag: String = "",
 ) {
     val songIds: List<String> get() = songIdList.ifEmpty { songs.map { it.id } }
     val artists: String get() = artistLine(songs)
@@ -258,6 +260,7 @@ fun HomeHero(
     // The row's next cards, at its foot on the same gradient (the owner, 22 Nov): three or four, each as wide as its
     // share of the row, its name on its picture and its line under it.
     under: List<HomeItem> = emptyList(),
+    tag: String = "homeHero",
     playSongs: (List<Song>, Boolean) -> Unit,
 ) {
     val songs = item.songs.ifEmpty { rowSongs }
@@ -274,13 +277,16 @@ fun HomeHero(
                 1f to lerp(lerp(tint, item.colors.second, 0.5f), Color.Black, 0.5f),
             ))
             .clickable(onClick = item.open)
-            .testTag("homeHero"),
+            .testTag(tag),
     ) {
         Column(Modifier.padding(start = Space.Page, end = Space.Page, top = Space.Section, bottom = Space.Section), verticalArrangement = Arrangement.spacedBy(Space.Page)) {
             Text(title.uppercase(), style = MaterialTheme.typography.labelMedium.copy(letterSpacing = androidx.compose.ui.unit.TextUnit(1.5f, androidx.compose.ui.unit.TextUnitType.Sp)),
                 fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.8f))
             Row(horizontalArrangement = Arrangement.spacedBy(Space.Page), verticalAlignment = Alignment.Bottom) {
-                CardPicture(item.mosaic, item.coverArt, item.colors, item.title, Modifier.size(HERO_COVER), RoundedCornerShape(8.dp), 600, songIds = item.songIds, artists = item.artists)
+                Box {
+                    CardPicture(item.mosaic, item.coverArt, item.colors, item.title, Modifier.size(HERO_COVER), RoundedCornerShape(8.dp), 600, songIds = item.songIds, artists = item.artists)
+                    if (item.tag.isNotBlank()) PictureTag(item.tag, Modifier.align(Alignment.BottomStart))
+                }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
                     WholeWordsText(item.title, MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.ExtraBold), color = Color.White, maxLines = 3)
                     val line = listOf(item.subtitle, item.meta).filter { it.isNotBlank() }.joinToString(" · ")
@@ -322,8 +328,11 @@ private fun HeroCards(cards: List<HomeItem>) {
                         Modifier.width(side).clip(RoundedCornerShape(8.dp)).clickable(onClickLabel = "Open ${card.title}", onClick = card.open)
                             .semantics(mergeDescendants = true) {}.testTag("homeHeroCard"),
                     ) {
-                        CardPicture(card.mosaic, card.coverArt, card.colors, card.title, Modifier.size(side), RoundedCornerShape(8.dp), 300,
-                            names = true, line = "", songIds = card.songIds, artists = card.artists)
+                        Box {
+                            CardPicture(card.mosaic, card.coverArt, card.colors, card.title, Modifier.size(side), RoundedCornerShape(8.dp), 300,
+                                names = true, line = "", songIds = card.songIds, artists = card.artists)
+                            if (card.tag.isNotBlank()) PictureTag(card.tag, Modifier.align(Alignment.TopStart))
+                        }
                         if (card.subtitle.isNotBlank()) {
                             Spacer(Modifier.height(Space.Small))
                             Text(card.subtitle, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.82f), maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -333,6 +342,21 @@ private fun HeroCards(cards: List<HomeItem>) {
             }
         }
     }
+}
+
+/**
+ * A small tag in a corner of a hero's picture (issue #1341): the date a Time Machine list is from, white on a dark
+ * pill, a small step in from the picture's edges.
+ */
+@Composable
+private fun PictureTag(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text,
+        modifier.padding(Space.Small).clip(RoundedCornerShape(50)).background(Color.Black.copy(alpha = 0.5f))
+            .padding(horizontal = Space.Small, vertical = Space.Tight).testTag("pictureTag"),
+        style = MaterialTheme.typography.labelSmall.copy(letterSpacing = androidx.compose.ui.unit.TextUnit(1f, androidx.compose.ui.unit.TextUnitType.Sp)),
+        fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1,
+    )
 }
 
 /** The side of each of [count] cards, in px, sharing a row [width] wide with [gap] between them. */
