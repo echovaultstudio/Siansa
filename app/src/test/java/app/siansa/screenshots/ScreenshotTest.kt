@@ -501,6 +501,17 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                 )
                 app.siansa.ui.HomeHero("For now", items.first(), play = {}, rowSongs = emptyList(), under = items.drop(1).take(3)) { _, _ -> }
             },
+            // A hero in each Card colour of its row (issue #1351): Vivid, Soft, Plain, From the artwork, top to bottom.
+            Scene("home_hero_card_colours") {
+                val item = app.siansa.ui.HomeItem("h1", "Clear-sky mix", "High-energy music, sung", open = {}, colors = Color(0xFF3A6FB0) to Color(0xFF30206A))
+                Column {
+                    for (look in listOf(app.siansa.data.CardLook.VIVID, app.siansa.data.CardLook.SOFT, app.siansa.data.CardLook.PLAIN, app.siansa.data.CardLook.ARTWORK)) {
+                        androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalCardLook provides look) {
+                            app.siansa.ui.HomeHero(look.label, item, play = {}, rowSongs = emptyList(), tint = Color(0xFF3A6FB0)) { _, _ -> }
+                        }
+                    }
+                }
+            },
             // Cards without their lines (the owner, 22 Nov): the hero's, its cards' and a row of tiles'.
             Scene("cards_without_lines") {
                 fun item(key: String, name: String, line: String) = app.siansa.ui.HomeItem(key, name, line, open = {})

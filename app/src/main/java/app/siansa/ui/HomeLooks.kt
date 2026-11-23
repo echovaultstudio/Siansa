@@ -36,6 +36,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -261,7 +262,11 @@ fun HomeHero(
     playSongs: (List<Song>, Boolean) -> Unit,
 ) {
     val songs = item.songs.ifEmpty { rowSongs }
-    val tint = tint ?: item.colors.first
+    // Its colours follow its row, as every other card's do (the owner, 23 Nov: "changing hero cards colours has no
+    // effect"): the row's Colours when they're a set or the songs' moods, else its picture's; filled as the row's
+    // Card colour says ([heroColours]).
+    val chosen = shortcutColours(item.title, item.songIds)
+    val fill = heroColours(LocalCardLook.current, chosen?.first ?: tint ?: item.colors.first, chosen ?: item.colors, fromPicture = chosen == null)
     val onPlay: (() -> Unit)? = item.play ?: songs.takeIf { it.isNotEmpty() }?.let { { playSongs(it, false) } } ?: play
     Box(
         Modifier
@@ -269,10 +274,7 @@ fun HomeHero(
             .padding(start = Space.Page, end = Space.Page, top = LocalSectionGap.current)
             .clip(RoundedCornerShape(HERO_CORNER))
             // Deep enough under the white words in light mode too, deeper towards its foot.
-            .background(Brush.verticalGradient(
-                0f to lerp(lerp(tint, item.colors.first, 0.35f), Color.Black, 0.25f),
-                1f to lerp(lerp(tint, item.colors.second, 0.5f), Color.Black, 0.5f),
-            ))
+            .background(Brush.verticalGradient(0f to fill.first, 1f to fill.second))
             .clickable(onClick = item.open)
             .testTag("homeHero"),
     ) {
@@ -334,6 +336,39 @@ private fun HeroCards(cards: List<HomeItem>) {
         }
     }
 }
+
+/**
+ * A hero's fill, top and foot, in its row's Card colour [look] (issue #1351): from [tint] (its picture's colour, or the
+ * first of the row's chosen colours) and its [own] two.
+ * - Vivid (and Home's own): the tint with its own colours mixed in, deeper towards the foot, as it always was.
+ * - From the artwork: the tint itself, nearly whole, one colour from top to foot.
+ * - Soft: a dark grey with a little of the tint.
+ * - Plain: dark grey, no colour.
+ * Its words are white in both themes, so each fill is kept dark enough to read them on ([readableUnderWhite]); all
+ * but Vivid from its picture ([fromPicture]), which stays exactly as it was.
+ */
+internal fun heroColours(look: app.siansa.data.CardLook, tint: Color, own: Pair<Color, Color>, fromPicture: Boolean = true): Pair<Color, Color> {
+    val vivid = look == app.siansa.data.CardLook.VIVID || look == app.siansa.data.CardLook.AS_HOME
+    val (top, foot) = when (look) {
+        app.siansa.data.CardLook.VIVID, app.siansa.data.CardLook.AS_HOME ->
+            lerp(lerp(tint, own.first, 0.35f), Color.Black, 0.25f) to lerp(lerp(tint, own.second, 0.5f), Color.Black, 0.5f)
+        app.siansa.data.CardLook.ARTWORK -> lerp(tint, Color.Black, 0.1f) to lerp(tint, Color.Black, 0.35f)
+        app.siansa.data.CardLook.SOFT -> lerp(HERO_GREY, tint, 0.38f) to lerp(HERO_GREY_FOOT, tint, 0.16f)
+        app.siansa.data.CardLook.PLAIN -> HERO_GREY to HERO_GREY_FOOT
+    }
+    return if (vivid && fromPicture) top to foot else readableUnderWhite(top) to readableUnderWhite(foot)
+}
+
+/** [colour], made darker until white words read on it (a pale tint: Siansa's frost, Mono's light greys, a white cover). */
+internal fun readableUnderWhite(colour: Color): Color {
+    var c = colour
+    repeat(8) { if (c.luminance() <= HERO_LIGHTEST) return c; c = lerp(c, Color.Black, 0.2f) }
+    return c
+}
+
+private val HERO_GREY = Color(0xFF2A2A2E)
+private val HERO_GREY_FOOT = Color(0xFF141416)
+private const val HERO_LIGHTEST = 0.2f
 
 /** The side of each of [count] cards, in px, sharing a row [width] wide with [gap] between them. */
 internal fun heroCardSide(width: Int, gap: Int, count: Int): Int = ((width - gap * (count - 1).coerceAtLeast(0)) / count.coerceAtLeast(1)).coerceAtLeast(0)
