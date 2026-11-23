@@ -384,7 +384,7 @@ internal fun shareBar(n: Int, most: Int): Float = (n.toFloat() / most.coerceAtLe
 
 /** The accent on the card: the dark theme's amber in both themes, as the card is dark in both. */
 private val LISTEN_ACCENT = Color(0xFFFFB547)
-private val LISTEN_BARS = listOf(Color(0xFFB05AA8), Color(0xFF4F8FD0), Color(0xFFD89A3C), Color(0xFF3FA39A))
+private val LISTEN_BARS = listOf(Color(0xFFB05AA8), Color(0xFF4F8FD0), Color(0xFFD89A3C), Color(0xFF3FA39A), Color(0xFFC8605A))
 private val LISTEN_CORNER = 16.dp
 private val LISTEN_COVER = 120.dp
 private val LISTEN_SMALL_COVER = 40.dp
@@ -396,7 +396,8 @@ private val LISTEN_MARK = 24.dp
 private val LISTEN_RING = 104.dp
 private val LISTEN_RING_WIDTH = 18.dp
 private val LISTEN_DOT = 10.dp
-private const val LISTEN_SONGS = 3
+// The top song big and four under it: five in all (the owner, 23 Nov).
+private const val LISTEN_SONGS = 4
 
 /** A colour for each kind of list, the same every day. */
 internal fun timeListColours(kind: String): Pair<Color, Color> = when (kind) {
