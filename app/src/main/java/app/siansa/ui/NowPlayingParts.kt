@@ -553,7 +553,7 @@ internal fun rememberPlayingAs(song: Song, state: app.siansa.playback.PlayerStat
     // What blends this song at its changes: a DJ mix or radio it's part of, or the crossfade for every song.
     val seed by graph.songRadio.seed.collectAsStateWithLifecycle()
     val blended = when {
-        seed != null && graph.songRadio.mode == app.siansa.playback.ContinuousMode.DJ -> "DJ mix"
+        seed != null && graph.songRadio.mode == app.siansa.mix.ContinuousMode.DJ -> "DJ mix"
         graph.continuousPlay.addedForDj(song.id) || app.siansa.mix.AlbumDjMix.isOn(song.id) -> "DJ mix"
         settings.crossfade != app.siansa.playback.CrossfadeMode.OFF -> "crossfade"
         else -> null
