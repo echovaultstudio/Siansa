@@ -214,8 +214,9 @@ private fun ArtistsPage(artists: List<CardArtist>, actions: ListeningActions) {
                 horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Space.Tight),
             ) {
                 draw(Artist(a.id ?: a.name, a.name, coverArt = a.coverArt, imageUrl = a.imageUrl).picture, 150, Modifier.size(LISTEN_ARTIST), androidx.compose.foundation.shape.CircleShape, null)
-                Text(a.name, Modifier.padding(top = Space.Tight), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold, color = Color.White, maxLines = 2,
-                    overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+                // Whole words only, a little smaller when a name is wide ("Karnivool" at large text broke in two).
+                WholeWordsText(a.name, MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center),
+                    Modifier.fillMaxWidth().padding(top = Space.Tight), color = Color.White, maxLines = 2)
                 Text(playCount(a.plays), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f), maxLines = 1)
             }
         }
@@ -256,7 +257,8 @@ private fun BackPage(lists: List<TimeCardList>, actions: ListeningActions) {
                     // "NOV 2025" over two lines, so it fits a small square at large text too.
                     Text(list.tag.replace(' ', '\n'), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.ExtraBold, color = Color.White, textAlign = TextAlign.Center, maxLines = 2)
                 }
-                Text(list.title, Modifier.padding(top = Space.Tight), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                // Up to three lines, so "This time last year" is whole at large text too.
+                WholeWordsText(list.title, MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold), Modifier.padding(top = Space.Tight), color = Color.White, maxLines = 3)
                 Text(songCount(list.songIds.size), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f), maxLines = 1)
             }
         }
