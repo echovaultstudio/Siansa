@@ -322,7 +322,7 @@ private fun ArtistsPage(range: ListenRange, artists: List<CardArtist>, actions: 
 private fun GenresPage(range: ListenRange, genres: List<CardGenre>, actions: ListeningActions) {
     RangeLine(range, actions)
     val first = genres.firstOrNull() ?: return Nothing("genres played", range)
-    Row(Modifier.fillMaxWidth().padding(top = Space.Small), horizontalArrangement = Arrangement.spacedBy(Space.Section), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().padding(top = Space.Small), horizontalArrangement = Arrangement.spacedBy(Space.Page), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(LISTEN_RING).testTag("listeningRing"), contentAlignment = Alignment.Center) {
             Canvas(Modifier.size(LISTEN_RING)) {
                 val stroke = LISTEN_RING_WIDTH.toPx()
@@ -345,7 +345,8 @@ private fun GenresPage(range: ListenRange, genres: List<CardGenre>, actions: Lis
             genres.forEachIndexed { i, g ->
                 Row(Modifier.testTag("listeningGenre"), horizontalArrangement = Arrangement.spacedBy(Space.Small), verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.size(LISTEN_DOT).clip(CircleShape).background(LISTEN_BARS[i % LISTEN_BARS.size]))
-                    Text(g.name, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    // Two lines for a long name ("Progressive metal" was cut short beside the ring).
+                    Text(g.name, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     Text("${g.share} %", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.82f), maxLines = 1)
                 }
             }
@@ -393,7 +394,7 @@ private val LISTEN_BUTTON = 48.dp
 private val LISTEN_SONG_BAR = 3.dp
 private val LISTEN_RANK = 16.dp
 private val LISTEN_MARK = 24.dp
-private val LISTEN_RING = 112.dp
+private val LISTEN_RING = 104.dp
 private val LISTEN_RING_WIDTH = 18.dp
 private val LISTEN_DOT = 10.dp
 private const val LISTEN_SONGS = 3
