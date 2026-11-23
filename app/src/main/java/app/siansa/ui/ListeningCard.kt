@@ -317,7 +317,7 @@ private fun ArtistsPage(range: ListenRange, artists: List<CardArtist>, actions: 
     }
 }
 
-/** Genres: a ring with each genre's share of the plays, the most played's in its middle, and each named beside it. */
+/** Genres: a ring with each genre's share of the plays, the most played's in its middle in its own colour, and each named beside it. */
 @Composable
 private fun GenresPage(range: ListenRange, genres: List<CardGenre>, actions: ListeningActions) {
     RangeLine(range, actions)
@@ -336,10 +336,9 @@ private fun GenresPage(range: ListenRange, genres: List<CardGenre>, actions: Lis
                     from += sweep
                 }
             }
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("${first.share}%", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold, color = Color.White, maxLines = 1)
-                Text("top genre", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f), maxLines = 1)
-            }
+            // The most played genre's share alone, in that genre's colour: a second line under it ran over the ring at
+            // large text.
+            Text("${first.share}%", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold, color = LISTEN_BARS.first(), maxLines = 1)
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
             genres.forEachIndexed { i, g ->
