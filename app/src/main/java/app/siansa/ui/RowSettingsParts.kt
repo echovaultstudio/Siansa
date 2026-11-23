@@ -225,6 +225,12 @@ internal fun <T> StopSlider(
             onValueChange = { v -> stopFor(v, options.size).takeIf { it != at }?.let { onPick(options[it]) } },
             valueRange = 0f..(options.size - 1).toFloat(),
             steps = options.size - 2,
+            // The part past the thumb is quiet, so where the thumb stands shows at a glance (the theme's own made the
+            // whole track one colour).
+            colors = androidx.compose.material3.SliderDefaults.colors(
+                inactiveTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                inactiveTickColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            ),
             modifier = Modifier.fillMaxWidth().testTag(sliderTag),
         )
         androidx.compose.ui.layout.Layout(
@@ -249,8 +255,9 @@ internal fun <T> StopSlider(
             modifier = Modifier.fillMaxWidth().testTag("stopLabels"),
         ) { measurables, constraints ->
             val width = constraints.maxWidth
-            // Each label may be as wide as its share of the row: a long one breaks on to two lines, centred.
-            val each = androidx.compose.ui.unit.Constraints(maxWidth = (width / measurables.size).coerceAtLeast(1))
+            // Each label may be as wide as the gap between two stops, so "Three a row" stays on one line at large text
+            // too; only a longer one breaks on to two lines, centred.
+            val each = androidx.compose.ui.unit.Constraints(maxWidth = (width / (measurables.size - 1)).coerceAtLeast(1))
             val placed = measurables.map { it.measure(each) }
             val height = placed.maxOf { it.height }
             layout(width, height) {
