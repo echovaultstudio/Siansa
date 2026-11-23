@@ -71,6 +71,21 @@ class SwitchSinkTest {
         assertTrue(SwitchSink(sink(mutableListOf()), sink(mutableListOf())) { true }.isDirect)
     }
 
+    /** The owner, 23 Nov: Untouched playback on "still allows starting DJ mix from now playing screen". */
+    @Test fun aDjMixAsksFirstWhileUntouchedPlaybackIsOn() {
+        var started = 0
+        app.siansa.ui.DjNeedsBlends.then(untouched = false) { started++ }
+        assertEquals(1, started)  // off: straight away, nothing asked
+        assertEquals(null, app.siansa.ui.DjNeedsBlends.waiting.value)
+        app.siansa.ui.DjNeedsBlends.then(untouched = true) { started++ }
+        assertEquals(1, started)  // on: it waits on the answer
+        val waiting = app.siansa.ui.DjNeedsBlends.waiting.value
+        assertTrue(waiting != null)
+        waiting!!()  // "Turn off and start"
+        assertEquals(2, started)
+        app.siansa.ui.DjNeedsBlends.waiting.value = null
+    }
+
     @Test fun thePlaybackPageSaysWhatItSwitchesOff() {
         assertFalse(AppSettings().untouchedPlayback)  // off as it comes: crossfades and DJ blends work as before
         val on = AppSettings(untouchedPlayback = true, crossfade = CrossfadeMode.SMART)

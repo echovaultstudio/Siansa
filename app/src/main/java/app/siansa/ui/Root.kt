@@ -285,6 +285,7 @@ fun SiansaRoot() {
 
         // "Start song radio" from any menu asks Steady or DJ here (issue #337).
         RadioChooserHost()
+        DjNeedsBlendsHost()
         BackHandler(enabled = sheet.isOpen) { sheet.close() }
         // The book player slides up like now playing (issue #542); without a book loaded it closes itself.
         val bookLoaded by graph.bookPlayer.state.collectAsStateWithLifecycle()
