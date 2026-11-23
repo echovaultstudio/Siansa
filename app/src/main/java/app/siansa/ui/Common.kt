@@ -953,7 +953,10 @@ fun QuickTile(
     covers: List<String?> = emptyList(),
 ) {
     // Plain, unless its row has a colour of its own (#1261), in the colours its row's Colours say.
-    val paint = LocalShortcutLook.current?.let { look -> shortcutPaint(colors ?: tileColors(title), coverArt, title, look, songIds) }
+    val chosen = shortcutColours(title, songIds)
+    val paint = LocalShortcutLook.current?.let { look -> shortcutPaint(colors ?: tileColors(title), chosen, coverArt, title, look) }
+    // With no cover, its square is in its row's colours too, the other way round so it stands off the tile.
+    val square = chosen?.let { it.second to it.first } ?: colors
     val style = LocalPictureStyle.current
     val small = tall < QUICK_TILE_HEIGHT
     val big = tall > QUICK_TILE_HEIGHT
@@ -975,11 +978,11 @@ fun QuickTile(
         } else {
             Box(
                 Modifier.size(tall).background(
-                    Brush.linearGradient(listOf(colors?.first ?: Color.Gray, colors?.second ?: Color.DarkGray))
+                    Brush.linearGradient(listOf(square?.first ?: Color.Gray, square?.second ?: Color.DarkGray))
                 ),
                 contentAlignment = Alignment.Center,
             ) {
-                if (icon != null) Icon(icon, null, tint = Color.White, modifier = Modifier.size(if (small) 20.dp else if (big) 32.dp else 26.dp))
+                if (icon != null) Icon(icon, null, tint = if (chosen != null && wordsDarkOn(square!!)) Color(0xFF14181C) else Color.White, modifier = Modifier.size(if (small) 20.dp else if (big) 32.dp else 26.dp))
             }
         }
         Column(Modifier.padding(horizontal = if (small) Space.Small else Space.Medium), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
@@ -1029,7 +1032,9 @@ fun ShortcutChip(
     title: String, coverArt: String?, colors: Pair<Color, Color>?, onClick: () -> Unit, modifier: Modifier = Modifier, icon: ImageVector? = null,
     songIds: List<String> = emptyList(),
 ) {
-    val paint = LocalShortcutLook.current?.let { look -> shortcutPaint(colors ?: tileColors(title), coverArt, title, look, songIds) }
+    val chosen = shortcutColours(title, songIds)
+    val paint = LocalShortcutLook.current?.let { look -> shortcutPaint(colors ?: tileColors(title), chosen, coverArt, title, look) }
+    val square = chosen?.let { it.second to it.first } ?: colors
     val shape = RoundedCornerShape(percent = 50)
     Row(
         modifier
@@ -1046,10 +1051,10 @@ fun ShortcutChip(
         } else {
             Box(
                 Modifier.size(QUICK_CHIP_PICTURE).clip(androidx.compose.foundation.shape.CircleShape)
-                    .background(Brush.linearGradient(listOf(colors?.first ?: Color.Gray, colors?.second ?: Color.DarkGray))),
+                    .background(Brush.linearGradient(listOf(square?.first ?: Color.Gray, square?.second ?: Color.DarkGray))),
                 contentAlignment = Alignment.Center,
             ) {
-                if (icon != null) Icon(icon, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                if (icon != null) Icon(icon, null, tint = if (chosen != null && wordsDarkOn(square!!)) Color(0xFF14181C) else Color.White, modifier = Modifier.size(16.dp))
             }
         }
         Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis,

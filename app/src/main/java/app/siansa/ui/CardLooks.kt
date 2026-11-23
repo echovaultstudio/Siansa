@@ -33,6 +33,7 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.Shape
 import app.siansa.data.CardLook
 
@@ -94,17 +95,34 @@ internal fun shortcutLookOf(cardColour: CardLook?, colours: app.siansa.data.Pict
     cardColour ?: CardLook.VIVID.takeIf { colours != null && colours != app.siansa.data.PictureColours.COVERS }
 
 /**
- * A shortcut tile's paint in [look]: in the colours its row's Colours say ([LocalPictureColours]: its songs' moods for
- * a mix, [songIds], or a set), else its picture's or its [own] as before.
+ * The two colours a shortcut tile's row gives it ([LocalPictureColours]: its songs' moods for a mix, [songIds], or a
+ * set), or null when it keeps its own (the covers' colours, or By mood for something that isn't a mix).
  */
 @Composable
-internal fun shortcutPaint(own: Pair<Color, Color>, picture: String?, title: String, look: CardLook, songIds: List<String> = emptyList()): CardPaint {
+internal fun shortcutColours(title: String, songIds: List<String> = emptyList()): Pair<Color, Color>? {
     val palette = LocalPictureColours.current
     val mood = if (palette == app.siansa.data.PictureColours.MOOD) rememberMoodPaint(songIds) else null
-    val chosen = mood ?: setPaint(palette, title)
-    // The row's chosen colours are the card's own then, whatever its picture's are.
-    return if (chosen != null) cardPaint(chosen.first to chosen.second, null, title, look) else cardPaint(own, picture, title, look)
+    return (mood ?: setPaint(palette, title))?.let { it.first to it.second }
 }
+
+/**
+ * A shortcut tile's paint in [look]: in its row's [chosen] colours when it has them ([shortcutColours]), whatever its
+ * picture's are, with words that can be read on them; else its picture's or its [own] as before.
+ */
+@Composable
+internal fun shortcutPaint(own: Pair<Color, Color>, chosen: Pair<Color, Color>?, picture: String?, title: String, look: CardLook): CardPaint {
+    if (chosen == null) return cardPaint(own, picture, title, look)
+    val paint = cardPaint(chosen, null, title, look)
+    // Vivid fills the tile with the colours themselves: pale ones (Siansa's frost, Mono's light greys) take dark words.
+    val filled = look == CardLook.VIVID || look == CardLook.AS_HOME
+    return if (filled && wordsDarkOn(chosen)) CardPaint(paint.base, paint.wash, DARK_WORDS, DARK_WORDS.copy(alpha = 0.75f)) else paint
+}
+
+/** Whether words on a fill of [colours] should be dark: the fill is light where the words begin. */
+internal fun wordsDarkOn(colours: Pair<Color, Color>): Boolean =
+    (colours.first.luminance() * 2f + colours.second.luminance()) / 3f > 0.42f
+
+private val DARK_WORDS = Color(0xFF14181C)
 
 /** Fills a card with [paint] in [shape]: the solid, then the wash over it. */
 fun Modifier.cardFill(paint: CardPaint, shape: Shape): Modifier {

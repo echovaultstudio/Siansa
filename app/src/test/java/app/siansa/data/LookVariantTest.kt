@@ -3,6 +3,8 @@ package app.siansa.data
 import androidx.test.core.app.ApplicationProvider
 import app.siansa.ui.shortcutKind
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -46,6 +48,13 @@ class LookVariantTest {
         // The row's own Card colour stays the look, Plain too, whatever its Colours.
         assertEquals(app.siansa.data.CardLook.SOFT, look(app.siansa.data.CardLook.SOFT, PictureColours.MONO))
         assertEquals(app.siansa.data.CardLook.PLAIN, look(app.siansa.data.CardLook.PLAIN, PictureColours.SIANSA))
+        // Words stay readable on the colours: dark on pale ones (frost, light grey), white on deep ones.
+        val c = { v: Long -> androidx.compose.ui.graphics.Color(v) }
+        assertTrue(app.siansa.ui.wordsDarkOn(c(0xFFD8E3EC) to c(0xFF6F86A0)))
+        assertTrue(app.siansa.ui.wordsDarkOn(c(0xFFF2F2F3) to c(0xFF8A8A90)))
+        assertTrue(app.siansa.ui.wordsDarkOn(c(0xFFFFB547) to c(0xFFD8E3EC)))
+        assertFalse(app.siansa.ui.wordsDarkOn(c(0xFF4B2BD6) to c(0xFF2A1470)))
+        assertFalse(app.siansa.ui.wordsDarkOn(c(0xFF7A2E3A) to c(0xFF14181C)))
     }
 
     @Test fun aBigShortcutSaysWhatItIs() {
