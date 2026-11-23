@@ -466,7 +466,7 @@ fun AboutSongCard(song: Song, surface: Color, stars: Int? = null, playing: Playi
         CardTitle("About this song")
         if (stars != null) AboutRating(stars, line = cells.isNotEmpty() || playing != null, onRate = onRate)
         if (playing != null) {
-            StreamPath(PlayingAs.file(d.codec, song.suffix, d.bitRateKbps), playing)
+            StreamPath(PlayingAs.file(d.codec, song.suffix, d.bitRateKbps), playing.heard(d.sampleRateHz))
             if (cells.isNotEmpty()) Spacer(Modifier.height(Space.Page))
         }
         cells.chunked(2).forEach { row ->
@@ -506,17 +506,19 @@ internal fun StreamPath(file: Pair<String, String?>, playing: PlayingAs) {
         // The file's side is as wide as its words ("FLAC", "2,116 kbit/s" never broken), Playing gets the rest.
         StreamEnd("FILE", file.first, file.second, lit = false, Modifier.width(IntrinsicSize.Max).fillMaxHeight().testTag("streamFile"))
         Icon(Icons.AutoMirrored.Rounded.ArrowForward, null, tint = Color.White.copy(alpha = 0.45f), modifier = Modifier.size(STREAM_ARROW))
-        StreamEnd("PLAYING", playing.title, playing.detail, lit = playing.differs, Modifier.weight(1f).fillMaxHeight().testTag("streamPlaying"))
+        StreamEnd("PLAYING", playing.title, playing.detail, lit = playing.differs, Modifier.weight(1f).fillMaxHeight().testTag("streamPlaying"), more = playing.sound)
     }
 }
 
 @Composable
-private fun StreamEnd(label: String, title: String, detail: String?, lit: Boolean, modifier: Modifier) {
+private fun StreamEnd(label: String, title: String, detail: String?, lit: Boolean, modifier: Modifier, more: String? = null) {
     // Both sides start at the top, so their labels and their first lines sit on one line each.
     Column(modifier, verticalArrangement = Arrangement.Top) {
         Text(label, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.45f), letterSpacing = 0.4.sp, maxLines = 1)
         Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = if (lit) Accent else Color.Unspecified, maxLines = 2, overflow = TextOverflow.Ellipsis)
         if (detail != null) Text(detail, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.72f), maxLines = 3, overflow = TextOverflow.Ellipsis)
+        // What the phone does with it: untouched, unchanged, resampled, blended.
+        if (more != null) Text(more, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.72f), maxLines = 4, overflow = TextOverflow.Ellipsis, modifier = Modifier.testTag("streamSound"))
     }
 }
 
@@ -548,8 +550,18 @@ internal fun rememberPlayingAs(song: Song, state: app.siansa.playback.PlayerStat
     }
     val wifi = remember(song.id, state.transcodeKbps, state.isPlaying) { app.siansa.playback.Streaming.isUnmetered(context) }
     val settings by graph.settings.state.collectAsStateWithLifecycle()
+    // What blends this song at its changes: a DJ mix or radio it's part of, or the crossfade for every song.
+    val seed by graph.songRadio.seed.collectAsStateWithLifecycle()
+    val blended = when {
+        seed != null && graph.songRadio.mode == app.siansa.playback.ContinuousMode.DJ -> "DJ mix"
+        graph.continuousPlay.addedForDj(song.id) || app.siansa.mix.AlbumDjMix.isOn(song.id) -> "DJ mix"
+        settings.crossfade != app.siansa.playback.CrossfadeMode.OFF -> "crossfade"
+        else -> null
+    }
+    // The file's sample rate comes with the song's details, which the card loads: it's put in there ([PlayingAs.heard]).
     return PlayingAs.of(device = dlna?.name ?: cast.device, downloadKbps = download, transcodeKbps = state.transcodeKbps, cached = cached, wifi = wifi,
-        cacheOn = app.siansa.playback.songCacheOn(settings))
+        cacheOn = app.siansa.playback.songCacheOn(settings)).copy(told = PlayingAs.Told(dlna?.name ?: cast.device, download, state.transcodeKbps, cached, wifi,
+        app.siansa.playback.songCacheOn(settings), settings.untouchedPlayback, blended))
 }
 
 /**
