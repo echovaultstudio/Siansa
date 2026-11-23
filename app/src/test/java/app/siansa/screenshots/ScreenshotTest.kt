@@ -281,6 +281,25 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     }
                 }
             },
+            // What the phone does with the sound, in the Playing box (the owner, 23 Nov: "even in DJ mix it says playing same
+            // as file"): a hi-res file resampled in a DJ mix (lit), a 44.1 kHz one between blends, a 44.1 kHz one alone,
+            // and Untouched playback.
+            Scene("player_stream_sound") {
+                OnPlayer {
+                    Column(Modifier.fillMaxWidth().padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Page)) {
+                        listOf(
+                            app.siansa.playback.PlayingAs.file("FLAC", null, 4608) to app.siansa.playback.PlayingAs.of(null, null, 0, false, true, true, fileHz = 96_000, untouched = false, blended = "DJ mix"),
+                            app.siansa.playback.PlayingAs.file("FLAC", null, 1608) to app.siansa.playback.PlayingAs.of(null, null, 0, true, true, false, fileHz = 44_100, untouched = false, blended = "crossfade"),
+                            app.siansa.playback.PlayingAs.file("FLAC", null, 1608) to app.siansa.playback.PlayingAs.of(null, null, 0, false, true, true, fileHz = 44_100, untouched = false, blended = null),
+                            app.siansa.playback.PlayingAs.file("FLAC", null, 4608) to app.siansa.playback.PlayingAs.of(null, null, 0, false, true, true, fileHz = 96_000, untouched = true, blended = null),
+                        ).forEach { (file, playing) ->
+                            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(nowPlayingCardColor(Color(0xFF7A2E3A))).padding(Space.Page)) {
+                                app.siansa.ui.StreamPath(file, playing)
+                            }
+                        }
+                    }
+                }
+            },
             // File → Playing in About this song (issue #1038): converted (lit), the original streamed, an Opus download,
             // on a TV with a long name, and offline with only the file type known.
             Scene("player_stream_path") {

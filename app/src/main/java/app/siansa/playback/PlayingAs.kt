@@ -3,11 +3,31 @@ package app.siansa.playback
 /**
  * What About this song says under "Playing" (issue #1038): what really reaches the ears, beside the file's own details.
  * [title] is the format playing ("Opus 256 kbit/s") or "Same as the file"; [detail] says where it comes from; [differs]
- * is true when what plays isn't the file as it is on the server, which lights the box.
+ * is true when what plays isn't the file as it is on the server, which lights the box. [sound] says what the phone
+ * then does with it (the owner, 23 Nov: "actually show what's being played, whether it's resampled or not. Because even
+ * in DJ mix it says playing same as file"): untouched, unchanged through the mixer, resampled, blended at song changes.
  */
-data class PlayingAs(val title: String, val detail: String, val differs: Boolean) {
+data class PlayingAs(val title: String, val detail: String, val differs: Boolean, val sound: String? = null, val told: Told? = null) {
+    /** What the player knew when this was made, kept so the file's sample rate can be added once the server has said it. */
+    data class Told(
+        val device: String?, val downloadKbps: Int?, val transcodeKbps: Int, val cached: Boolean, val wifi: Boolean, val cacheOn: Boolean,
+        val untouched: Boolean, val blended: String?,
+    )
+
+    /** This, with what the phone does with the sound, now that the file's sample rate ([fileHz], null if unknown) is known. */
+    fun heard(fileHz: Int?): PlayingAs = told?.let { of(it.device, it.downloadKbps, it.transcodeKbps, it.cached, it.wifi, it.cacheOn, fileHz, it.untouched, it.blended) } ?: this
+
     companion object {
         const val SAME = "Same as the file"
+
+        /** The one rate Siansa's mixer runs at, where crossfades and DJ blends happen. */
+        const val MIXER_HZ = 44_100
+
+        /** Opus always comes out of its decoder at this rate, whatever the file was. */
+        const val OPUS_HZ = 48_000
+
+        /** With blends on, the song is the file only between them. */
+        const val SAME_BETWEEN = "Same as the file between blends"
 
         /**
          * From what the player knows: [device] is the TV or speaker it plays on (null on the phone); [downloadKbps] is
@@ -19,6 +39,47 @@ data class PlayingAs(val title: String, val detail: String, val differs: Boolean
          */
         fun of(device: String?, downloadKbps: Int?, transcodeKbps: Int, cached: Boolean, wifi: Boolean, cacheOn: Boolean = true): PlayingAs {
             val net = if (wifi) "Wi-Fi" else "mobile data"
+            return arrives(device, downloadKbps, transcodeKbps, cached, cacheOn, net)
+        }
+
+        /**
+         * As [of], and what the phone then does with the sound: [fileHz] is the file's sample rate (null when the
+         * server didn't say), [untouched] whether Untouched playback is on, and [blended] what blends the songs at
+         * their changes ("DJ mix", "crossfade"; null when nothing does). Nothing is said of a song playing on a TV or
+         * speaker, which the phone doesn't play.
+         */
+        fun of(
+            device: String?, downloadKbps: Int?, transcodeKbps: Int, cached: Boolean, wifi: Boolean, cacheOn: Boolean,
+            fileHz: Int?, untouched: Boolean, blended: String?,
+        ): PlayingAs {
+            val base = of(device, downloadKbps, transcodeKbps, cached, wifi, cacheOn)
+            if (device != null) return base
+            val opus = (downloadKbps ?: 0) > 0 || (downloadKbps == null && transcodeKbps > 0)
+            val hz = if (opus) OPUS_HZ else fileHz?.takeIf { it > 0 }
+            if (untouched) {
+                return base.copy(sound = if (hz != null) "Untouched · ${rate(hz)}" else "Untouched, at its own sample rate")
+            }
+            val resampled = hz != null && hz != MIXER_HZ
+            val through = when {
+                resampled -> "Resampled from ${rate(hz!!)} to ${rate(MIXER_HZ)}"
+                hz != null -> "Unchanged at ${rate(MIXER_HZ)}"
+                else -> "Through Siansa's mixer at ${rate(MIXER_HZ)}"
+            }
+            val blends = blended?.let { " · blended at song changes ($it)" }.orEmpty()
+            val sound = through + blends
+            return when {
+                base.title != SAME -> base.copy(sound = sound)
+                // The first line says it already: the last one only adds from what.
+                resampled -> base.copy(title = "Resampled to ${rate(MIXER_HZ)}", differs = true, sound = "From ${rate(hz!!)}, in Siansa's mixer$blends")
+                blended != null -> base.copy(title = SAME_BETWEEN, sound = sound)
+                else -> base.copy(sound = sound)
+            }
+        }
+
+        /** "44.1 kHz", "96 kHz": never broken at its space. */
+        private fun rate(hz: Int): String = app.siansa.net.formatSampleRate(hz).replace(' ', '\u00A0')
+
+        private fun arrives(device: String?, downloadKbps: Int?, transcodeKbps: Int, cached: Boolean, cacheOn: Boolean, net: String): PlayingAs {
             return when {
                 device != null -> PlayingAs("On $device", "Sent there by your server", differs = false)
                 downloadKbps != null && downloadKbps > 0 -> PlayingAs(opus(downloadKbps), "Downloaded · plays from this phone", differs = true)
