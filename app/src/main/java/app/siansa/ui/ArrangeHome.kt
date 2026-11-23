@@ -14,6 +14,10 @@ import androidx.compose.foundation.layout.Arrangement
 import app.siansa.data.CardLook
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.FilterChip
 import androidx.compose.foundation.rememberScrollState
@@ -100,7 +104,9 @@ fun HomeSettingsSheet(nav: androidx.navigation.NavController, startOnSources: Bo
     // More of you is Siansa Beats' alone: listed only while its mixes are on.
     val offered = if (HomeSection.MORE_OF_YOU in beatsRows) emptySet() else setOf(HomeSection.NOTICES, HomeSection.MORE_OF_YOU)
     ArrangeHomeSheet(s.homeOrder - offered - HomeSection.NOTICES, s.homeHidden, holds = beatsRows,
-        sections = HomeSection.default - HomeSection.NOTICES - offered, gap = s.homeGap, onGapChange = {
+        sections = HomeSection.default - HomeSection.NOTICES - offered,
+        listenColour = app.siansa.data.ListenColour.of(s.listenColour), onListenColour = { graph.settings.setListenColour(it.id) },
+        gap = s.homeGap, onGapChange = {
         AppLog.i("Home", "Spacing: ${homeGapLabel(it)}")
         graph.settings.setHomeGap(it)
     }, onChange = {
@@ -225,6 +231,9 @@ fun ArrangeHomeSheet(
     // How many rows of tiles Shortcuts shows (the owner, 23 Nov), set in its cog.
     shortcutRows: Int = SHORTCUT_ROWS.last,
     onShortcutRows: (Int) -> Unit = {},
+    // Your listening's colour (issue #1347), set in its cog.
+    listenColour: app.siansa.data.ListenColour = app.siansa.data.ListenColour.TEAL,
+    onListenColour: (app.siansa.data.ListenColour) -> Unit = {},
     noLines: Set<HomeSection> = emptySet(),
     onLinesShownChange: (HomeSection, Boolean) -> Unit = { _, _ -> },
     untitled: Set<HomeSection> = emptySet(),
@@ -261,6 +270,10 @@ fun ArrangeHomeSheet(
     onSectionCardLookChange: (HomeSection, CardLook) -> Unit = { _, _ -> },
 ) {
     var picking by remember { mutableStateOf<HomeSection?>(null) }
+    // Your listening's colour, under its cog (issue #1347).
+    var colouring by remember { mutableStateOf(false) }
+    var colour by remember(listenColour) { mutableStateOf(listenColour) }
+    if (colouring) ListenColourDialog(colour, onPick = { colour = it; onListenColour(it) }) { colouring = false }
     var hiddenItems by remember { mutableStateOf(hidden) }
     picking?.let { section ->
         HomeLookDialog(
@@ -468,16 +481,15 @@ fun ArrangeHomeSheet(
                                     tint = if (isHidden) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurface,
                                 )
                             }
-                            // A row whose look is fixed has no cog (the Time Machine card, issue #1341): a gap as wide
-                            // keeps every row's eye in one line.
-                            if (section.fixed) Spacer(Modifier.size(FIXED_ROW_COG)) else IconButton(
-                                // Every row's cog opens the same choices (#1261), Your cards' too.
-                                onClick = { if (section != HomeSection.NOTICES) picking = section else onOpenSettings(section) },
+                            IconButton(
+                                // Every row's cog opens the same choices (#1261), Your cards' too. Your listening's
+                                // look is fixed: its cog has its colour alone (issue #1347).
+                                onClick = { if (section.fixed) colouring = true else if (section != HomeSection.NOTICES) picking = section else onOpenSettings(section) },
                                 modifier = Modifier.testTag("homeLookCog"),
                             ) {
                                 Icon(
                                     Icons.Rounded.Settings,
-                                    contentDescription = if (section == HomeSection.NOTICES) "Notices in Settings" else "Look of ${section.label}",
+                                    contentDescription = if (section == HomeSection.NOTICES) "Notices in Settings" else if (section.fixed) "Colour of ${section.label}" else "Look of ${section.label}",
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
@@ -933,5 +945,50 @@ fun ArrangeHomePage(nav: androidx.navigation.NavController) {
 }
 
 
-/** As wide as a row's cog button, where a row has none. */
-private val FIXED_ROW_COG = 48.dp
+/**
+ * Your listening's colour (issue #1347): each as a round swatch of the card's own fade, the chosen one ringed and
+ * named in bold. A tap picks it at once; Done closes.
+ */
+@Composable
+internal fun ListenColourDialog(chosen: app.siansa.data.ListenColour, onPick: (app.siansa.data.ListenColour) -> Unit, onDismiss: () -> Unit) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Your listening") },
+        text = { ListenColourSwatches(chosen, onPick) },
+        confirmButton = { TextButton(onClick = onDismiss, modifier = Modifier.testTag("listenColourDone")) { Text("Done") } },
+    )
+}
+
+/** The swatches, three to a row, evenly spread. */
+@Composable
+internal fun ListenColourSwatches(chosen: app.siansa.data.ListenColour, onPick: (app.siansa.data.ListenColour) -> Unit) {
+    Column(Modifier.fillMaxWidth().testTag("listenColours"), verticalArrangement = Arrangement.spacedBy(Space.Page)) {
+        Text("Colour", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        app.siansa.data.ListenColour.entries.chunked(3).forEach { row ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+                row.forEach { c ->
+                    val on = c == chosen
+                    Column(
+                        Modifier.weight(1f).clip(RoundedCornerShape(LISTEN_SWATCH_CORNER))
+                            .selectable(selected = on, role = androidx.compose.ui.semantics.Role.RadioButton) { onPick(c) }
+                            .padding(vertical = Space.Small).testTag("listenColour-${c.id}"),
+                        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Space.Small),
+                    ) {
+                        Box(
+                            Modifier.size(LISTEN_SWATCH)
+                                .border(if (on) 2.dp else 1.dp, if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant, CircleShape)
+                                .padding(Space.Tight).clip(CircleShape)
+                                .background(Brush.verticalGradient(listOf(androidx.compose.ui.graphics.Color(c.top), androidx.compose.ui.graphics.Color(c.foot)))),
+                        )
+                        Text(c.label, style = MaterialTheme.typography.labelMedium, fontWeight = if (on) FontWeight.Bold else FontWeight.Normal,
+                            color = if (on) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center, maxLines = 2)
+                    }
+                }
+            }
+        }
+    }
+}
+
+private val LISTEN_SWATCH = 52.dp
+private val LISTEN_SWATCH_CORNER = 12.dp

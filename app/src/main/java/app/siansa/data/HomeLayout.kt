@@ -20,8 +20,8 @@ enum class HomeSection(val id: String, val label: String) {
     MORE_OF_YOU("more_of_you", "More of you"),
     /**
      * Your listening (issues #1341, #1343): one card with a page each for hot now, top songs, this year's artists and
-     * genres, and the Time Machine's look back lists. Its look is fixed: it's moved and hidden like any row, and has
-     * no cog. Empty without a listening history. Its id is from when it was the Time Machine card.
+     * genres, and the Time Machine's look back lists. Its look is fixed: it's moved and hidden like any row, and its
+     * cog has its colour alone (issue #1347). Empty without a listening history. Its id is from when it was the Time Machine card.
      */
     TIME_MACHINE("time_machine", "Your listening"),
     /** Custom cards pinned to Home (issue #622); each shows in its own look, in the order set in Settings › Home › Cards. */
@@ -38,7 +38,7 @@ enum class HomeSection(val id: String, val label: String) {
     /** Its look can be changed under Arrange Home (issue #655); Your cards each have their own, in Settings › Home › Cards. */
     val lookable: Boolean get() = this != CARDS && this != NOTICES && this != TIME_MACHINE
 
-    /** Its look can't be changed anywhere: Arrange Home shows no cog for it. */
+    /** Its look can't be changed: its cog in Arrange Home has its colour alone (issue #1347). */
     val fixed: Boolean get() = this == TIME_MACHINE
 
     companion object {
@@ -350,5 +350,23 @@ enum class CardNames(val id: String, val label: String) {
 
         fun format(chosen: Map<HomeSection, CardNames>): String =
             HomeSection.entries.mapNotNull { s -> chosen[s]?.takeIf { it != AUTO }?.let { "${s.id}:${it.id}" } }.joinToString(",")
+    }
+}
+
+/**
+ * The colour of Your listening's card on Home (issue #1347; the owner, 23 Nov: "allow choosing the colours for this
+ * card"), chosen under its cog in Arrange Home: [top] at its top fading to [foot], with a soft [glow] in a corner.
+ * [COVER] takes them from the top song's cover instead (its own are what shows until the cover is read).
+ */
+enum class ListenColour(val id: String, val label: String, val top: Long, val foot: Long, val glow: Long) {
+    TEAL("teal", "Teal", 0xFF1C3A40, 0xFF0F181B, 0xFF3FA39A),
+    PLUM("plum", "Plum", 0xFF3A2040, 0xFF150F1B, 0xFFB05AA8),
+    INK("ink", "Ink", 0xFF1E1E22, 0xFF0D0D0F, 0xFF8A8A96),
+    EMBER("ember", "Ember", 0xFF40261C, 0xFF1B120F, 0xFFD89A3C),
+    MOSS("moss", "Moss", 0xFF22382A, 0xFF0F1B13, 0xFF5FA86A),
+    COVER("cover", "From its cover", 0xFF2A2A30, 0xFF101013, 0xFF8A8A96);
+
+    companion object {
+        fun of(id: String?): ListenColour = entries.firstOrNull { it.id == id } ?: TEAL
     }
 }

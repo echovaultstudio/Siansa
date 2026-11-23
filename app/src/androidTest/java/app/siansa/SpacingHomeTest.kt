@@ -276,7 +276,8 @@ class SpacingHomeTest : SpacingCheck() {
             list(app.siansa.mix.TimeListKind.YEAR_AGO, "This time last year", "NOV 2025"), list(app.siansa.mix.TimeListKind.DAY, "This day last year", "23 NOV"),
             list(app.siansa.mix.TimeListKind.LAST_MONTH, "Last month", "OCT"), list(app.siansa.mix.TimeListKind.LAST_YEAR, "Your 2025", "2025"),
         ), app.siansa.mix.TIME_CARD_MAKE)
-        compose.setContent { SiansaTheme { Column { app.siansa.ui.ListeningCard(card, app.siansa.ui.ListeningActions({ emptyList() }, { _, _, _ -> }, {}, {}, {})) } } }
+        compose.setContent { SiansaTheme { Column { app.siansa.ui.ListeningCard(card, app.siansa.mix.ListenRange.MONTH, app.siansa.data.ListenColour.TEAL,
+            app.siansa.ui.ListeningActions({ emptyList() }, { _, _, _ -> }, {}, {}, {})) } } }
         val screen = compose.onRoot().getBoundsInRoot()
         val d = compose.density
         fun dp(px: Float) = with(d) { px.toDp() }
@@ -289,6 +290,19 @@ class SpacingHomeTest : SpacingCheck() {
         assertEven("Your listening: its lists' left margin in the card", dp(squares.first().left - whole.left), Space.Page, 1.dp)
         assertEven("Your listening: the gaps between its lists", dp(squares[1].left - squares[0].right), dp(squares[3].left - squares[2].right), 0.5.dp)
         assertEven("Your listening: the gap between lists is a small step", dp(squares[1].left - squares[0].right), Space.Small, 1.dp)
+    }
+
+    /** Your listening's colours under its cog (issue #1347): three to a row, evenly spread, both rows alike. */
+    @Test fun listenColoursAreEvenlySpread() {
+        compose.setContent { SiansaTheme { Column(Modifier.padding(Space.Section)) { app.siansa.ui.ListenColourSwatches(app.siansa.data.ListenColour.TEAL) {} } } }
+        val all = compose.onNodeWithTag("listenColours").getBoundsInRoot()
+        val b = app.siansa.data.ListenColour.entries.map { compose.onNodeWithTag("listenColour-${it.id}").getBoundsInRoot() }
+        assertEven("Listen colours: the first starts at the edge", b[0].left, all.left, 1.dp)
+        assertEven("Listen colours: the third ends at the edge", b[2].right, all.right, 1.dp)
+        assertEven("Listen colours: the gaps in a row", b[1].left - b[0].right, b[2].left - b[1].right, 1.dp)
+        assertEven("Listen colours: the gap is a small step", b[1].left - b[0].right, Space.Small, 1.dp)
+        assertEven("Listen colours: the second row under the first", b[3].left, b[0].left, 1.dp)
+        assertEven("Listen colours: all as wide", b[4].right - b[4].left, b[1].right - b[1].left, 1.dp)
     }
 
     /** A cover grid with one featured (the owner, 22 Nov): the gap under the big square is the gap between all of them. */

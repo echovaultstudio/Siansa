@@ -39,8 +39,8 @@ class TimeCards(private val graph: AppGraph) {
         val made = buildListeningCard(
             today, timeCardPlans(today),
             songsOf = { plan, limit ->
-                // Only a finished month or year is kept for good: a day, the last 30 days and all time move on every day.
-                val lasting = plan.kind != TimeListKind.DAY && plan.kind != TimeListKind.HOT && plan.kind != TimeListKind.TOP
+                // Only a finished month or year is kept for good: a day and the card's times move on every day.
+                val lasting = plan.kind != TimeListKind.DAY && plan.kind != TimeListKind.RANGE
                 runCatching { graph.insights.topOnce(plan.window, plan.key, limit, lasting) }
                     .onFailure { AppLog.w("TimeCard", "${plan.title} not made: ${it.message}") }
                     .getOrNull()?.takeIf { it.complete || it.songs.isNotEmpty() }
@@ -48,7 +48,7 @@ class TimeCards(private val graph: AppGraph) {
             },
             artistsOf = { window ->
                 runCatching { graph.insights.topArtistsOnce(window, CARD_ARTISTS * 2) }
-                    .onFailure { AppLog.w("TimeCard", "This year's artists not made: ${it.message}") }.getOrNull()
+                    .onFailure { AppLog.w("TimeCard", "The artists of ${window.label} not made: ${it.message}") }.getOrNull()
                     ?.map { CardArtist(it.name, it.plays.toInt(), it.artist?.id, it.artist?.coverArt, it.artist?.imageUrl) }
             },
             // Siansa Beats' genres by each song's sound where it has them, else the song's tag.
@@ -64,8 +64,8 @@ class TimeCards(private val graph: AppGraph) {
         }
         file.update { TimeCardKept(made) }
         AppLog.i("TimeCard", "Made for $today in ${System.currentTimeMillis() - now}ms: " +
-            (listOfNotNull(made.hot, made.top) + made.lists).joinToString { "${it.title} (${it.songIds.size})" }.ifEmpty { "no list has enough plays" } +
-            " · ${made.artists.size} artists · genres ${made.genres.joinToString { "${it.name} ${it.share} %" }.ifEmpty { "none" }}")
+            made.lists.joinToString { "${it.title} (${it.songIds.size})" }.ifEmpty { "no look back has enough plays" } + " · " +
+            made.ranges.joinToString { "${it.range}: ${it.songs?.songIds?.size ?: 0} songs, ${it.artists.size} artists, ${it.genres.size} genres" })
         made
     }
 

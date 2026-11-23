@@ -244,6 +244,9 @@ data class AppSettings(
     val homePictureColours: Map<HomeSection, PictureColours> = emptyMap(),
     /** The gap between Home's sections (#554), as a step of the spacing scale: 0 tight … 4 airy. 2 is the default. */
     val homeGap: Int = HOME_GAP_DEFAULT,
+    /** Your listening's card on Home (issue #1347): the time it's set to ([app.siansa.mix.ListenRange.id]) and its colour ([ListenColour.id]). */
+    val listenRange: String = "month",
+    val listenColour: String = "teal",
     /** Show only music on the phone, across the whole app (issue #141). */
     val downloadedOnly: Boolean = false,
     /** The time machine lists songs that aren't in your library, marked (issue #234). */
@@ -580,6 +583,8 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         homeCarouselCompact = HomeSection.parseHidden(prefs.getString("home_carousel_compact", null)),
         homeCarouselSmall = HomeSection.parseHidden(prefs.getString("home_carousel_small", null)),
         homeGap = prefs.getInt("home_gap", AppSettings.HOME_GAP_DEFAULT).coerceIn(0, AppSettings.HOME_GAP_MAX),
+        listenRange = prefs.getString("listen_range", null) ?: "month",
+        listenColour = prefs.getString("listen_colour", null) ?: "teal",
         downloadedOnly = prefs.getBoolean("downloaded_only", false),
         timeMachineMissing = prefs.getBoolean("time_machine_missing", true),
         badBlendButton = prefs.getBoolean("bad_blend_button", app.siansa.playback.LastBlend.onByDefault),
@@ -1075,6 +1080,18 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
      */
     private fun noteBlend(what: String, before: Any, after: Any) {
         if (before != after) app.siansa.log.AppLog.i("Settings", "$what: $before → $after")
+    }
+
+    fun setListenRange(id: String) {
+        app.siansa.log.AppLog.i("Settings", "Your listening shows: $id")
+        prefs.edit().putString("listen_range", id).apply()
+        _state.value = _state.value.copy(listenRange = id)
+    }
+
+    fun setListenColour(id: String) {
+        app.siansa.log.AppLog.i("Settings", "Your listening's colour: $id")
+        prefs.edit().putString("listen_colour", id).apply()
+        _state.value = _state.value.copy(listenColour = id)
     }
 
     fun setUntouchedPlayback(on: Boolean) {
