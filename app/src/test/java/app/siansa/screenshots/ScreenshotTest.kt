@@ -367,6 +367,21 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
             // Siansa Beats' mix settings (the owner, 22 Nov: "a total revamp… 100% organised and not bloated"): three parts
             // of one line each, AUTO or TUNED on a mix's line; then with lines open: a number, names left out with a long
             // Untouched playback on the Playback page (the owner, 22 Nov): its switch with what it does in a few lines,
+            // A DJ mix asked for with Untouched playback on (the owner, 23 Nov): the chooser says what DJ does, and the
+            // question that follows.
+            Scene("dj_needs_blends") {
+                Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Section)) {
+                    app.siansa.ui.RadioModeChoices(djNote = app.siansa.ui.DjNeedsBlends.NOTE) {}
+                    Column(verticalArrangement = Arrangement.spacedBy(Space.Small)) {
+                        Text(app.siansa.ui.DjNeedsBlends.TITLE, style = MaterialTheme.typography.headlineSmall)
+                        Text(app.siansa.ui.DjNeedsBlends.WHY, style = MaterialTheme.typography.bodyMedium)
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                            androidx.compose.material3.TextButton(onClick = {}) { Text("Not now") }
+                            androidx.compose.material3.TextButton(onClick = {}) { Text(app.siansa.ui.DjNeedsBlends.YES) }
+                        }
+                    }
+                }
+            },
             // and the fades' section saying why it's off.
             Scene("untouched_playback") {
                 Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {

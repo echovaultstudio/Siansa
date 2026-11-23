@@ -201,7 +201,7 @@ internal fun crossfadeLengthHint(s: AppSettings): String? =
 /** The section's summary: Smart has nothing to set; Fixed says its length and bars. */
 /** What Untouched playback does, and what it switches off. */
 internal const val UNTOUCHED_HINT = "Plays each song at its own sample rate and bit depth, straight to your phone's sound output. " +
-    "Crossfades, DJ blends and the equaliser are off while it's on. Switching it pauses the song for a moment."
+    "Crossfades, DJ blends and the equaliser are off while it's on, and starting a DJ mix asks to turn it off. Switching it pauses the song for a moment."
 
 /** The Equaliser's line on the Playback page: it can't work on sound that goes out untouched. */
 internal fun equaliserSummary(s: AppSettings, on: Boolean, preset: String): String = when {

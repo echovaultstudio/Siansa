@@ -27,7 +27,11 @@ hi-res song is converted to 44.1 kHz there (you won't hear it, but it isn't the 
 While Untouched playback is on:
 
 - **Crossfades and DJ blends are off**, as nothing can be blended on the way out. Songs play back to back, and albums
-  stay gapless. DJ radio and DJ mixes still pick and order their songs; they just aren't blended.
+  stay gapless.
+- **Starting a DJ mix asks first**: "DJ mix needs Untouched playback off", with **Turn off and start**. Say yes and
+  Untouched playback goes off, the song pauses for a moment and the mix starts; say **Not now** and nothing changes.
+  The DJ mix bar in now playing is drawn fainter meanwhile, and **Start a mix** says "Turns off Untouched playback"
+  under DJ. Keep playing in DJ mode, which adds songs by itself, doesn't ask: its songs play without blends.
 - **The equaliser is off**, since it changes the sound.
 - **Levelling still works**: it only turns the volume of a song up or down.
 - Set **Streaming quality** to **Original** to get the file itself: Opus is a conversion made by your server.
