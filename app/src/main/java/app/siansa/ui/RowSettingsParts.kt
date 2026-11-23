@@ -206,6 +206,9 @@ private val LOOK_LINE = 4.dp
  * spacing"; a bar of four broke "Three a row" over two lines): a stop for each of [options], and under the slider each
  * one's [label], centred on its own stop (the first and last kept inside the edges), the chosen one in the accent
  * colour. A tap on a label picks it too. [onPick] is told as the thumb comes to a stop.
+ *
+ * With [onlyChosen], only the chosen one's name is shown, under its own stop (the owner, 23 Nov: four names in a row
+ * "looks messy, maybe only show the selected text so it fits neatly"): for choices with names longer than a number.
  */
 @Composable
 internal fun <T> StopSlider(
@@ -215,6 +218,7 @@ internal fun <T> StopSlider(
     tag: (T) -> String,
     modifier: Modifier = Modifier,
     sliderTag: String = "stopSlider",
+    onlyChosen: Boolean = false,
     onPick: (T) -> Unit,
 ) {
     if (options.size < 2) return
@@ -235,7 +239,7 @@ internal fun <T> StopSlider(
         )
         androidx.compose.ui.layout.Layout(
             content = {
-                options.forEach { option ->
+                (if (onlyChosen) listOf(options[at]) else options).forEach { option ->
                     val chosen = option == selected
                     Text(
                         label(option),
@@ -243,7 +247,8 @@ internal fun <T> StopSlider(
                         fontWeight = if (chosen) FontWeight.Bold else FontWeight.Normal,
                         color = if (chosen) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                        maxLines = 2,
+                        maxLines = if (onlyChosen) 1 else 2,
+                        overflow = TextOverflow.Ellipsis,
                         modifier = Modifier
                             .clip(RoundedCornerShape(STOP_LABEL_CORNER))
                             .selectable(selected = chosen, role = androidx.compose.ui.semantics.Role.RadioButton) { onPick(option) }
@@ -257,11 +262,14 @@ internal fun <T> StopSlider(
             val width = constraints.maxWidth
             // Each label may be as wide as the gap between two stops, so "Three a row" stays on one line at large text
             // too; only a longer one breaks on to two lines, centred.
-            val each = androidx.compose.ui.unit.Constraints(maxWidth = (width / (measurables.size - 1)).coerceAtLeast(1))
+            val each = androidx.compose.ui.unit.Constraints(maxWidth = if (onlyChosen) width else (width / (measurables.size - 1)).coerceAtLeast(1))
             val placed = measurables.map { it.measure(each) }
             val height = placed.maxOf { it.height }
             layout(width, height) {
-                placed.forEachIndexed { i, p -> p.placeRelative(stopLabelLeft(i, placed.size, width, p.width), 0) }
+                placed.forEachIndexed { i, p ->
+                    // The one name shown stands under the chosen stop, as each of them does when all are shown.
+                    p.placeRelative(stopLabelLeft(if (onlyChosen) at else i, options.size, width, p.width), 0)
+                }
             }
         }
     }

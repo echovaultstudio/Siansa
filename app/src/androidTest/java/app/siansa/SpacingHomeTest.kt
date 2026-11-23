@@ -378,6 +378,22 @@ class SpacingHomeTest : SpacingCheck() {
         assertEven("Stop slider: the third name is centred on its stop", (names[2].left + names[2].right) / 2 - row.left, width * 2 / 3, 1.dp)
     }
 
+    /** With only the chosen name shown (the owner, 23 Nov: "only show the selected text so it fits neatly"): it alone, centred under its stop. */
+    @Test fun stopSliderShowsOnlyTheChosenNameUnderItsStop() {
+        val shapes = listOf("Two a row", "Three a row", "Big tiles", "Pill chips")
+        compose.setContent {
+            SiansaTheme {
+                Column(Modifier.padding(Space.Section)) {
+                    app.siansa.ui.StopSlider(shapes, shapes[2], { it }, { "stop-" + shapes.indexOf(it) }, onlyChosen = true) {}
+                }
+            }
+        }
+        val row = compose.onNodeWithTag("stopLabels").getBoundsInRoot()
+        val name = compose.onNodeWithTag("stop-2").getBoundsInRoot()
+        assertEven("Stop slider: the one name is centred on its stop", (name.left + name.right) / 2 - row.left, (row.right - row.left) * 2 / 3, 1.dp)
+        listOf(0, 1, 3).forEach { compose.onNodeWithTag("stop-$it").assertDoesNotExist() }
+    }
+
     /** A row's settings sheet (the owner, 22 Nov): its switch lines one height, one after the other, with the same margin on both sides. */
     @Test fun rowSettingsLinesAreEven() {
         compose.setContent {

@@ -601,11 +601,13 @@ internal fun HomeLookDialog(
                 if ("look" in open) LookCards(look, Modifier.padding(bottom = Space.Medium)) { look = it; onPick(it) }
                 if (variants.size > 1 && style != null) {
                     SheetRule()
-                    ValueLine(variantTitle(look), style.label, "style" in open, "rowStyle") { toggle("style") }
+                    // Shortcuts' four shapes on a slider (the owner, 23 Nov): a bar of four broke their names. Open, the
+                    // chosen one's name stands under its stop only, so the line above doesn't say it twice.
+                    val onSlider = look == HomeLook.AS_IS && section == HomeSection.QUICK
+                    ValueLine(variantTitle(look), if (onSlider && "style" in open) "" else style.label, "style" in open, "rowStyle") { toggle("style") }
                     if ("style" in open) {
-                        // Shortcuts' four shapes on a slider (the owner, 23 Nov): a bar of four broke their names.
-                        if (look == HomeLook.AS_IS && section == HomeSection.QUICK) {
-                            StopSlider(variants, style, { stopName(it) }, { "lookVariant-${it.id}" }, Modifier.padding(bottom = Space.Medium), sliderTag = "rowStyleSlider") { layout = it; onVariant(it) }
+                        if (onSlider) {
+                            StopSlider(variants, style, { it.label }, { "lookVariant-${it.id}" }, Modifier.padding(bottom = Space.Medium), sliderTag = "rowStyleSlider", onlyChosen = true) { layout = it; onVariant(it) }
                         } else {
                             SegmentBar(variants, style, { shortLabel(it) }, { "lookVariant-${it.id}" }, Modifier.padding(bottom = Space.Medium)) { layout = it; onVariant(it) }
                         }
@@ -928,14 +930,3 @@ fun ArrangeHomePage(nav: androidx.navigation.NavController) {
     }
 }
 
-/**
- * A tile shape's name under its stop on the slider: one short word, so four of them never run into each other at large
- * text ("Two a row" and "Three a row" did at 130%). The full name stands on the line above the slider.
- */
-internal fun stopName(variant: app.siansa.data.LookVariant): String = when (variant) {
-    app.siansa.data.LookVariant.TWO -> "Two"
-    app.siansa.data.LookVariant.THREE -> "Three"
-    app.siansa.data.LookVariant.BIG -> "Big"
-    app.siansa.data.LookVariant.CHIPS -> "Pills"
-    else -> variant.label
-}

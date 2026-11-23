@@ -74,9 +74,4 @@ class QuickShortcutsTest {
         assertNull(fillRoute("album/{id}") { null })
         assertNull(fillRoute(null) { "x" })
     }
-
-    @Test fun aTileShapesNameUnderItsStopIsOneShortWord() {
-        val names = app.siansa.data.LookVariant.of(app.siansa.data.HomeLook.GRID).map { stopName(it) }
-        org.junit.Assert.assertEquals(listOf("Two", "Three", "Big", "Pills"), names)
-    }
 }
