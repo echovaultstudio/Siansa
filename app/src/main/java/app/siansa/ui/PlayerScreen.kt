@@ -456,7 +456,7 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                                             DjBar(
                                                 shownBar.spots, shownBar.chosen, now = now, starting = shownBar.starting, open = open,
                                                 modifier = Modifier.padding(top = DJ_BAR_CENTRE - DJ_BAR_HEIGHT / 2),
-                                                asks = shownBar.starting && graph.settings.state.collectAsStateWithLifecycle().value.untouchedPlayback,
+                                                asks = shownBar.starting && graph.settings.state.collectAsStateWithLifecycle().value.untouchedNow,
                                             )
                                         }
                                     }

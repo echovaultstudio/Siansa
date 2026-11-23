@@ -28,10 +28,12 @@ While Untouched playback is on:
 
 - **Crossfades and DJ blends are off**, as nothing can be blended on the way out. Songs play back to back, and albums
   stay gapless.
-- **Starting a DJ mix asks first**: "DJ mix needs Untouched playback off", with **Turn off and start**. Say yes and
-  Untouched playback goes off, the song pauses for a moment and the mix starts; say **Not now** and nothing changes.
-  The DJ mix bar in now playing is drawn fainter meanwhile, and **Start a mix** says "Turns off Untouched playback"
-  under DJ. Keep playing in DJ mode, which adds songs by itself, doesn't ask: its songs play without blends.
+- **Starting a DJ mix asks first**: "DJ mix pauses Untouched playback", with **Pause it and start**. Say yes and
+  Untouched playback is set aside for that mix only: the song stops for a moment and the mix starts, blended. The
+  switch stays on (it says "Paused for the DJ mix that's playing" under it), and when you play something that isn't a
+  DJ mix, Untouched playback is on again by itself, from that song. Say **Not now** and nothing changes.
+  The DJ mix bar in now playing is drawn fainter meanwhile, and **Start a mix** says "Pauses Untouched playback for
+  the mix" under DJ. Keep playing in DJ mode, which adds songs by itself, doesn't ask: its songs play without blends.
 - **The equaliser is off**, since it changes the sound.
 - **Levelling still works**: it only turns the volume of a song up or down.
 - Set **Streaming quality** to **Original** to get the file itself: Opus is a conversion made by your server.

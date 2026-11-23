@@ -275,6 +275,11 @@ data class AppSettings(
      * bit depth, past Siansa's mixer and equaliser. Nothing can be blended then: crossfades and DJ blends are off.
      */
     val untouchedPlayback: Boolean = false,
+    /**
+     * Untouched playback set aside while a DJ mix plays (issue #1345; the owner, 23 Nov: "temporary… goes back off if
+     * new session without those is started"). Never saved: the switch stays on, and a restart starts untouched again.
+     */
+    val untouchedPaused: Boolean = false,
     /** How far a song radio may wander from its first song (issue #256). */
     val radioDrift: RadioDrift = RadioDrift.SOME,
     /** What plays when the queue is about to end (issue #337): nothing, songs like the last one, or a DJ-ordered set. */
@@ -296,6 +301,9 @@ data class AppSettings(
     /** How much louder the receiver plays Dolby Digital Plus songs sent to it, in dB (issue #930); 0 is off. TV app only. */
     val dolbyLouderDb: Int = 0,
 ) {
+    /** Whether songs go straight to the phone's output right now: Untouched playback on, and not set aside for a DJ mix. */
+    val untouchedNow: Boolean get() = untouchedPlayback && !untouchedPaused
+
     val lastFmReady: Boolean get() = lastFmEnabled && lastFmApiKey.isNotBlank() && lastFmSecret.isNotBlank() && lastFmSession.isNotBlank()
     val listenBrainzReady: Boolean get() = listenBrainzEnabled && listenBrainzToken.isNotBlank()
 
@@ -1072,7 +1080,15 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
     fun setUntouchedPlayback(on: Boolean) {
         app.siansa.log.AppLog.i("Settings", "Untouched playback: " + if (on) "on (crossfades, DJ blends and the equaliser are off)" else "off")
         prefs.edit().putBoolean("untouched_playback", on).apply()
-        _state.value = _state.value.copy(untouchedPlayback = on)
+        // Switched by hand: whatever was set aside for a DJ mix is over.
+        _state.value = _state.value.copy(untouchedPlayback = on, untouchedPaused = false)
+    }
+
+    /** Sets Untouched playback aside for a DJ mix, or takes it up again after it (issue #1345). The switch isn't touched. */
+    fun pauseUntouched(paused: Boolean) {
+        if (_state.value.untouchedPaused == paused) return
+        app.siansa.log.AppLog.i("Settings", "Untouched playback: " + if (paused) "paused for a DJ mix" else "on again, the DJ mix is over")
+        _state.value = _state.value.copy(untouchedPaused = paused)
     }
 
     fun setCrossfade(mode: CrossfadeMode = _state.value.crossfade, seconds: Int = _state.value.crossfadeSeconds) {

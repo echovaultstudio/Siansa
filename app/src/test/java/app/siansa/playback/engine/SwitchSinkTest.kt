@@ -81,9 +81,34 @@ class SwitchSinkTest {
         assertEquals(1, started)  // on: it waits on the answer
         val waiting = app.siansa.ui.DjNeedsBlends.waiting.value
         assertTrue(waiting != null)
-        waiting!!()  // "Turn off and start"
+        waiting!!()  // "Pause it and start"
         assertEquals(2, started)
         app.siansa.ui.DjNeedsBlends.waiting.value = null
+    }
+
+    /** Issue #1345 (the owner, 23 Nov: "temporary… goes back off if new session without those is started"). */
+    @Test fun untouchedPlaybackIsOnlySetAsideForADjMix() {
+        val on = AppSettings(untouchedPlayback = true)
+        assertTrue(on.untouchedNow)
+        val paused = on.copy(untouchedPaused = true)
+        assertTrue(paused.untouchedPlayback)  // the switch stays on
+        assertFalse(paused.untouchedNow)      // but songs go through the mixer, so they can be blended
+        assertFalse(AppSettings(untouchedPaused = true).untouchedNow)
+        assertEquals(app.siansa.ui.DjNeedsBlends.PAUSED, app.siansa.ui.untouchedHint(paused))
+        assertEquals(app.siansa.ui.UNTOUCHED_HINT, app.siansa.ui.untouchedHint(on))
+        assertEquals(app.siansa.ui.UNTOUCHED_HINT, app.siansa.ui.untouchedHint(AppSettings(untouchedPaused = true)))
+    }
+
+    @Test fun itComesBackWhenWhatPlaysIsNoDjMix() {
+        val wait = app.siansa.playback.UNTOUCHED_DJ_WAIT_MS
+        // While the mix plays, never.
+        assertFalse(app.siansa.playback.untouchedResumes(dj = true, djSeen = true, sinceMs = 10 * wait))
+        // The mix was playing and now something else is: back on.
+        assertTrue(app.siansa.playback.untouchedResumes(dj = false, djSeen = true, sinceMs = 5_000))
+        // The mix is still being made (a song changed meanwhile): not yet.
+        assertFalse(app.siansa.playback.untouchedResumes(dj = false, djSeen = false, sinceMs = 5_000))
+        // It never got going: back on after the wait, not paused for good.
+        assertTrue(app.siansa.playback.untouchedResumes(dj = false, djSeen = false, sinceMs = wait))
     }
 
     @Test fun thePlaybackPageSaysWhatItSwitchesOff() {

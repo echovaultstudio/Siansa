@@ -561,7 +561,7 @@ internal fun rememberPlayingAs(song: Song, state: app.siansa.playback.PlayerStat
     // The file's sample rate comes with the song's details, which the card loads: it's put in there ([PlayingAs.heard]).
     return PlayingAs.of(device = dlna?.name ?: cast.device, downloadKbps = download, transcodeKbps = state.transcodeKbps, cached = cached, wifi = wifi,
         cacheOn = app.siansa.playback.songCacheOn(settings)).copy(told = PlayingAs.Told(dlna?.name ?: cast.device, download, state.transcodeKbps, cached, wifi,
-        app.siansa.playback.songCacheOn(settings), settings.untouchedPlayback, blended))
+        app.siansa.playback.songCacheOn(settings), settings.untouchedNow, blended))
 }
 
 /**
