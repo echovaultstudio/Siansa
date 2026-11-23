@@ -605,7 +605,7 @@ internal fun HomeLookDialog(
                     if ("style" in open) {
                         // Shortcuts' four shapes on a slider (the owner, 23 Nov): a bar of four broke their names.
                         if (look == HomeLook.AS_IS && section == HomeSection.QUICK) {
-                            StopSlider(variants, style, { it.label }, { "lookVariant-${it.id}" }, Modifier.padding(bottom = Space.Medium), sliderTag = "rowStyleSlider") { layout = it; onVariant(it) }
+                            StopSlider(variants, style, { stopName(it) }, { "lookVariant-${it.id}" }, Modifier.padding(bottom = Space.Medium), sliderTag = "rowStyleSlider") { layout = it; onVariant(it) }
                         } else {
                             SegmentBar(variants, style, { shortLabel(it) }, { "lookVariant-${it.id}" }, Modifier.padding(bottom = Space.Medium)) { layout = it; onVariant(it) }
                         }
@@ -926,4 +926,16 @@ fun ArrangeHomePage(nav: androidx.navigation.NavController) {
             HomeSettingsSheet(nav, startOnSources = false, onDismiss = { nav.popBackStack() }, asPage = true)
         }
     }
+}
+
+/**
+ * A tile shape's name under its stop on the slider: one short word, so four of them never run into each other at large
+ * text ("Two a row" and "Three a row" did at 130%). The full name stands on the line above the slider.
+ */
+internal fun stopName(variant: app.siansa.data.LookVariant): String = when (variant) {
+    app.siansa.data.LookVariant.TWO -> "Two"
+    app.siansa.data.LookVariant.THREE -> "Three"
+    app.siansa.data.LookVariant.BIG -> "Big"
+    app.siansa.data.LookVariant.CHIPS -> "Pills"
+    else -> variant.label
 }

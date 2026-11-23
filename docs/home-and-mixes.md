@@ -120,7 +120,7 @@ their covers' colours), and a picture style other than Auto draws each tile's sm
 
 | Section | What it shows |
 |---|---|
-| **Shortcuts** | The albums, playlists, mixes and Liked songs you played from last, newest first: 8 of them, or as many as you pick from 2 to 8 under **Settings › Home › Top of Home**, or by rows in its cog: **Rows**, 1 to 4 (three a row shows three in each row, up to 12). Its **Tiles' shape** (two a row, three a row, big tiles, pill chips) and its rows are sliders, each choice named under its stop. Until there's enough of that, today's mixes, your playlists and recent albums. |
+| **Shortcuts** | The albums, playlists, mixes and Liked songs you played from last, newest first: 8 of them, or as many as you pick from 2 to 8 under **Settings › Home › Top of Home**, or by rows in its cog: **Rows**, 1 to 4 (three a row shows three in each row, up to 12). Its **Tiles' shape** (two a row, three a row, big tiles, pill chips) and its rows are sliders, with a short name under each stop and the full one above. Until there's enough of that, today's mixes, your playlists and recent albums. |
 | **Today's mix** | The day's mix, made for the vibe of the hour it's made in (see below). |
 | **For now** | Three or four mixes of your own for each part of the day, side by side. |
 | **Made for you** | Your sound, On repeat, Discover for you, then cards of your own. |

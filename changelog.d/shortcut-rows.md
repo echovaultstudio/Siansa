@@ -4,4 +4,4 @@
 
 ### Changed
 
-- Shortcuts' Tiles' shape is a slider with each choice named under its stop; "Three a row" no longer breaks over two lines.
+- Shortcuts' Tiles' shape is a slider with a short name under each stop (Two, Three, Big, Pills) and the full name above it; "Three a row" no longer breaks over two lines.
