@@ -124,9 +124,24 @@ class PlaybackService : MediaLibraryService() {
      * changes its way out ([app.siansa.playback.engine.SwitchSink]). The song carries on from where it was after a
      * short pause; a fade under way is given up first, as nothing can be blended on the phone's own output.
      */
+    // Untouched playback set aside for a DJ mix (issue #1345): when, and whether the mix has been seen playing since.
+    private var untouchedPausedAt = 0L
+    private var djSeenWhilePaused = false
+
+    /**
+     * At a change of song: Untouched playback, set aside for a DJ mix, is taken up again once what plays isn't a DJ
+     * mix any more ([untouchedResumes]). The new song then starts on the phone's own output after a short pause.
+     */
+    private fun resumeUntouchedAfterDj(player: Player) {
+        if (!graph.settings.current.untouchedPaused) return
+        val dj = djPlayback(player)
+        if (dj) djSeenWhilePaused = true
+        if (untouchedResumes(dj, djSeenWhilePaused, android.os.SystemClock.elapsedRealtime() - untouchedPausedAt)) graph.settings.pauseUntouched(false)
+    }
+
     private fun onSoundPathChanged() {
         val switch = soundSwitch ?: return
-        val want = graph.settings.current.untouchedPlayback
+        val want = graph.settings.current.untouchedNow
         if (switch.isDirect == want) return
         crossfader?.cancel("Untouched playback was switched " + if (want) "on" else "off")
         if (exo.playbackState == Player.STATE_IDLE) {
@@ -171,7 +186,7 @@ class PlaybackService : MediaLibraryService() {
         val mainMix = mixer?.deck("main")
         val tailMix = mixer?.deck("tail")
         val built = PlayerFactory.build(this, graph, ::kbpsFor, engine = mixer, mixDeck = mainMix, passthrough = BuildConfig.TV_APP,
-            untouched = { graph.settings.current.untouchedPlayback })
+            untouched = { graph.settings.current.untouchedNow })
         exo = built.player
         soundSwitch = built.switch
         if (built.switch?.isDirect == true) AppLog.i("Player", "Untouched playback is on: each song goes out at its own rate, nothing is blended")
@@ -349,10 +364,16 @@ class PlaybackService : MediaLibraryService() {
         // Untouched playback switched in Settings › Playback: the sound takes its other way out now.
         scope.launch {
             graph.settings.state
-                .map { it.untouchedPlayback }
+                .map { it.untouchedNow }
                 .distinctUntilChanged()
                 .drop(1)
                 .collect { withContext(Dispatchers.Main) { onSoundPathChanged() } }
+        }
+        // Set aside for a DJ mix (issue #1345): from now it's watched for the mix's end.
+        scope.launch {
+            graph.settings.state.map { it.untouchedPaused }.distinctUntilChanged().collect { paused ->
+                withContext(Dispatchers.Main) { untouchedPausedAt = if (paused) android.os.SystemClock.elapsedRealtime() else 0L; djSeenWhilePaused = false }
+            }
         }
 
         // Levelling changed in Settings (ReplayGain, or where loudness comes from): applies to this song too.
@@ -989,6 +1010,7 @@ class PlaybackService : MediaLibraryService() {
             precacheJob?.cancel()
             precachedFor = null
             dropPlayedSongs(player)
+            resumeUntouchedAfterDj(player)
             // A seek to another song is the listener's own doing; a song that ran out, or a queue swapped for another, isn't.
             finishCurrent(movedOn = reason == Player.MEDIA_ITEM_TRANSITION_REASON_SEEK && mediaItem != null && mediaItem.mediaId != current?.id)
             val song = mediaItem?.toSong() ?: return
@@ -1407,3 +1429,13 @@ internal fun errorCategory(code: Int): String = when (code) {
     in 1000..1999 -> "player"
     else -> "other"
 }
+
+/**
+ * Whether Untouched playback, set aside for a DJ mix, is taken up again at a change of song (issue #1345): what plays
+ * isn't a DJ mix ([dj] false), and either the mix was seen playing since ([djSeen]) or it never got going within
+ * [UNTOUCHED_DJ_WAIT_MS] of being asked for ([sinceMs]). So the songs that change while the mix is still being made
+ * don't end the pause, and a mix that failed to start doesn't keep it for good.
+ */
+internal fun untouchedResumes(dj: Boolean, djSeen: Boolean, sinceMs: Long): Boolean = !dj && (djSeen || sinceMs >= UNTOUCHED_DJ_WAIT_MS)
+
+internal const val UNTOUCHED_DJ_WAIT_MS = 60_000L

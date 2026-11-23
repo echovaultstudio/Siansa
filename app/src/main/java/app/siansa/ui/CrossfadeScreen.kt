@@ -75,7 +75,7 @@ fun CrossfadeScreen(nav: NavController) {
             // What the server sends, then how the phone plays it, together (the owner, 22 Nov).
             Heading("Sound quality")
             StreamingQualitySection(settings, graph)
-            SwitchRow("Untouched playback", UNTOUCHED_HINT, settings.untouchedPlayback, tag = "untouchedPlayback") { graph.settings.setUntouchedPlayback(it) }
+            SwitchRow("Untouched playback", untouchedHint(settings), settings.untouchedPlayback, tag = "untouchedPlayback") { graph.settings.setUntouchedPlayback(it) }
             HorizontalDivider()
             PageLink("Equaliser", equaliserSummary(settings, eq.enabled, eq.preset.label), "soundEqualiser") { nav.navigate("settings/equaliser") }
             HorizontalDivider()
@@ -200,6 +200,9 @@ internal fun crossfadeLengthHint(s: AppSettings): String? =
 
 /** The section's summary: Smart has nothing to set; Fixed says its length and bars. */
 /** What Untouched playback does, and what it switches off. */
+/** Under the switch: what it does, or that it's set aside while a DJ mix plays (issue #1345). */
+internal fun untouchedHint(s: AppSettings): String = if (s.untouchedPlayback && s.untouchedPaused) DjNeedsBlends.PAUSED else UNTOUCHED_HINT
+
 internal const val UNTOUCHED_HINT = "Plays each song at its own sample rate and bit depth, straight to your phone's sound output. " +
     "Crossfades, DJ blends and the equaliser are off while it's on, and starting a DJ mix asks to turn it off. Switching it pauses the song for a moment."
 

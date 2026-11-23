@@ -73,21 +73,24 @@ object DjNeedsBlends {
     val waiting = MutableStateFlow<(() -> Unit)?>(null)
 
     /** Runs [start] now, or asks first while Untouched playback is on. */
-    fun then(graph: app.siansa.AppGraph, start: () -> Unit) = then(graph.settings.current.untouchedPlayback, start)
+    fun then(graph: app.siansa.AppGraph, start: () -> Unit) = then(graph.settings.current.untouchedNow, start)
 
     internal fun then(untouched: Boolean, start: () -> Unit) {
         if (!untouched) return start()
-        AppLog.i("Player", "A DJ mix was asked for with Untouched playback on: asking whether to turn it off")
+        AppLog.i("Player", "A DJ mix was asked for with Untouched playback on: asking whether to pause it for the mix")
         waiting.value = start
     }
 
-    const val TITLE = "DJ mix needs Untouched playback off"
+    const val TITLE = "DJ mix pauses Untouched playback"
     const val WHY = "Untouched playback sends each song straight to your phone's sound output, so songs can't be blended. " +
-        "Turning it off pauses the song for a moment."
-    const val YES = "Turn off and start"
+        "It's paused for this mix and comes back on when you play something else. The song stops for a moment."
+    const val YES = "Pause it and start"
 
     /** Under DJ in a chooser, while Untouched playback is on. */
-    const val NOTE = "Turns off Untouched playback"
+    const val NOTE = "Pauses Untouched playback for the mix"
+
+    /** Under the switch in Settings, while it's set aside for a DJ mix. */
+    const val PAUSED = "Paused for the DJ mix that's playing. It comes back on when you play something else."
 }
 
 /** Asks whether to turn Untouched playback off for the DJ mix that waits in [DjNeedsBlends]; placed once, in the app's root. */
@@ -99,8 +102,8 @@ fun DjNeedsBlendsHost() {
     DjNeedsBlendsDialog(
         onYes = {
             DjNeedsBlends.waiting.value = null
-            AppLog.i("Player", "Untouched playback turned off for a DJ mix")
-            graph.settings.setUntouchedPlayback(false)
+            // For this mix only (issue #1345): the switch stays on, and it's taken up again when the mix is over.
+            graph.settings.pauseUntouched(true)
             go()
         },
         onNo = { DjNeedsBlends.waiting.value = null },
@@ -179,7 +182,7 @@ fun RadioChooserHost() {
     AlertDialog(
         onDismissRequest = { RadioChooser.song.value = null },
         title = { Text("Start a mix") },
-        text = { RadioModeChoices(app.siansa.mix.DjReady.problem(settings, connection, djBeats), DjNeedsBlends.NOTE.takeIf { settings.untouchedPlayback }, ::start) },
+        text = { RadioModeChoices(app.siansa.mix.DjReady.problem(settings, connection, djBeats), DjNeedsBlends.NOTE.takeIf { settings.untouchedNow }, ::start) },
         confirmButton = {},
         dismissButton = { TextButton(onClick = { RadioChooser.song.value = null }) { Text("Cancel") } },
     )
