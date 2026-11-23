@@ -141,7 +141,7 @@ class TimeCardTest {
     }
 
     @Test fun theWholeCard() = runBlocking {
-        val artists = listOf("One", "Two", "Three", "Four", "Five").mapIndexed { i, n -> CardArtist(n, 50 - i, "id$i") }
+        val artists = listOf("One", "Two", "Three", "Four", "Five", "Six").mapIndexed { i, n -> CardArtist(n, 50 - i, "id$i") }
         val asked = ArrayList<Pair<TimeListKind, Int>>()
         val card = buildListeningCard(today, plans,
             songsOf = { plan, limit -> asked += plan.kind to limit; songs(if (limit == GENRE_SONGS) 120 else 60, plan.key) },
@@ -151,7 +151,8 @@ class TimeCardTest {
         val month = card.range(ListenRange.MONTH)!!
         assertEquals("songs-month" to "Last 30 days", month.songs!!.kind to month.songs!!.line)
         assertEquals(TIME_LIST_SONGS, month.songs!!.songIds.size)
-        assertEquals(listOf("One", "Two", "Three", "Four"), month.artists.map { it.name })
+        // The top five (issue #1349).
+        assertEquals(listOf("One", "Two", "Three", "Four", "Five"), month.artists.map { it.name })
         assertEquals(listOf(CardGenre("Metal", 100)), month.genres)
         assertEquals(TIME_CARD_MAKE, card.make)
         // Each time's songs are asked for in full, for its genres.

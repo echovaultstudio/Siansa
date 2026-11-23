@@ -125,7 +125,7 @@ data class CardArtist(val name: String, val plays: Int, val id: String? = null, 
 data class CardGenre(val name: String, val share: Int)
 
 /** How many artists and genres the card shows, and how many of the year's songs its genres are counted from. */
-const val CARD_ARTISTS = 4
+const val CARD_ARTISTS = 5
 const val CARD_GENRES = 4
 const val GENRE_SONGS = 200
 
@@ -182,8 +182,11 @@ data class TimeCard(
     val empty: Boolean get() = lists.isEmpty() && ranges.all { it.empty }
 }
 
-/** The make of card this version keeps: 2 had Your listening's pages and each song's plays, 3 has them for each time. */
-const val TIME_CARD_MAKE = 3
+/**
+ * The make of card this version keeps: 2 had Your listening's pages and each song's plays, 3 has them for each time,
+ * 4 has five artists (the owner, 23 Nov: "only shows top 4 and not top 5").
+ */
+const val TIME_CARD_MAKE = 4
 
 /** What's in the card's file: nothing until it was first made. */
 @Serializable
