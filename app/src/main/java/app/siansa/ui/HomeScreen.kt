@@ -655,15 +655,16 @@ fun HomeScreen(nav: NavController) {
                 // Your listening's card (issues #1341, #1343): from the phone at once; nothing without a listening history.
                 HomeSection.TIME_MACHINE -> timeCard?.takeIf { !it.empty && homeSettings.navidromeReady }?.let { card ->
                     item(key = "time-machine", contentType = "time-machine") {
-                        ListeningCard(card, androidx.compose.runtime.remember(nav) {
-                            ListeningActions(
-                                songsOf = { ids -> graph.library.songs(ids) },
-                                play = { list, at, shuffle -> graph.player.play(list, startIndex = at, shuffle = shuffle) },
-                                openList = { nav.navigate(app.siansa.mix.timeListRoute(it)) },
-                                openArtist = { nav.navigate("artist/$it") },
-                                openYear = { nav.navigate(app.siansa.mix.timeMachineRoute(java.time.LocalDate.now().year, null)) },
-                            )
-                        })
+                        ListeningCard(card, app.siansa.mix.ListenRange.of(homeSettings.listenRange), app.siansa.data.ListenColour.of(homeSettings.listenColour),
+                            androidx.compose.runtime.remember(nav) {
+                                ListeningActions(
+                                    songsOf = { ids -> graph.library.songs(ids) },
+                                    play = { list, at, shuffle -> graph.player.play(list, startIndex = at, shuffle = shuffle) },
+                                    openList = { nav.navigate(app.siansa.mix.timeListRoute(it)) },
+                                    openArtist = { nav.navigate("artist/$it") },
+                                    setRange = { graph.settings.setListenRange(it.id) },
+                                )
+                            })
                     }
                 }
                 // Siansa Beats' More of you, a row of its own (the owner, 17 Nov); nothing without its mixes.

@@ -1,6 +1,8 @@
 package app.siansa.ui
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -16,22 +18,36 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ArrowDropDown
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Shuffle
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
@@ -41,10 +57,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.siansa.data.Artist
-import app.siansa.data.picture
+import app.siansa.data.ListenColour
 import app.siansa.data.Song
+import app.siansa.data.picture
 import app.siansa.mix.CardArtist
 import app.siansa.mix.CardGenre
+import app.siansa.mix.ListenRange
+import app.siansa.mix.RangeData
 import app.siansa.mix.TimeCard
 import app.siansa.mix.TimeCardList
 import app.siansa.mix.TimeListKind
@@ -52,15 +71,17 @@ import kotlinx.coroutines.launch
 
 /** The pages of Your listening's card, in order, each with the name at the card's top. */
 enum class ListenPage(val label: String) {
-    HOT("Hot now"), SONGS("Top songs"), ARTISTS("Artists"), GENRES("Genres"), BACK("Look back"),
+    SONGS("Songs"), ARTISTS("Artists"), GENRES("Genres"), BACK("Look back"),
 }
 
-/** The pages [card] has something for, in order: a page with nothing to show isn't there. */
+/**
+ * The pages [card] has something for, in order. Songs, Artists and Genres are there when any of the card's times has
+ * them (a time with none says so on the page, so the time can still be changed there); Look back when it has a list.
+ */
 internal fun listenPages(card: TimeCard): List<ListenPage> = listOfNotNull(
-    ListenPage.HOT.takeIf { card.hot != null },
-    ListenPage.SONGS.takeIf { card.top != null },
-    ListenPage.ARTISTS.takeIf { card.artists.isNotEmpty() },
-    ListenPage.GENRES.takeIf { card.genres.isNotEmpty() },
+    ListenPage.SONGS.takeIf { card.ranges.any { it.songs != null } },
+    ListenPage.ARTISTS.takeIf { card.ranges.any { it.artists.isNotEmpty() } },
+    ListenPage.GENRES.takeIf { card.ranges.any { it.genres.isNotEmpty() } },
     ListenPage.BACK.takeIf { card.lists.isNotEmpty() },
 )
 
@@ -70,29 +91,37 @@ class ListeningActions(
     val songsOf: suspend (List<String>) -> List<Song>,
     /** Plays these songs from the one at this place, or shuffled. */
     val play: (List<Song>, Int, Boolean) -> Unit,
-    /** Opens one of the card's lists as a page of songs ([TimeListKind.id]). */
+    /** Opens one of the card's lists as a page of songs (its kind). */
     val openList: (String) -> Unit,
     val openArtist: (String) -> Unit,
-    /** Opens this year in the Time Machine. */
-    val openYear: () -> Unit,
+    /** Another time was picked in the drop-down. */
+    val setRange: (ListenRange) -> Unit,
 )
 
 /**
- * Home's Your listening card (issue #1343; the owner, 23 Nov: "show more. Like whats hot now, genres and artists… and
- * also my top songs", "B with swipe but same card"): the hero card's shape in a colour of its own, with a page each for
- * hot now, top songs, this year's artists and genres, and the look back lists. Swipe sideways or tap a name at its top.
- * Nothing on it moves when tapped: a list opens its own page of songs. Nothing when [card] has no page.
+ * Home's Your listening card (issues #1343, #1347; the owner, 23 Nov: "the listening card needs to have filters… Make
+ * it look totally beautiful", as a drop-down where the card said "Last 30 days"): the hero card's shape in a [colour]
+ * of your choice with a soft glow in its corner, and a page each for your songs, artists and genres of the time picked
+ * ([range]), and the look back lists. Swipe sideways or tap a name at its top. Nothing on it moves when tapped: a list
+ * opens its own page of songs. Nothing when [card] has no page.
  */
 @Composable
-fun ListeningCard(card: TimeCard, actions: ListeningActions) {
+fun ListeningCard(card: TimeCard, range: ListenRange, colour: ListenColour, actions: ListeningActions) {
     val pages = listenPages(card)
     if (pages.isEmpty()) return
     val pager = rememberPagerState { pages.size }
     val scope = rememberCoroutineScope()
+    val data = card.range(range) ?: RangeData(range.id)
+    val paint = listenPaint(colour, data.songs?.covers?.firstOrNull())
     Column(
         Modifier.fillMaxWidth().padding(start = Space.Page, end = Space.Page, top = LocalSectionGap.current)
             .clip(RoundedCornerShape(LISTEN_CORNER))
-            .background(Brush.verticalGradient(0f to LISTEN_TOP, 1f to LISTEN_FOOT))
+            .background(Brush.verticalGradient(0f to paint.top, 1f to paint.foot))
+            // A soft light in its top right corner, in the colour's own glow.
+            .drawBehind {
+                val radius = size.width * 0.62f
+                drawCircle(Brush.radialGradient(listOf(paint.glow.copy(alpha = 0.34f), Color.Transparent), Offset(size.width * 0.92f, 0f), radius), radius, Offset(size.width * 0.92f, 0f))
+            }
             .padding(top = Space.Section, bottom = Space.Section)
             .testTag("listeningCard"),
     ) {
@@ -121,10 +150,9 @@ fun ListeningCard(card: TimeCard, actions: ListeningActions) {
             verticalAlignment = Alignment.Top) { i ->
             Column(Modifier.fillMaxWidth().padding(horizontal = Space.Page).testTag("listeningPage-${pages[i].name}")) {
                 when (pages[i]) {
-                    ListenPage.HOT -> card.hot?.let { HotPage(it, actions) }
-                    ListenPage.SONGS -> card.top?.let { SongsPage(it, actions) }
-                    ListenPage.ARTISTS -> ArtistsPage(card.artists, actions)
-                    ListenPage.GENRES -> GenresPage(card.genres, actions)
+                    ListenPage.SONGS -> SongsPage(range, data.songs, actions)
+                    ListenPage.ARTISTS -> ArtistsPage(range, data.artists, actions)
+                    ListenPage.GENRES -> GenresPage(range, data.genres, actions)
                     ListenPage.BACK -> BackPage(card.lists, actions)
                 }
             }
@@ -132,40 +160,94 @@ fun ListeningCard(card: TimeCard, actions: ListeningActions) {
     }
 }
 
-/** A page's first line: what its numbers are of ("Last 30 days"), and where the rest is ("See all"). */
+/** The card's colours as drawn. */
+internal class ListenPaint(val top: Color, val foot: Color, val glow: Color)
+
+/**
+ * [colour] as the card draws it. From its cover: the colour of [cover] (the top song's), deep at the top and nearly
+ * black at the foot so the white words read on any cover, its glow the colour itself.
+ */
 @Composable
-private fun PageLine(of: String, more: String? = null, onMore: () -> Unit = {}) {
+private fun listenPaint(colour: ListenColour, cover: String?): ListenPaint {
+    if (colour != ListenColour.COVER || cover == null) return ListenPaint(Color(colour.top), Color(colour.foot), Color(colour.glow))
+    val tint = rememberHeaderTint(cover, "listening-card")
+    return ListenPaint(lerp(tint, Color.Black, 0.55f), lerp(tint, Color.Black, 0.86f), tint)
+}
+
+/**
+ * A page's first line: the time it shows as a drop-down (the owner, 23 Nov: "a drop down where I circled", the line
+ * that said "Last 30 days"), and where the rest is ("See all") at its right.
+ */
+@Composable
+private fun RangeLine(range: ListenRange, actions: ListeningActions, more: (() -> Unit)? = null) {
+    var open by remember { mutableStateOf(false) }
     Row(Modifier.fillMaxWidth().padding(bottom = Space.Medium), verticalAlignment = Alignment.CenterVertically) {
-        Text(of, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.6f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-        if (more != null) Text(more, Modifier.clip(RoundedCornerShape(50)).clickable(onClick = onMore).padding(horizontal = Space.Small, vertical = Space.Tight).testTag("listeningMore"),
+        Box {
+            Row(
+                Modifier.clip(RoundedCornerShape(50)).background(Color.White.copy(alpha = 0.10f))
+                    .clickable(role = Role.DropdownList, onClickLabel = "Choose the time") { open = true }
+                    .padding(start = Space.Medium, end = Space.Tight, top = Space.Tight, bottom = Space.Tight).testTag("listeningRange"),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(range.label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = LISTEN_ACCENT, maxLines = 1)
+                Icon(Icons.Rounded.ArrowDropDown, null, tint = LISTEN_ACCENT)
+            }
+            DropdownMenu(open, onDismissRequest = { open = false }) {
+                ListenRange.entries.forEach { r ->
+                    DropdownMenuItem(
+                        text = { Text(r.label, fontWeight = if (r == range) FontWeight.Bold else FontWeight.Normal) },
+                        onClick = { open = false; if (r != range) actions.setRange(r) },
+                        trailingIcon = { if (r == range) Icon(Icons.Rounded.Check, "Chosen") },
+                        modifier = Modifier.testTag("listeningRange-${r.id}"),
+                    )
+                }
+            }
+        }
+        Box(Modifier.weight(1f))
+        if (more != null) Text("See all", Modifier.clip(RoundedCornerShape(50)).clickable(onClick = more).padding(horizontal = Space.Small, vertical = Space.Tight).testTag("listeningMore"),
             style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = LISTEN_ACCENT, maxLines = 1)
     }
 }
 
+/** What a page says when its time has nothing. */
 @Composable
-private fun rememberSongs(list: TimeCardList, actions: ListeningActions): List<Song> {
-    val songs by produceState(emptyList<Song>(), list.kind, list.songIds) { value = actions.songsOf(list.songIds) }
-    return songs
+private fun Nothing(what: String, range: ListenRange) {
+    Text("No $what ${range.said}.", Modifier.padding(vertical = Space.Section), style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.6f))
 }
 
-/** Hot now: the most played song of the last 30 days, and Play and Shuffle for the list. A tap on the song opens the list. */
 @Composable
-private fun HotPage(list: TimeCardList, actions: ListeningActions) {
-    val songs = rememberSongs(list, actions)
+private fun Rule() = Box(Modifier.fillMaxWidth().padding(vertical = Space.Page).height(1.dp).background(Color.White.copy(alpha = 0.10f)))
+
+/**
+ * Songs: the most played song of the time picked, big, with Play and Shuffle for its list; under it the next
+ * [LISTEN_SONGS] with a bar each for their plays against the first's. A tap on a song plays the list from it; the big
+ * one and See all open the list.
+ */
+@Composable
+private fun SongsPage(range: ListenRange, list: TimeCardList?, actions: ListeningActions) {
+    RangeLine(range, actions, list?.let { { actions.openList(it.kind) } })
+    if (list == null) return Nothing("songs played", range)
+    val songs by produceState(emptyList<Song>(), list.kind, list.songIds) { value = actions.songsOf(list.songIds) }
+    val plays = remember(list) { list.songIds.zip(list.plays).toMap() }
     val scope = rememberCoroutineScope()
+    val draw = LocalCoverDraw.current
     fun play(shuffle: Boolean) {
         if (songs.isNotEmpty()) actions.play(songs, 0, shuffle)
         else scope.launch { actions.songsOf(list.songIds).takeIf { it.isNotEmpty() }?.let { actions.play(it, 0, shuffle) } }
     }
     val first = songs.firstOrNull()
-    PageLine(list.line, "See all") { actions.openList(list.kind) }
-    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable(onClickLabel = "Open Hot now") { actions.openList(list.kind) },
+    val most = (first?.let { plays[it.id] } ?: list.plays.firstOrNull() ?: 1).coerceAtLeast(1)
+    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable(onClickLabel = "Open your top songs") { actions.openList(list.kind) },
         horizontalArrangement = Arrangement.spacedBy(Space.Page), verticalAlignment = Alignment.Bottom) {
-        LocalCoverDraw.current(first?.coverArt ?: list.covers.firstOrNull(), 300, Modifier.size(LISTEN_COVER), RoundedCornerShape(8.dp), null)
+        Box {
+            draw(first?.coverArt ?: list.covers.firstOrNull(), 300, Modifier.size(LISTEN_COVER), RoundedCornerShape(8.dp), null)
+            Text("#1", Modifier.padding(Space.Small).clip(RoundedCornerShape(50)).background(Color.Black.copy(alpha = 0.5f)).padding(horizontal = Space.Small, vertical = Space.Tight),
+                style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.ExtraBold, color = LISTEN_ACCENT)
+        }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
             WholeWordsText(first?.title.orEmpty(), MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.ExtraBold), color = Color.White, maxLines = 2)
             Text(first?.artist.orEmpty(), style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.82f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-            list.plays.firstOrNull()?.let { Text(playCount(it), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = LISTEN_ACCENT, maxLines = 1) }
+            Text(playCount(most), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = LISTEN_ACCENT, maxLines = 1)
         }
     }
     Row(Modifier.padding(top = Space.Page), horizontalArrangement = Arrangement.spacedBy(Space.Medium), verticalAlignment = Alignment.CenterVertically) {
@@ -177,66 +259,94 @@ private fun HotPage(list: TimeCardList, actions: ListeningActions) {
             border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.35f))) { Icon(Icons.Rounded.Shuffle, "Shuffle", tint = Color.White) }
         Text("Your ${list.songIds.size} most played", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.6f), maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
-}
-
-/** Top songs: the first [LISTEN_SONGS] of all time with their plays. A tap plays the list from that song. */
-@Composable
-private fun SongsPage(list: TimeCardList, actions: ListeningActions) {
-    val songs = rememberSongs(list, actions)
-    val plays = list.songIds.zip(list.plays).toMap()
-    val draw = LocalCoverDraw.current
-    PageLine(list.line, "See all") { actions.openList(list.kind) }
+    val next = songs.drop(1).take(LISTEN_SONGS)
+    if (next.isEmpty()) return
+    Rule()
     Column(verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
-        songs.take(LISTEN_SONGS).forEachIndexed { i, song ->
-            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable(onClickLabel = "Play ${song.title}") { actions.play(songs, i, false) }.testTag("listeningSong"),
+        next.forEachIndexed { i, song ->
+            val n = plays[song.id] ?: 0
+            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable(onClickLabel = "Play ${song.title}") { actions.play(songs, i + 1, false) }.testTag("listeningSong"),
                 horizontalArrangement = Arrangement.spacedBy(Space.Medium), verticalAlignment = Alignment.CenterVertically) {
-                Text("${i + 1}", Modifier.width(LISTEN_RANK), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.6f), textAlign = TextAlign.Center)
+                Text("${i + 2}", Modifier.width(LISTEN_RANK), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.6f), textAlign = TextAlign.Center)
                 draw(song.coverArt, 150, Modifier.size(LISTEN_SMALL_COVER), RoundedCornerShape(4.dp), null)
-                Column(Modifier.weight(1f)) {
-                    Text(song.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(song.artist, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.6f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+                        Text(song.title, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text("$n", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.82f), maxLines = 1)
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(Space.Small), verticalAlignment = Alignment.CenterVertically) {
+                        Text(song.artist, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.6f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Box(Modifier.weight(1f).height(LISTEN_SONG_BAR).clip(RoundedCornerShape(50)).background(Color.White.copy(alpha = 0.10f))) {
+                            Box(Modifier.fillMaxWidth(shareBar(n, most)).height(LISTEN_SONG_BAR).clip(RoundedCornerShape(50)).background(LISTEN_ACCENT.copy(alpha = 0.85f)))
+                        }
+                    }
                 }
-                plays[song.id]?.let { Text(playCount(it), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.82f), maxLines = 1) }
             }
         }
     }
 }
 
-/** This year's artists, each with its picture and plays. A tap opens the artist, when it's in the library. */
+/** Artists: the most played big, with a ring in the accent, and the next ones listed with their plays. A tap opens the artist. */
 @Composable
-private fun ArtistsPage(artists: List<CardArtist>, actions: ListeningActions) {
-    PageLine("This year", "See all", actions.openYear)
+private fun ArtistsPage(range: ListenRange, artists: List<CardArtist>, actions: ListeningActions) {
+    RangeLine(range, actions)
+    val first = artists.firstOrNull() ?: return Nothing("artists played", range)
     val draw = LocalCoverDraw.current
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
-        artists.forEach { a ->
-            Column(
-                Modifier.weight(1f).clip(RoundedCornerShape(8.dp)).clickable(enabled = a.id != null, onClickLabel = "Open ${a.name}") { a.id?.let(actions.openArtist) }.testTag("listeningArtist"),
-                horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Space.Tight),
-            ) {
-                draw(Artist(a.id ?: a.name, a.name, coverArt = a.coverArt, imageUrl = a.imageUrl).picture, 150, Modifier.size(LISTEN_ARTIST), androidx.compose.foundation.shape.CircleShape, null)
-                // Whole words only, a little smaller when a name is wide ("Karnivool" at large text broke in two).
-                WholeWordsText(a.name, MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center),
-                    Modifier.fillMaxWidth().padding(top = Space.Tight), color = Color.White, maxLines = 2)
-                Text(playCount(a.plays), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f), maxLines = 1)
+    fun picture(a: CardArtist) = Artist(a.id ?: a.name, a.name, coverArt = a.coverArt, imageUrl = a.imageUrl).picture
+    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable(enabled = first.id != null, onClickLabel = "Open ${first.name}") { first.id?.let(actions.openArtist) }.testTag("listeningArtist"),
+        horizontalArrangement = Arrangement.spacedBy(Space.Page), verticalAlignment = Alignment.CenterVertically) {
+        draw(picture(first), 300, Modifier.size(LISTEN_TOP_ARTIST).border(3.dp, LISTEN_ACCENT, CircleShape).padding(Space.Tight), CircleShape, null)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
+            Text("#1 ARTIST", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.ExtraBold, color = LISTEN_ACCENT, maxLines = 1)
+            WholeWordsText(first.name, MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.ExtraBold), color = Color.White, maxLines = 2)
+            Text(playCount(first.plays), style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.82f), maxLines = 1)
+        }
+    }
+    if (artists.size < 2) return
+    Rule()
+    Column(verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
+        artists.drop(1).forEachIndexed { i, a ->
+            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable(enabled = a.id != null, onClickLabel = "Open ${a.name}") { a.id?.let(actions.openArtist) }.testTag("listeningArtist"),
+                horizontalArrangement = Arrangement.spacedBy(Space.Medium), verticalAlignment = Alignment.CenterVertically) {
+                Text("${i + 2}", Modifier.width(LISTEN_RANK), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.6f), textAlign = TextAlign.Center)
+                draw(picture(a), 150, Modifier.size(LISTEN_SMALL_COVER), CircleShape, null)
+                Text(a.name, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(playCount(a.plays), style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.82f), maxLines = 1)
             }
         }
     }
 }
 
-/** This year's genres, each with its share of the plays as a bar: the longest is the most played. */
+/** Genres: a ring with each genre's share of the plays, the most played's in its middle, and each named beside it. */
 @Composable
-private fun GenresPage(genres: List<CardGenre>, actions: ListeningActions) {
-    PageLine("This year", "See all", actions.openYear)
-    val most = genres.maxOf { it.share }.coerceAtLeast(1)
-    Column(verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
-        genres.forEachIndexed { i, g ->
-            Column(Modifier.testTag("listeningGenre"), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
-                Row(Modifier.fillMaxWidth()) {
+private fun GenresPage(range: ListenRange, genres: List<CardGenre>, actions: ListeningActions) {
+    RangeLine(range, actions)
+    val first = genres.firstOrNull() ?: return Nothing("genres played", range)
+    Row(Modifier.fillMaxWidth().padding(top = Space.Small), horizontalArrangement = Arrangement.spacedBy(Space.Section), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(LISTEN_RING).testTag("listeningRing"), contentAlignment = Alignment.Center) {
+            Canvas(Modifier.size(LISTEN_RING)) {
+                val stroke = LISTEN_RING_WIDTH.toPx()
+                val inset = stroke / 2
+                val box = Size(size.width - stroke, size.height - stroke)
+                drawArc(Color.White.copy(alpha = 0.12f), 0f, 360f, false, Offset(inset, inset), box, style = Stroke(stroke))
+                var from = -90f
+                genres.forEachIndexed { i, g ->
+                    val sweep = 360f * g.share / 100f
+                    drawArc(LISTEN_BARS[i % LISTEN_BARS.size], from, sweep, false, Offset(inset, inset), box, style = Stroke(stroke, cap = StrokeCap.Butt))
+                    from += sweep
+                }
+            }
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("${first.share}%", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold, color = Color.White, maxLines = 1)
+                Text("top genre", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f), maxLines = 1)
+            }
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
+            genres.forEachIndexed { i, g ->
+                Row(Modifier.testTag("listeningGenre"), horizontalArrangement = Arrangement.spacedBy(Space.Small), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(LISTEN_DOT).clip(CircleShape).background(LISTEN_BARS[i % LISTEN_BARS.size]))
                     Text(g.name, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text("${g.share} %", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.82f), maxLines = 1)
-                }
-                Box(Modifier.fillMaxWidth().height(LISTEN_BAR).clip(RoundedCornerShape(50)).background(Color.White.copy(alpha = 0.12f))) {
-                    Box(Modifier.fillMaxWidth(genreBar(g.share, most)).height(LISTEN_BAR).clip(RoundedCornerShape(50)).background(LISTEN_BARS[i % LISTEN_BARS.size]))
                 }
             }
         }
@@ -246,7 +356,7 @@ private fun GenresPage(genres: List<CardGenre>, actions: ListeningActions) {
 /** The look back lists side by side: its date on a square in its own colour, its name and how many songs. A tap opens it. */
 @Composable
 private fun BackPage(lists: List<TimeCardList>, actions: ListeningActions) {
-    PageLine("From your Time Machine")
+    Text("From your Time Machine", Modifier.padding(top = Space.Tight, bottom = Space.Page), style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.6f), maxLines = 1)
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
         lists.forEach { list ->
             val colours = timeListColours(list.kind)
@@ -269,24 +379,24 @@ internal fun songCount(n: Int): String = if (n == 1) "1 song" else "$n songs"
 
 internal fun playCount(n: Int): String = if (n == 1) "1 play" else "${java.text.NumberFormat.getIntegerInstance().format(n)} plays"
 
-/** How much of its track a genre's bar fills: the most played fills it, the others their share of that; never nothing. */
-internal fun genreBar(share: Int, most: Int): Float = (share.toFloat() / most.coerceAtLeast(1)).coerceIn(0.04f, 1f)
+/** How much of its track a bar fills: the most played fills it, the others their share of that; never nothing. */
+internal fun shareBar(n: Int, most: Int): Float = (n.toFloat() / most.coerceAtLeast(1)).coerceIn(0.04f, 1f)
 
-/** The card's own colour: a deep teal, so it reads as your history and not as today's mixes. */
-private val LISTEN_TOP = Color(0xFF1C3A40)
-private val LISTEN_FOOT = Color(0xFF0F181B)
 /** The accent on the card: the dark theme's amber in both themes, as the card is dark in both. */
 private val LISTEN_ACCENT = Color(0xFFFFB547)
 private val LISTEN_BARS = listOf(Color(0xFFB05AA8), Color(0xFF4F8FD0), Color(0xFFD89A3C), Color(0xFF3FA39A))
 private val LISTEN_CORNER = 16.dp
 private val LISTEN_COVER = 120.dp
 private val LISTEN_SMALL_COVER = 40.dp
-private val LISTEN_ARTIST = 64.dp
+private val LISTEN_TOP_ARTIST = 104.dp
 private val LISTEN_BUTTON = 48.dp
-private val LISTEN_BAR = 6.dp
+private val LISTEN_SONG_BAR = 3.dp
 private val LISTEN_RANK = 16.dp
 private val LISTEN_MARK = 24.dp
-private const val LISTEN_SONGS = 4
+private val LISTEN_RING = 112.dp
+private val LISTEN_RING_WIDTH = 18.dp
+private val LISTEN_DOT = 10.dp
+private const val LISTEN_SONGS = 3
 
 /** A colour for each kind of list, the same every day. */
 internal fun timeListColours(kind: String): Pair<Color, Color> = when (kind) {
@@ -295,6 +405,5 @@ internal fun timeListColours(kind: String): Pair<Color, Color> = when (kind) {
     TimeListKind.LAST_YEAR.id -> Color(0xFFB05AA8) to Color(0xFF5A2E7A)
     TimeListKind.TWO_YEARS.id -> Color(0xFF5FA86A) to Color(0xFF2E5A4A)
     TimeListKind.FIVE_YEARS.id -> Color(0xFFC8605A) to Color(0xFF6A2A3A)
-    TimeListKind.HOT.id -> Color(0xFFD0603A) to Color(0xFF5A1E1A)
     else -> Color(0xFF3FA39A) to Color(0xFF1C4A50)
 }

@@ -641,122 +641,105 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     looks = mapOf(app.siansa.data.HomeSection.MORE_OF_YOU to app.siansa.data.HomeLook.TILES, app.siansa.data.HomeSection.PODCASTS to app.siansa.data.HomeLook.COVER_ROWS),
                 )
             },
-            // Home's Your listening card (issues #1341, #1343): each of its pages, with long names; and its row in
-            // Arrange Home, which has no cog.
+            // Home's Your listening card (issues #1341, #1343, #1347): each of its pages, with long names, in some of
+            // its colours; a time with nothing; its colours under its cog; and its row in Arrange Home.
             Scene("listening_card") {
-                fun list(kind: app.siansa.mix.TimeListKind, title: String, tag: String, line: String, n: Int) =
-                    app.siansa.mix.TimeCardList(kind.id, title, tag, line, (1..n).map { "$kind-$it" }, (1..n).map { 400 - it * 7 }, year = 2025)
+                fun list(kind: String, title: String, tag: String, line: String, n: Int) =
+                    app.siansa.mix.TimeCardList(kind, title, tag, line, (1..n).map { "$kind-$it" }, (1..n).map { 60 - it * 7 / 6 }, listOf("a"), year = 2025)
+                fun range(r: app.siansa.mix.ListenRange) = app.siansa.mix.RangeData(r.id, list(r.listKind, "Top songs", "", r.label, 50),
+                    listOf("Sleep Token" to 575, "Karnivool" to 278, "An Artist With a Very Long Name" to 169, "Pola & Bryson" to 132).map { (n, p) -> app.siansa.mix.CardArtist(n, p) },
+                    listOf("Progressive metal" to 34, "Drum and bass" to 21, "Folk" to 12, "Ambient" to 9).map { (n, p) -> app.siansa.mix.CardGenre(n, p) })
                 val card = app.siansa.mix.TimeCard("2026-11-23", listOf(
-                    list(app.siansa.mix.TimeListKind.YEAR_AGO, "This time last year", "NOV 2025", "November 2025", 48),
-                    list(app.siansa.mix.TimeListKind.DAY, "This day last year", "23 NOV", "23 November 2025", 12),
-                    list(app.siansa.mix.TimeListKind.LAST_MONTH, "Last month", "OCT", "October 2026", 50),
-                    list(app.siansa.mix.TimeListKind.LAST_YEAR, "Your 2025", "2025", "2025", 50),
-                ), app.siansa.mix.TIME_CARD_MAKE,
-                    hot = list(app.siansa.mix.TimeListKind.HOT, "Hot now", "", "Last 30 days", 50),
-                    top = list(app.siansa.mix.TimeListKind.TOP, "Top songs", "", "All time", 50),
-                    artists = listOf("Sleep Token" to 575, "Karnivool" to 278, "An Artist With a Very Long Name" to 169, "Pola & Bryson" to 132).map { (n, p) -> app.siansa.mix.CardArtist(n, p) },
-                    genres = listOf("Progressive metal" to 34, "Drum and bass" to 21, "Folk" to 12, "Ambient" to 9).map { (n, p) -> app.siansa.mix.CardGenre(n, p) },
-                )
-                fun songs(ids: List<String>) = ids.mapIndexed { i, id -> app.siansa.data.Song(id = id, title = if (i == 0) "A Song With a Very Long Name Indeed" else "Song ${i + 1}", artist = "Artist ${i + 1}") }
+                    list("year_ago", "This time last year", "NOV 2025", "November 2025", 48), list("day", "This day last year", "23 NOV", "23 November 2025", 12),
+                    list("last_month", "Last month", "OCT", "October 2026", 50), list("last_year", "Your 2025", "2025", "2025", 50),
+                ), app.siansa.mix.TIME_CARD_MAKE, listOf(range(app.siansa.mix.ListenRange.MONTH), app.siansa.mix.RangeData("week")))
+                fun songs(ids: List<String>) = ids.mapIndexed { i, id -> app.siansa.data.Song(id = id, title = if (i == 0) "A Song With a Very Long Name Indeed" else "Song ${i + 1}", artist = "Artist ${i + 1}", coverArt = "c$i") }
                 val actions = app.siansa.ui.ListeningActions({ songs(it) }, { _, _, _ -> }, {}, {}, {})
                 // Stand-in covers: the scene has no server to ask.
                 val draw: app.siansa.ui.CoverDraw = { id, _, modifier, shape, _ ->
                     val c = app.siansa.ui.tileColors(id ?: "none")
                     Box(modifier.clip(shape).drawBehind { drawRect(Brush.linearGradient(listOf(c.first, c.second))) })
                 }
-                androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalCoverDraw provides draw) { Column { app.siansa.ui.ListeningCard(card, actions) } }
-            },
-            Scene("listening_card_songs") {
-                fun list(kind: app.siansa.mix.TimeListKind, title: String, tag: String, line: String, n: Int) =
-                    app.siansa.mix.TimeCardList(kind.id, title, tag, line, (1..n).map { "$kind-$it" }, (1..n).map { 400 - it * 7 }, year = 2025)
-                val card = app.siansa.mix.TimeCard("2026-11-23", listOf(
-                    list(app.siansa.mix.TimeListKind.YEAR_AGO, "This time last year", "NOV 2025", "November 2025", 48),
-                    list(app.siansa.mix.TimeListKind.DAY, "This day last year", "23 NOV", "23 November 2025", 12),
-                    list(app.siansa.mix.TimeListKind.LAST_MONTH, "Last month", "OCT", "October 2026", 50),
-                    list(app.siansa.mix.TimeListKind.LAST_YEAR, "Your 2025", "2025", "2025", 50),
-                ), app.siansa.mix.TIME_CARD_MAKE,
-                    hot = list(app.siansa.mix.TimeListKind.HOT, "Hot now", "", "Last 30 days", 50),
-                    top = list(app.siansa.mix.TimeListKind.TOP, "Top songs", "", "All time", 50),
-                    artists = listOf("Sleep Token" to 575, "Karnivool" to 278, "An Artist With a Very Long Name" to 169, "Pola & Bryson" to 132).map { (n, p) -> app.siansa.mix.CardArtist(n, p) },
-                    genres = listOf("Progressive metal" to 34, "Drum and bass" to 21, "Folk" to 12, "Ambient" to 9).map { (n, p) -> app.siansa.mix.CardGenre(n, p) },
-                )
-                fun songs(ids: List<String>) = ids.mapIndexed { i, id -> app.siansa.data.Song(id = id, title = if (i == 0) "A Song With a Very Long Name Indeed" else "Song ${i + 1}", artist = "Artist ${i + 1}") }
-                val actions = app.siansa.ui.ListeningActions({ songs(it) }, { _, _, _ -> }, {}, {}, {})
-                // Stand-in covers: the scene has no server to ask.
-                val draw: app.siansa.ui.CoverDraw = { id, _, modifier, shape, _ ->
-                    val c = app.siansa.ui.tileColors(id ?: "none")
-                    Box(modifier.clip(shape).drawBehind { drawRect(Brush.linearGradient(listOf(c.first, c.second))) })
-                }
-                androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalCoverDraw provides draw) { Column { app.siansa.ui.ListeningCard(card.copy(hot = null), actions) } }
+                androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalCoverDraw provides draw) { Column { app.siansa.ui.ListeningCard(card, app.siansa.mix.ListenRange.MONTH, app.siansa.data.ListenColour.TEAL, actions) } }
             },
             Scene("listening_card_artists") {
-                fun list(kind: app.siansa.mix.TimeListKind, title: String, tag: String, line: String, n: Int) =
-                    app.siansa.mix.TimeCardList(kind.id, title, tag, line, (1..n).map { "$kind-$it" }, (1..n).map { 400 - it * 7 }, year = 2025)
+                fun list(kind: String, title: String, tag: String, line: String, n: Int) =
+                    app.siansa.mix.TimeCardList(kind, title, tag, line, (1..n).map { "$kind-$it" }, (1..n).map { 60 - it * 7 / 6 }, listOf("a"), year = 2025)
+                fun range(r: app.siansa.mix.ListenRange) = app.siansa.mix.RangeData(r.id, list(r.listKind, "Top songs", "", r.label, 50),
+                    listOf("Sleep Token" to 575, "Karnivool" to 278, "An Artist With a Very Long Name" to 169, "Pola & Bryson" to 132).map { (n, p) -> app.siansa.mix.CardArtist(n, p) },
+                    listOf("Progressive metal" to 34, "Drum and bass" to 21, "Folk" to 12, "Ambient" to 9).map { (n, p) -> app.siansa.mix.CardGenre(n, p) })
                 val card = app.siansa.mix.TimeCard("2026-11-23", listOf(
-                    list(app.siansa.mix.TimeListKind.YEAR_AGO, "This time last year", "NOV 2025", "November 2025", 48),
-                    list(app.siansa.mix.TimeListKind.DAY, "This day last year", "23 NOV", "23 November 2025", 12),
-                    list(app.siansa.mix.TimeListKind.LAST_MONTH, "Last month", "OCT", "October 2026", 50),
-                    list(app.siansa.mix.TimeListKind.LAST_YEAR, "Your 2025", "2025", "2025", 50),
-                ), app.siansa.mix.TIME_CARD_MAKE,
-                    hot = list(app.siansa.mix.TimeListKind.HOT, "Hot now", "", "Last 30 days", 50),
-                    top = list(app.siansa.mix.TimeListKind.TOP, "Top songs", "", "All time", 50),
-                    artists = listOf("Sleep Token" to 575, "Karnivool" to 278, "An Artist With a Very Long Name" to 169, "Pola & Bryson" to 132).map { (n, p) -> app.siansa.mix.CardArtist(n, p) },
-                    genres = listOf("Progressive metal" to 34, "Drum and bass" to 21, "Folk" to 12, "Ambient" to 9).map { (n, p) -> app.siansa.mix.CardGenre(n, p) },
-                )
-                fun songs(ids: List<String>) = ids.mapIndexed { i, id -> app.siansa.data.Song(id = id, title = if (i == 0) "A Song With a Very Long Name Indeed" else "Song ${i + 1}", artist = "Artist ${i + 1}") }
+                    list("year_ago", "This time last year", "NOV 2025", "November 2025", 48), list("day", "This day last year", "23 NOV", "23 November 2025", 12),
+                    list("last_month", "Last month", "OCT", "October 2026", 50), list("last_year", "Your 2025", "2025", "2025", 50),
+                ), app.siansa.mix.TIME_CARD_MAKE, listOf(range(app.siansa.mix.ListenRange.MONTH), app.siansa.mix.RangeData("week")))
+                fun songs(ids: List<String>) = ids.mapIndexed { i, id -> app.siansa.data.Song(id = id, title = if (i == 0) "A Song With a Very Long Name Indeed" else "Song ${i + 1}", artist = "Artist ${i + 1}", coverArt = "c$i") }
                 val actions = app.siansa.ui.ListeningActions({ songs(it) }, { _, _, _ -> }, {}, {}, {})
                 // Stand-in covers: the scene has no server to ask.
                 val draw: app.siansa.ui.CoverDraw = { id, _, modifier, shape, _ ->
                     val c = app.siansa.ui.tileColors(id ?: "none")
                     Box(modifier.clip(shape).drawBehind { drawRect(Brush.linearGradient(listOf(c.first, c.second))) })
                 }
-                androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalCoverDraw provides draw) { Column { app.siansa.ui.ListeningCard(card.copy(hot = null, top = null), actions) } }
+                androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalCoverDraw provides draw) { Column { app.siansa.ui.ListeningCard(card.copy(ranges = card.ranges.map { it.copy(songs = null) }), app.siansa.mix.ListenRange.MONTH, app.siansa.data.ListenColour.PLUM, actions) } }
             },
             Scene("listening_card_genres") {
-                fun list(kind: app.siansa.mix.TimeListKind, title: String, tag: String, line: String, n: Int) =
-                    app.siansa.mix.TimeCardList(kind.id, title, tag, line, (1..n).map { "$kind-$it" }, (1..n).map { 400 - it * 7 }, year = 2025)
+                fun list(kind: String, title: String, tag: String, line: String, n: Int) =
+                    app.siansa.mix.TimeCardList(kind, title, tag, line, (1..n).map { "$kind-$it" }, (1..n).map { 60 - it * 7 / 6 }, listOf("a"), year = 2025)
+                fun range(r: app.siansa.mix.ListenRange) = app.siansa.mix.RangeData(r.id, list(r.listKind, "Top songs", "", r.label, 50),
+                    listOf("Sleep Token" to 575, "Karnivool" to 278, "An Artist With a Very Long Name" to 169, "Pola & Bryson" to 132).map { (n, p) -> app.siansa.mix.CardArtist(n, p) },
+                    listOf("Progressive metal" to 34, "Drum and bass" to 21, "Folk" to 12, "Ambient" to 9).map { (n, p) -> app.siansa.mix.CardGenre(n, p) })
                 val card = app.siansa.mix.TimeCard("2026-11-23", listOf(
-                    list(app.siansa.mix.TimeListKind.YEAR_AGO, "This time last year", "NOV 2025", "November 2025", 48),
-                    list(app.siansa.mix.TimeListKind.DAY, "This day last year", "23 NOV", "23 November 2025", 12),
-                    list(app.siansa.mix.TimeListKind.LAST_MONTH, "Last month", "OCT", "October 2026", 50),
-                    list(app.siansa.mix.TimeListKind.LAST_YEAR, "Your 2025", "2025", "2025", 50),
-                ), app.siansa.mix.TIME_CARD_MAKE,
-                    hot = list(app.siansa.mix.TimeListKind.HOT, "Hot now", "", "Last 30 days", 50),
-                    top = list(app.siansa.mix.TimeListKind.TOP, "Top songs", "", "All time", 50),
-                    artists = listOf("Sleep Token" to 575, "Karnivool" to 278, "An Artist With a Very Long Name" to 169, "Pola & Bryson" to 132).map { (n, p) -> app.siansa.mix.CardArtist(n, p) },
-                    genres = listOf("Progressive metal" to 34, "Drum and bass" to 21, "Folk" to 12, "Ambient" to 9).map { (n, p) -> app.siansa.mix.CardGenre(n, p) },
-                )
-                fun songs(ids: List<String>) = ids.mapIndexed { i, id -> app.siansa.data.Song(id = id, title = if (i == 0) "A Song With a Very Long Name Indeed" else "Song ${i + 1}", artist = "Artist ${i + 1}") }
+                    list("year_ago", "This time last year", "NOV 2025", "November 2025", 48), list("day", "This day last year", "23 NOV", "23 November 2025", 12),
+                    list("last_month", "Last month", "OCT", "October 2026", 50), list("last_year", "Your 2025", "2025", "2025", 50),
+                ), app.siansa.mix.TIME_CARD_MAKE, listOf(range(app.siansa.mix.ListenRange.MONTH), app.siansa.mix.RangeData("week")))
+                fun songs(ids: List<String>) = ids.mapIndexed { i, id -> app.siansa.data.Song(id = id, title = if (i == 0) "A Song With a Very Long Name Indeed" else "Song ${i + 1}", artist = "Artist ${i + 1}", coverArt = "c$i") }
                 val actions = app.siansa.ui.ListeningActions({ songs(it) }, { _, _, _ -> }, {}, {}, {})
                 // Stand-in covers: the scene has no server to ask.
                 val draw: app.siansa.ui.CoverDraw = { id, _, modifier, shape, _ ->
                     val c = app.siansa.ui.tileColors(id ?: "none")
                     Box(modifier.clip(shape).drawBehind { drawRect(Brush.linearGradient(listOf(c.first, c.second))) })
                 }
-                androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalCoverDraw provides draw) { Column { app.siansa.ui.ListeningCard(card.copy(hot = null, top = null, artists = emptyList()), actions) } }
+                androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalCoverDraw provides draw) { Column { app.siansa.ui.ListeningCard(card.copy(ranges = card.ranges.map { it.copy(songs = null, artists = emptyList()) }), app.siansa.mix.ListenRange.MONTH, app.siansa.data.ListenColour.EMBER, actions) } }
             },
             Scene("listening_card_back") {
-                fun list(kind: app.siansa.mix.TimeListKind, title: String, tag: String, line: String, n: Int) =
-                    app.siansa.mix.TimeCardList(kind.id, title, tag, line, (1..n).map { "$kind-$it" }, (1..n).map { 400 - it * 7 }, year = 2025)
+                fun list(kind: String, title: String, tag: String, line: String, n: Int) =
+                    app.siansa.mix.TimeCardList(kind, title, tag, line, (1..n).map { "$kind-$it" }, (1..n).map { 60 - it * 7 / 6 }, listOf("a"), year = 2025)
+                fun range(r: app.siansa.mix.ListenRange) = app.siansa.mix.RangeData(r.id, list(r.listKind, "Top songs", "", r.label, 50),
+                    listOf("Sleep Token" to 575, "Karnivool" to 278, "An Artist With a Very Long Name" to 169, "Pola & Bryson" to 132).map { (n, p) -> app.siansa.mix.CardArtist(n, p) },
+                    listOf("Progressive metal" to 34, "Drum and bass" to 21, "Folk" to 12, "Ambient" to 9).map { (n, p) -> app.siansa.mix.CardGenre(n, p) })
                 val card = app.siansa.mix.TimeCard("2026-11-23", listOf(
-                    list(app.siansa.mix.TimeListKind.YEAR_AGO, "This time last year", "NOV 2025", "November 2025", 48),
-                    list(app.siansa.mix.TimeListKind.DAY, "This day last year", "23 NOV", "23 November 2025", 12),
-                    list(app.siansa.mix.TimeListKind.LAST_MONTH, "Last month", "OCT", "October 2026", 50),
-                    list(app.siansa.mix.TimeListKind.LAST_YEAR, "Your 2025", "2025", "2025", 50),
-                ), app.siansa.mix.TIME_CARD_MAKE,
-                    hot = list(app.siansa.mix.TimeListKind.HOT, "Hot now", "", "Last 30 days", 50),
-                    top = list(app.siansa.mix.TimeListKind.TOP, "Top songs", "", "All time", 50),
-                    artists = listOf("Sleep Token" to 575, "Karnivool" to 278, "An Artist With a Very Long Name" to 169, "Pola & Bryson" to 132).map { (n, p) -> app.siansa.mix.CardArtist(n, p) },
-                    genres = listOf("Progressive metal" to 34, "Drum and bass" to 21, "Folk" to 12, "Ambient" to 9).map { (n, p) -> app.siansa.mix.CardGenre(n, p) },
-                )
-                fun songs(ids: List<String>) = ids.mapIndexed { i, id -> app.siansa.data.Song(id = id, title = if (i == 0) "A Song With a Very Long Name Indeed" else "Song ${i + 1}", artist = "Artist ${i + 1}") }
+                    list("year_ago", "This time last year", "NOV 2025", "November 2025", 48), list("day", "This day last year", "23 NOV", "23 November 2025", 12),
+                    list("last_month", "Last month", "OCT", "October 2026", 50), list("last_year", "Your 2025", "2025", "2025", 50),
+                ), app.siansa.mix.TIME_CARD_MAKE, listOf(range(app.siansa.mix.ListenRange.MONTH), app.siansa.mix.RangeData("week")))
+                fun songs(ids: List<String>) = ids.mapIndexed { i, id -> app.siansa.data.Song(id = id, title = if (i == 0) "A Song With a Very Long Name Indeed" else "Song ${i + 1}", artist = "Artist ${i + 1}", coverArt = "c$i") }
                 val actions = app.siansa.ui.ListeningActions({ songs(it) }, { _, _, _ -> }, {}, {}, {})
                 // Stand-in covers: the scene has no server to ask.
                 val draw: app.siansa.ui.CoverDraw = { id, _, modifier, shape, _ ->
                     val c = app.siansa.ui.tileColors(id ?: "none")
                     Box(modifier.clip(shape).drawBehind { drawRect(Brush.linearGradient(listOf(c.first, c.second))) })
                 }
-                androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalCoverDraw provides draw) { Column { app.siansa.ui.ListeningCard(card.copy(hot = null, top = null, artists = emptyList(), genres = emptyList()), actions) } }
+                androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalCoverDraw provides draw) { Column { app.siansa.ui.ListeningCard(card.copy(ranges = emptyList()), app.siansa.mix.ListenRange.MONTH, app.siansa.data.ListenColour.INK, actions) } }
+            },
+            Scene("listening_card_nothing") {
+                fun list(kind: String, title: String, tag: String, line: String, n: Int) =
+                    app.siansa.mix.TimeCardList(kind, title, tag, line, (1..n).map { "$kind-$it" }, (1..n).map { 60 - it * 7 / 6 }, listOf("a"), year = 2025)
+                fun range(r: app.siansa.mix.ListenRange) = app.siansa.mix.RangeData(r.id, list(r.listKind, "Top songs", "", r.label, 50),
+                    listOf("Sleep Token" to 575, "Karnivool" to 278, "An Artist With a Very Long Name" to 169, "Pola & Bryson" to 132).map { (n, p) -> app.siansa.mix.CardArtist(n, p) },
+                    listOf("Progressive metal" to 34, "Drum and bass" to 21, "Folk" to 12, "Ambient" to 9).map { (n, p) -> app.siansa.mix.CardGenre(n, p) })
+                val card = app.siansa.mix.TimeCard("2026-11-23", listOf(
+                    list("year_ago", "This time last year", "NOV 2025", "November 2025", 48), list("day", "This day last year", "23 NOV", "23 November 2025", 12),
+                    list("last_month", "Last month", "OCT", "October 2026", 50), list("last_year", "Your 2025", "2025", "2025", 50),
+                ), app.siansa.mix.TIME_CARD_MAKE, listOf(range(app.siansa.mix.ListenRange.MONTH), app.siansa.mix.RangeData("week")))
+                fun songs(ids: List<String>) = ids.mapIndexed { i, id -> app.siansa.data.Song(id = id, title = if (i == 0) "A Song With a Very Long Name Indeed" else "Song ${i + 1}", artist = "Artist ${i + 1}", coverArt = "c$i") }
+                val actions = app.siansa.ui.ListeningActions({ songs(it) }, { _, _, _ -> }, {}, {}, {})
+                // Stand-in covers: the scene has no server to ask.
+                val draw: app.siansa.ui.CoverDraw = { id, _, modifier, shape, _ ->
+                    val c = app.siansa.ui.tileColors(id ?: "none")
+                    Box(modifier.clip(shape).drawBehind { drawRect(Brush.linearGradient(listOf(c.first, c.second))) })
+                }
+                androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalCoverDraw provides draw) { Column { app.siansa.ui.ListeningCard(card, app.siansa.mix.ListenRange.WEEK, app.siansa.data.ListenColour.MOSS, actions) } }
+            },
+            Scene("listening_colours") {
+                Column(Modifier.padding(Space.Section)) { app.siansa.ui.ListenColourSwatches(app.siansa.data.ListenColour.PLUM) {} }
             },
             Scene("arrange_home_time_machine") {
                 app.siansa.ui.ArrangeHomeSheet(
