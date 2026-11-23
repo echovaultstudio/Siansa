@@ -18,6 +18,11 @@ enum class HomeSection(val id: String, val label: String) {
     MADE_FOR_YOU("made", "Made for you"),
     /** Siansa Beats' On repeat, Rediscover and New for you (the owner, 17 Nov: its own row); empty without them. */
     MORE_OF_YOU("more_of_you", "More of you"),
+    /**
+     * A card from the Time Machine (issue #1341): this time last year, this day last year, last month, last year. Its
+     * look is fixed: it's moved and hidden like any row, and has no cog. Empty without a listening history.
+     */
+    TIME_MACHINE("time_machine", "Time Machine"),
     /** Custom cards pinned to Home (issue #622); each shows in its own look, in the order set in Settings › Home › Cards. */
     CARDS("cards", "Your cards"),
     REDISCOVER("rediscover", "Rediscover"),
@@ -30,7 +35,10 @@ enum class HomeSection(val id: String, val label: String) {
     RANDOM("random", "Random picks");
 
     /** Its look can be changed under Arrange Home (issue #655); Your cards each have their own, in Settings › Home › Cards. */
-    val lookable: Boolean get() = this != CARDS && this != NOTICES
+    val lookable: Boolean get() = this != CARDS && this != NOTICES && this != TIME_MACHINE
+
+    /** Its look can't be changed anywhere: Arrange Home shows no cog for it. */
+    val fixed: Boolean get() = this == TIME_MACHINE
 
     companion object {
         val default: List<HomeSection> = entries.toList()

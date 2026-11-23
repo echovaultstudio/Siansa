@@ -26,7 +26,9 @@ class HomeLookTest {
         assertFalse(HomeSection.CARDS.lookable)
         // Notices are always a row of chips (issue #784).
         assertFalse(HomeSection.NOTICES.lookable)
-        assertTrue(HomeSection.entries.filter { it != HomeSection.CARDS && it != HomeSection.NOTICES }.all { it.lookable })
+        // The Time Machine card's look is fixed (issue #1341).
+        assertFalse(HomeSection.TIME_MACHINE.lookable)
+        assertTrue(HomeSection.entries.filter { it != HomeSection.CARDS && it != HomeSection.NOTICES && it != HomeSection.TIME_MACHINE }.all { it.lookable })
         assertTrue(HomeLook.parse("cards:banner").isEmpty())
         assertTrue(HomeLook.parse("notices:list").isEmpty())
     }

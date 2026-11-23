@@ -641,6 +641,25 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     looks = mapOf(app.siansa.data.HomeSection.MORE_OF_YOU to app.siansa.data.HomeLook.TILES, app.siansa.data.HomeSection.PODCASTS to app.siansa.data.HomeLook.COVER_ROWS),
                 )
             },
+            // Home's Time Machine card (issue #1341): the hero card in its own colour, a date on each picture, with long
+            // names; and its row in Arrange Home, which has no cog.
+            Scene("time_machine_card") {
+                fun list(kind: app.siansa.mix.TimeListKind, title: String, tag: String, line: String, n: Int) =
+                    app.siansa.mix.TimeCardList(kind.id, title, tag, line, (1..n).map { "$kind-$it" }, year = 2025)
+                val card = app.siansa.mix.TimeCard("2026-11-23", listOf(
+                    list(app.siansa.mix.TimeListKind.YEAR_AGO, "This time last year", "NOV 2025", "November 2025", 48),
+                    list(app.siansa.mix.TimeListKind.DAY, "This day last year", "23 NOV", "23 November 2025", 12),
+                    list(app.siansa.mix.TimeListKind.LAST_MONTH, "Last month", "OCT", "October 2026", 50),
+                    list(app.siansa.mix.TimeListKind.LAST_YEAR, "Your 2025", "2025", "2025", 50),
+                ))
+                Column { app.siansa.ui.TimeMachineCard(card, songsOf = { emptyList() }, play = { _, _ -> }, open = {}) }
+            },
+            Scene("arrange_home_time_machine") {
+                app.siansa.ui.ArrangeHomeSheet(
+                    order = listOf(app.siansa.data.HomeSection.QUICK, app.siansa.data.HomeSection.TIME_MACHINE, app.siansa.data.HomeSection.RECENT),
+                    hidden = emptySet(), onChange = {}, onHiddenChange = {}, onDismiss = {}, asPage = true,
+                )
+            },
             // Every row has the same cog (#1261): Your cards say their looks are their own; Shortcuts has a colour.
             Scene("arrange_home_every_row") {
                 app.siansa.ui.ArrangeHomeSheet(
