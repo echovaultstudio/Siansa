@@ -359,6 +359,41 @@ class SpacingHomeTest : SpacingCheck() {
         gaps.forEach { assertEven("Cards: the gap between them", it, Space.Medium, 1.dp) }
     }
 
+    /** A slider of choices (the owner, 23 Nov: "perfect text spacing"): each name centred under its stop, the outer two inside the edges. */
+    @Test fun stopSliderNamesSitUnderTheirStops() {
+        val shapes = listOf("Two a row", "Three a row", "Big tiles", "Pill chips")
+        compose.setContent {
+            SiansaTheme {
+                Column(Modifier.padding(Space.Section)) {
+                    app.siansa.ui.StopSlider(shapes, shapes[1], { it }, { "stop-" + shapes.indexOf(it) }) {}
+                }
+            }
+        }
+        val row = compose.onNodeWithTag("stopLabels").getBoundsInRoot()
+        val names = shapes.indices.map { compose.onNodeWithTag("stop-$it").getBoundsInRoot() }
+        val width = row.right - row.left
+        assertEven("Stop slider: the first name starts at the edge", names[0].left, row.left, 1.dp)
+        assertEven("Stop slider: the last name ends at the edge", names[3].right, row.right, 1.dp)
+        assertEven("Stop slider: the second name is centred on its stop", (names[1].left + names[1].right) / 2 - row.left, width / 3, 1.dp)
+        assertEven("Stop slider: the third name is centred on its stop", (names[2].left + names[2].right) / 2 - row.left, width * 2 / 3, 1.dp)
+    }
+
+    /** With only the chosen name shown (the owner, 23 Nov: "only show the selected text so it fits neatly"): it alone, centred under its stop. */
+    @Test fun stopSliderShowsOnlyTheChosenNameUnderItsStop() {
+        val shapes = listOf("Two a row", "Three a row", "Big tiles", "Pill chips")
+        compose.setContent {
+            SiansaTheme {
+                Column(Modifier.padding(Space.Section)) {
+                    app.siansa.ui.StopSlider(shapes, shapes[2], { it }, { "stop-" + shapes.indexOf(it) }, onlyChosen = true) {}
+                }
+            }
+        }
+        val row = compose.onNodeWithTag("stopLabels").getBoundsInRoot()
+        val name = compose.onNodeWithTag("stop-2").getBoundsInRoot()
+        assertEven("Stop slider: the one name is centred on its stop", (name.left + name.right) / 2 - row.left, (row.right - row.left) * 2 / 3, 1.dp)
+        listOf(0, 1, 3).forEach { compose.onNodeWithTag("stop-$it").assertDoesNotExist() }
+    }
+
     /** A row's settings sheet (the owner, 22 Nov): its switch lines one height, one after the other, with the same margin on both sides. */
     @Test fun rowSettingsLinesAreEven() {
         compose.setContent {

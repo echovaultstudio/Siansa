@@ -1013,6 +1013,11 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                 Column(Modifier.padding(vertical = Space.Page)) { app.siansa.ui.ShortcutCountRow(6) {} }
             },
             // A row's settings under its cog (the owner, 22 Nov, from the mockup): everything at a glance, each choice a
+            // Shortcuts' own settings (the owner, 23 Nov): its tiles' shape and its rows on sliders, each name under its stop.
+            Scene("row_settings_shortcuts") {
+                app.siansa.ui.HomeLookDialog(app.siansa.data.HomeSection.QUICK, app.siansa.data.HomeLook.AS_IS, titleShown = false, onTitleShown = {},
+                    onPick = {}, onDismiss = {}, variant = app.siansa.data.LookVariant.THREE, shortcutRows = 3, sheet = false, opened = setOf("style", "rows"))
+            },
             // line with what's chosen; then with parts opened; then a row of your own cards, which has less.
             Scene("row_settings") {
                 app.siansa.ui.HomeLookDialog(app.siansa.data.HomeSection.MADE_FOR_YOU, app.siansa.data.HomeLook.BANNER, titleShown = true, onTitleShown = {},
