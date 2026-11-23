@@ -131,6 +131,9 @@ class TimeCardTest {
         val genres = topGenres(songs, genresOf = ::tagGenres)
         assertEquals(listOf(CardGenre("Metal", 60), CardGenre("Folk", 30), CardGenre("Ambient", 10)), genres)
         assertEquals(listOf("Metal"), topGenres(songs, most = 1, genresOf = ::tagGenres).map { it.name })
+        // The top five, as it comes (issue #1349).
+        assertEquals(5, CARD_GENRES)
+        assertEquals(5, topGenres((1..8).map { played("g$it", "Genre $it", 10 - it) }, genresOf = ::tagGenres).size)
         // Siansa Beats' genre for a song, where it has one, comes before the tag's.
         assertEquals("Progressive metal", topGenres(songs) { if (it.id == "a") listOf("Progressive metal") else tagGenres(it) }.first().name)
         assertTrue(topGenres(listOf(played("d", null, 9)), genresOf = ::tagGenres).isEmpty())

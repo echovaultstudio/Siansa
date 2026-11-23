@@ -648,7 +648,7 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     app.siansa.mix.TimeCardList(kind, title, tag, line, (1..n).map { "$kind-$it" }, (1..n).map { 60 - it * 7 / 6 }, listOf("a"), year = 2025)
                 fun range(r: app.siansa.mix.ListenRange) = app.siansa.mix.RangeData(r.id, list(r.listKind, "Top songs", "", r.label, 50),
                     listOf("Sleep Token" to 575, "Karnivool" to 278, "An Artist With a Very Long Name" to 169, "Pola & Bryson" to 132, "Thornhill" to 121).map { (n, p) -> app.siansa.mix.CardArtist(n, p) },
-                    listOf("Progressive metal" to 34, "Drum and bass" to 21, "Folk" to 12, "Ambient" to 9).map { (n, p) -> app.siansa.mix.CardGenre(n, p) })
+                    listOf("Progressive metal" to 34, "Drum and bass" to 21, "Folk" to 12, "Ambient" to 9, "Alternative rock" to 7).map { (n, p) -> app.siansa.mix.CardGenre(n, p) })
                 val card = app.siansa.mix.TimeCard("2026-11-23", listOf(
                     list("year_ago", "This time last year", "NOV 2025", "November 2025", 48), list("day", "This day last year", "23 NOV", "23 November 2025", 12),
                     list("last_month", "Last month", "OCT", "October 2026", 50), list("last_year", "Your 2025", "2025", "2025", 50),
@@ -667,7 +667,7 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     app.siansa.mix.TimeCardList(kind, title, tag, line, (1..n).map { "$kind-$it" }, (1..n).map { 60 - it * 7 / 6 }, listOf("a"), year = 2025)
                 fun range(r: app.siansa.mix.ListenRange) = app.siansa.mix.RangeData(r.id, list(r.listKind, "Top songs", "", r.label, 50),
                     listOf("Sleep Token" to 575, "Karnivool" to 278, "An Artist With a Very Long Name" to 169, "Pola & Bryson" to 132, "Thornhill" to 121).map { (n, p) -> app.siansa.mix.CardArtist(n, p) },
-                    listOf("Progressive metal" to 34, "Drum and bass" to 21, "Folk" to 12, "Ambient" to 9).map { (n, p) -> app.siansa.mix.CardGenre(n, p) })
+                    listOf("Progressive metal" to 34, "Drum and bass" to 21, "Folk" to 12, "Ambient" to 9, "Alternative rock" to 7).map { (n, p) -> app.siansa.mix.CardGenre(n, p) })
                 val card = app.siansa.mix.TimeCard("2026-11-23", listOf(
                     list("year_ago", "This time last year", "NOV 2025", "November 2025", 48), list("day", "This day last year", "23 NOV", "23 November 2025", 12),
                     list("last_month", "Last month", "OCT", "October 2026", 50), list("last_year", "Your 2025", "2025", "2025", 50),
@@ -686,7 +686,7 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     app.siansa.mix.TimeCardList(kind, title, tag, line, (1..n).map { "$kind-$it" }, (1..n).map { 60 - it * 7 / 6 }, listOf("a"), year = 2025)
                 fun range(r: app.siansa.mix.ListenRange) = app.siansa.mix.RangeData(r.id, list(r.listKind, "Top songs", "", r.label, 50),
                     listOf("Sleep Token" to 575, "Karnivool" to 278, "An Artist With a Very Long Name" to 169, "Pola & Bryson" to 132, "Thornhill" to 121).map { (n, p) -> app.siansa.mix.CardArtist(n, p) },
-                    listOf("Progressive metal" to 34, "Drum and bass" to 21, "Folk" to 12, "Ambient" to 9).map { (n, p) -> app.siansa.mix.CardGenre(n, p) })
+                    listOf("Progressive metal" to 34, "Drum and bass" to 21, "Folk" to 12, "Ambient" to 9, "Alternative rock" to 7).map { (n, p) -> app.siansa.mix.CardGenre(n, p) })
                 val card = app.siansa.mix.TimeCard("2026-11-23", listOf(
                     list("year_ago", "This time last year", "NOV 2025", "November 2025", 48), list("day", "This day last year", "23 NOV", "23 November 2025", 12),
                     list("last_month", "Last month", "OCT", "October 2026", 50), list("last_year", "Your 2025", "2025", "2025", 50),
@@ -705,7 +705,7 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     app.siansa.mix.TimeCardList(kind, title, tag, line, (1..n).map { "$kind-$it" }, (1..n).map { 60 - it * 7 / 6 }, listOf("a"), year = 2025)
                 fun range(r: app.siansa.mix.ListenRange) = app.siansa.mix.RangeData(r.id, list(r.listKind, "Top songs", "", r.label, 50),
                     listOf("Sleep Token" to 575, "Karnivool" to 278, "An Artist With a Very Long Name" to 169, "Pola & Bryson" to 132, "Thornhill" to 121).map { (n, p) -> app.siansa.mix.CardArtist(n, p) },
-                    listOf("Progressive metal" to 34, "Drum and bass" to 21, "Folk" to 12, "Ambient" to 9).map { (n, p) -> app.siansa.mix.CardGenre(n, p) })
+                    listOf("Progressive metal" to 34, "Drum and bass" to 21, "Folk" to 12, "Ambient" to 9, "Alternative rock" to 7).map { (n, p) -> app.siansa.mix.CardGenre(n, p) })
                 val card = app.siansa.mix.TimeCard("2026-11-23", listOf(
                     list("year_ago", "This time last year", "NOV 2025", "November 2025", 48), list("day", "This day last year", "23 NOV", "23 November 2025", 12),
                     list("last_month", "Last month", "OCT", "October 2026", 50), list("last_year", "Your 2025", "2025", "2025", 50),
@@ -724,7 +724,7 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     app.siansa.mix.TimeCardList(kind, title, tag, line, (1..n).map { "$kind-$it" }, (1..n).map { 60 - it * 7 / 6 }, listOf("a"), year = 2025)
                 fun range(r: app.siansa.mix.ListenRange) = app.siansa.mix.RangeData(r.id, list(r.listKind, "Top songs", "", r.label, 50),
                     listOf("Sleep Token" to 575, "Karnivool" to 278, "An Artist With a Very Long Name" to 169, "Pola & Bryson" to 132, "Thornhill" to 121).map { (n, p) -> app.siansa.mix.CardArtist(n, p) },
-                    listOf("Progressive metal" to 34, "Drum and bass" to 21, "Folk" to 12, "Ambient" to 9).map { (n, p) -> app.siansa.mix.CardGenre(n, p) })
+                    listOf("Progressive metal" to 34, "Drum and bass" to 21, "Folk" to 12, "Ambient" to 9, "Alternative rock" to 7).map { (n, p) -> app.siansa.mix.CardGenre(n, p) })
                 val card = app.siansa.mix.TimeCard("2026-11-23", listOf(
                     list("year_ago", "This time last year", "NOV 2025", "November 2025", 48), list("day", "This day last year", "23 NOV", "23 November 2025", 12),
                     list("last_month", "Last month", "OCT", "October 2026", 50), list("last_year", "Your 2025", "2025", "2025", 50),

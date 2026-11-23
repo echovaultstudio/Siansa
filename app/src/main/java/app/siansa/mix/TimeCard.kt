@@ -126,7 +126,7 @@ data class CardGenre(val name: String, val share: Int)
 
 /** How many artists and genres the card shows, and how many of the year's songs its genres are counted from. */
 const val CARD_ARTISTS = 5
-const val CARD_GENRES = 4
+const val CARD_GENRES = 5
 const val GENRE_SONGS = 200
 
 /**
@@ -184,7 +184,7 @@ data class TimeCard(
 
 /**
  * The make of card this version keeps: 2 had Your listening's pages and each song's plays, 3 has them for each time,
- * 4 has five artists (the owner, 23 Nov: "only shows top 4 and not top 5").
+ * 4 has five artists and five genres (the owner, 23 Nov: "only shows top 4 and not top 5… the same for genres and songs").
  */
 const val TIME_CARD_MAKE = 4
 

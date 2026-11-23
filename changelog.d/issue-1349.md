@@ -1,2 +1,2 @@
 ### Changed
-- Your listening's Artists page shows your top five artists, not four.
+- Your listening shows your top five songs, artists and genres, not four.
