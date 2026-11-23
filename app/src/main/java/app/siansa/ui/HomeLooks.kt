@@ -116,7 +116,7 @@ fun HomeLookRow(
         HomeLook.LIST -> HomeList(title, items, open)
         HomeLook.BUTTON -> HomeButton(id, title, items, open, play, songs)
         HomeLook.COVER_ROWS -> HomeCoverRows(title, items, open)
-        HomeLook.GRID -> TileGrid(title, items.map { GridTile(it.key, it.title, it.coverArt, it.colors, onClick = it.open, subtitle = it.subtitle) }, gridSize, openAll)
+        HomeLook.GRID -> TileGrid(title, items.map { GridTile(it.key, it.title, it.coverArt, it.colors, onClick = it.open, subtitle = it.subtitle, songIds = it.songIds, covers = it.mosaic) }, gridSize, openAll)
         HomeLook.CAROUSEL -> HomeCarouselLook(title, items)
         HomeLook.COVER_GRID -> if (LocalLookVariant.current == app.siansa.data.LookVariant.FEATURED) HomeFeaturedGrid(title, items, openAll)
             else HomeCoverGrid(title, items, LocalCoverGridSize.current, openAll)
@@ -602,6 +602,9 @@ data class GridTile(
     val onClick: () -> Unit,
     /** What it is ("Mix", "Album"…), under its name on a big tile. */
     val subtitle: String = "",
+    /** A mix's songs and their covers, for its row's Colours (By mood) and Pictures. */
+    val songIds: List<String> = emptyList(),
+    val covers: List<String?> = emptyList(),
 )
 
 /** The layout chosen for the row being drawn ([app.siansa.data.LookVariant], Arrange Home): null as before. */
@@ -620,7 +623,7 @@ fun ShortcutTiles(tiles: List<GridTile>, variant: app.siansa.data.LookVariant?, 
             horizontalArrangement = Arrangement.spacedBy(Space.Small),
             verticalArrangement = Arrangement.spacedBy(Space.Small),
         ) {
-            tiles.forEach { t -> ShortcutChip(t.title, t.coverArt, t.colors, t.onClick, Modifier.testTag("tileGridTile"), icon = t.icon) }
+            tiles.forEach { t -> ShortcutChip(t.title, t.coverArt, t.colors, t.onClick, Modifier.testTag("tileGridTile"), icon = t.icon, songIds = t.songIds) }
         }
         return
     }
@@ -635,7 +638,8 @@ fun ShortcutTiles(tiles: List<GridTile>, variant: app.siansa.data.LookVariant?, 
             Row(horizontalArrangement = Arrangement.spacedBy(if (perRow == 3) Space.Tight else Space.Small)) {
                 row.forEach { t ->
                     QuickTile(t.title, t.coverArt, t.colors, t.onClick, Modifier.weight(1f).testTag("tileGridTile"), icon = t.icon,
-                        tall = tall, subtitle = t.subtitle.takeIf { variant == app.siansa.data.LookVariant.BIG && LocalCardLines.current })
+                        tall = tall, subtitle = t.subtitle.takeIf { variant == app.siansa.data.LookVariant.BIG && LocalCardLines.current },
+                        songIds = t.songIds, covers = t.covers)
                 }
                 repeat(perRow - row.size) { Spacer(Modifier.weight(1f)) }
             }

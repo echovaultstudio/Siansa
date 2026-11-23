@@ -113,7 +113,10 @@ screen. Moving cards stand still while Home scrolls, and when Android's "Remove 
 The same cog has **Show its title**: turn it off and the section shows without the heading above it ("Your evening",
 "Recently played"), keeping the gap where it was. And its **Colour**: a card shows the section's cards in the chosen
 look, and **As Home** follows the choice made under Cards, or pick one for this section alone. For Shortcuts, As Home
-keeps its tiles plain; a colour of its own paints them, as it does a Shortcut grid in any section.
+keeps its tiles plain; a colour of its own paints them, as it does a Shortcut grid in any section. A row's **Colours**
+and **Pictures** act on its shortcut tiles too: with Colours set to **By mood**, **Siansa** or **Mono** the tiles take
+those colours (painted Vivid until the row has a Card colour of its own; By mood needs a mix, and other tiles keep
+their covers' colours), and a picture style other than Auto draws each tile's small picture that way.
 
 | Section | What it shows |
 |---|---|
