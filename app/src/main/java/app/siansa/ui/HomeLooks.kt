@@ -284,7 +284,9 @@ fun HomeHero(
                 fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.8f))
             Row(horizontalArrangement = Arrangement.spacedBy(Space.Page), verticalAlignment = Alignment.Bottom) {
                 Box {
-                    CardPicture(item.mosaic, item.coverArt, item.colors, item.title, Modifier.size(HERO_COVER), RoundedCornerShape(8.dp), 600, songIds = item.songIds, artists = item.artists)
+                    // With a tag in its corner, the picture leaves its name out: it's beside it, and the two would meet.
+                    CardPicture(item.mosaic, item.coverArt, item.colors, item.title, Modifier.size(HERO_COVER), RoundedCornerShape(8.dp), 600,
+                        names = if (item.tag.isNotBlank()) false else null, songIds = item.songIds, artists = item.artists)
                     if (item.tag.isNotBlank()) PictureTag(item.tag, Modifier.align(Alignment.BottomStart))
                 }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
