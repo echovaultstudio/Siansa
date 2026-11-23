@@ -424,7 +424,7 @@ internal fun TimePicker(year: Int, month: Int?, today: LocalDate, onYear: (Int) 
 
 /** What the time machine found: Play, Create memory and the switch for songs not in your library, or why there's nothing. */
 @Composable
-private fun TimeMachineSongs(tm: TimeMachine, showMissing: Boolean, onShowMissing: (Boolean) -> Unit, onCreate: () -> Unit) {
+internal fun TimeMachineSongs(tm: TimeMachine, showMissing: Boolean, onShowMissing: (Boolean) -> Unit, onCreate: () -> Unit) {
     val graph = LocalGraph.current
     if (tm.tracks.isEmpty()) {
         Column(Modifier.padding(horizontal = Space.Page, vertical = Space.Large), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
@@ -468,7 +468,7 @@ private fun TimeMachineSongs(tm: TimeMachine, showMissing: Boolean, onShowMissin
 
 /** The time machine's songs, numbered as shown (with or without the ones not in the library), and where they came from. */
 @Composable
-private fun TimeMachineSongRows(tm: TimeMachine, showMissing: Boolean) {
+internal fun TimeMachineSongRows(tm: TimeMachine, showMissing: Boolean) {
     val graph = LocalGraph.current
     if (tm.tracks.isEmpty() || tm.songs.isEmpty()) return
     val songs = tm.songs
@@ -538,7 +538,7 @@ private fun MissingSongRow(track: RankedTrack, leading: String) {
  * playlist with all the songs and gives it a picture of that time's top albums.
  */
 @Composable
-private fun CreateMemory(tm: TimeMachine, nav: NavController, onDone: () -> Unit) {
+internal fun CreateMemory(tm: TimeMachine, nav: NavController, onDone: () -> Unit) {
     val graph = LocalGraph.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()

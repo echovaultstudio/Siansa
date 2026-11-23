@@ -36,18 +36,36 @@ class TimeCards(private val graph: AppGraph) {
         if (!force && now - triedAt < RETRY_MS) return@withLock kept
         if (!graph.settings.current.navidromeReady) return@withLock kept
         triedAt = now
-        val made = buildTimeCard(today, timeCardPlans(today)) { plan ->
-            runCatching { graph.insights.topOnce(plan.window, plan.key, TIME_LIST_SONGS, lasting = plan.kind != TimeListKind.DAY) }
-                .onFailure { AppLog.w("TimeCard", "${plan.title} not made: ${it.message}") }
-                .getOrNull()?.takeIf { it.complete || it.songs.isNotEmpty() }?.songs
-        }
+        val made = buildListeningCard(
+            today, timeCardPlans(today),
+            songsOf = { plan, limit ->
+                // Only a finished month or year is kept for good: a day, the last 30 days and all time move on every day.
+                val lasting = plan.kind != TimeListKind.DAY && plan.kind != TimeListKind.HOT && plan.kind != TimeListKind.TOP
+                runCatching { graph.insights.topOnce(plan.window, plan.key, limit, lasting) }
+                    .onFailure { AppLog.w("TimeCard", "${plan.title} not made: ${it.message}") }
+                    .getOrNull()?.takeIf { it.complete || it.songs.isNotEmpty() }
+                    ?.tracks?.mapNotNull { t -> t.song?.let { PlayedSong(it, t.plays.toInt()) } }
+            },
+            artistsOf = { window ->
+                runCatching { graph.insights.topArtistsOnce(window, CARD_ARTISTS * 2) }
+                    .onFailure { AppLog.w("TimeCard", "This year's artists not made: ${it.message}") }.getOrNull()
+                    ?.map { CardArtist(it.name, it.plays.toInt(), it.artist?.id, it.artist?.coverArt, it.artist?.imageUrl) }
+            },
+            // Siansa Beats' genres by each song's sound where it has them, else the song's tag.
+            genresOf = { songs ->
+                val bySound = runCatching { graph.beatsGenres.ofSongs(songs.map { it.id }) }.getOrNull().orEmpty()
+                val of: (app.siansa.data.Song) -> List<String> = { song -> bySound[song.id]?.map { it.name }?.takeIf { it.isNotEmpty() } ?: tagGenres(song) }
+                of
+            },
+        )
         if (made == null) {
             AppLog.w("TimeCard", "Not made for $today: the history couldn't be reached; ${if (kept == null) "no card yet" else "keeping the one from ${kept.day}"}")
             return@withLock kept
         }
         file.update { TimeCardKept(made) }
         AppLog.i("TimeCard", "Made for $today in ${System.currentTimeMillis() - now}ms: " +
-            made.lists.joinToString { "${it.title} (${it.songIds.size})" }.ifEmpty { "no list has enough plays" })
+            (listOfNotNull(made.hot, made.top) + made.lists).joinToString { "${it.title} (${it.songIds.size})" }.ifEmpty { "no list has enough plays" } +
+            " · ${made.artists.size} artists · genres ${made.genres.joinToString { "${it.name} ${it.share} %" }.ifEmpty { "none" }}")
         made
     }
 

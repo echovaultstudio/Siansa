@@ -21,9 +21,9 @@ setting up: Siansa Beats keeps the history, including what you imported there fr
 or "feat." version, a title with or without its apostrophe ("I'm", "Im"), and "The Beatles" for "Beatles" all
 count. Songs not in your library are listed too, marked "Not in your library" (you can hide them). **Create memory** saves the list as a playlist, named like "Time Machine - March 2019".
 
-Home has a **Time Machine** card with this time last year, this day last year, last month and last year, ready to
-play: see [Home and mixes](home-and-mixes.md). Its plays come from Siansa Beats when you scrobble there, else Koito or
-Last.fm, else Siansa's own history.
+Home has a **Your listening** card with what's hot now, your top songs, this year's artists and genres, and this
+time last year, this day last year, last month and last year, ready to play: see [Home and mixes](home-and-mixes.md).
+Its plays come from Siansa Beats when you scrobble there, else Koito or Last.fm, else Siansa's own history.
 
 When you scrobble to more than one of them, the same listen usually reached each, so a song's count is the
 highest of them, never the sum. Months and years that are over are kept on the phone, so they open at once;

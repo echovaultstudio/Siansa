@@ -485,6 +485,23 @@ class Insights(private val graph: AppGraph) {
     suspend fun topOnce(window: TimeWindow, period: String, limit: Int = 50, lasting: Boolean = true): TimeMachine =
         topUpdates(window, period, limit, lasting, beatsAlone = true).last()
 
+    /**
+     * Your most played artists in [window], once, for Your listening's card (issue #1343): from Siansa Beats' history
+     * when that's set up, else Koito, else Siansa's own history; each with its artist in the library, when it's there.
+     */
+    suspend fun topArtistsOnce(window: TimeWindow, limit: Int): List<RankedArtist> {
+        val s = graph.settings.current
+        val fromSec = window.from.atStartOfDay(zone).toEpochSecond()
+        val toSec = window.to.atStartOfDay(zone).toEpochSecond()
+        val plays: List<Played> = when {
+            graph.beatsHistory.on -> graph.beatsHistory.top("artists", fromSec, toSec, limit)
+            s.listenBrainzReady && graph.historyApi.isKoito(s.listenBrainzUrl) -> graph.historyApi.koitoTop(s.listenBrainzUrl, s.listenBrainzToken, "artists", fromSec, toSec, limit)
+            else -> graph.history.all().filter { it.at / 1000 in fromSec until toSec && !it.skipped && it.artist.isNotBlank() }
+                .groupBy { it.artist }.entries.sortedByDescending { it.value.size }.take(limit).map { Played(artist = it.key, count = it.value.size.toLong()) }
+        }
+        return plays.filter { it.artist.isNotBlank() }.take(limit).map { RankedArtist(it.artist, it.count, findArtist(it.artist)) }
+    }
+
     private fun topUpdates(window: TimeWindow, period: String, limit: Int, lasting: Boolean, beatsAlone: Boolean): Flow<TimeMachine> = channelFlow {
         val started = System.currentTimeMillis()
         val s = graph.settings.current

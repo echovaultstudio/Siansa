@@ -269,30 +269,26 @@ class SpacingHomeTest : SpacingCheck() {
         assertEven("A section's gap from the buttons to the cards", dp(cards[0].top - play.bottom), Space.Section, 1.dp)
     }
 
-    /** The Time Machine card (issue #1341): the hero's margins, and each date tag a small step in from its picture's corner. */
-    @Test fun timeMachineCardSitsAsTheHeroWithItsDatesInTheCorners() {
-        fun list(kind: app.siansa.mix.TimeListKind, title: String, tag: String) = app.siansa.mix.TimeCardList(kind.id, title, tag, "November 2025", listOf("a", "b", "c"), year = 2025)
+    /** Your listening's card (issue #1343): the hero's margins, its pages a page margin inside it, its look back squares evenly spread. */
+    @Test fun listeningCardSitsAsTheHeroWithEvenPages() {
+        fun list(kind: app.siansa.mix.TimeListKind, title: String, tag: String) = app.siansa.mix.TimeCardList(kind.id, title, tag, "November 2025", listOf("a", "b", "c"), listOf(3, 2, 1), year = 2025)
         val card = app.siansa.mix.TimeCard("2026-11-23", listOf(
             list(app.siansa.mix.TimeListKind.YEAR_AGO, "This time last year", "NOV 2025"), list(app.siansa.mix.TimeListKind.DAY, "This day last year", "23 NOV"),
             list(app.siansa.mix.TimeListKind.LAST_MONTH, "Last month", "OCT"), list(app.siansa.mix.TimeListKind.LAST_YEAR, "Your 2025", "2025"),
-        ))
-        compose.setContent { SiansaTheme { Column { app.siansa.ui.TimeMachineCard(card, songsOf = { emptyList() }, play = { _, _ -> }, open = {}) } } }
+        ), app.siansa.mix.TIME_CARD_MAKE)
+        compose.setContent { SiansaTheme { Column { app.siansa.ui.ListeningCard(card, app.siansa.ui.ListeningActions({ emptyList() }, { _, _, _ -> }, {}, {}, {})) } } }
         val screen = compose.onRoot().getBoundsInRoot()
         val d = compose.density
         fun dp(px: Float) = with(d) { px.toDp() }
-        val hero = compose.onNodeWithTag("timeMachineCard").fetchSemanticsNode().boundsInRoot
-        assertEven("Time Machine card: its left margin is the page margin", dp(hero.left) - screen.left, Space.Page, 1.dp)
-        assertEven("Time Machine card: margins left and right", dp(hero.left) - screen.left, screen.right - dp(hero.right), 1.dp)
-        val cards = compose.onAllNodesWithTag("homeHeroCard").fetchSemanticsNodes().map { it.boundsInRoot }
-        assertEquals(3, cards.size)
-        assertEven("Time Machine card: its cards' outer edges sit evenly", dp(cards.first().left - hero.left), dp(hero.right - cards.last().right), 1.dp)
-        // Tags are drawn after their pictures: the big one's first, then one for each card at the foot.
-        val tags = compose.onAllNodesWithTag("pictureTag", useUnmergedTree = true).fetchSemanticsNodes().map { it.boundsInRoot }
-        assertEquals(4, tags.size)
-        tags.drop(1).zip(cards).forEach { (tag, card) ->
-            assertEven("Time Machine card: a tag's gap from its picture's left edge", dp(tag.left - card.left), Space.Small, 1.dp)
-            assertEven("Time Machine card: a tag's gaps left and above", dp(tag.left - card.left), dp(tag.top - card.top), 1.dp)
-        }
+        val whole = compose.onNodeWithTag("listeningCard").fetchSemanticsNode().boundsInRoot
+        assertEven("Your listening: its left margin is the page margin", dp(whole.left) - screen.left, Space.Page, 1.dp)
+        assertEven("Your listening: margins left and right", dp(whole.left) - screen.left, screen.right - dp(whole.right), 1.dp)
+        val squares = compose.onAllNodesWithTag("listeningBack").fetchSemanticsNodes().map { it.boundsInRoot }
+        assertEquals(4, squares.size)
+        assertEven("Your listening: its lists' outer edges sit evenly", dp(squares.first().left - whole.left), dp(whole.right - squares.last().right), 1.dp)
+        assertEven("Your listening: its lists' left margin in the card", dp(squares.first().left - whole.left), Space.Page, 1.dp)
+        assertEven("Your listening: the gaps between its lists", dp(squares[1].left - squares[0].right), dp(squares[3].left - squares[2].right), 0.5.dp)
+        assertEven("Your listening: the gap between lists is a small step", dp(squares[1].left - squares[0].right), Space.Small, 1.dp)
     }
 
     /** A cover grid with one featured (the owner, 22 Nov): the gap under the big square is the gap between all of them. */

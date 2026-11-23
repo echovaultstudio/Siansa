@@ -120,6 +120,8 @@ fun NavGraphBuilder.siansaRoutes(nav: NavController, except: Set<String> = empty
     page("sync") { SyncScreen(nav) }
     page("report/{range}") { ReportScreen(nav, it.arguments?.getString("range").orEmpty()) }
     page("discover/artists") { ArtistDiscoveryScreen(nav) }
+    // One of Your listening's lists as a page of songs (issue #1343).
+    page("timelist/{kind}") { TimeListScreen(nav, it.arguments?.getString("kind").orEmpty()) }
     // A month or a year to open at (Home's Time Machine card, issue #1341): month 0 is the whole year; without them,
     // this month a year ago.
     page(

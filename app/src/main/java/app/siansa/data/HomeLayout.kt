@@ -19,10 +19,11 @@ enum class HomeSection(val id: String, val label: String) {
     /** Siansa Beats' On repeat, Rediscover and New for you (the owner, 17 Nov: its own row); empty without them. */
     MORE_OF_YOU("more_of_you", "More of you"),
     /**
-     * A card from the Time Machine (issue #1341): this time last year, this day last year, last month, last year. Its
-     * look is fixed: it's moved and hidden like any row, and has no cog. Empty without a listening history.
+     * Your listening (issues #1341, #1343): one card with a page each for hot now, top songs, this year's artists and
+     * genres, and the Time Machine's look back lists. Its look is fixed: it's moved and hidden like any row, and has
+     * no cog. Empty without a listening history. Its id is from when it was the Time Machine card.
      */
-    TIME_MACHINE("time_machine", "Time Machine"),
+    TIME_MACHINE("time_machine", "Your listening"),
     /** Custom cards pinned to Home (issue #622); each shows in its own look, in the order set in Settings › Home › Cards. */
     CARDS("cards", "Your cards"),
     REDISCOVER("rediscover", "Rediscover"),
