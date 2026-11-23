@@ -353,8 +353,9 @@ format and bit rate) and, beside it, what is really playing and where it comes f
 A last line says what the phone then does with the sound:
 
 - **Unchanged at 44.1 kHz**: a 44.1 kHz song passes Siansa's mixer as it is.
-- **Resampled from … to 44.1 kHz**: a song at any other rate (48 kHz, hi-res, and every Opus conversion, which is
-  48 kHz) is converted to the mixer's rate. The first line then says **Resampled to 44.1 kHz**, in the accent colour.
+- **Resampled to 44.1 kHz**, in the accent colour as the first line, with the rate it came from under it: a song at
+  any other rate (48 kHz, hi-res) is converted to the mixer's rate. An Opus conversion, always 48 kHz, says
+  **Resampled from 48 kHz to 44.1 kHz** as its last line.
 - **Blended at song changes (DJ mix** or **crossfade)**: the song is the file only between its blends, and the first
   line says **Same as the file between blends**.
 - **Untouched** with the song's own rate, while [Untouched playback](#untouched-playback) is on.

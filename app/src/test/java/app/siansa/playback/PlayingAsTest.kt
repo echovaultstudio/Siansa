@@ -68,15 +68,15 @@ class PlayingAsTest {
         val hiRes = heard(96_000)
         assertEquals("Resampled to 44.1${nb}kHz", hiRes.title)
         assertTrue(hiRes.differs)
-        assertEquals("Resampled from 96${nb}kHz to 44.1${nb}kHz", hiRes.sound)
-        assertEquals("Resampled from 48${nb}kHz to 44.1${nb}kHz", heard(48_000).sound)
+        assertEquals("From 96${nb}kHz, in Siansa's mixer", hiRes.sound)
+        assertEquals("From 48${nb}kHz, in Siansa's mixer", heard(48_000).sound)
         // In a DJ mix or with crossfade the song is the file only between its blends.
         val dj = heard(44_100, blended = "DJ mix")
         assertEquals("Same as the file between blends", dj.title)
         assertFalse(dj.differs)
         assertEquals("Unchanged at 44.1${nb}kHz · blended at song changes (DJ mix)", dj.sound)
         assertEquals("Resampled to 44.1${nb}kHz", heard(96_000, blended = "crossfade").title)
-        assertEquals("Resampled from 96${nb}kHz to 44.1${nb}kHz · blended at song changes (crossfade)", heard(96_000, blended = "crossfade").sound)
+        assertEquals("From 96${nb}kHz, in Siansa's mixer · blended at song changes (crossfade)", heard(96_000, blended = "crossfade").sound)
         // Untouched playback: the file's own rate, nothing blended, whatever else is set.
         assertEquals(PlayingAs("Same as the file", "Streamed as it is · Wi-Fi", differs = false, sound = "Untouched · 96${nb}kHz"), heard(96_000, untouched = true, blended = "crossfade"))
         assertEquals("Untouched, at its own sample rate", heard(null, untouched = true).sound)

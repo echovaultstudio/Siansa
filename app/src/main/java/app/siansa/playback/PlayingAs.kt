@@ -65,10 +65,12 @@ data class PlayingAs(val title: String, val detail: String, val differs: Boolean
                 hz != null -> "Unchanged at ${rate(MIXER_HZ)}"
                 else -> "Through Siansa's mixer at ${rate(MIXER_HZ)}"
             }
-            val sound = if (blended != null) "$through · blended at song changes ($blended)" else through
+            val blends = blended?.let { " · blended at song changes ($it)" }.orEmpty()
+            val sound = through + blends
             return when {
                 base.title != SAME -> base.copy(sound = sound)
-                resampled -> base.copy(title = "Resampled to ${rate(MIXER_HZ)}", differs = true, sound = sound)
+                // The first line says it already: the last one only adds from what.
+                resampled -> base.copy(title = "Resampled to ${rate(MIXER_HZ)}", differs = true, sound = "From ${rate(hz!!)}, in Siansa's mixer$blends")
                 blended != null -> base.copy(title = SAME_BETWEEN, sound = sound)
                 else -> base.copy(sound = sound)
             }
