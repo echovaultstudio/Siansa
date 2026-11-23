@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ChevronRight
@@ -199,3 +200,76 @@ private val LOOK_BLOCK_BIG = 30.dp
 private val LOOK_BLOCK_SMALL = 14.dp
 private val LOOK_ROW = 8.dp
 private val LOOK_LINE = 4.dp
+
+/**
+ * One of a few choices on a slider (the owner, 23 Nov: "can we also use sliders for tiles shapes with perfect text
+ * spacing"; a bar of four broke "Three a row" over two lines): a stop for each of [options], and under the slider each
+ * one's [label], centred on its own stop (the first and last kept inside the edges), the chosen one in the accent
+ * colour. A tap on a label picks it too. [onPick] is told as the thumb comes to a stop.
+ */
+@Composable
+internal fun <T> StopSlider(
+    options: List<T>,
+    selected: T,
+    label: (T) -> String,
+    tag: (T) -> String,
+    modifier: Modifier = Modifier,
+    sliderTag: String = "stopSlider",
+    onPick: (T) -> Unit,
+) {
+    if (options.size < 2) return
+    val at = options.indexOf(selected).coerceAtLeast(0)
+    Column(modifier.fillMaxWidth()) {
+        androidx.compose.material3.Slider(
+            value = at.toFloat(),
+            onValueChange = { v -> stopFor(v, options.size).takeIf { it != at }?.let { onPick(options[it]) } },
+            valueRange = 0f..(options.size - 1).toFloat(),
+            steps = options.size - 2,
+            modifier = Modifier.fillMaxWidth().testTag(sliderTag),
+        )
+        androidx.compose.ui.layout.Layout(
+            content = {
+                options.forEach { option ->
+                    val chosen = option == selected
+                    Text(
+                        label(option),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = if (chosen) FontWeight.Bold else FontWeight.Normal,
+                        color = if (chosen) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        maxLines = 2,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(STOP_LABEL_CORNER))
+                            .selectable(selected = chosen, role = androidx.compose.ui.semantics.Role.RadioButton) { onPick(option) }
+                            .padding(horizontal = Space.Tight, vertical = Space.Tight)
+                            .testTag(tag(option)),
+                    )
+                }
+            },
+            modifier = Modifier.fillMaxWidth().testTag("stopLabels"),
+        ) { measurables, constraints ->
+            val width = constraints.maxWidth
+            // Each label may be as wide as its share of the row: a long one breaks on to two lines, centred.
+            val each = androidx.compose.ui.unit.Constraints(maxWidth = (width / measurables.size).coerceAtLeast(1))
+            val placed = measurables.map { it.measure(each) }
+            val height = placed.maxOf { it.height }
+            layout(width, height) {
+                placed.forEachIndexed { i, p -> p.placeRelative(stopLabelLeft(i, placed.size, width, p.width), 0) }
+            }
+        }
+    }
+}
+
+/** The stop nearest [value] on a slider of [count] stops. */
+internal fun stopFor(value: Float, count: Int): Int = kotlin.math.round(value).toInt().coerceIn(0, count - 1)
+
+/**
+ * Where the label of stop [index] of [count] starts in a row [width] wide, itself [own] wide: centred on its stop
+ * (stops are evenly spread from edge to edge), and never past an edge.
+ */
+internal fun stopLabelLeft(index: Int, count: Int, width: Int, own: Int): Int {
+    val centre = if (count <= 1) width / 2f else width * index / (count - 1).toFloat()
+    return (centre - own / 2f).toInt().coerceIn(0, (width - own).coerceAtLeast(0))
+}
+
+private val STOP_LABEL_CORNER = 8.dp

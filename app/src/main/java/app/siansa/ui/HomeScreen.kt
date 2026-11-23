@@ -373,7 +373,7 @@ fun HomeScreen(nav: NavController) {
                         }
                         val played = shownRecents(recentPlays.orEmpty(), shownRecentAlbums)
                             .filter { !it.route.startsWith("mix/") || it.route.removePrefix("mix/") in mixIds }
-                        val quick = quickShortcuts(played, fill, homeSettings.homeShortcuts)
+                        val quick = quickShortcuts(played, fill, shortcutCount(homeSettings.homeShortcuts, homeSettings.homeVariants[section]))
                         fun colorsOf(r: RecentPlay) = if (r.route == "liked") Color(0xFF4B2BD6) to Color(0xFF8FD3C8) else generatedCoverColors(r.route) ?: tileColors(r.title)
                         // A radio's (or another page whose cover Siansa draws) is its own cover, in its colours, never one
                         // of its songs' (the owner, 10 Nov), also for shortcuts noted before.
@@ -940,6 +940,22 @@ internal fun madeForYouCaption(trackCount: Int?, aiDown: Boolean, prompt: String
 internal const val QUICK_COUNT = 8
 internal const val QUICK_MIN = 2
 
+/** How many rows of shortcut tiles can be chosen (the owner, 23 Nov: "minimum 1 maximum 4"). */
+internal val SHORTCUT_ROWS = 1..4
+
+/** The most tiles the rows can hold: four rows of three. */
+internal const val QUICK_MOST = 12
+
+/** The rows [count] shortcuts take two to a row, as the row's cog shows and sets them. */
+internal fun shortcutRows(count: Int): Int = ((count + 1) / 2).coerceIn(SHORTCUT_ROWS.first, SHORTCUT_ROWS.last)
+
+/**
+ * How many shortcuts Home shows for the [saved] number (2 to 8, two to a row) in the row's layout: three a row fills
+ * each of its rows, so the rows chosen stay the rows shown; every other layout shows the number itself.
+ */
+internal fun shortcutCount(saved: Int, variant: app.siansa.data.LookVariant?): Int =
+    if (variant == app.siansa.data.LookVariant.THREE) shortcutRows(saved) * 3 else saved.coerceIn(QUICK_MIN, QUICK_COUNT)
+
 /** The album a shortcut opens ("album/123"), or null for any other page. */
 internal fun recentAlbumId(route: String): String? =
     route.takeIf { it.startsWith("album/") }?.removePrefix("album/")?.substringBefore('?')?.takeIf { it.isNotBlank() }
@@ -954,7 +970,7 @@ internal fun shownRecents(played: List<RecentPlay>, shownAlbums: Set<String>?): 
  * was played.
  */
 internal fun quickShortcuts(played: List<RecentPlay>, fill: List<RecentPlay>, count: Int): List<RecentPlay> =
-    (played + fill).distinctBy { it.route }.take(count.coerceIn(QUICK_MIN, QUICK_COUNT))
+    (played + fill).distinctBy { it.route }.take(count.coerceIn(QUICK_MIN, QUICK_MOST))
 
 /**
  * A section of Home as one list item, with its title shown or not as set in Arrange Home (issue #961).

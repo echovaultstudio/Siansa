@@ -116,6 +116,11 @@ fun HomeSettingsSheet(nav: androidx.navigation.NavController, startOnSources: Bo
             AppLog.i("Home", "${section.label}: reset to how it came")
             graph.settings.resetHomeRow(section)
         },
+        shortcutRows = shortcutRows(s.homeShortcuts),
+        onShortcutRows = { rows ->
+            AppLog.i("Home", "Shortcuts: $rows ${if (rows == 1) "row" else "rows"}")
+            graph.settings.setHomeShortcuts(rows * 2)
+        },
         noLines = s.homeNoLines,
         onLinesShownChange = { section, shown ->
             AppLog.i("Home", "${section.label}: its cards' lines ${if (shown) "shown" else "hidden"}")
@@ -217,6 +222,9 @@ fun ArrangeHomeSheet(
     looks: Map<HomeSection, HomeLook> = emptyMap(),
     // Each row's title shown or hidden (issue #961), in the same dialog as its look.
     onResetRow: (HomeSection) -> Unit = {},
+    // How many rows of tiles Shortcuts shows (the owner, 23 Nov), set in its cog.
+    shortcutRows: Int = SHORTCUT_ROWS.last,
+    onShortcutRows: (Int) -> Unit = {},
     noLines: Set<HomeSection> = emptySet(),
     onLinesShownChange: (HomeSection, Boolean) -> Unit = { _, _ -> },
     untitled: Set<HomeSection> = emptySet(),
@@ -266,6 +274,8 @@ fun ArrangeHomeSheet(
             onHome = section !in hiddenItems,
             onOnHome = { hiddenItems = if (it) hiddenItems - section else hiddenItems + section; onHiddenChange(hiddenItems) },
             onReset = { onResetRow(section) },
+            shortcutRows = shortcutRows.takeIf { section == HomeSection.QUICK },
+            onShortcutRows = onShortcutRows,
             onDismiss = { picking = null },
             // Your cards each have their own look, chosen in Settings › Home › Cards: a way there.
             onOpenSettings = if (section.lookable) null else { { picking = null; onOpenSettings(section) } },
@@ -506,6 +516,9 @@ internal fun HomeLookDialog(
     // Where its pictures' colours come from (the owner, 20 Nov).
     pictureColours: app.siansa.data.PictureColours = app.siansa.data.PictureColours.COVERS,
     onPictureColours: (app.siansa.data.PictureColours) -> Unit = {},
+    // Shortcuts alone: how many rows of tiles it shows (the owner, 23 Nov); null for every other row.
+    shortcutRows: Int? = null,
+    onShortcutRows: (Int) -> Unit = {},
     // Its cards' colour (the owner, 13 Nov): its own, or [CardLook.AS_HOME], which is [homeCardLook].
     cardLook: CardLook = CardLook.AS_HOME,
     homeCardLook: CardLook = CardLook.DEFAULT,
@@ -531,6 +544,7 @@ internal fun HomeLookDialog(
     var home by remember(section) { mutableStateOf(onHome) }
     var shown by remember(section) { mutableStateOf(titleShown) }
     var lines by remember(section) { mutableStateOf(linesShown) }
+    var rows by remember(section) { mutableStateOf(shortcutRows ?: SHORTCUT_ROWS.last) }
     var look by remember(section) { mutableStateOf(current) }
     var tiles by remember(section) { mutableStateOf(gridSize) }
     var coverGridSize by remember(section) { mutableStateOf(coverGrid) }
@@ -589,7 +603,21 @@ internal fun HomeLookDialog(
                     SheetRule()
                     ValueLine(variantTitle(look), style.label, "style" in open, "rowStyle") { toggle("style") }
                     if ("style" in open) {
-                        SegmentBar(variants, style, { shortLabel(it) }, { "lookVariant-${it.id}" }, Modifier.padding(bottom = Space.Medium)) { layout = it; onVariant(it) }
+                        // Shortcuts' four shapes on a slider (the owner, 23 Nov): a bar of four broke their names.
+                        if (look == HomeLook.AS_IS && section == HomeSection.QUICK) {
+                            StopSlider(variants, style, { it.label }, { "lookVariant-${it.id}" }, Modifier.padding(bottom = Space.Medium), sliderTag = "rowStyleSlider") { layout = it; onVariant(it) }
+                        } else {
+                            SegmentBar(variants, style, { shortLabel(it) }, { "lookVariant-${it.id}" }, Modifier.padding(bottom = Space.Medium)) { layout = it; onVariant(it) }
+                        }
+                    }
+                }
+                // How many rows of shortcuts (the owner, 23 Nov: "no way to set number of shortcuts vertically… minimum
+                // 1 maximum 4"), for Shortcuts as it is; as a Shortcut grid it's Tiles, below.
+                if (shortcutRows != null && look == HomeLook.AS_IS) {
+                    SheetRule()
+                    ValueLine("Rows", "$rows", "rows" in open, "rowRows") { toggle("rows") }
+                    if ("rows" in open) {
+                        StopSlider(SHORTCUT_ROWS.toList(), rows, { "$it" }, { "shortcutRows-$it" }, Modifier.padding(bottom = Space.Medium), sliderTag = "rowRowsSlider") { rows = it; onShortcutRows(it) }
                     }
                 }
                 if (look == HomeLook.GRID) {
