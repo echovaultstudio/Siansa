@@ -84,6 +84,28 @@ fun cardPaint(colors: Pair<Color, Color>, picture: String? = null, label: String
 private fun soft(colors: Pair<Color, Color>, quiet: CardPaint) =
     CardPaint(quiet.base, Brush.linearGradient(listOf(colors.first.copy(alpha = SOFT_ALPHA), colors.second.copy(alpha = SOFT_ALPHA))), quiet.text, quiet.faint)
 
+/**
+ * The colour a row's shortcut tiles take (the owner, 23 Nov: "shortcuts don't get their colour changes at all. All
+ * changes and settings must be possible for all cards"): the row's own Card colour when it has one; else Vivid once its
+ * Colours are a choice that isn't the covers' own (By mood, Siansa, Mono), so that choice shows; else none, and the
+ * tiles stay plain as they came (#1261).
+ */
+internal fun shortcutLookOf(cardColour: CardLook?, colours: app.siansa.data.PictureColours?): CardLook? =
+    cardColour ?: CardLook.VIVID.takeIf { colours != null && colours != app.siansa.data.PictureColours.COVERS }
+
+/**
+ * A shortcut tile's paint in [look]: in the colours its row's Colours say ([LocalPictureColours]: its songs' moods for
+ * a mix, [songIds], or a set), else its picture's or its [own] as before.
+ */
+@Composable
+internal fun shortcutPaint(own: Pair<Color, Color>, picture: String?, title: String, look: CardLook, songIds: List<String> = emptyList()): CardPaint {
+    val palette = LocalPictureColours.current
+    val mood = if (palette == app.siansa.data.PictureColours.MOOD) rememberMoodPaint(songIds) else null
+    val chosen = mood ?: setPaint(palette, title)
+    // The row's chosen colours are the card's own then, whatever its picture's are.
+    return if (chosen != null) cardPaint(chosen.first to chosen.second, null, title, look) else cardPaint(own, picture, title, look)
+}
+
 /** Fills a card with [paint] in [shape]: the solid, then the wash over it. */
 fun Modifier.cardFill(paint: CardPaint, shape: Shape): Modifier {
     // The wash on a fresh Modifier: on `this` it would carry the chain before it (the card's padding) a second time,

@@ -948,9 +948,13 @@ fun QuickTile(
     // The tile's height (the owner, 20 Nov): [QUICK_TILE_SMALL] three a row, [QUICK_TILE_BIG] with [subtitle] under the name.
     tall: Dp = QUICK_TILE_HEIGHT,
     subtitle: String? = null,
+    // A mix's songs and their covers, for its row's Colours (By mood) and Pictures.
+    songIds: List<String> = emptyList(),
+    covers: List<String?> = emptyList(),
 ) {
-    // Plain, unless its row has a colour of its own (#1261).
-    val paint = LocalShortcutLook.current?.let { look -> cardPaint(colors ?: tileColors(title), coverArt, title, look) }
+    // Plain, unless its row has a colour of its own (#1261), in the colours its row's Colours say.
+    val paint = LocalShortcutLook.current?.let { look -> shortcutPaint(colors ?: tileColors(title), coverArt, title, look, songIds) }
+    val style = LocalPictureStyle.current
     val small = tall < QUICK_TILE_HEIGHT
     val big = tall > QUICK_TILE_HEIGHT
     Row(
@@ -961,7 +965,12 @@ fun QuickTile(
             .clickable(onClick = onClick),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (coverArt != null) {
+        if (coverArt != null && style != app.siansa.data.PictureStyle.AUTO) {
+            // Its picture in the row's Pictures (the owner, 23 Nov: every setting for every card), without its name:
+            // the tile says that beside it.
+            CardPicture(covers, coverArt, colors ?: tileColors(title), title, Modifier.size(tall),
+                RoundedCornerShape(topStart = QUICK_TILE_CORNER, bottomStart = QUICK_TILE_CORNER), if (big) 300 else 150, names = false, style = style, songIds = songIds)
+        } else if (coverArt != null) {
             Cover(coverArt, if (big) 300 else 150, Modifier.size(tall), RoundedCornerShape(topStart = QUICK_TILE_CORNER, bottomStart = QUICK_TILE_CORNER))
         } else {
             Box(
@@ -1016,8 +1025,11 @@ val QUICK_TILE_BIG = 76.dp
  * wide as the name; the pills flow on to as many lines as they need.
  */
 @Composable
-fun ShortcutChip(title: String, coverArt: String?, colors: Pair<Color, Color>?, onClick: () -> Unit, modifier: Modifier = Modifier, icon: ImageVector? = null) {
-    val paint = LocalShortcutLook.current?.let { look -> cardPaint(colors ?: tileColors(title), coverArt, title, look) }
+fun ShortcutChip(
+    title: String, coverArt: String?, colors: Pair<Color, Color>?, onClick: () -> Unit, modifier: Modifier = Modifier, icon: ImageVector? = null,
+    songIds: List<String> = emptyList(),
+) {
+    val paint = LocalShortcutLook.current?.let { look -> shortcutPaint(colors ?: tileColors(title), coverArt, title, look, songIds) }
     val shape = RoundedCornerShape(percent = 50)
     Row(
         modifier

@@ -453,6 +453,28 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     }
                 }
             },
+            // Shortcut tiles in their row's Colours (the owner, 23 Nov: "shortcuts don't get their colour changes at all"):
+            // Siansa's set and Mono on tiles, Siansa's on pill chips, and the row's Card colour Soft with Mono.
+            Scene("shortcut_colours") {
+                val tiles = listOf(
+                    app.siansa.ui.GridTile("s1", "On repeat", null, app.siansa.ui.tileColors("s1"), null, {}, subtitle = "Mix"),
+                    app.siansa.ui.GridTile("s2", "Neo-Classical Downtempo With Field Recordings", null, app.siansa.ui.tileColors("s2"), null, {}, subtitle = "Mix"),
+                    app.siansa.ui.GridTile("s3", "Benthic Surge", null, app.siansa.ui.tileColors("s3"), null, {}, subtitle = "Mix"),
+                    app.siansa.ui.GridTile("s4", "Night Drive", null, app.siansa.ui.tileColors("s4"), Icons.Rounded.Radio, {}, subtitle = "Radio"),
+                )
+                Column(Modifier.padding(vertical = Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Section)) {
+                    for ((colours, card, variant) in listOf(
+                        Triple(app.siansa.data.PictureColours.SIANSA, null, null),
+                        Triple(app.siansa.data.PictureColours.MONO, null, null),
+                        Triple(app.siansa.data.PictureColours.SIANSA, null, app.siansa.data.LookVariant.CHIPS),
+                        Triple(app.siansa.data.PictureColours.MONO, app.siansa.data.CardLook.SOFT, null),
+                    )) {
+                        CompositionLocalProvider(app.siansa.ui.LocalPictureColours provides colours, app.siansa.ui.LocalShortcutLook provides app.siansa.ui.shortcutLookOf(card, colours)) {
+                            app.siansa.ui.ShortcutTiles(tiles, variant, Modifier.padding(horizontal = Space.Page))
+                        }
+                    }
+                }
+            },
             // A cover grid with one featured, and a banner as a hero (the owner, 20 Nov), with long names.
             // A hero with the row's next cards at its foot (the owner, 22 Nov): three, then four, with long names and lines.
             Scene("hero_cards") {

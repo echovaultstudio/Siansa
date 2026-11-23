@@ -35,6 +35,19 @@ class LookVariantTest {
         assertEquals(emptyMap<HomeSection, LookVariant>(), settings().state.value.homeVariants)
     }
 
+    /** The owner, 23 Nov: "shortcuts don't get their colour changes at all. All changes and settings must be possible for all cards." */
+    @Test fun shortcutTilesTakeTheirRowsColours() {
+        val look = { card: app.siansa.data.CardLook?, colours: PictureColours? -> app.siansa.ui.shortcutLookOf(card, colours) }
+        // As they came: plain, with the covers' own colours and no colour of the row's.
+        assertEquals(null, look(null, null))
+        assertEquals(null, look(null, PictureColours.COVERS))
+        // Colours chosen for the row show on its tiles, without a Card colour having to be picked first.
+        for (chosen in listOf(PictureColours.MOOD, PictureColours.SIANSA, PictureColours.MONO)) assertEquals(app.siansa.data.CardLook.VIVID, look(null, chosen))
+        // The row's own Card colour stays the look, Plain too, whatever its Colours.
+        assertEquals(app.siansa.data.CardLook.SOFT, look(app.siansa.data.CardLook.SOFT, PictureColours.MONO))
+        assertEquals(app.siansa.data.CardLook.PLAIN, look(app.siansa.data.CardLook.PLAIN, PictureColours.SIANSA))
+    }
+
     @Test fun aBigShortcutSaysWhatItIs() {
         assertEquals("Your hearts", shortcutKind("liked"))
         assertEquals("Mix", shortcutKind("mix/abc"))
