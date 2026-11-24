@@ -220,7 +220,7 @@ private fun NamedSquare(item: HomeItem, featured: Boolean, modifier: Modifier) {
             .testTag(if (featured) "homeFeatured" else "homeCoverGridCell"),
     ) {
         CardPicture(item.mosaic, item.coverArt, item.colors, item.title, Modifier.fillMaxWidth().aspectRatio(1f), RoundedCornerShape(0.dp), if (featured) 600 else 300,
-            nameOver = true, songIds = item.songIds, artists = item.artists) { paint ->
+            nameOver = true, songIds = item.songIds, artists = item.artists, round = item.round) { paint ->
             Column(
                 Modifier
                     .align(Alignment.BottomStart)
@@ -284,7 +284,7 @@ fun HomeHero(
             Row(horizontalArrangement = Arrangement.spacedBy(Space.Page), verticalAlignment = Alignment.Bottom) {
                 // Its name stands beside it, so it's never on the picture as well (issue #1353: a mix not made yet, or
                 // an Aura, said "Wake up" twice).
-                CardPicture(item.mosaic, item.coverArt, item.colors, item.title, Modifier.size(HERO_COVER), RoundedCornerShape(8.dp), 600, names = false, songIds = item.songIds, artists = item.artists)
+                CardPicture(item.mosaic, item.coverArt, item.colors, item.title, Modifier.size(HERO_COVER), RoundedCornerShape(8.dp), 600, names = false, songIds = item.songIds, artists = item.artists, round = item.round)
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
                     WholeWordsText(item.title, MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.ExtraBold), color = Color.White, maxLines = 3)
                     val line = listOf(item.subtitle, item.meta).filter { it.isNotBlank() }.joinToString(" · ")
@@ -327,7 +327,7 @@ private fun HeroCards(cards: List<HomeItem>) {
                             .semantics(mergeDescendants = true) {}.testTag("homeHeroCard"),
                     ) {
                         CardPicture(card.mosaic, card.coverArt, card.colors, card.title, Modifier.size(side), RoundedCornerShape(8.dp), 300,
-                            names = true, line = "", songIds = card.songIds, artists = card.artists)
+                            names = true, line = "", songIds = card.songIds, artists = card.artists, round = card.round)
                         if (card.subtitle.isNotBlank()) {
                             Spacer(Modifier.height(Space.Small))
                             Text(card.subtitle, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.82f), maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -423,6 +423,7 @@ internal fun crateRecordOf(item: HomeItem): CrateRecord = CrateRecord(
     songs = emptyList(),
     onOpen = item.open,
     colors = item.colors,
+    round = item.round,
 )
 
 /**

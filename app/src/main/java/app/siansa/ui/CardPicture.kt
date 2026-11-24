@@ -1,6 +1,8 @@
 package app.siansa.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -94,6 +96,9 @@ fun CardPicture(
     songIds: List<String> = emptyList(),
     // Its main artists, for Frost's glass and the Poster ("Sleep Token, Deftones, Loathe"): [artistLine].
     artists: String = "",
+    // An artist's picture (issue #1355; the owner, 24 Nov: "artist images always round"): its photo round, centred on
+    // the card's own colours, whatever the row's Pictures say.
+    round: Boolean = false,
     content: @Composable androidx.compose.foundation.layout.BoxScope.(PicturePaint) -> Unit = {},
 ) {
     val draw = LocalCoverDraw.current
@@ -112,7 +117,10 @@ fun CardPicture(
     }
     // Its own layer: drawn once and reused while a row scrolls, stickers and shadows too.
     Box(modifier.clip(shape).graphicsLayer {}.testTag("cardPicture-${shown.id}")) {
-        when (shown) {
+        if (round && top != null) {
+            Box(Modifier.fillMaxSize().glowFill(paint))
+            draw(top, px, Modifier.align(Alignment.Center).fillMaxSize(ROUND_PHOTO).aspectRatio(1f).shadow(GLOW_SHADOW, CircleShape).testTag("cardPictureRound"), CircleShape, null)
+        } else when (shown) {
             PictureStyle.MOSAIC -> Column(Modifier.fillMaxSize()) {
                 for (row in 0..1) Row(Modifier.weight(1f).fillMaxWidth()) {
                     for (col in 0..1) draw(distinct[row * 2 + col], px / 2, Modifier.weight(1f).fillMaxSize(), RectangleShape, null)
@@ -510,6 +518,8 @@ private const val MOSAIC_LIGHT_SPREAD = 0.45f
 private const val MOSAIC_COLOURFUL = 0.18f
 private const val MOSAIC_HUE_SPREAD = 110f
 private const val GLOW_COVER = 0.56f
+/** How much of the picture an artist's round photo fills. */
+private const val ROUND_PHOTO = 0.62f
 private val GLOW_SHADOW = 12.dp
 private val COLOUR_BIG = 160.dp
 private val COLOUR_MEDIUM = 96.dp
