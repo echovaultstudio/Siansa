@@ -70,6 +70,17 @@ Without Siansa Beats, the smart parts come from AudioMuse-AI and its Siansa plug
 otherwise from your songs' tags: see [AudioMuse-AI and the Siansa plugin](audiomuse.md). DJ mixes are only offered
 with Siansa Beats.
 
+## What's next
+
+- **Vocal analysis**: today Siansa Beats hears whether a song is sung, and by a woman or a man. Next it should hear
+  *where* the singing is, so a DJ blend never lays two voices over each other, a blend can wait for a verse to end,
+  and a mix can keep to the instrumental parts. It will be tried first on how well it hears your music, then come
+  as options: vocals or instrumental per song, where the vocals are in time, and how clear they are over the music.
+- **Breakdowns and drops you can check**: each song's page in Siansa Beats shows the breakdowns and drops it found;
+  next the app can mix out at a breakdown and land the next song's drop on a phrase.
+
+The full list is on the [roadmap](https://siansa.app/tracking).
+
 ## When something's wrong
 
 - **"Needs Siansa Beats"** on a button or slide: it isn't set up, or isn't answering. Check Settings › Services.

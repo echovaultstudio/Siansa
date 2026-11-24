@@ -114,7 +114,12 @@ Where the end isn't soft and the two beats can't be laid on each other, the old 
 own beat and the next drops in on its first downbeat, as a DJ does it (it needs Siansa Beats' grid at the end).
 
 A blend is planned early enough for the longest one (32 bars); when there's no time left for the one picked, because
-you moved near the end of the song, a quick one is made instead, or a short blend of whatever is left.
+you moved near the end of the song, a quick one is made instead, or a short blend of whatever is left. Only a song
+that ends cold changes straight over: a move near the end never leaves silence.
+
+During each beat-matched blend, Siansa listens for both songs' kick drums and checks them against the beat grid.
+When a song's kicks land more than 20 ms off its grid, the log says which one (**Mark the last blend** keeps it too),
+so a song Siansa Beats read wrong can be found and analysed again from its **Bad blends** list.
 
 DJ radio, Keep playing in DJ mode and the DJ mix of an album or playlist leave out songs longer than 15 minutes (a
 whole DJ set or a live recording in one file): they're mixes themselves. You can still start one from such a song.
