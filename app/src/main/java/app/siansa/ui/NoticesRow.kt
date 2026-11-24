@@ -2,6 +2,10 @@ package app.siansa.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.rememberScrollState
@@ -27,11 +31,14 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -49,6 +56,7 @@ import app.siansa.mix.NoticeKind
 import app.siansa.mix.Notices
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.LocalDate
 
@@ -98,6 +106,7 @@ internal fun HomeTopBar(
     menuButton: @Composable () -> Unit,
 ) {
     val scroll = rememberScrollState()
+    val scope = rememberCoroutineScope()
     val surface = MaterialTheme.colorScheme.surface
     val shown = menuOpen.coerceIn(0f, 1f)
     val chipsAlpha = (1f - shown * CHIPS_GONE_BY).coerceIn(0f, 1f)
@@ -108,6 +117,20 @@ internal fun HomeTopBar(
             NoticePillContent(Icons.Rounded.Album, "Ag")
             Row(
                 Modifier
+                    // A chip the fade has hidden isn't opened by a tap there (the owner, 24 Nov: "the tiles at top
+                    // allow pressing a hidden tile if I click the very edge of the source filter button"): the tap
+                    // brings the chips along instead, so the hidden one comes into view. A drag there scrolls as ever.
+                    .pointerInput(scroll) {
+                        awaitEachGesture {
+                            val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                            val fade = NOTICES_FADE.toPx()
+                            if (!underFade(down.position.x, size.width.toFloat(), fade, scroll.canScrollForward)) return@awaitEachGesture
+                            val up = waitForUpOrCancellation(PointerEventPass.Initial) ?: return@awaitEachGesture
+                            up.consume()
+                            AppLog.d("Home", "Tap on the faded end of the notices: bringing them along")
+                            scope.launch { scroll.animateScrollBy(size.width * FADE_TAP_SCROLL) }
+                        }
+                    }
                     .horizontalScroll(scroll, enabled = shown == 0f)
                     .padding(start = Space.Page, end = Space.Small)
                     .testTag("noticesRow"),
@@ -162,6 +185,20 @@ private const val CHIPS_GONE_BY = 1.6f
 
 /** How wide the fade before Home's menu button is. */
 private val NOTICES_FADE = 48.dp
+
+/** How much of the fade, from its start, still shows the chip under it well enough to tap: the rest hides it. */
+private const val FADE_CLEAR = 0.25f
+
+/** How far a tap on the hidden end brings the chips along, as a share of their room. */
+private const val FADE_TAP_SCROLL = 0.5f
+
+/**
+ * Whether a touch at [x] in the chips' room ([room] wide) is on a part the fade has hidden: the end of the room, past
+ * the start of the fade where a chip still shows, and only while there are [more] chips to scroll to (with none the
+ * fade isn't drawn, and every chip is whole).
+ */
+internal fun underFade(x: Float, room: Float, fade: Float, more: Boolean): Boolean =
+    more && x > room - fade * (1f - FADE_CLEAR)
 
 /** A long book title is cut off rather than making one chip fill the screen. */
 internal val NOTICE_MAX_WIDTH = 280.dp

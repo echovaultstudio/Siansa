@@ -5,7 +5,8 @@ Home is built from sections you can reorder and hide (**Arrange Home**, in the m
 ## The top of Home
 
 The top of Home is the row of notices (see [Notices](#notices)) with a round menu button at its end, in line with
-the chips and the same height. When there are more chips than fit, they scroll and fade out just before the button.
+the chips and the same height. When there are more chips than fit, they scroll and fade out just before the button
+(a tap on a faded-out chip brings it into view rather than opening it).
 With no notices, or notices turned off, the button sits on its own.
 
 **Pull to load again.** At the top of Home, pull the page down: the Siansa logo grows above it, its half circles going round with your finger. Pulled far enough they lock in place with a short buzz, and when you let go
