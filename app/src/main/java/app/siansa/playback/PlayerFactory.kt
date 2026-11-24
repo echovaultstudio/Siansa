@@ -130,10 +130,16 @@ object PlayerFactory {
                     if (untouched == null) mixed else {
                         // The other way out: float, so 24-bit songs keep every bit, at the song's own rate. With float
                         // Media3 passes the sound by its processors, the equaliser among them: untouched means that too.
-                        val direct = DefaultAudioSink.Builder(context)
-                            .setEnableFloatOutput(true)
-                            .setEnableAudioOutputPlaybackParameters(enableAudioOutputPlaybackParams)
-                            .build()
+                        // The listener's fades there are the output's volume moving for a moment (issue #1370): the
+                        // song's samples stay as they are.
+                        val direct = app.siansa.playback.engine.FadingSink(
+                            DefaultAudioSink.Builder(context)
+                                .setEnableFloatOutput(true)
+                                .setEnableAudioOutputPlaybackParameters(enableAudioOutputPlaybackParams)
+                                .build(),
+                            fadeInMs = { graph.settings.current.fadeInMs },
+                            fadeOutMs = { graph.settings.current.fadeOutMs },
+                        )
                         app.siansa.playback.engine.SwitchSink(mixed, direct, untouched).also { switchSink = it }
                     }
                 } else {
