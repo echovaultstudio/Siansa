@@ -13,7 +13,7 @@
   back on afterwards.
 - **Smarter DJ blends**: a three-band EQ, ridden a little differently each time. *With Siansa Beats 0.60 or newer and
   Find vocals on, two voices are never heard at once.*
-- **Pull Home down to load it again**, with the Siansa logo turning above it.
+- **Pull Home down to load it again**, with the Siansa logo turning above it. A quick flick down does it too.
 - **What's new after an update**: the first time you open Siansa after an update, Home shows the biggest changes.
 - Album page: hold the cover for **Clear all images**, to get the album's pictures again from the server.
 
