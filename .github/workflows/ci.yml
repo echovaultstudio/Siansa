@@ -391,6 +391,25 @@ jobs:
           fi
           rm -f ~/.ssh/fdroid
 
+      # The docs after a release (the owner, 17 Nov 2026): an issue labelled `claude`, which the owner's hourly
+      # scheduled task picks up and answers with a pull request bringing docs/ up to date with what this version
+      # changed. Never merged by it: the owner reviews it. Asked once per version (by the issue's title).
+      - name: Ask for the docs to be brought up to date
+        if: steps.version.outputs.exists != 'true'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PLAY_HELD: ${{ hashFiles('.play-hold') != '' }}
+        run: |
+          v="${{ steps.version.outputs.version }}"
+          title=$(python3 scripts/docs_issue.py --title "$v" "notes/$v.md")
+          if gh issue list --state all --search "\"$title\" in:title" --json title -q '.[].title' | grep -qxF "$title"; then
+            echo "::notice::Already asked: $title"; exit 0
+          fi
+          held=(); [ "$PLAY_HELD" = "true" ] && held=(--play-held)
+          python3 scripts/docs_issue.py "$v" "notes/$v.md" "${held[@]}" > docs-issue.md
+          gh issue create --title "$title" --label claude --body-file docs-issue.md
+
       # Keeps the notes of every published version matching CHANGELOG.md, so fixes to the text show up too.
       - name: Sync release notes and titles
         env:
