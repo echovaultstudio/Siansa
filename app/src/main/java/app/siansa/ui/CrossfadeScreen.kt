@@ -135,6 +135,10 @@ fun CrossfadeScreen(nav: NavController) {
                 Hint(levellingHint(settings))
             }
             HorizontalDivider()
+            FoldSection("Fades", fadesSummary(settings)) {
+                FadesBody(settings) { fadeIn, fadeOut -> graph.settings.save(graph.settings.current.copy(fadeInMs = fadeIn, fadeOutMs = fadeOut)) }
+            }
+            HorizontalDivider()
             FoldSection("Crossfade & DJ blends", crossfadeFoldSummary(settings)) {
                 // Untouched, a song goes straight to the phone's output: there's nothing to blend it with.
                 if (settings.untouchedPlayback) {
@@ -176,6 +180,51 @@ fun CrossfadeScreen(nav: NavController) {
             }
             HorizontalDivider()
             MixingDocsLink()
+        }
+    }
+}
+
+/** What the Fades section says folded: each fade's length, or that it's off. */
+internal fun fadesSummary(s: AppSettings): String = when {
+    s.untouchedPlayback -> "Not with Untouched playback"
+    s.fadeInMs == 0 && s.fadeOutMs == 0 -> "Off"
+    else -> "In ${fadeLabel(s.fadeInMs)} · out ${fadeLabel(s.fadeOutMs)}"
+}
+
+/** A fade's length as its chip says it: "Off", or its milliseconds. */
+internal fun fadeLabel(ms: Int): String = if (ms == 0) "off" else "$ms ms"
+
+/**
+ * The Fades section's inside (issue #1368): a length for the fade in and one for the fade out, and what they're for.
+ * [save] gets both lengths.
+ */
+@Composable
+internal fun FadesBody(settings: AppSettings, save: (Int, Int) -> Unit) {
+    // Untouched, nothing of the sound is changed: not even a short fade.
+    if (settings.untouchedPlayback) {
+        Hint("Untouched playback is on, so songs start and stop as they are. Switch it off above to use fades.")
+        return
+    }
+    Text("Fade in", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.testTag("fadeInLabel"))
+    FadeChips(settings.fadeInMs, "fadeIn") { save(it, settings.fadeOutMs) }
+    Hint("When you press play, and after you seek or skip.")
+    Text("Fade out", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.testTag("fadeOutLabel"))
+    FadeChips(settings.fadeOutMs, "fadeOut") { save(settings.fadeInMs, it) }
+    Hint("When you pause or stop, and before you seek or skip.")
+    Hint("Only for what you start and stop yourself. Songs that follow on by themselves play as before: gapless albums, crossfades and DJ blends aren't touched.")
+}
+
+/** The lengths a fade can have, as chips (issue #1368): Off, then each of [AppSettings.FADE_CHOICES]. */
+@Composable
+internal fun FadeChips(selected: Int, tag: String, onPick: (Int) -> Unit) {
+    Row(Modifier.tvFocusGroup().horizontalScroll(rememberScrollState()).testTag(tag), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+        AppSettings.FADE_CHOICES.forEach { ms ->
+            FilterChip(
+                selected = selected == ms,
+                onClick = { onPick(ms) },
+                label = { Text(if (ms == 0) "Off" else "$ms ms") },
+                modifier = Modifier.testTag("$tag-$ms"),
+            )
         }
     }
 }

@@ -397,6 +397,16 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     }
                 }
             },
+            // Playback's Fades (issue #1368): a length for each, as chips, and what they're for.
+            Scene("playback_fades") {
+                Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
+                    val set = app.siansa.data.AppSettings()
+                    app.siansa.ui.FoldSection("Fades", app.siansa.ui.fadesSummary(set), startOpen = true) { app.siansa.ui.FadesBody(set) { _, _ -> } }
+                    androidx.compose.material3.HorizontalDivider()
+                    val untouched = app.siansa.data.AppSettings(untouchedPlayback = true)
+                    app.siansa.ui.FoldSection("Fades", app.siansa.ui.fadesSummary(untouched), tag = "fades-untouched", startOpen = true) { app.siansa.ui.FadesBody(untouched) { _, _ -> } }
+                }
+            },
             // one, how long mixes are kept, and Back to automatic.
             Scene("beats_mix_settings") {
                 Column(Modifier.padding(Space.Page)) {

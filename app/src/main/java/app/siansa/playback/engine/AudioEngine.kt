@@ -57,6 +57,13 @@ class AudioEngine(context: Context) {
     private var stampFrame = -1L
     @Volatile private var movedNs = 0L
     @Volatile private var reopenWanted = false
+
+    /**
+     * The fades the listener chose for what they start and stop themselves (Settings › Playback › Fades, issue #1368),
+     * in ms; 0 is none (the [DeckStream.RAMP_MS] that keeps it from clicking stays).
+     */
+    @Volatile var fadeInMs = 0
+    @Volatile var fadeOutMs = 0
     // Frames of silence written since the mix last had something to play (only the mixer's thread counts them).
     private var idleFrames = 0
 

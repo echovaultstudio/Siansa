@@ -22,6 +22,12 @@ class MixCore(val outRate: Int) {
      * are lined up against each other.
      */
     class Deck(val name: String) {
+        /**
+         * Whether this deck's last stream was cut short (the listener skipped, sought or stopped) rather than played
+         * to its end: what starts after a cut may fade in, what follows a song that ended starts whole (issue #1368).
+         * True before anything has played: the first start is the listener's.
+         */
+        @Volatile var cutShort = true
         val filter = DeckFilter()
         /** The echo at the end of a blend (the deck going out), once the engine made one for it ([MixCore.echoOf]). */
         @Volatile var echo: Echo? = null

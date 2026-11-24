@@ -76,6 +76,15 @@ class DeckStream(
     internal var gainNow = 1f
     /** The short fade in and out around play, pause and release, so none of them clicks (0..1). */
     private var envelope = 0.0
+
+    /**
+     * How long this stream takes to come in when it's told to play, and to go when it's paused or let go, in ms: never
+     * shorter than [RAMP_MS], which only keeps a start or a stop from clicking. Longer when the listener started or
+     * stopped it and wants a fade there (issue #1368); a stream brought in at a set moment ([cue]: a crossfade, a DJ
+     * blend) starts whole whatever this says, and one cut over to another copy ([cutAt]) goes at once.
+     */
+    @Volatile var fadeInMs = RAMP_MS
+    @Volatile var fadeOutMs = RAMP_MS
     /**
      * Blocks in a row in which the stream was playing with sound waiting but gave none (held by a cut or a cue):
      * what a stream stuck silent looks like ([stuckMs]).
@@ -352,7 +361,8 @@ class DeckStream(
         renderedTo = mixStart + frames
         val waiting = end > floor(readPos).toLong() + 1
 
-        val step = 1.0 / (RAMP_MS * outRate / 1_000.0)
+        val up = 1.0 / (maxOf(fadeInMs, RAMP_MS) * outRate / 1_000.0)
+        val down = 1.0 / (maxOf(fadeOutMs, RAMP_MS) * outRate / 1_000.0)
         var peak = 0.0
         // At the output's rate a stream is copied sample for sample; one left between two samples (by a speed
         // change in a blend) is read through the filter like any other (0.52.0-dev crashed there).
@@ -423,7 +433,7 @@ class DeckStream(
                 }
             }
             peak = maxOf(peak, kotlin.math.abs(l), kotlin.math.abs(r))
-            envelope = if (target > envelope) minOf(target, envelope + step) else maxOf(target, envelope - step)
+            envelope = if (target > envelope) minOf(target, envelope + up) else maxOf(target, envelope - down)
             out[o] = (l * envelope).toFloat()
             out[o + 1] = (r * envelope).toFloat()
             readPos += ratio
