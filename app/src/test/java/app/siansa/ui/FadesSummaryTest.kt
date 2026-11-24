@@ -10,7 +10,8 @@ class FadesSummaryTest {
         assertEquals("In 250 ms · out 150 ms", fadesSummary(AppSettings()))
         assertEquals("In off · out 100 ms", fadesSummary(AppSettings(fadeInMs = 0, fadeOutMs = 100)))
         assertEquals("Off", fadesSummary(AppSettings(fadeInMs = 0, fadeOutMs = 0)))
-        assertEquals("Not with Untouched playback", fadesSummary(AppSettings(untouchedPlayback = true)))
+        // With Untouched playback too (issue #1370).
+        assertEquals("In 250 ms · out 150 ms", fadesSummary(AppSettings(untouchedPlayback = true)))
     }
 
     @Test fun aLengthIsOneOfTheChoices() {

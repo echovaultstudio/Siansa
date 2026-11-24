@@ -98,8 +98,11 @@ A short fade for what you start and stop yourself, so music eases in and dips aw
 Each can be Off or 50 to 600 ms. A skip doesn't take longer for it: the old song fades while the next one loads.
 
 Fades are only for what you do yourself. Songs that follow on by themselves play as before: gapless albums run on
-without a gap, and crossfades and DJ blends aren't touched. With [Untouched playback](#untouched-playback) on there
-are no fades, as nothing of the sound is changed.
+without a gap, and crossfades and DJ blends aren't touched.
+
+With [Untouched playback](#untouched-playback) on, the fades work too: the song itself stays as it is, and only the
+output's volume moves for that moment. There a skip or a seek waits for the fade out to finish before the next song
+loads. Where a phone's output plays bit for bit and ignores the volume (some USB DACs), there's no fade.
 
 ## Crossfade
 

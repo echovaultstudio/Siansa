@@ -68,7 +68,7 @@ How music sounds and plays.
 | **Equaliser** | Ten bands, presets and a pre-amp, on its own page. |
 | **Where loudness and fades come from** | The songs' tags, or Siansa Beats (the Siansa plugin on AudioMuse-AI before it). |
 | **Levelling** | Track, Album or Off, and the target (−18 or −14 LUFS). |
-| **Fades** | A short fade in (when you press play, and after you seek or skip) and fade out (when you pause or stop, and before you seek or skip): Off or 50–600 ms each; 250 ms in and 150 ms out unless you change them. Only for what you start and stop yourself. See [Playback](playback.md#fades). |
+| **Fades** | A short fade in (when you press play, and after you seek or skip) and fade out (when you pause or stop, and before you seek or skip): Off or 50–600 ms each; 250 ms in and 150 ms out unless you change them. Only for what you start and stop yourself; with Untouched playback too. See [Playback](playback.md#fades). |
 | **Crossfade & DJ blends** | Off, Fixed or Smart, and **DJ blends** on Siansa Beats' beat grids. Smart has nothing to set: the phone decides every change. Fixed has its length (1–30 s) and, with Siansa Beats, the blend length in bars for DJ radio and DJ mixes. At the bottom, **How mixing works** opens these docs on crossfades and blends. |
 | **Book skips** | How far the book player's ↺ and ↻ skip, 10–90 s each. |
 | **Dolby songs on your receiver** | On the TV app only, with audio passthrough on. |
