@@ -47,5 +47,6 @@
 - **Android Auto**: tapping an artist opens it (Play all, Shuffle and its albums) instead of playing everything.
 - Names on cards no longer break in the middle of a word.
 - A hero card follows its row's Card colour and Colours.
+- A notice faded out beside Home's menu button no longer opens when you tap there: the tap brings it into view.
 - DJ blends out of a track cut from a mixed CD no longer lay a long blend over the CD's own.
 - A shortcut to an album whose picture was replaced on the server no longer shows the old one.
