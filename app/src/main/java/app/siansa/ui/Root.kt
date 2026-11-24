@@ -105,7 +105,7 @@ import app.siansa.log.AppLog
 import kotlinx.coroutines.CancellationException
 import app.siansa.playback.PlayerState
 
-/** A bottom-bar tab's look; which tabs show, and in what order, is set in Settings › Bottom bar (issue #346). */
+/** A bottom-bar tab's look; which tabs show, and in what order, is set in Settings › Navigation (issue #346). */
 internal fun NavTab.icon(): ImageVector = when (this) {
     NavTab.HOME -> Icons.Rounded.Home
     NavTab.SEARCH -> Icons.Rounded.Search
@@ -285,6 +285,7 @@ fun SiansaRoot() {
 
         // "Start song radio" from any menu asks Steady or DJ here (issue #337).
         RadioChooserHost()
+        DjNeedsBlendsHost()
         BackHandler(enabled = sheet.isOpen) { sheet.close() }
         // The book player slides up like now playing (issue #542); without a book loaded it closes itself.
         val bookLoaded by graph.bookPlayer.state.collectAsStateWithLifecycle()
@@ -421,7 +422,7 @@ private fun MiniPlayer(state: PlayerState, onOpen: () -> Unit) {
                     song.title, song.artist, dragged = { drag.value }, barWidth = barWidth, modifier = Modifier.weight(1f),
                     cover = { Cover(song.cover, 150, it, RoundedCornerShape(6.dp)) },
                 )
-                // The buttons and their order are set in Settings › Now playing › Mini player (issue #346).
+                // The buttons and their order are set in Settings › Player › Mini player (issue #346).
                 val settings by graph.settings.state.collectAsStateWithLifecycle()
                 settings.miniButtons.forEach { button ->
                     MiniPlayerButton(button, state, song, onOpen, onStop = {

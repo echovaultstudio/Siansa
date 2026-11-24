@@ -75,6 +75,10 @@ internal class MixedCrossfader(
     private var incomingId: String? = null
     /** Where the next song comes in (ms of its own), and the mix frame it does. */
     private var incomingFrom = 0L
+    /** The blend's EQ booked on the bars ([EqStyle]): the ticks then leave the lows, mids and highs alone. */
+    private var eqBooked = false
+    /** The EQ style's name, for the blend's report once it's recorded. */
+    private var eqLabel: String? = null
     private var incomingMix = 0L
     private var tailBase = 1f
     private var startedAt = 0L
@@ -386,6 +390,12 @@ internal class MixedCrossfader(
             if (Blending.of(settings()).bassSwap) {
                 mainMix.filter.shelfDb = DeckFilter.SHELF_START_DB
                 AppLog.d("Crossfade", "Bass swap over the first ${SWAP_FRACTION_PERCENT} % of the blend: next song's bass held back ${-DeckFilter.SHELF_START_DB.toInt()} dB, old song's cut up to ${DeckFilter.LOW_CUT_HZ.toInt()} Hz")
+                // The three-band EQ: the next song comes in with its mids gone and its highs down ([BlendEq]).
+                planned.eq?.let { eq ->
+                    eq.apply(0f, null, mainMix.filter)
+                    AppLog.d("Crossfade", "EQ: ${eq.describe()}")
+                }
+                eqBooked = bookEq(planned, beat, tMix)
             }
             if (planned.filterHz > 0) AppLog.d("Crossfade", "Filter fade: the old song's high-pass sweeps up to ${planned.filterHz.toInt()} Hz over the blend")
             if (planned.swapFrom > 0f) AppLog.d("Crossfade", "Bass swap from ${(planned.swapFrom * 100).toInt()} % to ${(planned.swapTo * 100).toInt()} % of the blend")
@@ -415,6 +425,8 @@ internal class MixedCrossfader(
                 "next song comes in at ${clock(from)} (${from} ms) on mix frame $incomingMix, with ${clock(against)} of the old song (in $inMs ms)",
         )
         LastBlend.record(item.mediaId, incomingId ?: "", against, planned, dj = inDjRadio())
+        eqLabel?.let { LastBlend.eqStyle(it) }
+        eqLabel = null
         handler.post(fadeTick)
     }
 
@@ -436,7 +448,12 @@ internal class MixedCrossfader(
             val outLevel = if (planned.technique == Technique.ECHO_OUT) 1f else Crossfade.fadeOut(out)
             t.volume = if (tailDone) 0f else tailBase * sleepLevel() * outLevel
             val beat = planned.beat
-            if (beat != null && Blending.of(settings()).bassSwap) swapBass(out, tMix, planned)
+            if (beat != null && Blending.of(settings()).bassSwap) {
+                if (!eqBooked) {
+                    swapBass(out, tMix, planned)
+                    planned.eq?.apply(out, tMix.filter, mainMix.filter)
+                } else if (planned.filterHz > 0) tMix.filter.lowCutHz = DeckFilter.filterAt(out.toDouble(), planned.filterHz)
+            }
             else if (planned.filterHz > 0) tMix.filter.lowCutHz = DeckFilter.filterAt(out.toDouble(), planned.filterHz)
             echoBeatMs(planned)?.let { beatMs -> tMix.echo?.let { echoOut(it, planned, beatMs, tailMs, tailDone) } }
             val onNext = main.currentMediaItemIndex == incomingIndex
@@ -548,6 +565,35 @@ internal class MixedCrossfader(
             loggedStage = stage
             AppLog.d("Crossfade", "Beat-matching, ${stage * 4} bars in: ${if (error >= 0) "+" else ""}$error ms out of step, next song at %.4f×".format(java.util.Locale.ROOT, main.playbackParameters.speed))
         }
+    }
+
+    /**
+     * Picks how this blend rides the EQ ([EqStyles.choose]) and, for one laid on the bars, books both decks' lanes on
+     * the mixer from the old song's own bar lines ([MixCore.Deck.mixFrameAt]), so each swap lands on its bar to the
+     * frame. True when booked; false leaves the blend to glide on its ticks, as before.
+     */
+    private fun bookEq(planned: FadePlan, beat: BeatMatch.Plan, tMix: MixCore.Deck): Boolean {
+        val style = EqStyles.choose(planned.technique, beat.onBars, beat.phraseBars != null, lastEqStyle)
+        lastEqStyle = style
+        val bars = beat.bars
+        val vocalBar = planned.eq?.midSwapAt?.let { Math.round(it * bars) }
+        val score = EqStyles.score(style, bars, vocalBar)
+        val rate = engine.outRate
+        val first = tMix.mixFrameAt(startAt * 1000, rate)
+        val last = tMix.mixFrameAt((startAt + planned.overlapMs) * 1000, rate)
+        if (score == null || first == null || last == null || last <= first) {
+            if (score != null) AppLog.w("Crossfade", "EQ: ${style.label} couldn't be laid on the bars (the old song can't say where it'll be); it glides")
+            else AppLog.d("Crossfade", "EQ: glide")
+            eqLabel = EqStyle.GLIDE.label
+            return false
+        }
+        val barFrames = (last - first) / bars
+        val instant = DeckFilter.INSTANT_MS * rate / 1000
+        tMix.filter.book(DeckFilter.Booked(score.outLow, score.outMid, score.outHigh, first, barFrames, instant))
+        mainMix.filter.book(DeckFilter.Booked(score.inLow, score.inMid, score.inHigh, first, barFrames, instant))
+        AppLog.i("Crossfade", "EQ: ${style.label}: ${score.note}", event = "crossfade.eq_style", fields = mapOf("style" to style.name, "bars" to bars))
+        eqLabel = style.label
+        return true
     }
 
     /** The bass swap over its span of the blend ([FadePlan.swapFrom] to [FadePlan.swapTo]), with a filter fade's sweep. */
@@ -754,6 +800,7 @@ internal class MixedCrossfader(
     }
 
     private fun releaseTail() {
+        eqBooked = false
         // The repeats ring out by themselves; nothing more goes in.
         tailMix?.echo?.send = 0f
         mainMix.filter.reset()
@@ -852,6 +899,8 @@ internal class MixedCrossfader(
     private fun clock(ms: Long): String = "%d:%02d".format(java.util.Locale.ROOT, ms / 60_000, ms / 1000 % 60)
 
     companion object {
+        /** The last blend's EQ style, so the next one is mixed a little differently ([EqStyles.choose]). */
+        @Volatile private var lastEqStyle: EqStyle? = null
         const val LOOK_MS = 1_000L
         /** The tail is made ready this long before the handover. */
         const val PREPARE_MS = 10_000L

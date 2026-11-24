@@ -15,6 +15,18 @@ object MixRules {
     fun showsPersonal(kind: MixGenerator.Personal, audioMuseReady: Boolean): Boolean = audioMuseReady || !kind.needsAudioMuse
 
     /**
+     * The mixes from your listening that stand in [row] of Home when this phone makes Home's mixes, grouped as Siansa
+     * Beats groups its own (issue #1353; the owner, 24 Nov: "the grouping should be same as beats"): **Made for you**
+     * has the kinds of music you play most (Your sound, as Beats' own "each with more like it"); **More of you** has
+     * On repeat and Discover for you (as Beats' On repeat, Rediscover and New for you). None in any other row.
+     */
+    fun personalIn(row: app.siansa.data.HomeSection): List<MixGenerator.Personal> = when (row) {
+        app.siansa.data.HomeSection.MADE_FOR_YOU -> listOf(MixGenerator.Personal.SOUND)
+        app.siansa.data.HomeSection.MORE_OF_YOU -> listOf(MixGenerator.Personal.REPEAT, MixGenerator.Personal.DISCOVER)
+        else -> emptyList()
+    }
+
+    /**
      * Its tile on Home: hidden once making it said there isn't enough to go on ([notEnough], e.g. On repeat without
      * plays in the last 30 days, issue #495), unless a mix of it was made today anyway.
      */

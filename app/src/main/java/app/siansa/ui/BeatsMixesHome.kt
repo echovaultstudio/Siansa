@@ -50,7 +50,7 @@ import kotlinx.coroutines.withContext
  * **Made for you** (the kinds of music you play most) and **More of you** (On repeat, Rediscover, New for you).
  *
  * Each stands in a row of Arrange Home and follows it (the owner, 17 Nov: "you cannot change the mixes card type, it
- * needs to be possible"): For now in **Your mixes carousel**, Made for you and More of you in **Made for you**, so
+ * needs to be possible"): For now in **For now** (once Your mixes carousel), Made for you and More of you in **Made for you**, so
  * each row's place, whether it shows, its cards' colours and its look are the row's. "As it is" is the row of sleeves
  * to flick through ([RecordCrate]); any other look draws the mixes as that look does.
  */
@@ -89,13 +89,17 @@ fun BeatsMixesHome(nav: NavController, shelves: Set<String>, look: HomeLook) {
             val mixes = shelf.mixes.mapNotNull { mix -> homeMix(mix, songs[mix.id].orEmpty(), answer.keepDays, nav, graph) }
             if (mixes.isEmpty()) return@forEachIndexed
             val title = BeatsMixes.title(shelf)
-            // Two looks only (the owner, 17 Nov): Tiles, each with four of its covers; else the carousel.
-            if (beatsLook(look) == HomeLook.TILES) {
-                Shelf(title, mixes, key = { it.key }) { m -> MixMosaicTile(m) }
-            } else {
-                // Just the title: the mixes say the rest (the owner, 17 Nov: no line under it).
-                SectionTitle(title, top = if (i == 0) LocalSectionGap.current else Space.Section)
-                RecordCrate(mixes)
+            // Its own look is the carousel; Tiles has four of each mix's covers; every other look as any row has it
+            // (#1261, the owner, 19 Nov: every row gets every option).
+            when (val shownLook = beatsLook(look)) {
+                HomeLook.TILES -> Shelf(title, mixes, key = { it.key }) { m -> MixMosaicTile(m) }
+                HomeLook.CAROUSEL -> {
+                    // Just the title: the mixes say the rest (the owner, 17 Nov: no line under it).
+                    SectionTitle(title, top = if (i == 0) LocalSectionGap.current else Space.Section)
+                    RecordCrate(mixes)
+                }
+                else -> HomeLookRow(shownLook, "beats-${shelf.key}", title, mixes.map(::homeItemOf),
+                    play = { graph.player.play(mixes.first().songs) }, songs = mixes.first().songs)
             }
         }
     }
@@ -111,23 +115,22 @@ fun BeatsMixesHome(nav: NavController, shelves: Set<String>, look: HomeLook) {
 /** A mix as a tile: four of its covers two by two, its name, and what's in it. */
 @Composable
 internal fun MixMosaicTile(record: CrateRecord) {
-    Column(Modifier.width(MOSAIC_TILE).clickable(onClickLabel = "Open ${record.name}", onClick = record.onOpen).padding(LocalTileInset.current).testTag("mixMosaicTile")) {
+    Column(Modifier.width(tileWidth(LocalCrateSize.current)).clickable(onClickLabel = "Open ${record.name}", onClick = record.onOpen).padding(LocalTileInset.current).testTag("mixMosaicTile")) {
         val square = Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(8.dp))
-        if (record.covers.any { it != null }) CoverMosaic(record.covers, square)
-        else {
-            // No cover known yet: its colours, as the sleeve has.
-            val colors = remember(record.key) { tileColors(record.key) }
-            androidx.compose.foundation.layout.Box(square.background(Brush.linearGradient(listOf(colors.first, colors.second))))
-        }
-        androidx.compose.foundation.layout.Spacer(Modifier.height(Space.Small))
-        Text(record.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        if (record.caption.isNotBlank()) {
-            Text(record.caption, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
+        val colors = remember(record.key, record.colors) { record.colors ?: tileColors(record.key) }
+        val names = LocalCardNames.current
+        CardPicture(record.covers, null, colors, record.name, square, songIds = remember(record.songs) { record.songs.map { it.id } },
+            artists = remember(record.songs) { artistLine(record.songs) },
+            names = when (names) { app.siansa.data.CardNames.UNDER -> false; app.siansa.data.CardNames.ON -> true; else -> null }, line = if (LocalCardLines.current) record.caption else "")
+        // Under it, two lines each (the owner, 21 Nov: genres were cut off); on it, when the row's Names says so.
+        // On Auto, a picture with its name on it (Aura, Frost, Poster) has just its line under it.
+        val style = LocalPictureStyle.current
+        val namesItself = remember(style, record.covers) { pictureNamesItself(style, record.covers, null) }
+        val named = names == app.siansa.data.CardNames.AUTO && namesItself
+        if (names != app.siansa.data.CardNames.ON) TileNames(record.name, record.caption, showTitle = !named)
     }
 }
 
-private val MOSAIC_TILE = 140.dp // as Home's other tiles
 private val REMAKING_SPINNER = 14.dp
 private const val REMAKING_ALPHA = 0.6f
 private const val REMAKING_AFTER_MS = 600L
@@ -153,6 +156,14 @@ private fun homeMix(mix: BeatsMixes.BeatsMix, songs: List<Song>, keepDays: Int, 
     val covers = songs.mapNotNull { it.cover }.distinct().take(4)
     return CrateRecord(key = id, name = mix.name, caption = mix.caption, covers = covers, songs = songs, onOpen = open)
 }
+
+/** A Siansa Beats mix as an item any of Home's looks can draw: its name, what's in it, its first cover. */
+internal fun homeItemOf(record: CrateRecord): HomeItem = HomeItem(
+    key = record.key, title = record.name, subtitle = record.caption, coverArt = record.covers.firstOrNull { it != null },
+    colors = record.colors ?: tileColors(record.key), open = record.onOpen, mosaic = record.covers,
+    meta = app.siansa.mix.CoverRows.songCount(record.songs.size).orEmpty(),
+    songs = record.songs,
+)
 
 /** The id a Siansa Beats mix is kept by here: Siansa Beats' own key, which no other mix has (0.55), else the day's. */
 internal fun beatsMixId(mix: BeatsMixes.BeatsMix, today: String): String =

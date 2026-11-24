@@ -80,7 +80,7 @@ fun ScrobblingScreen(nav: NavController) {
         }
     }
 
-    Screen(title = "Listening", nav = nav) { padding ->
+    Screen(title = "Scrobbling", nav = nav) { padding ->
         Column(
             Modifier
                 .padding(top = padding.calculateTopPadding())
@@ -136,7 +136,7 @@ fun ScrobblingScreen(nav: NavController) {
                         }
                         val listener = BeatsListens.listener(settings)
                         Hint("Keeps your listening history in Siansa Beats" + (if (listener.isNotBlank()) ", as $listener" else "") +
-                            ": see it on its Listening page, and here in Time Machine and your month and year. Siansa Beats can send your listens on to Last.fm; turn Last.fm off below then, or plays are counted twice.")
+                            ": see it on its Listening page, and here in Time Machine and your month and year. Songs you skip are sent too, for its mixes (Siansa Beats 0.64). Siansa Beats can send your listens on to Last.fm; turn Last.fm off below then, or plays are counted twice.")
                     } else {
                         Hint("Update Siansa Beats to 0.29 or newer to keep your listening history there.")
                     }

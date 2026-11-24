@@ -7,7 +7,7 @@ It's an app of its own, **Siansa** on the TV's home screen. It doesn't replace t
 your phone: install it on the TV, and both keep their own settings, library and sign-ins.
 
 > The TV app is in beta: it does most of what the phone app does, and it's still growing. Problems and ideas are very
-> welcome: **Settings › Help & feedback › Report a problem** on the TV sends one with its log.
+> welcome: **Settings › Help › Report a problem** on the TV sends one with its log.
 
 ## Getting the TV app
 
@@ -43,7 +43,7 @@ Everything works with the remote's arrows and the centre button; what the remote
 Settings) always open that tab's own page, wherever you are.
 
 - **Home**: one bar of pills at the top: Shuffle your library, Liked songs (opens the list) and **Sync**, then your notices, as on
-  the phone (what needs you, what you're partway through, what's new; shown or hidden in Settings › Home page ›
+  the phone (what needs you, what you're partway through, what's new; shown or hidden in Settings › Home ›
   Notices). **Sync** syncs your library and its covers without opening a page: its circle of arrows turns while it
   runs, and goes red if the sync failed. Then the rows of your phone's Home, in the same order
   and with the same rows hidden: Today's mixes (a wide card for each of the day's mixes, Morning, Daytime, Evening and
@@ -168,11 +168,11 @@ and play in stereo, with the centre and surround channels folded in.
 - Those songs play without crossfades, DJ blends, levelling, the equaliser or Siansa's volume: the receiver decides
   how they sound. Use the receiver's volume.
 - Dolby Atmos songs often play quieter than FLACs or the TV's own sound at the same volume, because the receiver turns
-  them down to the level they're marked with. **Settings › Sound & playback › Dolby songs on your receiver** has them played
+  them down to the level they're marked with. **Settings › Playback › Dolby songs on your receiver** has them played
   3 to 12 dB louder: Siansa marks them nearer the receiver's full level on their way, without changing the sound. A
   song can't go past full level, so one already marked near it gets less. It works for Dolby Atmos and Dolby Digital
   Plus, not for Dolby TrueHD, DTS or plain Dolby Digital. If a song doesn't seem louder, send a report after playing
-  it (Settings › Help & feedback › Report a problem): the log says for every Dolby song how much louder it was sent, or why not.
+  it (Settings › Help › Report a problem): the log says for every Dolby song how much louder it was sent, or why not.
 - Songs in the same format play one after another without a gap, a DJ mix or a live album included: the output to the
   receiver stays open from one song to the next. A file that says it's longer than it is (some DJ mixes do) plays to
   its real last frame, read from the file's own audio, so the next one still follows straight on. Most Atmos files

@@ -80,9 +80,12 @@ class BeatsMixesTest {
     @Test fun arrangeHomeSaysWhichRowsHoldThem() {
         assertEquals(emptyMap<app.siansa.data.HomeSection, String>(), app.siansa.ui.beatsRows(false))
         val rows = app.siansa.ui.beatsRows(true)
-        assertEquals("Siansa Beats: For now", rows[app.siansa.data.HomeSection.CAROUSEL])
-        assertEquals("Siansa Beats: Made for you", rows[app.siansa.data.HomeSection.MADE_FOR_YOU])
-        assertEquals("Siansa Beats: On repeat, Rediscover, New for you", rows[app.siansa.data.HomeSection.MORE_OF_YOU])
+        assertEquals("From Siansa Beats", rows[app.siansa.data.HomeSection.CAROUSEL])
+        assertEquals("From Siansa Beats", rows[app.siansa.data.HomeSection.MADE_FOR_YOU])
+        // The rows have Siansa Beats' names (the owner, 20 Nov).
+        assertEquals(listOf("For now", "Made for you", "More of you"),
+            listOf(app.siansa.data.HomeSection.CAROUSEL, app.siansa.data.HomeSection.MADE_FOR_YOU, app.siansa.data.HomeSection.MORE_OF_YOU).map { it.label })
+        assertEquals("From Siansa Beats: On repeat, Rediscover, New for you", rows[app.siansa.data.HomeSection.MORE_OF_YOU])
     }
 
     @Test fun twoRowsAskingAtOnceAskOnce() = runBlocking {
@@ -115,6 +118,24 @@ class BeatsMixesTest {
         assertEquals(before + 1, asked.size)
         // A broken file is no mixes, not a crash.
         assertNull(BeatsMixes({ AppJson.parseToJsonElement(answer) }, { settings }, loadKept = { "{broken" }).state.value)
+    }
+
+    @Test fun theWeatherGoesAlongForTheNames() = runBlocking {
+        // Beats 0.61 (the owner, 21 Nov): names "taking weather, location, season etc into consideration".
+        var weather: String? = "rain"
+        val rainy = BeatsMixes({ path -> asked += path; AppJson.parseToJsonElement(answer) }, { settings },
+            { ZoneId.of("Europe/Helsinki") }, { clock.toInstant().toEpochMilli() }, weather = { weather })
+        BeatsSound.restoreMixes(true)
+        rainy.refresh(force = true)
+        assertTrue(asked.last(), asked.last().endsWith("&weather=rain"))
+        weather = null
+        rainy.refresh(force = true)
+        assertFalse(asked.last(), "weather=" in asked.last())
+        val w = app.siansa.situation.Weather(app.siansa.situation.Sky.DRIZZLE, 12.0, true, null)
+        assertEquals("rain", w.forBeats)
+        assertEquals("cold", w.copy(sky = app.siansa.situation.Sky.SNOW, celsius = -14.0).forBeats)
+        assertEquals("hot", w.copy(sky = app.siansa.situation.Sky.CLEAR, celsius = 31.0).forBeats)
+        assertEquals("snow", w.copy(sky = app.siansa.situation.Sky.SNOW, celsius = -2.0).forBeats)
     }
 
     @Test fun thePartsOfTheDayAreSiansaBeats() {

@@ -53,10 +53,72 @@ object RadioChooser {
             say(app.siansa.mix.DjReady.explain(problem))
             return
         }
-        AppLog.i("SongRadio", "Chose ${mode.label} for a radio from \"${song.title}\"")
-        say("Starting ${mixName(mode)} from ${song.title}… more songs are added as it plays")
-        graph.songRadio.start(song, mode, shape) { message -> say(message) }
+        // A DJ mix blends its songs, which Untouched playback can't: asked first, then started (the owner, 23 Nov).
+        val start = {
+            AppLog.i("SongRadio", "Chose ${mode.label} for a radio from \"${song.title}\"")
+            say("Starting ${mixName(mode)} from ${song.title}… more songs are added as it plays")
+            graph.songRadio.start(song, mode, shape) { message -> say(message) }
+        }
+        if (mode == ContinuousMode.DJ) DjNeedsBlends.then(graph, start) else start()
     }
+}
+
+/**
+ * A DJ mix asked for while Untouched playback is on (the owner, 23 Nov: "still allows starting DJ mix from now playing
+ * screen. But in settings it says untouched playback disables DJ and fades"): the mix can't blend on the phone's own
+ * output, so the start waits here on a yes, shown by [DjNeedsBlendsHost] in the root. Nothing is switched unasked.
+ */
+object DjNeedsBlends {
+    /** The start that waits on the answer, or null when nothing is asked. */
+    val waiting = MutableStateFlow<(() -> Unit)?>(null)
+
+    /** Runs [start] now, or asks first while Untouched playback is on. */
+    fun then(graph: app.siansa.AppGraph, start: () -> Unit) = then(graph.settings.current.untouchedNow, start)
+
+    internal fun then(untouched: Boolean, start: () -> Unit) {
+        if (!untouched) return start()
+        AppLog.i("Player", "A DJ mix was asked for with Untouched playback on: asking whether to pause it for the mix")
+        waiting.value = start
+    }
+
+    const val TITLE = "DJ mix pauses Untouched playback"
+    const val WHY = "Untouched playback sends each song straight to your phone's sound output, so songs can't be blended. " +
+        "It's paused for this mix and comes back on when you play something else. The song stops for a moment."
+    const val YES = "Pause it and start"
+
+    /** Under DJ in a chooser, while Untouched playback is on. */
+    const val NOTE = "Pauses Untouched playback for the mix"
+
+    /** Under the switch in Settings, while it's set aside for a DJ mix. */
+    const val PAUSED = "Paused for the DJ mix that's playing. It comes back on when you play something else."
+}
+
+/** Asks whether to turn Untouched playback off for the DJ mix that waits in [DjNeedsBlends]; placed once, in the app's root. */
+@Composable
+fun DjNeedsBlendsHost() {
+    val graph = LocalGraph.current
+    val start by DjNeedsBlends.waiting.collectAsStateWithLifecycle()
+    val go = start ?: return
+    DjNeedsBlendsDialog(
+        onYes = {
+            DjNeedsBlends.waiting.value = null
+            // For this mix only (issue #1345): the switch stays on, and it's taken up again when the mix is over.
+            graph.settings.pauseUntouched(true)
+            go()
+        },
+        onNo = { DjNeedsBlends.waiting.value = null },
+    )
+}
+
+@Composable
+internal fun DjNeedsBlendsDialog(onYes: () -> Unit, onNo: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onNo,
+        title = { Text(DjNeedsBlends.TITLE) },
+        text = { Text(DjNeedsBlends.WHY) },
+        confirmButton = { TextButton(onClick = onYes, modifier = Modifier.testTag("djNeedsBlendsYes")) { Text(DjNeedsBlends.YES) } },
+        dismissButton = { TextButton(onClick = onNo) { Text("Not now") } },
+    )
 }
 
 /** A mix's name as the app says it: Steady radio or DJ mix (issue #919). */
@@ -73,7 +135,7 @@ internal fun radioModeIcon(mode: ContinuousMode): ImageVector = when (mode) {
  * docs, Discovery › Song radio).
  */
 @Composable
-internal fun RadioModeChoices(djProblem: String? = null, onPick: (ContinuousMode) -> Unit) {
+internal fun RadioModeChoices(djProblem: String? = null, djNote: String? = null, onPick: (ContinuousMode) -> Unit) {
     Column {
         listOf(ContinuousMode.STEADY, ContinuousMode.DJ).forEach { mode ->
             // A DJ mix only when its needs are met: shown greyed with why (Needs Siansa Beats…), not to be picked.
@@ -92,6 +154,8 @@ internal fun RadioModeChoices(djProblem: String? = null, onPick: (ContinuousMode
                 Column {
                     Text(mode.label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     if (why != null) Text(why, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.testTag("radioModeWhy"))
+                    // It can be picked, and says what picking it does (Untouched playback is on).
+                    else if (mode == ContinuousMode.DJ && djNote != null) Text(djNote, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.testTag("radioModeNote"))
                 }
             }
         }
@@ -118,7 +182,7 @@ fun RadioChooserHost() {
     AlertDialog(
         onDismissRequest = { RadioChooser.song.value = null },
         title = { Text("Start a mix") },
-        text = { RadioModeChoices(app.siansa.mix.DjReady.problem(settings, connection, djBeats), ::start) },
+        text = { RadioModeChoices(app.siansa.mix.DjReady.problem(settings, connection, djBeats), DjNeedsBlends.NOTE.takeIf { settings.untouchedNow }, ::start) },
         confirmButton = {},
         dismissButton = { TextButton(onClick = { RadioChooser.song.value = null }) { Text("Cancel") } },
     )

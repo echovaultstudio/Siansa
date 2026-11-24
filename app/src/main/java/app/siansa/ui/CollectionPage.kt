@@ -335,7 +335,7 @@ fun CollectionPage(
                         // An album's shuffle slides right onto Play for a DJ mix of its own songs (issue #965); it needs
                         // AudioMuse, as similar albums does.
                         // Only when a DJ mix's needs are met (AudioMuse and Siansa Beats): otherwise a plain Shuffle.
-                        onDjMix = if (((albumBar && onSimilar != null) || djMix) && djPossible && playAs == null) ({ graph.scope.launch { app.siansa.mix.AlbumDjMix.start(graph, title, songs.orEmpty()) } }) else null,
+                        onDjMix = if (((albumBar && onSimilar != null) || djMix) && djPossible && playAs == null) ({ DjNeedsBlends.then(graph) { graph.scope.launch { app.siansa.mix.AlbumDjMix.start(graph, title, songs.orEmpty()) } } }) else null,
                         djSlide = djSlide, onDjSlide = { djSlide = it }, dim = slideDim, albumBar = albumBar, resume = resume,
                         rowExtras = rowExtras,
                     )

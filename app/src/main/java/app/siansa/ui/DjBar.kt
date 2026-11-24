@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -142,8 +143,10 @@ internal fun DjBar(
     open: Float,
     modifier: Modifier = Modifier,
     onTap: ((DjBarSpot) -> Unit)? = null,
+    /** Starting a mix here asks first (Untouched playback is on): the bar is drawn fainter. */
+    asks: Boolean = false,
 ) {
-    GlidePill(open, modifier.testTag("djBar")) {
+    GlidePill(open, modifier.alpha(if (asks) 0.5f else 1f).testTag("djBar")) {
         spots.forEachIndexed { i, spot ->
             GlidePlace(
                 spot.icon(starting), spot.title(starting), chosen = i == chosen, now = spot == now,

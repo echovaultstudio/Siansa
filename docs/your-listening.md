@@ -21,6 +21,10 @@ setting up: Siansa Beats keeps the history, including what you imported there fr
 or "feat." version, a title with or without its apostrophe ("I'm", "Im"), and "The Beatles" for "Beatles" all
 count. Songs not in your library are listed too, marked "Not in your library" (you can hide them). **Create memory** saves the list as a playlist, named like "Time Machine - March 2019".
 
+Home has a **Your listening** card with your top songs, artists and genres of the last 7 days, 30 days, year or all
+time, and this time last year, this day last year, last month and last year, ready to play: see [Home and mixes](home-and-mixes.md).
+Its plays come from Siansa Beats when you scrobble there, else Koito or Last.fm, else Siansa's own history.
+
 When you scrobble to more than one of them, the same listen usually reached each, so a song's count is the
 highest of them, never the sum. Months and years that are over are kept on the phone, so they open at once;
 the current one shows what the phone had and then updates with your latest plays (within 15 minutes).
@@ -36,7 +40,7 @@ same faint, see-through white everywhere, so they read on any picture.
 
 ## Scrobbling
 
-**Settings › Listening**:
+**Settings › Scrobbling**:
 
 - **When a song counts**: once more than the chosen share of it has played (50% by default), or four minutes,
   whichever comes first. Songs under 30 seconds never count. Listens made offline are sent later.
@@ -48,6 +52,11 @@ same faint, see-through white everywhere, so they read on any picture.
   Siansa reads it back from there for **Time Machine**, **Your month and your year**, **Rediscover** and the taste
   your mixes are made from, so Koito or Last.fm needn't be set up for those.
   A listen reaches it by the same rules as everywhere else: **When a song counts**, and **Users**.
+  **Skips** go to it too (Siansa Beats 0.64 or newer): a song you leave for another one, with Next, Previous or a pick
+  from the queue, after hearing a second or more of it and before it counts. Siansa Beats keeps which song and when.
+  Its mixes then weigh a song you skip less, and don't bring it back as a new find for a while (see
+  [Home and mixes](home-and-mixes.md)). A song that ends by itself, or that you leave by playing something else
+  entirely, is no skip. Skips go nowhere else.
   Its **Listening** page shows any month or year: your top songs, artists and albums, hours, when you listen. You
   can bring in an export of Koito or Last.fm there, and have it send your listens on to Last.fm; turn **Last.fm**
   off here then, or plays count twice.

@@ -26,13 +26,15 @@ class HomeLookTest {
         assertFalse(HomeSection.CARDS.lookable)
         // Notices are always a row of chips (issue #784).
         assertFalse(HomeSection.NOTICES.lookable)
-        assertTrue(HomeSection.entries.filter { it != HomeSection.CARDS && it != HomeSection.NOTICES }.all { it.lookable })
+        // The Time Machine card's look is fixed (issue #1341).
+        assertFalse(HomeSection.TIME_MACHINE.lookable)
+        assertTrue(HomeSection.entries.filter { it != HomeSection.CARDS && it != HomeSection.NOTICES && it != HomeSection.TIME_MACHINE }.all { it.lookable })
         assertTrue(HomeLook.parse("cards:banner").isEmpty())
         assertTrue(HomeLook.parse("notices:list").isEmpty())
     }
 
     @Test fun theLooksAreTheCustomCardsLooks() {
-        assertEquals(listOf("As it is", "Tiles", "Banner", "List", "Play button", "Cover rows", "Shortcut grid", "Carousel"), HomeLook.entries.map { it.label })
+        assertEquals(listOf("As it is", "Tiles", "Banner", "List", "Play button", "Cover rows", "Shortcut grid", "Carousel", "Cover grid"), HomeLook.entries.map { it.label })
     }
 
     @Test fun moreOfYouIsARowOfItsOwnAfterMadeForYou() {
@@ -46,13 +48,18 @@ class HomeLookTest {
             app.siansa.ui.keepUnlisted(listOf(HomeSection.RADIOS, HomeSection.QUICK, HomeSection.MADE_FOR_YOU), before))
     }
 
-    @Test fun siansaBeatsRowsAreACarouselOrTiles() {
-        assertEquals(listOf(HomeLook.CAROUSEL, HomeLook.TILES), app.siansa.ui.BEATS_LOOKS)
-        assertEquals(HomeLook.TILES, app.siansa.ui.beatsLook(HomeLook.TILES))
-        listOf(null, HomeLook.AS_IS, HomeLook.BANNER, HomeLook.COVER_ROWS, HomeLook.CAROUSEL).forEach {
-            assertEquals("$it", HomeLook.CAROUSEL, app.siansa.ui.beatsLook(it))
-        }
+    @Test fun siansaBeatsRowsTakeEveryLookTheCarouselBeingTheirOwn() {
+        // #1261 (the owner, 19 Nov: every row gets every option): it was the carousel and Tiles only.
+        listOf(null, HomeLook.AS_IS, HomeLook.CAROUSEL).forEach { assertEquals("$it", HomeLook.CAROUSEL, app.siansa.ui.beatsLook(it)) }
+        (HomeLook.entries - HomeLook.AS_IS).forEach { assertEquals("$it", it, app.siansa.ui.beatsLook(it)) }
         assertEquals(setOf(HomeSection.CAROUSEL, HomeSection.MADE_FOR_YOU, HomeSection.MORE_OF_YOU), app.siansa.ui.beatsRows(true).keys)
+    }
+
+    @Test fun shortcutTilesArePlainAsHomeEveryOtherRowTakesHomesColour() {
+        // #1261: Shortcuts has a colour now; As Home keeps its tiles as they were.
+        assertEquals(CardLook.PLAIN, app.siansa.ui.asHomeCardLook(HomeSection.QUICK, CardLook.VIVID))
+        assertEquals(CardLook.SOFT, app.siansa.ui.asHomeCardLook(HomeSection.RECENT, CardLook.SOFT))
+        assertEquals(mapOf(HomeSection.CARDS to CardLook.SOFT, HomeSection.QUICK to CardLook.ARTWORK), CardLook.parse("cards:soft,quick:artwork"))
     }
 
     @Test fun anyRowCanBeACarousel() {

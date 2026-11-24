@@ -40,7 +40,7 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Delete
 
 /**
- * Settings › Home page (the owner, 13 Nov; Notices and Cards, Style › Home and Style › Home Menu before): the top of
+ * Settings › Home (the owner, 13 Nov; Notices and Cards, Style › Home and Style › Home Menu before): the top of
  * Home (how many shortcuts, the notices and each kind), the order of Home's menu, and the cards' page. The source
  * filter and Arrange Home are only behind the button at the top of Home, where they act on what's in front of you.
  */
@@ -49,7 +49,7 @@ fun HomeSettingsScreen(nav: NavController) {
     val graph = LocalGraph.current
     val settings by graph.settings.state.collectAsStateWithLifecycle()
     val shown = HomeSection.NOTICES !in settings.homeHidden
-    Screen(title = "Home page", nav = nav) { padding ->
+    Screen(title = "Home", nav = nav) { padding ->
         Column(
             Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().verticalScroll(rememberScrollState()).padding(Space.Page),
             verticalArrangement = Arrangement.spacedBy(Space.Medium),

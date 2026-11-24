@@ -112,6 +112,71 @@ class ServerSeekPlayer(
         swap(index, mediaItem)
     }
 
+    /**
+     * The queue's order before shuffle was turned on (the songs' ids), to put it back when it's turned off; null while
+     * shuffle is off.
+     */
+    private var unshuffled: List<String>? = null
+
+    /**
+     * Shuffle reorders the queue itself (issue #1238, the owner, 19 Nov: "the queue is right but enabling shuffle
+     * doesn't actually shuffle the tracks"). The player's own shuffle only changed the order songs are played in, so
+     * the queue and Up next still showed the album in order. Now turning it on moves the songs: the one playing first,
+     * then the rest of the list (also the songs before it) in a random order, then the songs Keep playing added, in
+     * theirs ([QueueRules.listFirstShuffle]). The player then plays the queue as it stands ([orderOf]: no order of its
+     * own), so songs added later go where they're put. Turning it off puts the list back in its order, the song playing
+     * carrying on wherever it lands.
+     */
+    override fun setShuffleModeEnabled(shuffleModeEnabled: Boolean) {
+        if (shuffleModeEnabled == exo.shuffleModeEnabled) return
+        if (shuffleModeEnabled) {
+            unshuffled = ids()
+            if (exo.mediaItemCount > 1) {
+                val order = QueueRules.listFirstShuffle(exo.mediaItemCount, exo.currentMediaItemIndex, { exo.getMediaItemAt(it).isAuto() })
+                arrange(order)
+                AppLog.d("Player", "Shuffle on: the queue reordered, ${order.count { !exo.getMediaItemAt(it).isAuto() }} songs of the list shuffled after the one playing, the songs Keep playing added after them")
+            }
+            exo.setShuffleOrder(ShuffleOrder.UnshuffledShuffleOrder(exo.mediaItemCount))
+        } else {
+            unshuffled?.let { before ->
+                val order = QueueRules.unshuffledOrder(ids(), before)
+                if (!order.withIndex().all { (i, v) -> i == v }) {
+                    arrange(order)
+                    AppLog.d("Player", "Shuffle off: the queue back in its order")
+                }
+            }
+            unshuffled = null
+        }
+        exo.shuffleModeEnabled = shuffleModeEnabled
+    }
+
+    /** A new list replaces the queue: shuffled at once when shuffle is on (the song it starts with first). */
+    override fun setMediaItems(mediaItems: MutableList<MediaItem>) = setMediaItems(mediaItems, true)
+
+    override fun setMediaItems(mediaItems: MutableList<MediaItem>, resetPosition: Boolean) {
+        exo.setMediaItems(mediaItems, resetPosition)
+        newList()
+    }
+
+    override fun setMediaItems(mediaItems: MutableList<MediaItem>, startIndex: Int, startPositionMs: Long) {
+        exo.setMediaItems(mediaItems, startIndex, startPositionMs)
+        newList()
+    }
+
+    private fun newList() {
+        unshuffled = null
+        if (!exo.shuffleModeEnabled) return
+        exo.shuffleModeEnabled = false
+        setShuffleModeEnabled(true)
+    }
+
+    private fun ids(): List<String> = List(exo.mediaItemCount) { exo.getMediaItemAt(it).mediaId }
+
+    /** Moves the songs so the queue is [order] (the queue's places, in their new order); the song playing plays on. */
+    private fun arrange(order: IntArray) {
+        for ((from, to) in QueueRules.moves(order)) exo.moveMediaItem(from, to)
+    }
+
     override fun seekTo(positionMs: Long) = seekTo(exo.currentMediaItemIndex, positionMs)
 
     override fun seekTo(mediaItemIndex: Int, positionMs: Long) {
@@ -170,7 +235,7 @@ class ServerSeekPlayer(
     private fun swap(index: Int, item: MediaItem) {
         val shuffled = shuffledOf(exo.shuffleOrder)
         exo.addMediaItem(index + 1, item)
-        exo.setShuffleOrder(ShuffleOrder.DefaultShuffleOrder(withCopyAfter(shuffled, index), System.nanoTime()))
+        exo.setShuffleOrder(orderOf(withCopyAfter(shuffled, index)))
         exo.removeMediaItem(index)
     }
 
@@ -179,6 +244,11 @@ class ServerSeekPlayer(
     companion object {
         /** Whether a stream is live for the media session: what the player says, except for a converted song. */
         fun live(playerSaysLive: Boolean, converted: Boolean): Boolean = playerSaysLive && !converted
+
+        /** A shuffle order playing [indices]: the queue as it stands when they're in order (songs added later go where they're put). */
+        fun orderOf(indices: IntArray): ShuffleOrder =
+            if (indices.withIndex().all { (i, v) -> i == v }) ShuffleOrder.UnshuffledShuffleOrder(indices.size)
+            else ShuffleOrder.DefaultShuffleOrder(indices, System.nanoTime())
 
         /** The songs' places in the queue, in the order shuffle plays them. */
         fun shuffledOf(order: ShuffleOrder): IntArray {

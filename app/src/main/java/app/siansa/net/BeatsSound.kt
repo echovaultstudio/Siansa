@@ -38,7 +38,7 @@ object BeatsSound {
     var onChanged: ((Set<String>, Map<String, String>) -> Unit)? = null
 
     /** Whether Siansa Beats has the sound of songs at all (what else it takes, such as listens, doesn't count). */
-    val available: Boolean get() = answers.any { it != BeatsListens.PATH }
+    val available: Boolean get() = answers.any { it != BeatsListens.PATH && it != BeatsListens.SKIPS }
 
     /** Whether Siansa Beats answers AudioMuse-AI's [path] (`/api/similar_tracks`). */
     fun answers(path: String): Boolean = path.substringBefore('?') in answers

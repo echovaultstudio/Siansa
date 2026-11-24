@@ -304,10 +304,10 @@ class SpacingSettingsTest : SpacingCheck() {
             SiansaTheme {
                 Column(Modifier.padding(Space.Page)) {
                     app.siansa.ui.HubTiles(listOf(
-                        app.siansa.ui.HubTile(Icons.Rounded.Palette, "Sound & playback", "a"),
-                        app.siansa.ui.HubTile(Icons.Rounded.Palette, "Mixes & radios", "b"),
+                        app.siansa.ui.HubTile(Icons.Rounded.Palette, "Playback", "a"),
+                        app.siansa.ui.HubTile(Icons.Rounded.Palette, "Mixes", "b"),
                         app.siansa.ui.HubTile(Icons.Rounded.Palette, "Discovery", "c"),
-                        app.siansa.ui.HubTile(Icons.Rounded.Palette, "Listening", "d"),
+                        app.siansa.ui.HubTile(Icons.Rounded.Palette, "Scrobbling", "d"),
                     )) { }
                 }
             }
@@ -399,5 +399,41 @@ class SpacingSettingsTest : SpacingCheck() {
         val slider = compose.onNodeWithTag("homeShortcuts").getBoundsInRoot()
         val count = compose.onNodeWithTag("homeShortcutsCount").getBoundsInRoot()
         assertEven("Count above and below", count.top - slider.top, slider.bottom - count.bottom, 2.dp)
+    }
+
+    /** Mix settings (the owner, 22 Nov): the mixes' lines one height, each with the same margin left and right of its part. */
+    @Test fun mixSettingsLinesAreEven() {
+        fun on(name: String) = app.siansa.net.BeatsMixSettings.Setting(name, app.siansa.net.BeatsMixSettings.Kind.ON, name, 0, 0, app.siansa.net.BeatsMixSettings.Value(on = true))
+        val settings = listOf("now", "daily", "repeat", "rediscover", "new").map(::on)
+        compose.setContent {
+            SiansaTheme {
+                Column(Modifier.padding(Space.Page)) {
+                    app.siansa.ui.MixSettingsBody(app.siansa.net.BeatsMixSettings.Settings("max", settings, settings.associate { it.name to it.default }, 7), null, emptyList(), save = { _, _ -> })
+                }
+            }
+        }
+        val screen = compose.onRoot().getBoundsInRoot()
+        val lines = listOf("now", "daily", "repeat", "rediscover", "new").map { compose.onNodeWithTag("mixLine-$it").getBoundsInRoot() }
+        val height = lines[0].bottom - lines[0].top
+        lines.forEach {
+            assertEven("Mix settings: each line as tall as the first", it.bottom - it.top, height, 1.dp)
+            assertEven("Mix settings: a line's margins", it.left - screen.left, screen.right - it.right, 1.dp)
+        }
+    }
+
+    /** Playback's Sound quality part (the owner, 22 Nov): Untouched playback's switch row starts where its heading does and spans the page. */
+    @Test fun untouchedPlaybackSitsInThePagesMargins() {
+        compose.setContent {
+            SiansaTheme {
+                Column(Modifier.padding(Space.Page).testTag("soundQuality")) {
+                    app.siansa.ui.Heading("Sound quality")
+                    app.siansa.ui.SwitchRow("Untouched playback", app.siansa.ui.UNTOUCHED_HINT, true, tag = "untouchedPlayback") {}
+                }
+            }
+        }
+        val screen = compose.onRoot().getBoundsInRoot()
+        val row = compose.onNodeWithTag("untouchedPlayback").getBoundsInRoot()
+        assertEven("Untouched playback: the margins left and right", row.left - screen.left, screen.right - row.right, 1.dp)
+        assertEven("Untouched playback: the page's margin", row.left - screen.left, Space.Page, 1.dp)
     }
 }

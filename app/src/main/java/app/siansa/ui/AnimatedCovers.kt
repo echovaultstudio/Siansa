@@ -432,7 +432,10 @@ fun BigCover(coverId: String?, albumId: String?, modifier: Modifier, shape: Shap
     }
     val small = @Composable { Cover(coverId, SMALL_COVER, Modifier.fillMaxSize(), shape) }
     val key = picked?.first
-    when (val k = if (own == null) AnimatedCovers.Kind.Still else picked?.second) {
+    // Cleared by hand (hold an album's cover, the owner, 21 Nov): an animation is started again from the server.
+    val clearedAll by app.siansa.covers.CoverCache.cleared.collectAsStateWithLifecycle()
+    val cleared = own?.let { clearedAll[app.siansa.covers.CoverVersions.cacheId(it)] } ?: 0
+    androidx.compose.runtime.key(cleared) { when (val k = if (own == null) AnimatedCovers.Kind.Still else picked?.second) {
         is AnimatedCovers.Kind.Animated, AnimatedCovers.Kind.Local ->
             if (settings.animatedCovers && key != null) AnimatedCover(key, k, modifier, shape, small)
             // Kept on the phone: its still is already there at full size.
@@ -441,5 +444,5 @@ fun BigCover(coverId: String?, albumId: String?, modifier: Modifier, shape: Shap
         AnimatedCovers.Kind.Still -> Cover(coverId, LARGE_COVER, modifier, shape)
         // Not checked yet, can't be checked, or animated without a usable version: the small one is always safe.
         else -> Box(modifier) { small() }
-    }
+    } }
 }

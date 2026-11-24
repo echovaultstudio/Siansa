@@ -17,14 +17,15 @@ class SettingsLayoutTest {
     @Test fun theStartPageHasFourGroupsOfTwelveTiles() {
         val hub = source("SettingsHub.kt").substringAfter("fun SettingsHub(").substringBefore("private fun SearchBox(")
         val groups = Regex("""HubGroupLabel\("([^"]+)"""").findAll(hub).map { it.groupValues[1] }.toList()
-        assertEquals(listOf("Playing", "On your phone", "Look", "Help"), groups)
+        // One word each, no "&" (the owner, 20 Nov).
+        assertEquals(listOf("Music", "Phone", "Look", "Support"), groups)
         val tiles = Regex("""HubTile\([^,]+, "([^"]+)", "([^"]+)"\)""").findAll(hub).map { it.groupValues[1] to it.groupValues[2] }.toList()
         assertEquals(
             listOf(
-                "Sound & playback" to "settings/sound", "Mixes & radios" to "settings/radios", "Discovery" to "settings/discovery", "Listening" to "settings/scrobbling",
-                "Storage & downloads" to "settings/streaming", "Backup & restore" to "settings/backup",
-                "Home page" to "settings/home", "Theme" to "settings/themes", "Now playing" to "settings/now-playing", "Bottom bar" to "settings/bottom-bar",
-                "Help & feedback" to "settings/help", "About" to "settings/about",
+                "Playback" to "settings/sound", "Mixes" to "settings/radios", "Discovery" to "settings/discovery", "Scrobbling" to "settings/scrobbling",
+                "Storage" to "settings/streaming", "Backup" to "settings/backup",
+                "Home" to "settings/home", "Theme" to "settings/themes", "Player" to "settings/now-playing", "Navigation" to "settings/bottom-bar",
+                "Help" to "settings/help", "About" to "settings/about",
             ),
             tiles,
         )
@@ -35,25 +36,28 @@ class SettingsLayoutTest {
     }
 
     @Test fun pagesAreCalledWhatTheirTilesAre() {
-        assertTrue(source("CrossfadeScreen.kt").contains("Screen(title = \"Sound & playback\""))
-        assertTrue(source("SettingsHub.kt").contains("Screen(title = \"Mixes & radios\""))
+        assertTrue(source("CrossfadeScreen.kt").contains("Screen(title = \"Playback\""))
+        assertTrue(source("SettingsHub.kt").contains("Screen(title = \"Mixes\""))
         assertTrue(source("DiscoveryScreen.kt").contains("Screen(title = \"Discovery\""))
-        assertTrue(source("SettingsHub.kt").contains("Screen(title = \"Storage & downloads\""))
-        assertFalse("Audiobooks & podcasts is gone: its skips are in Sound & playback", source("SettingsHub.kt").contains("Screen(title = \"Audiobooks & podcasts\""))
-        assertTrue(source("SettingsPages.kt").contains("Screen(title = \"Home page\""))
+        assertTrue(source("SettingsHub.kt").contains("Screen(title = \"Storage\""))
+        assertFalse("Audiobooks & podcasts is gone: its skips are in Playback", source("SettingsHub.kt").contains("Screen(title = \"Audiobooks & podcasts\""))
+        assertTrue(source("SettingsPages.kt").contains("Screen(title = \"Home\""))
         assertTrue(source("ThemesScreen.kt").contains("Screen(title = \"Theme\""))
-        assertTrue(source("StyleScreens.kt").contains("Screen(title = \"Now playing\""))
-        assertTrue(source("StyleScreens.kt").contains("title = \"Bottom bar\""))
-        assertTrue(source("ScrobblingScreen.kt").contains("Screen(title = \"Listening\""))
-        assertTrue(source("BackupScreen.kt").contains("Screen(title = \"Backup & restore\""))
-        assertTrue(source("SettingsHub.kt").contains("Screen(title = \"Help & feedback\""))
+        assertTrue(source("StyleScreens.kt").contains("Screen(title = \"Player\""))
+        assertTrue(source("StyleScreens.kt").contains("title = \"Navigation\""))
+        assertTrue(source("ScrobblingScreen.kt").contains("Screen(title = \"Scrobbling\""))
+        assertTrue(source("BackupScreen.kt").contains("Screen(title = \"Backup\""))
+        assertTrue(source("SettingsHub.kt").contains("Screen(title = \"Help\""))
         assertTrue(source("ServicesScreen.kt").contains("Screen(title = \"Services\""))
         assertTrue(source("SettingsSearch.kt").contains("Screen(title = \"Find a setting\""))
         // No page or hint still sends people to a name that's gone.
         for (file in ui.listFiles()!!.filter { it.name.endsWith(".kt") }) {
             val text = file.readText()
             for (old in listOf("Settings › Servers and services", "Settings › Streaming and data", "Settings › Mixes and vibes", "Settings › Notices and Cards", "Settings › Auto Generated Mixes", "Settings › Style ›", "Settings › Scrobbling and history",
-                "Settings › Connections", "Settings › Streaming & storage", "Settings › Scrobbling & history", "Settings › Radios & mixes")) {
+                "Settings › Connections", "Settings › Streaming & storage", "Settings › Scrobbling & history", "Settings › Radios & mixes",
+                // The names before the one-word ones (#1274).
+                "Settings › Sound & playback", "Settings › Mixes & radios", "Settings › Storage & downloads", "Settings › Backup & restore",
+                "Settings › Help & feedback", "Settings › Home page", "Settings › Now playing", "Settings › Bottom bar", "Settings › Listening")) {
                 assertFalse("${file.name} still says $old", text.contains(old))
             }
         }
@@ -73,9 +77,16 @@ class SettingsLayoutTest {
         // Discovery: genres, similar music and moods, each Siansa Beats' switch.
         val discovery = source("DiscoveryScreen.kt")
         for (use in listOf("GENRES", "SOUND", "MOODS")) assertTrue("Discovery misses $use", discovery.contains("BeatsUseSwitch(graph, BeatsUse.$use)"))
-        // Streaming & storage: the quality (as drop-downs), loading ahead, the caches and the downloads.
+        // Storage: loading ahead, the caches and the downloads. The streaming quality (as drop-downs) is on the Playback
+        // page since the owner found it "buried in storage" (22 Nov), with Untouched playback.
         val streaming = source("SettingsHub.kt").substringAfter("fun StreamingDataScreen(").substringBefore("fun restartApp(")
-        for (part in listOf("FoldSection(\"Streaming quality\"", "ChoicePicker(", "\"Load songs ahead\"", "\"Song cache\"", "DownloadSettings(nav)")) assertTrue("Streaming & storage misses $part", streaming.contains(part))
+        assertFalse("Streaming quality is still on the Storage page", streaming.contains("\"Streaming quality\""))
+        val quality = source("SettingsHub.kt").substringAfter("fun StreamingQualitySection(").substringBefore("internal val qualities")
+        for (part in listOf("FoldSection(\"Streaming quality\"", "ChoicePicker(")) assertTrue("Streaming quality misses $part", quality.contains(part))
+        val playback = source("CrossfadeScreen.kt")
+        for (part in listOf("Heading(\"Sound quality\")", "StreamingQualitySection(settings, graph)", "SwitchRow(\"Untouched playback\"")) assertTrue("Playback misses $part", playback.contains(part))
+        assertTrue("Sound quality isn't first on the Playback page", playback.indexOf("Heading(\"Sound quality\")") < playback.indexOf("PageLink(\"Equaliser\""))
+        for (part in listOf("\"Load songs ahead\"", "\"Song cache\"", "DownloadSettings(nav)")) assertTrue("Streaming & storage misses $part", streaming.contains(part))
         val downloads = source("DownloadsScreens.kt").substringAfter("fun DownloadSettings(").substringBefore("\n}\n")
         for (part in listOf("\"Download on Wi-Fi only\"", "ChoicePicker(\"Download quality\"", "\"Storage limit\"", "\"Remove all downloads\"", "CoverDownloadSection()", "ImageCacheSection()", "nav.navigate(\"downloads\")")) {
             assertTrue("The downloads miss $part", downloads.contains(part))
@@ -109,6 +120,10 @@ class SettingsLayoutTest {
         assertTrue(SettingsIndex.find("loud").take(3).any { it.name == "Levelling" })
         assertTrue(SettingsIndex.find("crossfade").first().let { it.route == "settings/sound" && it.section == "crossfade-dj-blends" })
         assertTrue(SettingsIndex.find("Theme").all { it.page == "Theme" })
+        // The pages' old names still find them (one word each since the owner, 20 Nov).
+        assertTrue(SettingsIndex.find("feedback").any { it.page == "Help" })
+        assertTrue(SettingsIndex.find("radios").any { it.page == "Mixes" })
+        assertTrue(SettingsIndex.find("bottom bar").any { it.page == "Navigation" })
         assertTrue(SettingsIndex.find("").isEmpty())
         assertTrue(SettingsIndex.find("zzzz").isEmpty())
         // Every entry's section is a FoldSection tag that exists, spelt as FoldSection spells it.

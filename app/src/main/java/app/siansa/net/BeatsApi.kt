@@ -168,7 +168,9 @@ class BeatsApi(
                     sound = (feature("sound")?.get("answers") as? kotlinx.serialization.json.JsonArray).orEmpty()
                         .mapNotNull { (it as? kotlinx.serialization.json.JsonPrimitive)?.content }.toSet() +
                         // It takes listens (0.29): kept with what it answers, so the switch shows without asking again.
-                        setOfNotNull(BeatsListens.PATH.takeIf { feature("scrobbling")?.get("available")?.toString() == "true" }),
+                        setOfNotNull(BeatsListens.PATH.takeIf { feature("scrobbling")?.get("available")?.toString() == "true" }) +
+                        // And skips (0.64), with the listens.
+                        setOfNotNull(BeatsListens.SKIPS.takeIf { feature("scrobbling")?.get("skips")?.toString() == "true" }),
                     soundPaths = (feature("sound")?.get("paths") as? JsonObject).orEmpty()
                         .mapNotNull { (name, path) -> (path as? kotlinx.serialization.json.JsonPrimitive)?.content?.let { name to it } }.toMap(),
                     traits = feature("traits")?.get("available")?.toString() == "true",

@@ -64,13 +64,13 @@ class SmartBlendTest {
         assertTrue(plan.why, plan.why.contains("where its beat stops locking"))
     }
 
-    @Test fun aMixTrackIsBlendedInsideItsLockAndKeptShort() {
+    @Test fun aMixTrackIsSwappedAtItsVeryEnd() {
         val lockedOut = outro.copy(lockMs = 296_250.0)
         val lockedIn = intro.copy(lockMs = 1_000.0)
         val plan = Crossfade.plan(CrossfadeMode.SMART, 20_000, song, next, 310_000, 300_000,
             profile("a", lockedOut, null, mix = true), profile("b", null, lockedIn), beatMatch = true)!!
         assertNotNull(plan.beat)
-        assertTrue("${plan.beat!!.bars}", plan.beat!!.bars <= BeatMatch.MIX_TRACK_BARS)
+        assertTrue("${plan.beat!!.bars}", plan.beat!!.bars <= BeatMatch.MIX_SWAP_BARS)
         // Without the lock (the Siansa plugin's readings), a mix track is never beat-matched: a short blend.
         val unlocked = Crossfade.plan(CrossfadeMode.SMART, 20_000, song, next, 310_000, 300_000,
             profile("a", outro, null, mix = true), profile("b", null, intro), beatMatch = true)!!

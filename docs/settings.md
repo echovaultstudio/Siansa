@@ -5,10 +5,10 @@ each (green when it answers, red when it doesn't), then twelve pages in four gro
 
 | Group | Pages |
 |---|---|
-| Playing | [Sound & playback](#sound--playback) · [Mixes & radios](#mixes--radios) · [Discovery](#discovery) · [Listening](#listening) |
-| On your phone | [Storage & downloads](#storage--downloads) · [Backup & restore](#backup--restore) |
-| Look | [Home page](#home-page) · [Theme](#theme) · [Now playing](#now-playing) · [Bottom bar](#bottom-bar) |
-| Help | [Help & feedback](#help--feedback) · [About](#about) |
+| Music | [Playback](#playback) · [Mixes](#mixes) · [Discovery](#discovery) · [Scrobbling](#scrobbling) |
+| Phone | [Storage](#storage) · [Backup](#backup) |
+| Look | [Home](#home) · [Theme](#theme) · [Player](#player) · [Navigation](#navigation) |
+| Support | [Help](#help) · [About](#about) |
 
 Above the groups: tap your name to open [Your server](#your-server) (your servers and logins), tap a service to go
 straight to its own page, and **All services** beside the services to open [Services](#services), the list of them
@@ -43,13 +43,13 @@ its own page. A service's page has its switch (off: left alone and shown nowhere
 (address, key, **Test**, **Save**) and **Used for**: what it does, each line opening the page where that's set.
 
 - **Siansa Beats**: its address (port 8090) and, if it asks for one, its API key or password. Used for loudness and DJ
-  blends (Sound & playback), Home's mixes (Mixes & radios), genres, similar music and moods (Discovery) and your
-  listens (Listening). See [Siansa Beats](siansa-beats.md).
+  blends (Playback), Home's mixes (Mixes), genres, similar music and moods (Discovery) and your
+  listens (Scrobbling). See [Siansa Beats](siansa-beats.md).
 - **AudioMuse-AI**: address, and an API token or user name and password. Not listed while Siansa Beats is on: Beats
   does all it did. See [AudioMuse-AI](audiomuse.md).
 - **Audiobookshelf**: address, API token or user name and password, and **Scan for new books**. See
   [Audiobooks and podcasts](books.md).
-- **Last.fm** and **ListenBrainz / Koito**: set on [Listening](#listening).
+- **Last.fm** and **ListenBrainz / Koito**: set on [Scrobbling](#scrobbling).
 - **AI** (optional): which service writes Today's mix, Flow's words and the mood radios (OpenRouter, OpenAI,
   Anthropic, Google Gemini, Mistral, Groq, Ollama or another), its key and its model. Not listed while Siansa Beats'
   own AI does this (Siansa Beats 0.57 or newer, with AI set up on its page). See [AI features](ai.md).
@@ -57,12 +57,14 @@ its own page. A service's page has its switch (off: left alone and shown nowhere
 **For the best Siansa**, under the list: a line per service, ✓ when it's on and answers, ✕ when it doesn't (with
 what the check said), – when it's not needed, ○ when it's off or optional.
 
-## Sound & playback
+## Playback
 
 How music sounds and plays.
 
 | Setting | What it does |
 |---|---|
+| **Streaming quality** | Original or Opus 96–320 kbit/s, on Wi-Fi and on mobile data, each from a drop-down. |
+| **Untouched playback** | Plays each song at its own sample rate and bit depth, straight to the phone's sound output. Crossfades, DJ blends and the equaliser are off while it's on. See [Playback](playback.md#untouched-playback). |
 | **Equaliser** | Ten bands, presets and a pre-amp, on its own page. |
 | **Where loudness and fades come from** | The songs' tags, or Siansa Beats (the Siansa plugin on AudioMuse-AI before it). |
 | **Levelling** | Track, Album or Off, and the target (−18 or −14 LUFS). |
@@ -72,7 +74,7 @@ How music sounds and plays.
 
 See [Playback](playback.md).
 
-## Mixes & radios
+## Mixes
 
 | Setting | What it does |
 |---|---|
@@ -86,23 +88,22 @@ See [Playback](playback.md).
 With Siansa Beats set up: **Genres** by sound (off: your songs' tags), **Similar music & search by words**, and
 **Moods in Flow** (vocals, a woman's or a man's voice, how songs feel). Without it, what AudioMuse-AI does.
 
-## Storage & downloads
+## Storage
 
 What you hear over the network, what it costs in data, and how well Siansa plays on without a connection.
 
 | Setting | What it does |
 |---|---|
-| **Streaming quality** | Original or Opus 96–320 kbit/s, on Wi-Fi and on mobile data, each from a drop-down. |
 | **Load songs ahead** | How many songs to load ahead, on Wi-Fi and on mobile data (0–5). |
 | **Song cache** | Keeps songs as they play, up to the size chosen, with **Clear song cache**. **Off** keeps no song once it has played (from the next song); then up to 3 songs are loaded ahead, each held only until it plays. A new size applies after a restart. |
 | **Downloads** | **Your downloads** (what's on the phone, opening the list to add or remove music), **Download on Wi-Fi only**, the download quality (a drop-down), the storage limit and **Remove all downloads**. See [Playback](playback.md#downloads). |
 | **Covers on the phone** | **Download all covers** (every album, artist, playlist, song and disc cover, at the small size lists use and the big one now playing shows, and albums' animated covers whole while **Animated covers** is on, which can be 100 MB each; it looks each artist up first, also artists who are only credited on songs (a compilation, a featured singer), and at the end asks again every half minute, for up to ten minutes, for photos the server is still fetching (Navidrome gets them from Apple Music or Deezer a few at a time; those it has none for yet are counted apart, and the next run asks again), so their photo is downloaded even when Navidrome found it after your library was last read; with a limit on the image cache, give it room for them all), and the **Image cache** (its size on a slider, 100 MB to 5 GB or no limit, and **Clear image cache**; a new size applies after a restart). |
-| **Library on the phone** | What the library database takes. The log is under [Help & feedback](#help--feedback). |
+| **Library on the phone** | What the library database takes. The log is under [Help](#help). |
 
 The downloads themselves are also in Your Library (the download button at the top), with **Add music**,
 **Downloaded songs** and a link to these settings.
 
-## Home page
+## Home
 
 The source filter (whose music shows, and **Only downloaded music**) is in the menu behind the round button at the
 top of Home.
@@ -149,7 +150,7 @@ top of Home.
   page and in now playing. Lists and the Library show its first frame, read from the start of the file, so a big
   animation is only downloaded where it plays.
 
-## Now playing
+## Player
 
 - **Buttons**: the lyrics, device and queue buttons, or the earlier look with the lyrics card peeking in.
 - **About this song**: **How the song is playing** (on at first) shows the file and what really plays side by side in
@@ -166,23 +167,23 @@ top of Home.
 - **Mini player**: its buttons, in order: hold a row and drag it; tap the eye to show or hide it. It starts with
   **Play or pause**, **Next song** and **Add to playlist**.
 
-## Bottom bar
+## Navigation
 
 The tabs, in their order on the bar: hold a row and drag it; tap the eye to show or hide it. Settings always stays.
 
-## Listening
+## Scrobbling
 
 When a song counts, your server, Siansa Beats (when it's set up), Last.fm, ListenBrainz or Koito, and which users are sent. See
 [Your listening](your-listening.md#scrobbling). **Time Machine**: whether it also lists songs you played that aren't
 in your library now (the same switch is on the Time Machine page).
 
-## Backup & restore
+## Backup
 
 A backup holds your settings, vibes, mixes, play history, Home and library layout and more, **without passwords,
 tokens or API keys**. **Save backup** writes a file you pick; **Restore** brings one back (Siansa then restarts).
 **Automatic backup** saves one a day to a folder you choose and keeps the last 7.
 
-## Help & feedback
+## Help
 
 **Report a problem**, with the steps to a useful report. Under **Debugging**: **Debug logs** on or off and **Show
 the log** (with its size). See [Privacy, logs and reporting problems](privacy-and-logs.md).

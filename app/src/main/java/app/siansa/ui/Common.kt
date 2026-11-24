@@ -335,6 +335,8 @@ fun Cover(
     size: Int?,
     modifier: Modifier = Modifier,
     shape: Shape = RoundedCornerShape(8.dp),
+    // A colour filter over the cover; null draws it as it is.
+    colorFilter: androidx.compose.ui.graphics.ColorFilter? = null,
 ) {
     val graph = LocalGraph.current
     // An artist's picture as looked up this run (ArtistPhotos), wherever it shows: their page, Fans also like, Home,
@@ -342,12 +344,15 @@ fun Cover(
     // new one shows as soon as it's known, without the page being opened again (the owner, 10 Nov).
     val freshArtists by graph.artistPhotos.covers.collectAsStateWithLifecycle()
     @Suppress("NAME_SHADOWING")
-    val coverId = coverId?.let { app.siansa.data.freshArtistCover(it, freshArtists) }
+    val coverId = coverId?.let { app.siansa.covers.CoverVersions.current(app.siansa.data.freshArtistCover(it, freshArtists)) }
     val context = LocalContext.current
     val loader = SingletonImageLoader.get(context)
     // A stand-in showing here is asked for again when its time comes (StandIns: soon the first times), without the
     // cover having to leave the screen and come back (the owner, 12 Nov: a song's row kept the blue disc).
     var again by remember(coverId) { androidx.compose.runtime.mutableIntStateOf(0) }
+    // Cleared by hand (hold an album's cover): fetched fresh here at once, wherever it shows (the owner, 21 Nov).
+    val clearedAll by app.siansa.covers.CoverCache.cleared.collectAsStateWithLifecycle()
+    val cleared = coverId?.let { clearedAll[app.siansa.covers.CoverVersions.cacheId(it)] } ?: 0
     LaunchedEffect(coverId) {
         val id = coverId ?: return@LaunchedEffect
         val cacheId = app.siansa.covers.CoverVersions.cacheId(id)
@@ -361,7 +366,7 @@ fun Cover(
             }
         }
     }
-    val cached = remember(coverId, size, again) {
+    val cached = remember(coverId, size, again, cleared) {
         coverId?.let {
             // The server's stand-in, shown a while ago, is dropped here, so the cover is asked for again.
             app.siansa.covers.CoverCache.askAgain(loader, it)
@@ -373,7 +378,7 @@ fun Cover(
         if (cached != null || coverId == null) null
         else coverFallbackKeys(coverId, size).firstNotNullOfOrNull { loader.memoryCache?.get(MemoryCache.Key(it))?.image }
     }
-    val request = remember(coverId, size, again) { coverId?.let { coverRequest(context, graph, it, size) } }
+    val request = remember(coverId, size, again, cleared) { coverId?.let { coverRequest(context, graph, it, size) } }
     // Its colours, worked out in the background while it shows (CoverToneStore): the page it opens has them in its
     // first frame. A cover only scrolled past isn't read.
     LaunchedEffect(coverId) {
@@ -389,6 +394,7 @@ fun Cover(
                 painter = remember(cached) { cached.asPainter(context) },
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
+                colorFilter = colorFilter,
                 modifier = Modifier.fillMaxSize(),
             )
             request != null -> {
@@ -397,6 +403,7 @@ fun Cover(
                         painter = remember(standIn) { standIn.asPainter(context) },
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
+                colorFilter = colorFilter,
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
@@ -405,6 +412,7 @@ fun Cover(
                     model = request,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
+                colorFilter = colorFilter,
                     modifier = Modifier.fillMaxSize(),
                 )
             }
@@ -818,6 +826,8 @@ fun AlbumTile(
     modifier: Modifier = Modifier,
     round: Boolean = false,
 ) {
+    @Suppress("NAME_SHADOWING")
+    val subtitle = if (LocalCardLines.current) subtitle else ""
     // The name sits a step under the cover, and the subtitle straight under the name, as one block (issue #338):
     // an even gap between all three left the artist floating away from the album name.
     Column(modifier.clickable(onClick = onClick).padding(LocalTileInset.current)) {
@@ -869,6 +879,8 @@ fun GradientTile(
     size: Dp = 160.dp,
     busy: Boolean = false,
 ) {
+    @Suppress("NAME_SHADOWING")
+    val caption = caption.takeIf { LocalCardLines.current }
     // In the look chosen for Home's cards (the owner, 13 Nov): its own colours, softened, plain, or its cover's.
     val paint = cardPaint(colors, coverArt, "tile-$title")
     Column(modifier.width(size).clickable(onClick = onClick)) {
@@ -933,37 +945,126 @@ fun QuickTile(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     icon: ImageVector? = null,
+    // The tile's height (the owner, 20 Nov): [QUICK_TILE_SMALL] three a row, [QUICK_TILE_BIG] with [subtitle] under the name.
+    tall: Dp = QUICK_TILE_HEIGHT,
+    subtitle: String? = null,
+    // A mix's songs and their covers, for its row's Colours (By mood) and Pictures.
+    songIds: List<String> = emptyList(),
+    covers: List<String?> = emptyList(),
 ) {
+    // Plain, unless its row has a colour of its own (#1261), in the colours its row's Colours say.
+    val chosen = shortcutColours(title, songIds)
+    val paint = LocalShortcutLook.current?.let { look -> shortcutPaint(colors ?: tileColors(title), chosen, coverArt, title, look) }
+    // With no cover, its square is in its row's colours too, the other way round so it stands off the tile.
+    val square = chosen?.let { it.second to it.first } ?: colors
+    val style = LocalPictureStyle.current
+    val small = tall < QUICK_TILE_HEIGHT
+    val big = tall > QUICK_TILE_HEIGHT
     Row(
         modifier
-            .height(QUICK_TILE_HEIGHT)
+            .height(tall)
             .clip(RoundedCornerShape(QUICK_TILE_CORNER))
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .then(if (paint != null) Modifier.cardFill(paint, RoundedCornerShape(QUICK_TILE_CORNER)) else Modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh))
             .clickable(onClick = onClick),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (coverArt != null) {
-            Cover(coverArt, 150, Modifier.size(56.dp), RoundedCornerShape(topStart = 6.dp, bottomStart = 6.dp))
+        if (coverArt != null && style != app.siansa.data.PictureStyle.AUTO) {
+            // Its picture in the row's Pictures (the owner, 23 Nov: every setting for every card), without its name:
+            // the tile says that beside it.
+            CardPicture(covers, coverArt, colors ?: tileColors(title), title, Modifier.size(tall),
+                RoundedCornerShape(topStart = QUICK_TILE_CORNER, bottomStart = QUICK_TILE_CORNER), if (big) 300 else 150, names = false, style = style, songIds = songIds)
+        } else if (coverArt != null) {
+            Cover(coverArt, if (big) 300 else 150, Modifier.size(tall), RoundedCornerShape(topStart = QUICK_TILE_CORNER, bottomStart = QUICK_TILE_CORNER))
         } else {
             Box(
-                Modifier.size(56.dp).background(
-                    Brush.linearGradient(listOf(colors?.first ?: Color.Gray, colors?.second ?: Color.DarkGray))
+                Modifier.size(tall).background(
+                    Brush.linearGradient(listOf(square?.first ?: Color.Gray, square?.second ?: Color.DarkGray))
                 ),
                 contentAlignment = Alignment.Center,
             ) {
-                if (icon != null) Icon(icon, null, tint = Color.White, modifier = Modifier.size(26.dp))
+                if (icon != null) Icon(icon, null, tint = if (chosen != null && wordsDarkOn(square!!)) Color(0xFF14181C) else Color.White, modifier = Modifier.size(if (small) 20.dp else if (big) 32.dp else 26.dp))
             }
         }
-        Text(
-            title,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = Space.Medium),
-        )
+        Column(Modifier.padding(horizontal = if (small) Space.Small else Space.Medium), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
+            if (small || big) {
+                // Every tile's name the same size (the owner, 20 Nov): a word too long for a narrow tile is hyphenated
+                // where it may be, and a name too long for two lines ends with "…".
+                Text(
+                    title,
+                    style = (if (small) MaterialTheme.typography.labelMedium else MaterialTheme.typography.titleSmall).copy(
+                        fontWeight = if (big) FontWeight.Bold else FontWeight.SemiBold,
+                        hyphens = androidx.compose.ui.text.style.Hyphens.Auto,
+                        lineBreak = androidx.compose.ui.text.style.LineBreak.Paragraph,
+                    ),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    color = paint?.text ?: androidx.compose.ui.graphics.Color.Unspecified,
+                )
+            } else {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    color = paint?.text ?: androidx.compose.ui.graphics.Color.Unspecified,
+                )
+            }
+            if (big && !subtitle.isNullOrBlank()) {
+                Text(subtitle, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    color = paint?.faint ?: MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
     }
 }
+
+/** Shortcut tiles three a row (the owner, 20 Nov): the space of four holds six. */
+val QUICK_TILE_SMALL = 44.dp
+/** Big shortcut tiles, two a row with what each is under its name (the owner, 20 Nov). */
+val QUICK_TILE_BIG = 76.dp
+
+/**
+ * A shortcut as a pill (the owner, 20 Nov): a round picture (its cover, else its colours and icon) and its name, as
+ * wide as the name; the pills flow on to as many lines as they need.
+ */
+@Composable
+fun ShortcutChip(
+    title: String, coverArt: String?, colors: Pair<Color, Color>?, onClick: () -> Unit, modifier: Modifier = Modifier, icon: ImageVector? = null,
+    songIds: List<String> = emptyList(),
+) {
+    val chosen = shortcutColours(title, songIds)
+    val paint = LocalShortcutLook.current?.let { look -> shortcutPaint(colors ?: tileColors(title), chosen, coverArt, title, look) }
+    val square = chosen?.let { it.second to it.first } ?: colors
+    val shape = RoundedCornerShape(percent = 50)
+    Row(
+        modifier
+            .height(QUICK_CHIP_HEIGHT)
+            .clip(shape)
+            .then(if (paint != null) Modifier.cardFill(paint, shape) else Modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh))
+            .clickable(onClick = onClick)
+            .padding(start = Space.Tight, end = Space.Medium),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Space.Small),
+    ) {
+        if (coverArt != null) {
+            Cover(coverArt, 100, Modifier.size(QUICK_CHIP_PICTURE), androidx.compose.foundation.shape.CircleShape)
+        } else {
+            Box(
+                Modifier.size(QUICK_CHIP_PICTURE).clip(androidx.compose.foundation.shape.CircleShape)
+                    .background(Brush.linearGradient(listOf(square?.first ?: Color.Gray, square?.second ?: Color.DarkGray))),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (icon != null) Icon(icon, null, tint = if (chosen != null && wordsDarkOn(square!!)) Color(0xFF14181C) else Color.White, modifier = Modifier.size(16.dp))
+            }
+        }
+        Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            color = paint?.text ?: androidx.compose.ui.graphics.Color.Unspecified)
+    }
+}
+
+/** A shortcut pill's height and its picture: a touch target, the picture inside it with room round it. */
+val QUICK_CHIP_HEIGHT = 44.dp
+val QUICK_CHIP_PICTURE = 32.dp
 
 /**
  * A horizontal shelf of tiles under a section title. With [onOpenAll], a shelf with more than a handful of

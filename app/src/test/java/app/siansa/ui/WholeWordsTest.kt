@@ -46,4 +46,22 @@ class WholeWordsTest {
         assertEquals(true, scale >= WORD_FLOOR_SCALE)
         assertEquals(true, widest(text.split(" "))(scale) <= 64)
     }
+
+    @Test fun shortWordsStayWithTheirNeighbours() {
+        // The owner, 21 Nov: "New for / you" and "Drum n / Bass" on the pictures.
+        val nb = '\u00A0'
+        assertEquals("Easy Drum${nb}n${nb}Bass", keepTogether("Easy Drum n Bass"))
+        assertEquals("New for${nb}you", keepTogether("New for you"))
+        assertEquals("Rock${nb}&${nb}Roll", keepTogether("Rock & Roll"))
+        assertEquals("On${nb}repeat", keepTogether("On repeat"))
+        assertEquals("Hushed Alternative Rock", keepTogether("Hushed Alternative Rock"))
+        assertEquals("Rediscover", keepTogether("Rediscover"))
+    }
+
+    @Test fun piecesHeldTogetherAreMeasuredWhole() {
+        // On a phone \s matched the no-break space, so "On repeat" was measured as "On" and "repeat" and broke inside
+        // a word ("On re / peat", the owner, 21 Nov).
+        assertEquals(listOf("On\u00A0repeat"), words(keepTogether("On repeat")))
+        assertEquals(listOf("Easy", "Drum\u00A0n\u00A0Bass"), words(keepTogether("Easy Drum n Bass")))
+    }
 }

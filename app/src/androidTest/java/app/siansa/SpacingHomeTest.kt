@@ -82,6 +82,26 @@ class SpacingHomeTest : SpacingCheck() {
         }
     }
 
+    /** What's new after an update (the owner, 16 Nov): the title and the headlines start a page margin in, the two buttons end the same room from the edges. */
+    @Test fun whatsNewSheetIsEvenlySpaced() {
+        compose.setContent {
+            SiansaTheme {
+                Box(Modifier.width(360.dp)) {
+                    app.siansa.ui.WhatsNewPanel(app.siansa.ui.UpdateSummary("1.6.0", listOf("Siansa Beats", "Star ratings for songs"), more = 3), onOpenAll = {}, onDone = {})
+                }
+            }
+        }
+        val panel = compose.onNodeWithTag("whatsNewPanel").getBoundsInRoot()
+        val title = compose.onNodeWithTag("whatsNewTitle").getBoundsInRoot()
+        val line = compose.onNodeWithTag("whatsNewLine-0").getBoundsInRoot()
+        val all = compose.onNodeWithTag("whatsNewAll").getBoundsInRoot()
+        val done = compose.onNodeWithTag("whatsNewDone").getBoundsInRoot()
+        assertEven("The title and the first headline, one left edge", title.left, line.left, tolerance = 1.dp)
+        assertEven("The headlines, full width", line.left - panel.left, panel.right - line.right, tolerance = 1.dp)
+        assertEven("The buttons, the same room at both edges", all.left - panel.left, panel.right - done.right, tolerance = 1.dp)
+        assertEven("The buttons, in line", all.top + (all.bottom - all.top) / 2, done.top + (done.bottom - done.top) / 2, tolerance = 1.dp)
+    }
+
     /** Home's notice chips are Your Library's pills (issue #794): the same height, so Home and the library match. */
     @Test fun noticeChipsMatchTheLibrarysPills() {
         compose.setContent {
@@ -228,6 +248,97 @@ class SpacingHomeTest : SpacingCheck() {
         assertEven("The gap is a small step", dp(boxes[1].left - boxes[0].right), Space.Small, 1.dp)
     }
 
+    /** A hero with cards at its foot (the owner, 22 Nov: "spacing needs to be 100% correct"). */
+    @Test fun heroCardsSitEvenlyAtItsFoot() {
+        val items = (1..5).map { i -> app.siansa.ui.HomeItem(key = "h$i", title = "Mix $i with a long name", subtitle = "Calm music", open = {}) }
+        compose.setContent { SiansaTheme { Column { app.siansa.ui.HomeHero("For now", items.first(), play = {}, rowSongs = emptyList(), under = items.drop(1)) { _, _ -> } } } }
+        val screen = compose.onRoot().getBoundsInRoot()
+        val cards = compose.onAllNodesWithTag("homeHeroCard").fetchSemanticsNodes().map { it.boundsInRoot }
+        val play = compose.onNodeWithTag("homeHeroPlay").fetchSemanticsNode().boundsInRoot
+        assertEquals(4, cards.size)
+        val d = compose.density
+        fun dp(px: Float) = with(d) { px.toDp() }
+        // The hero is a card with the page's margins beside it (the owner, 22 Nov), and its cards a page margin inside it.
+        val hero = compose.onNodeWithTag("homeHero").fetchSemanticsNode().boundsInRoot
+        assertEven("The hero's left margin is the page margin", dp(hero.left) - screen.left, Space.Page, 1.dp)
+        assertEven("The hero's margins left and right", dp(hero.left) - screen.left, screen.right - dp(hero.right), 1.dp)
+        assertEven("The cards' outer edges sit evenly in the hero", dp(cards.first().left - hero.left), dp(hero.right - cards.last().right), 1.dp)
+        assertEven("The cards' left margin in the hero", dp(cards.first().left - hero.left), Space.Page, 1.dp)
+        assertEven("The gaps between the cards", dp(cards[1].left - cards[0].right), dp(cards[3].left - cards[2].right), 0.5.dp)
+        assertEven("The gap between cards is a small step", dp(cards[1].left - cards[0].right), Space.Small, 1.dp)
+        assertEven("A section's gap from the buttons to the cards", dp(cards[0].top - play.bottom), Space.Section, 1.dp)
+    }
+
+    /** Your listening's card (issue #1343): the hero's margins, its pages a page margin inside it, its look back squares evenly spread. */
+    @Test fun listeningCardSitsAsTheHeroWithEvenPages() {
+        fun list(kind: app.siansa.mix.TimeListKind, title: String, tag: String) = app.siansa.mix.TimeCardList(kind.id, title, tag, "November 2025", listOf("a", "b", "c"), listOf(3, 2, 1), year = 2025)
+        val card = app.siansa.mix.TimeCard("2026-11-23", listOf(
+            list(app.siansa.mix.TimeListKind.YEAR_AGO, "This time last year", "NOV 2025"), list(app.siansa.mix.TimeListKind.DAY, "This day last year", "23 NOV"),
+            list(app.siansa.mix.TimeListKind.LAST_MONTH, "Last month", "OCT"), list(app.siansa.mix.TimeListKind.LAST_YEAR, "Your 2025", "2025"),
+        ), app.siansa.mix.TIME_CARD_MAKE)
+        compose.setContent { SiansaTheme { Column { app.siansa.ui.ListeningCard(card, app.siansa.mix.ListenRange.MONTH, app.siansa.data.ListenColour.TEAL,
+            app.siansa.ui.ListeningActions({ emptyList() }, { _, _, _ -> }, {}, {}, {})) } } }
+        val screen = compose.onRoot().getBoundsInRoot()
+        val d = compose.density
+        fun dp(px: Float) = with(d) { px.toDp() }
+        val whole = compose.onNodeWithTag("listeningCard").fetchSemanticsNode().boundsInRoot
+        assertEven("Your listening: its left margin is the page margin", dp(whole.left) - screen.left, Space.Page, 1.dp)
+        assertEven("Your listening: margins left and right", dp(whole.left) - screen.left, screen.right - dp(whole.right), 1.dp)
+        val squares = compose.onAllNodesWithTag("listeningBack").fetchSemanticsNodes().map { it.boundsInRoot }
+        assertEquals(4, squares.size)
+        assertEven("Your listening: its lists' outer edges sit evenly", dp(squares.first().left - whole.left), dp(whole.right - squares.last().right), 1.dp)
+        assertEven("Your listening: its lists' left margin in the card", dp(squares.first().left - whole.left), Space.Page, 1.dp)
+        assertEven("Your listening: the gaps between its lists", dp(squares[1].left - squares[0].right), dp(squares[3].left - squares[2].right), 0.5.dp)
+        assertEven("Your listening: the gap between lists is a small step", dp(squares[1].left - squares[0].right), Space.Small, 1.dp)
+    }
+
+    /** An artist's round photo (issue #1355): centred in its picture, the same room on every side, and as wide as it's tall. */
+    @Test fun anArtistsRoundPhotoIsCentredInItsPicture() {
+        compose.setContent {
+            SiansaTheme {
+                androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalCoverDraw provides { _, _, modifier, _, _ -> androidx.compose.foundation.layout.Box(modifier) }) {
+                    // In a box with a tag of its own: the picture's tag names its look, which follows the row's Pictures.
+                    androidx.compose.foundation.layout.Box(Modifier.size(200.dp).testTag("roundCard")) {
+                        app.siansa.ui.CardPicture(listOf("photo"), "photo", app.siansa.ui.tileColors("artist"), "Artist radio", Modifier.size(200.dp), round = true)
+                    }
+                }
+            }
+        }
+        val whole = compose.onNodeWithTag("roundCard", useUnmergedTree = true).getBoundsInRoot()
+        val photo = compose.onNodeWithTag("cardPictureRound", useUnmergedTree = true).getBoundsInRoot()
+        assertEven("Round photo: as wide as it's tall", photo.right - photo.left, photo.bottom - photo.top, 0.5.dp)
+        assertEven("Round photo: room left and right", photo.left - whole.left, whole.right - photo.right, 0.5.dp)
+        assertEven("Round photo: room above and below", photo.top - whole.top, whole.bottom - photo.bottom, 0.5.dp)
+    }
+
+    /** Your listening's colours under its cog (issue #1347): three to a row, evenly spread, both rows alike. */
+    @Test fun listenColoursAreEvenlySpread() {
+        compose.setContent { SiansaTheme { Column(Modifier.padding(Space.Section)) { app.siansa.ui.ListenColourSwatches(app.siansa.data.ListenColour.TEAL) {} } } }
+        val all = compose.onNodeWithTag("listenColours").getBoundsInRoot()
+        val b = app.siansa.data.ListenColour.entries.map { compose.onNodeWithTag("listenColour-${it.id}").getBoundsInRoot() }
+        assertEven("Listen colours: the first starts at the edge", b[0].left, all.left, 1.dp)
+        assertEven("Listen colours: the third ends at the edge", b[2].right, all.right, 1.dp)
+        assertEven("Listen colours: the gaps in a row", b[1].left - b[0].right, b[2].left - b[1].right, 1.dp)
+        assertEven("Listen colours: the gap is a small step", b[1].left - b[0].right, Space.Small, 1.dp)
+        assertEven("Listen colours: the second row under the first", b[3].left, b[0].left, 1.dp)
+        assertEven("Listen colours: all as wide", b[4].right - b[4].left, b[1].right - b[1].left, 1.dp)
+    }
+
+    /** A cover grid with one featured (the owner, 22 Nov): the gap under the big square is the gap between all of them. */
+    @Test fun featuredCoverGridHasEvenGaps() {
+        val items = (1..6).map { i -> app.siansa.ui.HomeItem(key = "f$i", title = "Mix $i with a long name", subtitle = "Calm music", open = {}) }
+        compose.setContent { SiansaTheme { Column { app.siansa.ui.HomeFeaturedGrid("Made for you", items) } } }
+        val big = compose.onNodeWithTag("homeFeatured").fetchSemanticsNode().boundsInRoot
+        val cells = compose.onAllNodesWithTag("homeCoverGridCell").fetchSemanticsNodes().map { it.boundsInRoot }
+        assertEquals(5, cells.size)
+        val d = compose.density
+        fun dp(px: Float) = with(d) { px.toDp() }
+        assertEven("The featured square ends with the two beside it", dp(big.bottom), dp(cells[1].bottom), 0.5.dp)
+        assertEven("Gap beside and gap under the featured square", dp(cells[0].left - big.right), dp(cells[2].top - big.bottom), 0.5.dp)
+        assertEven("Gap between the two beside it and in the row under", dp(cells[1].top - cells[0].bottom), dp(cells[3].left - cells[2].right), 0.5.dp)
+        assertEven("The row under ends where the two beside it do", dp(cells[4].right), dp(cells[0].right), 0.5.dp)
+    }
+
     /** Custom cards (issue #622): the play button card sits a page margin from both edges of the screen. */
     @Test fun pinnedPlayButtonHasEvenPageMargins() {
         val card = app.siansa.mix.PinnedCard.new("Shuffle it").copy(look = app.siansa.mix.CardLook.BUTTON, favourites = true)
@@ -301,6 +412,59 @@ class SpacingHomeTest : SpacingCheck() {
         cards.forEach { assertEven("Cards: each as wide as the first", it.right - it.left, width, 1.dp) }
         val gaps = cards.zipWithNext { a, b -> b.left - a.right }
         gaps.forEach { assertEven("Cards: the gap between them", it, Space.Medium, 1.dp) }
+    }
+
+    /** A slider of choices (the owner, 23 Nov: "perfect text spacing"): each name centred under its stop, the outer two inside the edges. */
+    @Test fun stopSliderNamesSitUnderTheirStops() {
+        val shapes = listOf("Two a row", "Three a row", "Big tiles", "Pill chips")
+        compose.setContent {
+            SiansaTheme {
+                Column(Modifier.padding(Space.Section)) {
+                    app.siansa.ui.StopSlider(shapes, shapes[1], { it }, { "stop-" + shapes.indexOf(it) }) {}
+                }
+            }
+        }
+        val row = compose.onNodeWithTag("stopLabels").getBoundsInRoot()
+        val names = shapes.indices.map { compose.onNodeWithTag("stop-$it").getBoundsInRoot() }
+        val width = row.right - row.left
+        assertEven("Stop slider: the first name starts at the edge", names[0].left, row.left, 1.dp)
+        assertEven("Stop slider: the last name ends at the edge", names[3].right, row.right, 1.dp)
+        assertEven("Stop slider: the second name is centred on its stop", (names[1].left + names[1].right) / 2 - row.left, width / 3, 1.dp)
+        assertEven("Stop slider: the third name is centred on its stop", (names[2].left + names[2].right) / 2 - row.left, width * 2 / 3, 1.dp)
+    }
+
+    /** With only the chosen name shown (the owner, 23 Nov: "only show the selected text so it fits neatly"): it alone, centred under its stop. */
+    @Test fun stopSliderShowsOnlyTheChosenNameUnderItsStop() {
+        val shapes = listOf("Two a row", "Three a row", "Big tiles", "Pill chips")
+        compose.setContent {
+            SiansaTheme {
+                Column(Modifier.padding(Space.Section)) {
+                    app.siansa.ui.StopSlider(shapes, shapes[2], { it }, { "stop-" + shapes.indexOf(it) }, onlyChosen = true) {}
+                }
+            }
+        }
+        val row = compose.onNodeWithTag("stopLabels").getBoundsInRoot()
+        val name = compose.onNodeWithTag("stop-2").getBoundsInRoot()
+        assertEven("Stop slider: the one name is centred on its stop", (name.left + name.right) / 2 - row.left, (row.right - row.left) * 2 / 3, 1.dp)
+        listOf(0, 1, 3).forEach { compose.onNodeWithTag("stop-$it").assertDoesNotExist() }
+    }
+
+    /** A row's settings sheet (the owner, 22 Nov): its switch lines one height, one after the other, with the same margin on both sides. */
+    @Test fun rowSettingsLinesAreEven() {
+        compose.setContent {
+            SiansaTheme {
+                app.siansa.ui.HomeLookDialog(app.siansa.data.HomeSection.MADE_FOR_YOU, app.siansa.data.HomeLook.TILES, titleShown = true, onTitleShown = {},
+                    onPick = {}, onDismiss = {}, sheet = false)
+            }
+        }
+        val screen = compose.onRoot().getBoundsInRoot()
+        val lines = listOf("rowOnHome", "homeTitleShown", "homeCardLines").map { compose.onNodeWithTag(it).getBoundsInRoot() }
+        val height = lines[0].bottom - lines[0].top
+        lines.forEach {
+            assertEven("Row settings: each switch line as tall as the first", it.bottom - it.top, height, 1.dp)
+            assertEven("Row settings: a line's margins", it.left - screen.left, screen.right - it.right, 1.dp)
+            assertEven("Row settings: a line's left margin", it.left - screen.left, Space.Section, 1.dp)
+        }
     }
 
     /** Home's rows as a list (issue #655): five rows of one height, evenly spaced. */

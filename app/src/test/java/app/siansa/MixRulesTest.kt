@@ -68,4 +68,24 @@ class MixRulesTest {
         // Off, with nothing ever made: null, and Home offers to make one.
         assertEquals(null, MixRules.todaysMixBy(false, listOf(made("p", "you-sound", today, 1)), today, "morning", vibes))
     }
+
+    /**
+     * Issue #1353 (the owner, 24 Nov: "when mixes are made on the phone then they are split up differently than
+     * Siansa Beats. The grouping should be same as beats"): the phone's own mixes stand in the rows Beats' do.
+     */
+    @Test fun thePhonesMixesAreGroupedAsSiansaBeatsGroupsItsOwn() {
+        val made = MixRules.personalIn(app.siansa.data.HomeSection.MADE_FOR_YOU)
+        val more = MixRules.personalIn(app.siansa.data.HomeSection.MORE_OF_YOU)
+        // Made for you: the kinds of music you play most. More of you: On repeat and what's new for you.
+        assertEquals(listOf("Your sound"), made.map { it.title })
+        assertEquals(listOf("On repeat", "Discover for you"), more.map { it.title })
+        // Every mix from your listening is in exactly one of the two rows, and in no other.
+        assertEquals(MixGenerator.Personal.entries.toSet(), (made + more).toSet())
+        assertEquals(MixGenerator.Personal.entries.size, made.size + more.size)
+        for (row in app.siansa.data.HomeSection.entries - app.siansa.data.HomeSection.MADE_FOR_YOU - app.siansa.data.HomeSection.MORE_OF_YOU) {
+            assertTrue("$row", MixRules.personalIn(row).isEmpty())
+        }
+        // The part of the day's row is named For now whoever makes its mixes.
+        assertEquals("For now", app.siansa.ui.FOR_NOW)
+    }
 }

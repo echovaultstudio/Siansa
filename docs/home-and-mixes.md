@@ -5,14 +5,21 @@ Home is built from sections you can reorder and hide (**Arrange Home**, in the m
 ## The top of Home
 
 The top of Home is the row of notices (see [Notices](#notices)) with a round menu button at its end, in line with
-the chips and the same height. When there are more chips than fit, they scroll and fade out just before the button.
+the chips and the same height. When there are more chips than fit, they scroll and fade out just before the button
+(a tap on a faded-out chip brings it into view rather than opening it).
 With no notices, or notices turned off, the button sits on its own.
+
+**Pull to load again.** At the top of Home, pull the page down: the Siansa logo grows above it, its half circles going
+round with your finger. Pulled far enough they lock in place with a short buzz, and when you let go Home loads
+everything again (Siansa Beats' mixes too, asked afresh). A quick flick down does the same. The page stays down for a
+moment with the logo's half circles turning round its bars, like the TV's logo while a DJ mix plays, then goes back up;
+Home goes on loading behind it, so you never wait for it.
 
 ## Home's menu
 
 The round button opens the menu in the top row itself: the notice chips shrink and fade away and four pills of their
 own shape take their place, exactly the chips' height and a small gap apart, one option each (in the order set under
-Settings › Home page › Home menu). Nothing on the page is covered, and nothing moves. The names are read out by TalkBack:
+Settings › Home › Home menu). Nothing on the page is covered, and nothing moves. The names are read out by TalkBack:
 
 - **Roll the dice** (the dice) plays a song you've never played (see [Roll the dice](discovery.md)). While it finds
   one, the dice tumbles in the menu button.
@@ -28,15 +35,15 @@ fills and grows a touch, with a light tick as you pass each) and let go. Letting
 a tap on the button (its lines become a cross while the menu is open) or anywhere on the page. The button's three lines
 are always in the accent colour; the button has a thin ring in the same colour while the source filter hides something.
 
-Their order is yours: **Settings › Home page › Home menu**, hold a row and drag it.
+Their order is yours: **Settings › Home › Home menu**, hold a row and drag it.
 
 ## Arrange Home
 
 Arrange is a sheet of its own (the Sources sheet is another), in three parts: **Cards**, **Spacing** and **Sections**.
 
 **Cards** is how every coloured card on Home is painted — Today's mix, the book and podcast cards, Made for you,
-Radios and the other generated tiles; never the shortcut grid, whose tiles are plain already. Four small cards show
-the choice:
+Radios and the other generated tiles. Shortcut tiles stay plain unless their section has a colour of its own (under
+its cog). Four small cards show the choice:
 
 | Look | What it does |
 |---|---|
@@ -49,34 +56,79 @@ the choice:
 the handle at the left to move it, the eye to hide it and the cog for its look. **Reset** puts the order, the hidden
 sections, the spacing, the looks and the cards' colour back.
 
-The **cog** on a section changes its look, to any of the custom cards' looks:
+The **cog** on a section opens its settings, a sheet in three parts. Each choice is one line with what's chosen on
+it; tap the line to open its options under it, and again to close them. Only what the section's look has is listed.
+
+- **Show**: switches for **On Home** (the same as the eye), **Title** and **Descriptions**.
+- **Look**: the **Look** (small pictures of each, below), then what that look has of its own: its **Style** or
+  **Layout**, **Tiles**, **Columns and rows**, **Size**.
+- **Cards**: **Pictures** (for a hero with cards under it, **Picture of the big card** and **Pictures of the cards
+  under it**), **Colours**, **Names** and **Card colour**.
+
+**Reset this row** at its foot puts that section's look, pictures, colours, names, title and descriptions back as they
+came; where it is on Home and whether it shows stay.
+
+The looks:
 
 | Look | What it shows |
 |---|---|
 | **As it is** | The section's own look (the default). |
-| **Tiles** | A row of covers to swipe through. |
-| **Banner** | One wide card with the first covers and a button. |
+| **Tiles** | A row of covers to swipe through. **Size**: **Big** (as tiles have always been), **Compact** or **Small**, for more in view. |
+| **Banner** | One wide card with the first covers and a button. Its **Style**: **Card**, or **Hero**: a big card at the top of the section in the first mix's own colours, its covers big, its name and line, **Play** and **Shuffle**. **Hero and 3 cards** or **Hero and 4 cards** puts the row's next three or four at its foot on the same colours, each with its name on its picture and its line under it. Then **Picture of the big card** and **Pictures of the cards under it** are chosen apart (stickers on top and Aura under, say). The hero takes its row's **Card colour**: Vivid is its picture's colour with its own mixed in, From the artwork the picture's colour alone, Soft a dark grey with a little of it, Plain dark grey; and its row's **Colours** (By mood, Siansa, Mono) in place of its picture's. |
 | **List** | The first five, listed; the title opens the rest. |
 | **Play button** | A slim card: its ▶ plays the section; a tap anywhere else on the card opens it. |
 | **Cover rows** | Covers with their details beside them, three to a column, to swipe through: the same look as a custom card's. The cover plays that album or opens that item; the row opens it. Books and podcasts show how far you are along the cover. A radio or genre shows its colours instead of a cover. |
-| **Shortcut grid** | Small tiles two to a row, like Shortcuts. Pick **2, 4, 6 or 8 tiles** under it in the same dialog. A tile opens its item; the title opens the rest. Shortcuts itself has no such choice: it's the grid already, and its count is under Settings › Home page › Top of Home. |
-| **Carousel** | Big covers to flick through, the one in the middle in focus and the ones beside it blurred, with its name and what it is underneath. Tap the middle one to open it. |
+| **Shortcut grid** | Small tiles two to a row, like Shortcuts. Pick **2, 4, 6 or 8 tiles** under it in the same dialog. A tile opens its item; the title opens the rest. Shortcuts is the grid already as it is (its count is under Settings › Home › Top of Home); picked here, it takes the count chosen here. Its **Tiles**: **Two a row**, **Three a row** (smaller, six in the space of four), **Big tiles** (two a row, with what each is: a mix, an album, your hearts) or **Pill chips** (round chips, as many to a line as fit). Shortcuts has the same choice under its cog. |
+| **Carousel** | Big covers to flick through, the one in the middle in focus and the ones beside it blurred. Its name and what it is show under the row (the middle one's) or on each cover, as **Names** says (below). **Size**: **Big**, **Compact** (smaller covers, three in view, the name and details a size smaller), or **Small** (a strip of small squares like a row of albums, every one named, none dimmed). Tap the middle one to open it. An artist's picture (Artist radios) is always a round photo, in every look: centred on the card's colours where the look has a big picture. |
+| **Cover grid** | The cards in a grid across the screen, each with its own picture: an album its cover, a mix four of its covers, an artist its round photo. Pick its **Columns** (2 to 6) and **Rows** (1 to 6) under it in the same dialog: the squares grow or shrink to fill the width, and cards beyond columns × rows are left out (the title opens the rest). Names show under the pictures up to 3 columns. Its **Layout**: **Even**, or **One featured**: the first card two by two with its name and line on it, five smaller ones around it, names on their covers. |
 
 A section in another look says which under its name. **Play** in a banner or the ▶ of a play button card plays the section:
 today's mix or the carousel's first mix where they left off, or the albums of Rediscover, Recently played, Recently
-added and Random picks in order. Sections of radios, playlists, genres, books and Made for you open instead. **Your
-cards** keep their own looks: their cog opens **Settings › Home page › Cards**.
+added and Random picks in order. Sections of radios, playlists, genres, books and Made for you open instead. Every section's cog has the same
+choices, Shortcuts and Siansa Beats' rows too. **Your cards** keep their own looks, set with each card: their cog has
+the title and colour, and **Your cards in Settings** opens **Settings › Home › Cards**.
+
+The same cog has **Pictures**: how its cards' pictures show. **Auto** (the default) shows a mix's four covers two by
+two only when they sit well together, and otherwise **Glow**; an album keeps its cover. Or pick one for the row:
+**Mosaic** (four covers), **One cover** (its top album), **Glow** (one cover on a soft light in its colours), three
+that move: **Aura** (its colours drifting like light through water, slow for a calm mix and quicker for a loud one, its
+name big at the foot), **Frost** (its cover blurred and slowly breathing, the sleeve floating on it, its name and main
+artists on glass) and **Poster** (three of its covers washed in one bold colour, its name in heavy type with its
+artists), and three made of its covers: **Stickers** (stuck on at angles, with white edges), **Taped** (taped on paper,
+its name on a label) and **Cut-outs** (circles and squares, like a scrapbook). Where each sticker sits comes from the card itself, so no two look
+the same and one always looks the same. A card without enough covers for its style shows one cover, or Aura when it has
+none. An artist keeps its round photo.
+
+**Show descriptions**, for every row: off hides the small line on or under each of its cards (what's in a mix, an album's artist), whatever its look. Names stay.
+
+**Names**, for Tiles, Carousel, Cover grid and a mix row as it is: **Auto** (as each look does by itself; a picture with its name on it, Aura, Frost or Poster, has only what it is under it, not its name again), **Under the
+picture** (two lines for the name and two for what it is, so long genres aren't cut off; no name on the picture), or
+**On the picture** (Aura, Frost, Poster and the stickers each their own way, the others on a soft fade of the
+picture's own colour).
+
+Under Pictures, **Picture colours**: where those colours come from. **From covers** (the default) takes its covers' own
+colours, made brighter so a dull cover doesn't give a dull card (a grey one turns silver). **By mood** takes them from
+its songs' moods (happy is gold, relaxed teal, sad blue, party pink, intense red…), brighter the more energetic the
+songs are: it needs Siansa Beats or AudioMuse-AI, and a mix whose songs haven't been analysed yet keeps its covers'
+colours until they have. Or **Siansa** (amber and frost) or **Mono** (greys). A card keeps its colours while it's on
+screen. Moving cards stand still while Home scrolls, and when Android's "Remove animations" is on. A name over a picture fades into the picture's own deep colour, not black.
 
 The same cog has **Show its title**: turn it off and the section shows without the heading above it ("Your evening",
 "Recently played"), keeping the gap where it was. And its **Colour**: a card shows the section's cards in the chosen
-look, and **As Home** follows the choice made under Cards, or pick one for this section alone (Shortcuts has none).
+look, and **As Home** follows the choice made under Cards, or pick one for this section alone. For Shortcuts, As Home
+keeps its tiles plain; a colour of its own paints them, as it does a Shortcut grid in any section. A row's **Colours**
+and **Pictures** act on its shortcut tiles too: with Colours set to **By mood**, **Siansa** or **Mono** the tiles take
+those colours (painted Vivid until the row has a Card colour of its own; By mood needs a mix, and other tiles keep
+their covers' colours), and a picture style other than Auto draws each tile's small picture that way.
 
 | Section | What it shows |
 |---|---|
-| **Shortcuts** | The albums, playlists, mixes and Liked songs you played from last, newest first: 8 of them, or as many as you pick from 2 to 8 under **Settings › Home page › Top of Home**. Until there's enough of that, today's mixes, your playlists and recent albums. |
+| **Shortcuts** | The albums, playlists, mixes and Liked songs you played from last, newest first: 8 of them, or as many as you pick from 2 to 8 under **Settings › Home › Top of Home**, or by rows in its cog: **Rows**, 1 to 4 (three a row shows three in each row, up to 12). Its **Tiles' shape** (two a row, three a row, big tiles, pill chips) and its rows are sliders: the shape slider names the chosen shape under its stop, the rows slider has 1 to 4 under its stops. Until there's enough of that, today's mixes, your playlists and recent albums. |
 | **Today's mix** | The day's mix, made for the vibe of the hour it's made in (see below). |
-| **Your mixes carousel** | Three or four mixes of your own for each part of the day, side by side. |
-| **Made for you** | Your sound, On repeat, Discover for you, then cards of your own. |
+| **For now** | Three or four mixes of your own for each part of the day, side by side. The row says **For now** whichever part of the day it is. |
+| **Your listening** | One card with four pages; swipe sideways or tap a name at its top. A drop-down on the card sets the time for the first three: **Last 7 days**, **Last 30 days** (as it comes), **Last year** (the past 365 days) or **All time**; it's remembered. **Songs**: your most played song of that time, big, with Play and Shuffle for the 50 most played, and the next four under it, each with a bar for its plays; tap one to play from there. **Artists**: your most played artist big, the next four listed with their plays; tap one to open it. **Genres**: a ring with your top five genres' shares of the plays (by Siansa Beats' genres where it has them, else the songs' tags). **Look back**: this time last year, this day last year, last month and last year, from your [Time Machine](your-listening.md#time-machine); a list with too few plays is left out and Two years ago or Five years ago takes its place. Nothing moves when you tap: Songs (the big song, or **See all**) and each Look back list open a page of their songs, with Play and **Create memory**. A time with nothing played says so. **Its colour** is under its cog in Arrange Home: Teal, Plum, Ink, Ember, Moss, or **From its cover** (the colour of your top song's cover). The rest of its look is fixed; it's moved and hidden like any row. It's kept on the phone, so it's there at once, and made again once a day in the background. The card shows nothing until you have a listening history. |
+| **Made for you** | The kinds of music you play most: the mix for this hour's vibe and Your sound, then cards of your own. |
+| **More of you** | On repeat and Discover for you. |
 | **Rediscover** | Albums you used to play a lot and haven't in a while. |
 | **Radios** | Mood radios: Chill, Energy, Focus, Feel good, Party, Melancholy, Workout, Late night, Acoustic, Romance. |
 | **Your playlists** | Playlists on your server and ones kept only on the phone. |
@@ -103,22 +155,29 @@ their own: a finished book, albums older than three days or last month's report 
 | **12 new releases** (your own) | A notice of your own finds songs or albums by your rules. | What it found |
 
 At most five show. By default they're ordered for you: what needs you first, then what you're in the middle of, then
-what's new; among the new ones, the kinds you tap most come first. In **Settings › Home page › Top of Home** you can hide the
+what's new; among the new ones, the kinds you tap most come first. In **Settings › Home › Top of Home** you can hide the
 row, or set each kind to **Pinned**, **Automatic** or **Off**. Pinned kinds always show, first and in the order you
 pin them, and are never pushed out by other notices; the automatic ones fill the places left. The notices are
 always at the top of Home, so they're not in Arrange Home.
 
-**Notices of your own**: under **Your own notices** in Settings › Home page › Top of Home, **Add a notice**. Choose
+**Notices of your own**: under **Your own notices** in Settings › Home › Top of Home, **Add a notice**. Choose
 songs or albums, then rules on their details to keep or leave out: a genre, an artist, an album, a record label, a
 release type, the year, the length, when it was added or last played, play and skip counts, favourites, compilations.
 Give it the words to show after the number ("new releases"), and an **Icon** for its pill (**Auto**: an album for
 albums, a note for songs). **Show the number** off shows only the words ("New releases"). It shows while its rules find any, and a tap opens what
 it found. The switch beside each one turns it off without removing it.
 
+## What's new after an update
+
+The first time you open Siansa after an update, a small sheet comes up over Home with the biggest changes and fixes of
+that update, at most five lines, and **Every version's changes**, which opens the full list. Close it with **Done** or
+by swiping it down; it doesn't come back until the next update. It reads the list that comes with the app, so nothing
+is fetched. After a fresh install it doesn't show.
+
 ## Vibes and today's mix
 
 A **vibe** covers part of the day. Siansa starts with Morning, Daytime, Evening and Night. When you open the app,
-the vibe for the current hour builds **today's mix**. **Settings › Mixes & radios › Today's mix and vibes** lets you change them:
+the vibe for the current hour builds **today's mix**. **Settings › Mixes › Today's mix and vibes** lets you change them:
 
 - **Name**, **Days** (or every day), and **hours** (0–23; a vibe from 22 to 5 runs past midnight). When several
   vibes fit, the most specific wins: one set for a day before an everyday one, one for some hours before an
@@ -134,7 +193,7 @@ the vibe for the current hour builds **today's mix**. **Settings › Mixes & rad
 
 How the songs are picked is explained in [How it works](how-it-works.md#todays-mix-and-vibes).
 
-**Today's mix** has settings of its own at the top of **Settings › Mixes & radios › Today's mix and vibes**, which apply to it whichever
+**Today's mix** has settings of its own at the top of **Settings › Mixes › Today's mix and vibes**, which apply to it whichever
 vibe makes it:
 
 - **Auto update** (on by default): the mix follows the time of day. A new one is made as the day or the hour's vibe
@@ -172,6 +231,8 @@ zone). Three shelves, the same as on Siansa Beats' page:
 - **Made for you**: the kinds of music you play most, each with more like it.
 - **More of you**: On repeat, Rediscover and New for you.
 
+If you'd rather have them together, **Mix settings › In Siansa › All in one row** (Siansa Beats 0.62) puts every mix in one row, in For now's place, and **How many cards** says how many it has at most. The other two rows then stay away.
+
 Each shelf is a row of mixes: the one in the middle is sharp, the ones beside it smaller and blurred. Swipe to flick through,
 and tap the front one to open it and play it from there. Under it is its name and a few words on what's in it ("Wiry guitars and
 restless drums"); the artists it's like are on its own page. Siansa Beats makes the next part of the day's mixes a few
@@ -182,23 +243,38 @@ instrumental").
 A mix you open stays on the phone, and once played it's in your shortcuts on Home, for as long as Siansa Beats keeps its mixes:
 7 days, or what **Keep mixes for** on its Mixes page says (Siansa Beats 0.55).
 
-They're on while **Home's mixes** is set to **Siansa Beats** (Settings › Mixes & radios). While they are, the phone
+They're on while **Home's mixes** is set to **Siansa Beats** (Settings › Mixes). While they are, the phone
 makes none of its own: no hourly Today's mix and no mixes in the background. Set it to **This phone** for your own
-carousels, Today's mix and Made for you, which stay as you set them.
+carousels, Today's mix, Made for you and More of you, which stay as you set them. The phone's own mixes are grouped as
+Siansa Beats groups its: this part of the day's in For now, the kinds of music you play most in Made for you, and On
+repeat and Discover for you in More of you.
 
-In **Arrange Home**, For now takes the place of **Your mixes carousel**, Made for you the place of **Made for you**, and
-More of you has a row of its own, **More of you** (listed only while Siansa Beats' mixes are on). Each row says so under
-its name. Move or hide them as any other; their cog picks one of two looks: **Carousel** (big covers to flick through)
-or **Tiles** (a row of tiles, each with four of the mix's covers).
+In **Arrange Home**, the rows have the same names as on Siansa Beats' Mixes page: For now is in **For now**, Made for you in **Made for you**, and
+More of you has a row of its own, **More of you**. While Siansa Beats makes them, each row says so under its name. Move or hide them as any other; their cog picks any look: **As it is** is the **Carousel** (big covers to
+flick through), **Tiles** is a row of tiles each with four of the mix's covers, and the others are as for any section
+(Play in a banner or the play button card plays the first mix).
 
-**Mix settings** (Settings › Mixes & radios, under **Home's mixes**; Siansa Beats 0.56 or newer) choose
-what goes into them: which mixes are made and how many, songs in a mix, how many of them you know, songs by one artist,
-how long a song you played stays out, genres and artists to leave out, whether the part of the day, weekends, the dark
-and this time of year count, how far back your listening counts, On repeat's and Rediscover's spans, names from the AI
-service, and how long a mix is kept. Siansa Beats keeps them, and its own Mixes page changes the same. **As they come**
-puts every one back.
+**Mix settings** (Settings › Mixes, under **Home's mixes**; Siansa Beats 0.56 or newer). Siansa Beats makes your
+mixes by itself, from what you play, the time of day, the season and the light outside: change only what you want.
+The page has three parts, one line each:
 
-## Your mixes carousel
+- **Mixes**: For now and Made for you. **Your sound**: On repeat, Rediscover and New for you. Each line has a switch
+  and says **AUTO** while it's as it comes, **TUNED** once you've changed something of it.
+- **For all mixes**: **What's in a mix** (songs in a mix, how many you know, songs by one artist), **Leave out**
+  (songs played lately, genres, artists), **Made around** (the part of the day, weekends, the dark, this time of year,
+  **Songs you skip count for less**, how far back your listening counts) and **In Siansa** (all in one row, names from the AI service, how long a mix is
+  kept).
+
+**Skips** (Siansa Beats 0.64 or newer, with **Scrobble to Siansa Beats** on): each skip halves what that song's
+listens count for in your mixes, a song skipped lately doesn't come back as a new find (in a mix or in New for you),
+and a skip fades as a listen does. They count from the next time the mixes are made.
+
+Tap a line to open its choices under it; each line says what's chosen in a few words. **Back to automatic** puts that
+line back, **All back to automatic** every one. **Make the mixes again** makes them again now, a new pick from the same
+songs and settings, and puts them on Home; press it again for another (Siansa Beats 0.60.4 or newer). Siansa Beats
+keeps the settings, and its own Mix settings page changes the same.
+
+## For now
 
 **Home carousel** (from Arrange Home): three or four mixes for each part of the day. Give each a name and what it
 should sound like, for example "upbeat energetic groove, punchy drums". They never share songs, so make them
@@ -215,12 +291,12 @@ same day; Siansa tells you which one already has them.
   Koito, ListenBrainz or Last.fm when you use them. It opens straight away and checks your server for changes while
   the cog turns, like a playlist. Until there's enough to go on, it isn't shown.
 - **Discover for you**: songs that sound like your taste, from artists you don't play much (only with AudioMuse-AI).
-- **Cards of your own** (**Settings › Home page › Cards › Made for you**): pick what a card shows (for example a genre or a
+- **Cards of your own** (**Settings › Home › Cards › Made for you**): pick what a card shows (for example a genre or a
   period) and name it. Each card gets new songs every day.
 
 ## Your cards
 
-Custom cards you make yourself (**Settings › Home page › Cards › Custom cards**), shown on Home in its **Your cards** section
+Custom cards you make yourself (**Settings › Home › Cards › Custom cards**), shown on Home in its **Your cards** section
 (move it under Arrange Home; the cards' own order is set in Settings). **Add a custom card** or tap one to change it,
 on a page of its own:
 

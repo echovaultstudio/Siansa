@@ -74,7 +74,7 @@ fun NavGraphBuilder.siansaRoutes(nav: NavController, except: Set<String> = empty
     page("settings/equaliser") { EqualiserScreen(nav) }
     page("settings/storage") { StreamingDataScreen(nav) }
     page("settings/streaming") { StreamingDataScreen(nav) }
-    // Book skips are in Sound & playback now (the owner, 17 Nov).
+    // Book skips are in Playback now (the owner, 17 Nov).
     page("settings/books") { CrossfadeScreen(nav) }
     page("settings/discovery") { DiscoveryScreen(nav) }
     page("settings/home/arrange") { ArrangeHomePage(nav) }
@@ -120,7 +120,20 @@ fun NavGraphBuilder.siansaRoutes(nav: NavController, except: Set<String> = empty
     page("sync") { SyncScreen(nav) }
     page("report/{range}") { ReportScreen(nav, it.arguments?.getString("range").orEmpty()) }
     page("discover/artists") { ArtistDiscoveryScreen(nav) }
-    page("timemachine") { TimeMachineScreen(nav) }
+    // One of Your listening's lists as a page of songs (issue #1343).
+    page("timelist/{kind}") { TimeListScreen(nav, it.arguments?.getString("kind").orEmpty()) }
+    // A month or a year to open at (Home's Time Machine card, issue #1341): month 0 is the whole year; without them,
+    // this month a year ago.
+    page(
+        "timemachine?year={year}&month={month}",
+        arguments = listOf(
+            androidx.navigation.navArgument("year") { type = androidx.navigation.NavType.IntType; defaultValue = 0 },
+            androidx.navigation.navArgument("month") { type = androidx.navigation.NavType.IntType; defaultValue = -1 },
+        ),
+    ) {
+        val year = it.arguments?.getInt("year")?.takeIf { y -> y > 0 }
+        TimeMachineScreen(nav, year, it.arguments?.getInt("month")?.takeIf { m -> year != null && m >= 0 })
+    }
     page("favourite-albums") { FavouriteAlbumsScreen(nav) }
     // A podcast added by its feed (issue #353); stations themselves are in Your Library.
     page("podcast/{id}") { PodcastScreen(nav, it.arguments?.getString("id").orEmpty()) }

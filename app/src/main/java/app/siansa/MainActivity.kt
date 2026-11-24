@@ -62,7 +62,11 @@ class MainActivity : ComponentActivity() {
                     bars.show(WindowInsetsCompat.Type.statusBars())
                 }
             }
-            CompositionLocalProvider(LocalGraph provides graph) {
+            CompositionLocalProvider(
+                LocalGraph provides graph,
+                // Cards coloured by their songs' moods read them through the graph (the owner, 20 Nov).
+                app.siansa.ui.LocalMoodReader provides { key, ids -> app.siansa.ui.MoodColourStore.read(graph, key, ids) },
+            ) {
                 SiansaTheme(choice) {
                     // Hidden: the pages move up into the bar's space, but stay clear of a camera cut-out there.
                     val root = if (topBar == TopBarStyle.HIDDEN) {

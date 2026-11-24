@@ -190,7 +190,7 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
             LyricsShortcut.pending.value = false
         }
     }
-    // Settings › Now playing › Buttons: off brings back the look before the lyrics button (issue #346).
+    // Settings › Player › Buttons: off brings back the look before the lyrics button (issue #346).
     val style by graph.settings.state.collectAsStateWithLifecycle()
     val classic = !style.nowPlayingLyricsButton
     var menuOpen by remember { mutableStateOf(false) }
@@ -456,6 +456,7 @@ fun PlayerScreen(nav: NavController, onClose: () -> Unit) {
                                             DjBar(
                                                 shownBar.spots, shownBar.chosen, now = now, starting = shownBar.starting, open = open,
                                                 modifier = Modifier.padding(top = DJ_BAR_CENTRE - DJ_BAR_HEIGHT / 2),
+                                                asks = shownBar.starting && graph.settings.state.collectAsStateWithLifecycle().value.untouchedNow,
                                             )
                                         }
                                     }

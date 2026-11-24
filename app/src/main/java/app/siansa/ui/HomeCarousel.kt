@@ -1,5 +1,6 @@
 package app.siansa.ui
 
+import app.siansa.data.cover
 import app.siansa.data.Song
 import app.siansa.data.SavedVibe
 import app.siansa.data.pinnedVibes
@@ -55,6 +56,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.LocalDate
 import java.time.LocalTime
+
+/**
+ * The row's title, whoever makes its mixes (issue #1353): the part of the day's own name ("Your morning", set in Vibes)
+ * was shown when this phone made them, and "For now" when Siansa Beats did.
+ */
+internal val FOR_NOW = app.siansa.data.HomeSection.CAROUSEL.label
 
 /** Which carousel mixes are being made right now (selector ids), shared so leaving Home doesn't start them twice. */
 private object CarouselBuilding {
@@ -158,16 +165,19 @@ fun HomeCarousel(nav: NavController, aiDown: String?, look: app.siansa.data.Home
                 },
                 mix?.songs?.firstOrNull()?.coverArt, tileColors(selector.id.substringBeforeLast("-v") + i),
                 open = { if (mix != null) nav.navigate("mix/${mix.id}") else make(i, open = true) },
+                mosaic = mix?.songs?.map { it.cover }.orEmpty(),
+                // Its songs, so a hero or a card can play and shuffle it once it's made.
+                songs = mix?.songs.orEmpty(),
             )
-        } + pinned.map { vibe -> HomeItem(vibe.id, vibe.shownTitle, "${vibe.songs.size} tracks", vibe.songs.firstOrNull()?.coverArt, open = { nav.navigate("vibe/${vibe.id}") }) }
+        } + pinned.map { vibe -> HomeItem(vibe.id, vibe.shownTitle, "${vibe.songs.size} tracks", vibe.songs.firstOrNull()?.coverArt, open = { nav.navigate("vibe/${vibe.id}") }, mosaic = vibe.songs.map { it.cover }) }
         val first = made.firstOrNull()
-        HomeLookRow(look, "carousel", carousel.title, items, play = first?.let { { graph.mixResume.play(it) } }, songs = first?.songs.orEmpty())
+        HomeLookRow(look, "carousel", FOR_NOW, items, play = first?.let { { graph.mixResume.play(it) } }, songs = first?.songs.orEmpty())
         return
     }
     val pager = rememberPagerState { mixCount + pinned.size }
     // Nothing under the dots: the next section's gap is the room below, as under every other row on Home (#560).
     Column(Modifier.fillMaxWidth().testTag("homeCarousel")) {
-        SectionTitle(carousel.title)
+        SectionTitle(FOR_NOW)
         HorizontalPager(
             state = pager,
             contentPadding = PaddingValues(horizontal = Space.Page),

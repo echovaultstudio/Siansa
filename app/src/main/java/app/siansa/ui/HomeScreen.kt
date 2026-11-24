@@ -1,5 +1,7 @@
 package app.siansa.ui
 
+import app.siansa.data.carouselSize
+import app.siansa.data.cardNames
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -41,6 +43,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -92,6 +95,7 @@ import java.time.LocalDate
 import java.time.LocalTime
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -127,6 +131,13 @@ fun HomeScreen(nav: NavController) {
     val homeSettings by graph.settings.state.collectAsStateWithLifecycle()
     val homeOrder = homeSettings.homeOrder
     val homeHidden = homeSettings.homeHidden
+    // Home's Time Machine card (issue #1341): what's on the phone at once, made again in the background when it's
+    // from another day.
+    val timeCard by graph.timeCards.card.collectAsStateWithLifecycle(initialValue = null)
+    val timeCardShown = HomeSection.TIME_MACHINE !in homeHidden
+    LaunchedEffect(timeCardShown) {
+        if (timeCardShown) withContext(Dispatchers.IO) { runCatching { graph.timeCards.refresh() } }
+    }
     // The Home settings panel, open on Sources (true) or Arrange (false); null while closed.
     var panel by remember { mutableStateOf<Boolean?>(null) }
     // Home's menu (Roll the dice, Play on…, Sources, Arrange Home) and the Play on sheet it opens.
@@ -273,6 +284,8 @@ fun HomeScreen(nav: NavController) {
 
     // The Home tab tapped again: glide back to the top. From far down, jump most of the way first so it's quick.
     val listState = rememberLazyListState()
+    // Moving cards stand still while Home scrolls (the owner, 21 Nov: steady, not flickering).
+    val homeStill by remember { derivedStateOf { !listState.isScrollInProgress } }
     val scrollRequests by HomeScrollToTop.requests.collectAsStateWithLifecycle()
     var handledScroll by rememberSaveable { mutableStateOf(scrollRequests) }
     LaunchedEffect(scrollRequests) {
@@ -290,8 +303,98 @@ fun HomeScreen(nav: NavController) {
     ) { albums.drop(1).take(PLAY_ALBUMS - 1).flatMap { a -> runCatching { graph.source.album(a.id).songs }.getOrDefault(emptyList()) } }
 
     // The gap between sections, from Arrange Home's spacing slider (#554).
-    CompositionLocalProvider(LocalSectionGap provides homeGap(homeSettings.homeGap)) {
-    Box(Modifier.fillMaxSize()) {
+    // Pulled down (the owner, 22 Nov): everything on Home loads again, Siansa Beats' mixes asked afresh. It loads behind
+    // the page: the logo turns for its own moment and never waits for this (the owner, 24 Nov: "let stuff work in
+    // background but always show the animation"). A pull while it's still loading shows the logo and starts nothing new.
+    val reloading = remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+    val pull: () -> Unit = {
+        if (reloading.value?.isActive == true) AppLog.i("Home", "Pulled down: Home is still loading again")
+        else reloading.value = scope.launch {
+            val started = System.currentTimeMillis()
+            AppLog.i("Home", "Pulled down: loading Home again")
+            graph.library.bump()
+            if (graph.beatsMixes.on) runCatching { graph.beatsMixes.refresh(force = true) }
+                .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
+            AppLog.i("Home", "Pulled down: Home loaded again in ${System.currentTimeMillis() - started} ms")
+        }
+    }
+    // Made for you and More of you when this phone makes Home's mixes, grouped as Siansa Beats groups its own (issue
+    // #1353; the owner, 24 Nov: "the grouping should be same as beats"): Made for you has the kinds of music you play
+    // most (this hour's vibe, Your sound) and your own cards; More of you has On repeat and Discover for you
+    // ([MixRules.personalIn]). Each in its row's own look.
+    val phoneMixRow: @Composable (HomeSection, HomeLook) -> Unit = { row, look ->
+        // The same tiles as plain items, for the other looks (issue #655).
+        val made: List<HomeItem> = buildList {
+            applicable.filter { aiMixes && row == HomeSection.MADE_FOR_YOU }.forEach { selector ->
+                val mix = todaysMixes.firstOrNull { it.selectorId == selector.id }
+                add(HomeItem(selector.id, mix?.title ?: "${selector.name} mix", madeForYouCaption(mix?.songs?.size, aiDown != null, "Tap to make today's mix"),
+                    mix?.songs?.firstOrNull()?.coverArt, open = { if (mix != null) nav.navigate("mix/${mix.id}") else build(selector, force = false, open = true) }, mosaic = mix?.songs?.map { it.cover }.orEmpty(), songs = mix?.songs.orEmpty()))
+            }
+            MixRules.personalIn(row).filter { kind ->
+                MixRules.showsPersonalTile(kind, homeSettings.soundReady, madeToday = todaysMixes.any { it.selectorId == kind.id }, notEnough = kind.id in notEnough)
+            }.forEach { kind ->
+                val mix = todaysMixes.firstOrNull { it.selectorId == kind.id }
+                add(HomeItem(kind.id, kind.title, madeForYouCaption(mix?.songs?.size, aiDown != null, "Tap to make it"),
+                    mix?.songs?.firstOrNull()?.coverArt, open = { if (mix != null) nav.navigate("mix/${mix.id}") else buildPersonal(kind, open = true) }, mosaic = mix?.songs?.map { it.cover }.orEmpty(), songs = mix?.songs.orEmpty()))
+            }
+            customCards.orEmpty().filter { row == HomeSection.MADE_FOR_YOU }.forEach { card -> add(HomeItem(card.id, card.title, open = { nav.navigate("card/${card.id}") })) }
+        }
+        val tiles: List<Pair<String, @Composable () -> Unit>> = buildList {
+            // The vibe's mix is an AI mix: only with AudioMuse (issue #486).
+            applicable.filter { aiMixes && row == HomeSection.MADE_FOR_YOU }.forEach { selector ->
+                add(selector.id to @Composable {
+                    val mix = todaysMixes.firstOrNull { it.selectorId == selector.id }
+                    // Just the title and track count (issue #338): the description is on the mix's page.
+                    GradientTile(
+                        title = mix?.title ?: "${selector.name} mix",
+                        colors = tileColors(selector.id),
+                        coverArt = mix?.songs?.firstOrNull()?.coverArt,
+                        caption = madeForYouCaption(mix?.songs?.size, aiDown != null, "Tap to make today's mix"),
+                        busy = busySelector == selector.id,
+                        onClick = { if (mix != null) nav.navigate("mix/${mix.id}") else build(selector, force = false, open = true) },
+                    )
+                })
+            }
+            MixRules.personalIn(row).filter { kind ->
+                MixRules.showsPersonalTile(
+                    kind, homeSettings.soundReady,
+                    madeToday = todaysMixes.any { it.selectorId == kind.id },
+                    notEnough = kind.id in notEnough,
+                )
+            }.forEach { kind ->
+                add(kind.id to @Composable {
+                    val mix = todaysMixes.firstOrNull { it.selectorId == kind.id }
+                    GradientTile(
+                        title = kind.title,
+                        colors = tileColors(kind.id),
+                        coverArt = mix?.songs?.firstOrNull()?.coverArt,
+                        caption = madeForYouCaption(mix?.songs?.size, aiDown != null, "Tap to make it"),
+                        busy = personalBusy == kind.id,
+                        onClick = { if (mix != null) nav.navigate("mix/${mix.id}") else buildPersonal(kind, open = true) },
+                    )
+                })
+            }
+            // Your own cards, added and named in Settings › Home › Cards (issue #274).
+            customCards.orEmpty().filter { row == HomeSection.MADE_FOR_YOU }.forEach { card ->
+                add(card.id to @Composable {
+                    GradientTile(
+                        title = card.title,
+                        colors = tileColors(card.id),
+                        onClick = { nav.navigate("card/${card.id}") },
+                    )
+                })
+            }
+        }
+        if (look != HomeLook.AS_IS) HomeLookRow(look, if (row == HomeSection.MADE_FOR_YOU) "made" else "more", row.label, made)
+        else Shelf(row.label, tiles, key = { it.first }) { it.second() }
+    }
+    // Whether a row has something of this phone's own: a mix from your listening that can be made or was made today;
+    // for Made for you, this hour's vibe or a card of your own too. A row with nothing isn't drawn, title and all.
+    fun phoneHas(row: HomeSection): Boolean = MixRules.personalIn(row).any { kind ->
+        MixRules.showsPersonalTile(kind, homeSettings.soundReady, madeToday = todaysMixes.any { it.selectorId == kind.id }, notEnough = kind.id in notEnough)
+    } || (row == HomeSection.MADE_FOR_YOU && ((aiMixes && applicable.isNotEmpty()) || customCards.orEmpty().isNotEmpty()))
+    CompositionLocalProvider(LocalSectionGap provides homeGap(homeSettings.homeGap), LocalPictureMotion provides homeStill) {
+    HomePullToRefresh(onRefresh = pull) {
     LazyColumn(
         Modifier.fillMaxSize().aboveKeyboard(),
         state = listState,
@@ -329,19 +432,20 @@ fun HomeScreen(nav: NavController) {
 
         // The rest in the order chosen under Arrange Home, without the hidden ones, each in its look (issue #655).
         val visibleSections = HomeSection.visible(homeOrder, homeHidden)
-        // Its cards' look (the owner, 13 Nov): its own, or Home's; the shortcut grid keeps its plain tiles.
-        fun cardLookOf(section: HomeSection) = if (section == HomeSection.QUICK) CardLook.VIVID else homeSettings.homeCardLooks[section] ?: homeSettings.homeCardLook
+        // Its cards' look (the owner, 13 Nov): its own, or Home's. Shortcut tiles stay plain unless the row has its own
+        // colour (#1261: every row has every choice), given apart as shortcutLook.
+        fun cardLookOf(section: HomeSection) = homeSettings.homeCardLooks[section] ?: homeSettings.homeCardLook
         for (section in visibleSections) {
             val look = homeSettings.homeLooks[section] ?: HomeLook.AS_IS
             when (section) {
-                // The chips row (issue #784); its kinds are set in Settings › Home page › Top of Home.
+                // The chips row (issue #784); its kinds are set in Settings › Home › Top of Home.
                 // The notices are the top of Home now (issue #872), not a section of their own.
                 HomeSection.NOTICES -> Unit
                 HomeSection.QUICK -> {
                     // Quick access, the top grid (issue #271): what you played last, newest first, as
-                    // many as Settings › Home page says (issue #934); until there's enough of that, today's mixes,
+                    // many as Settings › Home says (issue #934); until there's enough of that, today's mixes,
                     // playlists and recent albums. Liked songs is one of them only when you played it.
-                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "quick") {
+                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, names = homeSettings.cardNames(section), crateSize = homeSettings.carouselSize(section), variant = homeSettings.homeVariants[section], picture = homeSettings.homePictures[section] ?: app.siansa.data.PictureStyle.AUTO, heroCardPicture = homeSettings.homeHeroCardPictures[section] ?: app.siansa.data.PictureStyle.AUTO, lines = section !in homeSettings.homeNoLines, pictureColours = homeSettings.homePictureColours[section] ?: app.siansa.data.PictureColours.COVERS, cardLook = cardLookOf(section), shortcutLook = shortcutLookOf(homeSettings.homeCardLooks[section], homeSettings.homePictureColours[section]), coverGrid = homeSettings.homeCoverGrids[section] ?: app.siansa.data.CoverGridSize.DEFAULT, key = "quick") {
                         val mixIds = mixes.orEmpty().mapTo(HashSet()) { it.id }
                         val fill = buildList {
                             todaysMixes.take(2).forEach { m -> add(RecentPlay("mix/${m.id}", m.title, m.songs.firstOrNull()?.cover)) }
@@ -350,7 +454,7 @@ fun HomeScreen(nav: NavController) {
                         }
                         val played = shownRecents(recentPlays.orEmpty(), shownRecentAlbums)
                             .filter { !it.route.startsWith("mix/") || it.route.removePrefix("mix/") in mixIds }
-                        val quick = quickShortcuts(played, fill, homeSettings.homeShortcuts)
+                        val quick = quickShortcuts(played, fill, shortcutCount(homeSettings.homeShortcuts, homeSettings.homeVariants[section]))
                         fun colorsOf(r: RecentPlay) = if (r.route == "liked") Color(0xFF4B2BD6) to Color(0xFF8FD3C8) else generatedCoverColors(r.route) ?: tileColors(r.title)
                         // A radio's (or another page whose cover Siansa draws) is its own cover, in its colours, never one
                         // of its songs' (the owner, 10 Nov), also for shortcuts noted before.
@@ -366,31 +470,28 @@ fun HomeScreen(nav: NavController) {
                                 HomeItem("quick-$i", r.title, coverArt = coverOf(r), colors = colorsOf(r), open = { nav.navigate(r.route) })
                             })
                         } else if (quick.isNotEmpty()) {
-                            Column(Modifier.padding(horizontal = Space.Page, vertical = Space.Medium).testTag("quickShortcuts"), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
-                                quick.chunked(2).forEach { row ->
-                                    Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
-                                        row.forEach { r ->
-                                            QuickTile(
-                                                r.title, coverOf(r), colorsOf(r), { nav.navigate(r.route) },
-                                                Modifier.weight(1f),
-                                                icon = iconOf(r),
-                                            )
-                                        }
-                                        if (row.size == 1) Spacer(Modifier.weight(1f))
-                                    }
-                                }
-                            }
+                            // In the row's layout (the owner, 20 Nov): two a row, three, big or pill chips.
+                            ShortcutTiles(
+                                quick.mapIndexed { i, r ->
+                                    // A mix's songs, for the row's Colours (By mood) and Pictures.
+                                    val songs = mixes.orEmpty().firstOrNull { "mix/${it.id}" == r.route }?.songs.orEmpty()
+                                    GridTile("quick-$i", r.title, coverOf(r), colorsOf(r), iconOf(r), { nav.navigate(r.route) }, subtitle = shortcutKind(r.route),
+                                        songIds = songs.map { it.id }, covers = songs.map { it.cover })
+                                },
+                                LocalLookVariant.current,
+                                Modifier.padding(horizontal = Space.Page, vertical = Space.Medium).testTag("quickShortcuts"),
+                            )
                         }
                     }
                 }
                 // The phone's Today's mix: not while Siansa Beats makes Home's mixes (the owner, 17 Nov).
                 HomeSection.TODAY -> if (!beatsMixesShown) {
-                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "today") {
+                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, names = homeSettings.cardNames(section), crateSize = homeSettings.carouselSize(section), variant = homeSettings.homeVariants[section], picture = homeSettings.homePictures[section] ?: app.siansa.data.PictureStyle.AUTO, heroCardPicture = homeSettings.homeHeroCardPictures[section] ?: app.siansa.data.PictureStyle.AUTO, lines = section !in homeSettings.homeNoLines, pictureColours = homeSettings.homePictureColours[section] ?: app.siansa.data.PictureColours.COVERS, cardLook = cardLookOf(section), shortcutLook = shortcutLookOf(homeSettings.homeCardLooks[section], homeSettings.homePictureColours[section]), coverGrid = homeSettings.homeCoverGrids[section] ?: app.siansa.data.CoverGridSize.DEFAULT, key = "today") {
                         val mix = current
                         when {
                             mix != null && look != HomeLook.AS_IS -> HomeLookRow(
                                 look, "today", "Today's mix",
-                                listOf(HomeItem(mix.id, mix.title, "${mix.songs.size} tracks", mix.songs.firstOrNull()?.coverArt, open = { nav.navigate("mix/${mix.id}") })),
+                                listOf(HomeItem(mix.id, mix.title, "${mix.songs.size} tracks", mix.songs.firstOrNull()?.coverArt, open = { nav.navigate("mix/${mix.id}") }, mosaic = mix.songs.map { it.cover }, songs = mix.songs)),
                                 play = {
                                     graph.mixResume.play(mix)
                                     graph.scope.launch { graph.recentPlays.note("mix/${mix.id}", mix.title, mix.songs.firstOrNull()?.cover) }
@@ -420,7 +521,7 @@ fun HomeScreen(nav: NavController) {
                     // While AudioMuse can't be reached the card above says so; no error and Try again as well. Without
                     // AudioMuse at all there's no today's mix (issue #486).
                     error?.takeIf { aiDown == null && aiMixes }?.let { message ->
-                        titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "today_error") {
+                        titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, names = homeSettings.cardNames(section), crateSize = homeSettings.carouselSize(section), variant = homeSettings.homeVariants[section], picture = homeSettings.homePictures[section] ?: app.siansa.data.PictureStyle.AUTO, heroCardPicture = homeSettings.homeHeroCardPictures[section] ?: app.siansa.data.PictureStyle.AUTO, lines = section !in homeSettings.homeNoLines, pictureColours = homeSettings.homePictureColours[section] ?: app.siansa.data.PictureColours.COVERS, cardLook = cardLookOf(section), shortcutLook = shortcutLookOf(homeSettings.homeCardLooks[section], homeSettings.homePictureColours[section]), coverGrid = homeSettings.homeCoverGrids[section] ?: app.siansa.data.CoverGridSize.DEFAULT, key = "today_error") {
                             Column(Modifier.padding(horizontal = Space.Page)) {
                                 ErrorText(message, Modifier)
                                 TextButton(onClick = { build(null, force = false, open = false) }) { Text("Try again") }
@@ -432,94 +533,29 @@ fun HomeScreen(nav: NavController) {
                     // Your own mixes for this part of the day, set in Vibes (issue #253): AI mixes, so only with
                     // AudioMuse (issue #486).
                     // With Siansa Beats' mixes on: its For now, in this row's look (the owner, 17 Nov).
-                    if (homeSettings.navidromeReady && beatsMixesShown) titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "beats_mixes") { BeatsMixesHome(nav, setOf("now"), look) }
-                    else if (homeSettings.navidromeReady && aiMixes) titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "carousel") { HomeCarousel(nav, aiDown, look) }
+                    if (homeSettings.navidromeReady && beatsMixesShown) titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, names = homeSettings.cardNames(section), crateSize = homeSettings.carouselSize(section), variant = homeSettings.homeVariants[section], picture = homeSettings.homePictures[section] ?: app.siansa.data.PictureStyle.AUTO, heroCardPicture = homeSettings.homeHeroCardPictures[section] ?: app.siansa.data.PictureStyle.AUTO, lines = section !in homeSettings.homeNoLines, pictureColours = homeSettings.homePictureColours[section] ?: app.siansa.data.PictureColours.COVERS, cardLook = cardLookOf(section), shortcutLook = shortcutLookOf(homeSettings.homeCardLooks[section], homeSettings.homePictureColours[section]), coverGrid = homeSettings.homeCoverGrids[section] ?: app.siansa.data.CoverGridSize.DEFAULT, key = "beats_mixes") { BeatsMixesHome(nav, setOf("now"), look) }
+                    else if (homeSettings.navidromeReady && aiMixes) titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, names = homeSettings.cardNames(section), crateSize = homeSettings.carouselSize(section), variant = homeSettings.homeVariants[section], picture = homeSettings.homePictures[section] ?: app.siansa.data.PictureStyle.AUTO, heroCardPicture = homeSettings.homeHeroCardPictures[section] ?: app.siansa.data.PictureStyle.AUTO, lines = section !in homeSettings.homeNoLines, pictureColours = homeSettings.homePictureColours[section] ?: app.siansa.data.PictureColours.COVERS, cardLook = cardLookOf(section), shortcutLook = shortcutLookOf(homeSettings.homeCardLooks[section], homeSettings.homePictureColours[section]), coverGrid = homeSettings.homeCoverGrids[section] ?: app.siansa.data.CoverGridSize.DEFAULT, key = "carousel") { HomeCarousel(nav, aiDown, look) }
                 }
                 // Audiobookshelf's books and podcasts (issue #521): only with a server set up.
-                HomeSection.BOOKS -> if (homeSettings.booksReady) titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "books") { BooksCarousel(nav, podcasts = false, look = look) }
-                HomeSection.PODCASTS -> if (homeSettings.booksReady) titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "podcasts") { BooksCarousel(nav, podcasts = true, look = look) }
+                HomeSection.BOOKS -> if (homeSettings.booksReady) titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, names = homeSettings.cardNames(section), crateSize = homeSettings.carouselSize(section), variant = homeSettings.homeVariants[section], picture = homeSettings.homePictures[section] ?: app.siansa.data.PictureStyle.AUTO, heroCardPicture = homeSettings.homeHeroCardPictures[section] ?: app.siansa.data.PictureStyle.AUTO, lines = section !in homeSettings.homeNoLines, pictureColours = homeSettings.homePictureColours[section] ?: app.siansa.data.PictureColours.COVERS, cardLook = cardLookOf(section), shortcutLook = shortcutLookOf(homeSettings.homeCardLooks[section], homeSettings.homePictureColours[section]), coverGrid = homeSettings.homeCoverGrids[section] ?: app.siansa.data.CoverGridSize.DEFAULT, key = "books") { BooksCarousel(nav, podcasts = false, look = look) }
+                HomeSection.PODCASTS -> if (homeSettings.booksReady) titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, names = homeSettings.cardNames(section), crateSize = homeSettings.carouselSize(section), variant = homeSettings.homeVariants[section], picture = homeSettings.homePictures[section] ?: app.siansa.data.PictureStyle.AUTO, heroCardPicture = homeSettings.homeHeroCardPictures[section] ?: app.siansa.data.PictureStyle.AUTO, lines = section !in homeSettings.homeNoLines, pictureColours = homeSettings.homePictureColours[section] ?: app.siansa.data.PictureColours.COVERS, cardLook = cardLookOf(section), shortcutLook = shortcutLookOf(homeSettings.homeCardLooks[section], homeSettings.homePictureColours[section]), coverGrid = homeSettings.homeCoverGrids[section] ?: app.siansa.data.CoverGridSize.DEFAULT, key = "podcasts") { BooksCarousel(nav, podcasts = true, look = look) }
                 // With Siansa Beats' mixes on: its Made for you, in this row's look (the owner, 17 Nov).
                 HomeSection.MADE_FOR_YOU -> if (beatsMixesShown) {
-                    if (homeSettings.navidromeReady) titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "beats_made") { BeatsMixesHome(nav, setOf("daily"), look) }
-                } else {
-                    // Made for you: the vibe for this hour, then mixes from your own listening.
-                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "made") {
-                        // The same tiles as plain items, for the other looks (issue #655).
-                        val made: List<HomeItem> = buildList {
-                            applicable.filter { aiMixes }.forEach { selector ->
-                                val mix = todaysMixes.firstOrNull { it.selectorId == selector.id }
-                                add(HomeItem(selector.id, mix?.title ?: "${selector.name} mix", madeForYouCaption(mix?.songs?.size, aiDown != null, "Tap to make today's mix"),
-                                    mix?.songs?.firstOrNull()?.coverArt, open = { if (mix != null) nav.navigate("mix/${mix.id}") else build(selector, force = false, open = true) }))
-                            }
-                            MixGenerator.Personal.entries.filter { kind ->
-                                MixRules.showsPersonalTile(kind, homeSettings.soundReady, madeToday = todaysMixes.any { it.selectorId == kind.id }, notEnough = kind.id in notEnough)
-                            }.forEach { kind ->
-                                val mix = todaysMixes.firstOrNull { it.selectorId == kind.id }
-                                add(HomeItem(kind.id, kind.title, madeForYouCaption(mix?.songs?.size, aiDown != null, "Tap to make it"),
-                                    mix?.songs?.firstOrNull()?.coverArt, open = { if (mix != null) nav.navigate("mix/${mix.id}") else buildPersonal(kind, open = true) }))
-                            }
-                            customCards.orEmpty().forEach { card -> add(HomeItem(card.id, card.title, open = { nav.navigate("card/${card.id}") })) }
-                        }
-                        val tiles: List<Pair<String, @Composable () -> Unit>> = buildList {
-                            // The vibe's mix is an AI mix: only with AudioMuse (issue #486).
-                            applicable.filter { aiMixes }.forEach { selector ->
-                                add(selector.id to @Composable {
-                                    val mix = todaysMixes.firstOrNull { it.selectorId == selector.id }
-                                    // Just the title and track count (issue #338): the description is on the mix's page.
-                                    GradientTile(
-                                        title = mix?.title ?: "${selector.name} mix",
-                                        colors = tileColors(selector.id),
-                                        coverArt = mix?.songs?.firstOrNull()?.coverArt,
-                                        caption = madeForYouCaption(mix?.songs?.size, aiDown != null, "Tap to make today's mix"),
-                                        busy = busySelector == selector.id,
-                                        onClick = { if (mix != null) nav.navigate("mix/${mix.id}") else build(selector, force = false, open = true) },
-                                    )
-                                })
-                            }
-                            MixGenerator.Personal.entries.filter { kind ->
-                                MixRules.showsPersonalTile(
-                                    kind, homeSettings.soundReady,
-                                    madeToday = todaysMixes.any { it.selectorId == kind.id },
-                                    notEnough = kind.id in notEnough,
-                                )
-                            }.forEach { kind ->
-                                add(kind.id to @Composable {
-                                    val mix = todaysMixes.firstOrNull { it.selectorId == kind.id }
-                                    GradientTile(
-                                        title = kind.title,
-                                        colors = tileColors(kind.id),
-                                        coverArt = mix?.songs?.firstOrNull()?.coverArt,
-                                        caption = madeForYouCaption(mix?.songs?.size, aiDown != null, "Tap to make it"),
-                                        busy = personalBusy == kind.id,
-                                        onClick = { if (mix != null) nav.navigate("mix/${mix.id}") else buildPersonal(kind, open = true) },
-                                    )
-                                })
-                            }
-                            // Your own cards, added and named in Settings › Home page › Cards (issue #274).
-                            customCards.orEmpty().forEach { card ->
-                                add(card.id to @Composable {
-                                    GradientTile(
-                                        title = card.title,
-                                        colors = tileColors(card.id),
-                                        onClick = { nav.navigate("card/${card.id}") },
-                                    )
-                                })
-                            }
-                        }
-                        if (look != HomeLook.AS_IS) HomeLookRow(look, "made", "Made for you", made)
-                        else Shelf("Made for you", tiles, key = { it.first }) { it.second() }
-                    }
+                    if (homeSettings.navidromeReady) titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, names = homeSettings.cardNames(section), crateSize = homeSettings.carouselSize(section), variant = homeSettings.homeVariants[section], picture = homeSettings.homePictures[section] ?: app.siansa.data.PictureStyle.AUTO, heroCardPicture = homeSettings.homeHeroCardPictures[section] ?: app.siansa.data.PictureStyle.AUTO, lines = section !in homeSettings.homeNoLines, pictureColours = homeSettings.homePictureColours[section] ?: app.siansa.data.PictureColours.COVERS, cardLook = cardLookOf(section), shortcutLook = shortcutLookOf(homeSettings.homeCardLooks[section], homeSettings.homePictureColours[section]), coverGrid = homeSettings.homeCoverGrids[section] ?: app.siansa.data.CoverGridSize.DEFAULT, key = "beats_made") { BeatsMixesHome(nav, setOf("daily"), look) }
+                } else if (phoneHas(section)) {
+                    // Made for you: the vibe for this hour and Your sound, then your own cards (phoneMixRow).
+                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, names = homeSettings.cardNames(section), crateSize = homeSettings.carouselSize(section), variant = homeSettings.homeVariants[section], picture = homeSettings.homePictures[section] ?: app.siansa.data.PictureStyle.AUTO, heroCardPicture = homeSettings.homeHeroCardPictures[section] ?: app.siansa.data.PictureStyle.AUTO, lines = section !in homeSettings.homeNoLines, pictureColours = homeSettings.homePictureColours[section] ?: app.siansa.data.PictureColours.COVERS, cardLook = cardLookOf(section), shortcutLook = shortcutLookOf(homeSettings.homeCardLooks[section], homeSettings.homePictureColours[section]), coverGrid = homeSettings.homeCoverGrids[section] ?: app.siansa.data.CoverGridSize.DEFAULT, key = "made") { phoneMixRow(section, look) }
                 }
                 HomeSection.CARDS -> {
-                    // Your cards (issue #622), in the order set in Settings › Home page › Cards; each is its own row.
+                    // Your cards (issue #622), in the order set in Settings › Home › Cards; each is its own row.
                     // Your own notices (issue #1234) are pills at the top of Home, not cards here.
                     pinnedCards.orEmpty().filter { it.shown && !it.notice }.forEach { card ->
-                        titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "pinned-${card.id}") { PinnedCardSection(nav, card, aiDown) }
+                        titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, names = homeSettings.cardNames(section), crateSize = homeSettings.carouselSize(section), variant = homeSettings.homeVariants[section], picture = homeSettings.homePictures[section] ?: app.siansa.data.PictureStyle.AUTO, heroCardPicture = homeSettings.homeHeroCardPictures[section] ?: app.siansa.data.PictureStyle.AUTO, lines = section !in homeSettings.homeNoLines, pictureColours = homeSettings.homePictureColours[section] ?: app.siansa.data.PictureColours.COVERS, cardLook = cardLookOf(section), shortcutLook = shortcutLookOf(homeSettings.homeCardLooks[section], homeSettings.homePictureColours[section]), coverGrid = homeSettings.homeCoverGrids[section] ?: app.siansa.data.CoverGridSize.DEFAULT, key = "pinned-${card.id}") { PinnedCardSection(nav, card, aiDown) }
                     }
                 }
                 HomeSection.REDISCOVER -> {
                     // Albums you loved a while ago but haven't played since.
-                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "rediscover") {
+                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, names = homeSettings.cardNames(section), crateSize = homeSettings.carouselSize(section), variant = homeSettings.homeVariants[section], picture = homeSettings.homePictures[section] ?: app.siansa.data.PictureStyle.AUTO, heroCardPicture = homeSettings.homeHeroCardPictures[section] ?: app.siansa.data.PictureStyle.AUTO, lines = section !in homeSettings.homeNoLines, pictureColours = homeSettings.homePictureColours[section] ?: app.siansa.data.PictureColours.COVERS, cardLook = cardLookOf(section), shortcutLook = shortcutLookOf(homeSettings.homeCardLooks[section], homeSettings.homePictureColours[section]), coverGrid = homeSettings.homeCoverGrids[section] ?: app.siansa.data.CoverGridSize.DEFAULT, key = "rediscover") {
                         val albums = lovedBefore.valueOrNull().orEmpty()
                         if (look != HomeLook.AS_IS) {
                             HomeLookRow(look, "rediscover", "Rediscover", albums.map { r -> albumItem(r.album, rediscoverSubtitle(r), play = { playAlbums(r.album.name, listOf(r.album)) }) { nav.navigate("album/${r.album.id}") } },
@@ -536,7 +572,7 @@ fun HomeScreen(nav: NavController) {
                     }
                 }
                 HomeSection.RADIOS -> {
-                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "radios") {
+                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, names = homeSettings.cardNames(section), crateSize = homeSettings.carouselSize(section), variant = homeSettings.homeVariants[section], picture = homeSettings.homePictures[section] ?: app.siansa.data.PictureStyle.AUTO, heroCardPicture = homeSettings.homeHeroCardPictures[section] ?: app.siansa.data.PictureStyle.AUTO, lines = section !in homeSettings.homeNoLines, pictureColours = homeSettings.homePictureColours[section] ?: app.siansa.data.PictureColours.COVERS, cardLook = cardLookOf(section), shortcutLook = shortcutLookOf(homeSettings.homeCardLooks[section], homeSettings.homePictureColours[section]), coverGrid = homeSettings.homeCoverGrids[section] ?: app.siansa.data.CoverGridSize.DEFAULT, key = "radios") {
                         if (look != HomeLook.AS_IS) {
                             HomeLookRow(look, "radios", "Radios", moodRadios.map { radio ->
                                 HomeItem(radio.id, radio.name, colors = Color(radio.colors.first) to Color(radio.colors.second), open = { nav.openMoodRadio(radio.id) })
@@ -553,7 +589,7 @@ fun HomeScreen(nav: NavController) {
                     }
                 }
                 HomeSection.PLAYLISTS -> {
-                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "playlists") {
+                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, names = homeSettings.cardNames(section), crateSize = homeSettings.carouselSize(section), variant = homeSettings.homeVariants[section], picture = homeSettings.homePictures[section] ?: app.siansa.data.PictureStyle.AUTO, heroCardPicture = homeSettings.homeHeroCardPictures[section] ?: app.siansa.data.PictureStyle.AUTO, lines = section !in homeSettings.homeNoLines, pictureColours = homeSettings.homePictureColours[section] ?: app.siansa.data.PictureColours.COVERS, cardLook = cardLookOf(section), shortcutLook = shortcutLookOf(homeSettings.homeCardLooks[section], homeSettings.homePictureColours[section]), coverGrid = homeSettings.homeCoverGrids[section] ?: app.siansa.data.CoverGridSize.DEFAULT, key = "playlists") {
                         if (look != HomeLook.AS_IS) {
                             HomeLookRow(look, "playlists", "Your playlists", playlists.valueOrNull().orEmpty().map { p ->
                                 HomeItem(p.id, p.name, if (p.songCount > 0) "${p.songCount} songs" else "", p.coverArt, open = { nav.navigate("playlist/${p.id}") })
@@ -564,7 +600,7 @@ fun HomeScreen(nav: NavController) {
                     }
                 }
                 HomeSection.RECENT -> {
-                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "recent") {
+                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, names = homeSettings.cardNames(section), crateSize = homeSettings.carouselSize(section), variant = homeSettings.homeVariants[section], picture = homeSettings.homePictures[section] ?: app.siansa.data.PictureStyle.AUTO, heroCardPicture = homeSettings.homeHeroCardPictures[section] ?: app.siansa.data.PictureStyle.AUTO, lines = section !in homeSettings.homeNoLines, pictureColours = homeSettings.homePictureColours[section] ?: app.siansa.data.PictureColours.COVERS, cardLook = cardLookOf(section), shortcutLook = shortcutLookOf(homeSettings.homeCardLooks[section], homeSettings.homePictureColours[section]), coverGrid = homeSettings.homeCoverGrids[section] ?: app.siansa.data.CoverGridSize.DEFAULT, key = "recent") {
                         val albums = recentAlbums.valueOrNull().orEmpty()
                         if (look != HomeLook.AS_IS) {
                             HomeLookRow(look, "recent", "Recently played", albums.map { a -> albumItem(a, a.artist, play = { playAlbums(a.name, listOf(a)) }) { nav.navigate("album/${a.id}") } },
@@ -575,7 +611,7 @@ fun HomeScreen(nav: NavController) {
                     }
                 }
                 HomeSection.ARTIST_RADIOS -> {
-                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "artist_radios") {
+                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, names = homeSettings.cardNames(section), crateSize = homeSettings.carouselSize(section), variant = homeSettings.homeVariants[section], picture = homeSettings.homePictures[section] ?: app.siansa.data.PictureStyle.AUTO, heroCardPicture = homeSettings.homeHeroCardPictures[section] ?: app.siansa.data.PictureStyle.AUTO, lines = section !in homeSettings.homeNoLines, pictureColours = homeSettings.homePictureColours[section] ?: app.siansa.data.PictureColours.COVERS, cardLook = cardLookOf(section), shortcutLook = shortcutLookOf(homeSettings.homeCardLooks[section], homeSettings.homePictureColours[section]), coverGrid = homeSettings.homeCoverGrids[section] ?: app.siansa.data.CoverGridSize.DEFAULT, key = "artist_radios") {
                         if (look != HomeLook.AS_IS) {
                             HomeLookRow(look, "artist_radios", "Artist radios", recentArtists.valueOrNull().orEmpty().map { artist ->
                                 HomeItem(artist.id, "${artist.name} radio", "With similar artists", freshCovers[artist.id] ?: artist.coverArt, round = true, open = {
@@ -597,7 +633,7 @@ fun HomeScreen(nav: NavController) {
                     }
                 }
                 HomeSection.ADDED -> {
-                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "added") {
+                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, names = homeSettings.cardNames(section), crateSize = homeSettings.carouselSize(section), variant = homeSettings.homeVariants[section], picture = homeSettings.homePictures[section] ?: app.siansa.data.PictureStyle.AUTO, heroCardPicture = homeSettings.homeHeroCardPictures[section] ?: app.siansa.data.PictureStyle.AUTO, lines = section !in homeSettings.homeNoLines, pictureColours = homeSettings.homePictureColours[section] ?: app.siansa.data.PictureColours.COVERS, cardLook = cardLookOf(section), shortcutLook = shortcutLookOf(homeSettings.homeCardLooks[section], homeSettings.homePictureColours[section]), coverGrid = homeSettings.homeCoverGrids[section] ?: app.siansa.data.CoverGridSize.DEFAULT, key = "added") {
                         val albums = newest.valueOrNull().orEmpty()
                         if (look != HomeLook.AS_IS) {
                             HomeLookRow(look, "added", "Recently added", albums.map { a -> albumItem(a, a.artist, play = { playAlbums(a.name, listOf(a)) }) { nav.navigate("album/${a.id}") } },
@@ -608,7 +644,7 @@ fun HomeScreen(nav: NavController) {
                     }
                 }
                 HomeSection.GENRES -> {
-                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "genres") {
+                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, names = homeSettings.cardNames(section), crateSize = homeSettings.carouselSize(section), variant = homeSettings.homeVariants[section], picture = homeSettings.homePictures[section] ?: app.siansa.data.PictureStyle.AUTO, heroCardPicture = homeSettings.homeHeroCardPictures[section] ?: app.siansa.data.PictureStyle.AUTO, lines = section !in homeSettings.homeNoLines, pictureColours = homeSettings.homePictureColours[section] ?: app.siansa.data.PictureColours.COVERS, cardLook = cardLookOf(section), shortcutLook = shortcutLookOf(homeSettings.homeCardLooks[section], homeSettings.homePictureColours[section]), coverGrid = homeSettings.homeCoverGrids[section] ?: app.siansa.data.CoverGridSize.DEFAULT, key = "genres") {
                         if (look != HomeLook.AS_IS) {
                             HomeLookRow(look, "genres", "Your genres", genres.orEmpty().map { genre ->
                                 HomeItem(genre.name, genre.name, open = { nav.openGenreRadio(genre.name) })
@@ -624,12 +660,30 @@ fun HomeScreen(nav: NavController) {
                         }
                     }
                 }
-                // Siansa Beats' More of you, a row of its own (the owner, 17 Nov); nothing without its mixes.
-                HomeSection.MORE_OF_YOU -> if (beatsMixesShown && homeSettings.navidromeReady) {
-                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "beats_more") { BeatsMixesHome(nav, setOf("more"), look) }
+                // Your listening's card (issues #1341, #1343): from the phone at once; nothing without a listening history.
+                HomeSection.TIME_MACHINE -> timeCard?.takeIf { !it.empty && homeSettings.navidromeReady }?.let { card ->
+                    item(key = "time-machine", contentType = "time-machine") {
+                        ListeningCard(card, app.siansa.mix.ListenRange.of(homeSettings.listenRange), app.siansa.data.ListenColour.of(homeSettings.listenColour),
+                            androidx.compose.runtime.remember(nav) {
+                                ListeningActions(
+                                    songsOf = { ids -> graph.library.songs(ids) },
+                                    play = { list, at, shuffle -> graph.player.play(list, startIndex = at, shuffle = shuffle) },
+                                    openList = { nav.navigate(app.siansa.mix.timeListRoute(it)) },
+                                    openArtist = { nav.navigate("artist/$it") },
+                                    setRange = { graph.settings.setListenRange(it.id) },
+                                )
+                            })
+                    }
+                }
+                // More of you, a row of its own (the owner, 17 Nov): Siansa Beats', or this phone's own.
+                HomeSection.MORE_OF_YOU -> if (beatsMixesShown) {
+                    if (homeSettings.navidromeReady) titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, names = homeSettings.cardNames(section), crateSize = homeSettings.carouselSize(section), variant = homeSettings.homeVariants[section], picture = homeSettings.homePictures[section] ?: app.siansa.data.PictureStyle.AUTO, heroCardPicture = homeSettings.homeHeroCardPictures[section] ?: app.siansa.data.PictureStyle.AUTO, lines = section !in homeSettings.homeNoLines, pictureColours = homeSettings.homePictureColours[section] ?: app.siansa.data.PictureColours.COVERS, cardLook = cardLookOf(section), shortcutLook = shortcutLookOf(homeSettings.homeCardLooks[section], homeSettings.homePictureColours[section]), coverGrid = homeSettings.homeCoverGrids[section] ?: app.siansa.data.CoverGridSize.DEFAULT, key = "beats_more") { BeatsMixesHome(nav, setOf("more"), look) }
+                } else if (phoneHas(section)) {
+                    // This phone's own (issue #1353): On repeat and Discover for you.
+                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, names = homeSettings.cardNames(section), crateSize = homeSettings.carouselSize(section), variant = homeSettings.homeVariants[section], picture = homeSettings.homePictures[section] ?: app.siansa.data.PictureStyle.AUTO, heroCardPicture = homeSettings.homeHeroCardPictures[section] ?: app.siansa.data.PictureStyle.AUTO, lines = section !in homeSettings.homeNoLines, pictureColours = homeSettings.homePictureColours[section] ?: app.siansa.data.PictureColours.COVERS, cardLook = cardLookOf(section), shortcutLook = shortcutLookOf(homeSettings.homeCardLooks[section], homeSettings.homePictureColours[section]), coverGrid = homeSettings.homeCoverGrids[section] ?: app.siansa.data.CoverGridSize.DEFAULT, key = "more") { phoneMixRow(section, look) }
                 }
                 HomeSection.RANDOM -> {
-                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, cardLook = cardLookOf(section), key = "random") {
+                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, names = homeSettings.cardNames(section), crateSize = homeSettings.carouselSize(section), variant = homeSettings.homeVariants[section], picture = homeSettings.homePictures[section] ?: app.siansa.data.PictureStyle.AUTO, heroCardPicture = homeSettings.homeHeroCardPictures[section] ?: app.siansa.data.PictureStyle.AUTO, lines = section !in homeSettings.homeNoLines, pictureColours = homeSettings.homePictureColours[section] ?: app.siansa.data.PictureColours.COVERS, cardLook = cardLookOf(section), shortcutLook = shortcutLookOf(homeSettings.homeCardLooks[section], homeSettings.homePictureColours[section]), coverGrid = homeSettings.homeCoverGrids[section] ?: app.siansa.data.CoverGridSize.DEFAULT, key = "random") {
                         val albums = rediscover.valueOrNull().orEmpty()
                         if (look != HomeLook.AS_IS) {
                             HomeLookRow(look, "random", "Random picks", albums.map { a -> albumItem(a, a.artist, play = { playAlbums(a.name, listOf(a)) }) { nav.navigate("album/${a.id}") } },
@@ -646,10 +700,12 @@ fun HomeScreen(nav: NavController) {
     }
     }
     panel?.let { sources ->
-        // The same panel opens from Settings › Home page (issue #780).
+        // The same panel opens from Settings › Home (issue #780).
         HomeSettingsSheet(nav, startOnSources = sources) { panel = null }
     }
     if (castOpen) CastSheet(onDismiss = { castOpen = false })
+    // Once after an update: what it brought, in short (the owner, 16 Nov).
+    WhatsNewAfterUpdate()
 }
 
 internal suspend fun recentlyPlayedAlbums(graph: AppGraph, limit: Int = 15): List<Album> {
@@ -716,6 +772,8 @@ private fun albumItem(album: Album, subtitle: String, play: (() -> Unit)? = null
 )
 
 /** A row of albums played as one plays this many of them, in order. */
+/** The least time the logo shows after a pull, so a quick load still reads as one. */
+
 private const val PLAY_ALBUMS = 10
 
 @Composable
@@ -754,7 +812,7 @@ private fun HeroMix(
     ) {
         Column(Modifier.padding(Space.Page)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                CoverMosaic(mix, Modifier.size(104.dp))
+                CardPicture(mix.songs.map { it.cover }, null, tileColors(mix.id), mix.title, Modifier.size(104.dp), songIds = mix.songs.map { it.id }, artists = artistLine(mix.songs))
                 Spacer(Modifier.width(Space.Page))
                 Column(Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -805,7 +863,7 @@ internal fun MakeTodayCard(onMake: () -> Unit) {
         Row(Modifier.padding(Space.Page), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("Today's mix", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Text("None made yet. Auto update is off in Settings › Mixes & radios › Today's mix and vibes, so it's made when you ask.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("None made yet. Auto update is off in Settings › Mixes › Today's mix and vibes, so it's made when you ask.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Spacer(Modifier.width(Space.Page))
             FilledTonalButton(onClick = onMake) { Text("Make it") }
@@ -911,9 +969,25 @@ internal fun madeForYouCaption(trackCount: Int?, aiDown: Boolean, prompt: String
     else -> prompt
 }
 
-/** The most shortcuts on Home, and the fewest (Settings › Home page, issue #934). */
+/** The most shortcuts on Home, and the fewest (Settings › Home, issue #934). */
 internal const val QUICK_COUNT = 8
 internal const val QUICK_MIN = 2
+
+/** How many rows of shortcut tiles can be chosen (the owner, 23 Nov: "minimum 1 maximum 4"). */
+internal val SHORTCUT_ROWS = 1..4
+
+/** The most tiles the rows can hold: four rows of three. */
+internal const val QUICK_MOST = 12
+
+/** The rows [count] shortcuts take two to a row, as the row's cog shows and sets them. */
+internal fun shortcutRows(count: Int): Int = ((count + 1) / 2).coerceIn(SHORTCUT_ROWS.first, SHORTCUT_ROWS.last)
+
+/**
+ * How many shortcuts Home shows for the [saved] number (2 to 8, two to a row) in the row's layout: three a row fills
+ * each of its rows, so the rows chosen stay the rows shown; every other layout shows the number itself.
+ */
+internal fun shortcutCount(saved: Int, variant: app.siansa.data.LookVariant?): Int =
+    if (variant == app.siansa.data.LookVariant.THREE) shortcutRows(saved) * 3 else saved.coerceIn(QUICK_MIN, QUICK_COUNT)
 
 /** The album a shortcut opens ("album/123"), or null for any other page. */
 internal fun recentAlbumId(route: String): String? =
@@ -929,7 +1003,7 @@ internal fun shownRecents(played: List<RecentPlay>, shownAlbums: Set<String>?): 
  * was played.
  */
 internal fun quickShortcuts(played: List<RecentPlay>, fill: List<RecentPlay>, count: Int): List<RecentPlay> =
-    (played + fill).distinctBy { it.route }.take(count.coerceIn(QUICK_MIN, QUICK_COUNT))
+    (played + fill).distinctBy { it.route }.take(count.coerceIn(QUICK_MIN, QUICK_MOST))
 
 /**
  * A section of Home as one list item, with its title shown or not as set in Arrange Home (issue #961).
@@ -941,7 +1015,43 @@ internal fun androidx.compose.foundation.lazy.LazyListScope.titledItem(
     gridSize: Int = GRID_LOOK_MOST,
     // How its coloured cards are painted (the owner, 13 Nov).
     cardLook: CardLook = CardLook.VIVID,
+    // As a carousel: each name and its details on the cover, not under the row (the owner, 19 Nov).
+    // Where its cards show their names (the owner, 21 Nov).
+    names: app.siansa.data.CardNames = app.siansa.data.CardNames.AUTO,
+    // As a carousel: big, compact or small (the owner, 20 Nov).
+    crateSize: app.siansa.data.CrateSize = app.siansa.data.CrateSize.BIG,
+    // Its look's own layout (the owner, 20 Nov): shortcut tiles, a featured cover grid, a hero banner.
+    variant: app.siansa.data.LookVariant? = null,
+    // How its cards' pictures show (the owner, 20 Nov): a mosaic, one cover, its colours…
+    picture: app.siansa.data.PictureStyle = app.siansa.data.PictureStyle.AUTO,
+    // How the cards at a hero's foot show theirs (the owner, 22 Nov).
+    heroCardPicture: app.siansa.data.PictureStyle = app.siansa.data.PictureStyle.AUTO,
+    // Whether its cards show their lines (the owner, 22 Nov).
+    lines: Boolean = true,
+    // Where its pictures' colours come from (the owner, 20 Nov).
+    pictureColours: app.siansa.data.PictureColours = app.siansa.data.PictureColours.COVERS,
+    // The row's own colour, for its shortcut tiles; null keeps them plain (#1261).
+    shortcutLook: CardLook? = null,
+    // As a cover grid: its columns and rows (#1263).
+    coverGrid: app.siansa.data.CoverGridSize = app.siansa.data.CoverGridSize.DEFAULT,
     content: @Composable androidx.compose.foundation.lazy.LazyItemScope.() -> Unit,
 ) = item(key = key) {
-    androidx.compose.runtime.CompositionLocalProvider(LocalSectionTitleShown provides titleShown, LocalGridSize provides gridSize, LocalCardLook provides cardLook) { content() }
+    androidx.compose.runtime.CompositionLocalProvider(
+        LocalSectionTitleShown provides titleShown, LocalGridSize provides gridSize, LocalCardLook provides cardLook,
+        LocalCrateNamesOnCover provides (names == app.siansa.data.CardNames.ON), LocalCardNames provides names, LocalCrateSize provides crateSize, LocalLookVariant provides variant, LocalPictureStyle provides picture, LocalHeroCardPictures provides heroCardPicture, LocalCardLines provides lines, LocalPictureColours provides pictureColours, LocalShortcutLook provides shortcutLook, LocalCoverGridSize provides coverGrid,
+    ) { content() }
+}
+
+/** What a shortcut is, under its name on a big tile (the owner, 20 Nov): "Mix", "Album", "Your hearts"… */
+internal fun shortcutKind(route: String): String = when {
+    route == "liked" -> "Your hearts"
+    route.startsWith("mix/") -> "Mix"
+    route.startsWith("album/") -> "Album"
+    route.startsWith("playlist/") -> "Playlist"
+    route.startsWith("artist/") -> "Artist"
+    route.startsWith("radio/") -> "Radio"
+    route.startsWith("blend/") -> "Blend"
+    route.startsWith("mood/") -> "Mood"
+    route.startsWith("genre") -> "Genre"
+    else -> ""
 }

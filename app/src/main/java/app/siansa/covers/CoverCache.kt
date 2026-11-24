@@ -40,6 +40,39 @@ object CoverCache {
     }
 
     /**
+     * How many times each cover (by its cache id) was cleared by hand ([clearAll]): a cover on screen reads it, so it
+     * fetches itself again straight away instead of keeping the picture it shows.
+     */
+    private val _cleared = kotlinx.coroutines.flow.MutableStateFlow<Map<String, Int>>(emptyMap())
+    val cleared: kotlinx.coroutines.flow.StateFlow<Map<String, Int>> get() = _cleared
+
+    /**
+     * Drops everything kept of covers [ids] (the owner, 21 Nov: hold an album's cover to clear its pictures): on disk,
+     * in memory at every size and shape (lists, shortcuts, the mini player, now playing, the notification), the server's
+     * version of it and its animated original. Every place showing one fetches it fresh. Returns how many covers.
+     */
+    fun clearAll(loader: ImageLoader, ids: Collection<String>): Int {
+        val distinct = ids.filter { it.isNotBlank() }.distinct()
+        val memory = loader.memoryCache
+        for (id in distinct) {
+            val cacheId = CoverVersions.cacheId(id)
+            SIZES.forEach { size -> CoverEtags.remove("cover:$cacheId:$size") }
+            forget(loader, id)
+            val anim = "anim:${CoverStore.canonical(id)}:"
+            // An album's cover at any of its versions (`al-<album>_<stamp>`): a shortcut may hold an older one.
+            if (id.startsWith("al-")) {
+                val album = "cover:al-" + id.removePrefix("al-").substringBefore('_')
+                memory?.keys?.filter { it.key.startsWith("${album}_") || it.key.startsWith("$album:") }?.forEach { memory.remove(it) }
+            }
+            memory?.keys?.filter { it.key.startsWith(anim) }?.forEach { memory.remove(it) }
+            runCatching { CoverStore.forget(id) }
+        }
+        _cleared.value = _cleared.value.toMutableMap().apply { distinct.forEach { id -> merge(CoverVersions.cacheId(id), 1, Int::plus) } }
+        AppLog.i("Covers", "Cleared the kept pictures of ${distinct.size} cover(s): ${distinct.take(4).joinToString()}")
+        return distinct.size
+    }
+
+    /**
      * Called wherever cover [id] is about to be shown: when the server's stand-in has been showing for a while
      * ([StandIns.AGAIN_MS]), it's dropped from memory, so this showing asks the server again.
      */

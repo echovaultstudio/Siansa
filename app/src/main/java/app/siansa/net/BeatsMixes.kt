@@ -34,6 +34,9 @@ class BeatsMixes(
     // new until they are loaded"): read once at the start, written when a new answer differs.
     private val loadKept: () -> String? = { null },
     private val saveKept: (String) -> Unit = {},
+    // What it's like outside ("rain", "snow"…), for the names of the mixes of now (Beats 0.61); null when not known or
+    // the weather is off.
+    private val weather: suspend () -> String? = { null },
 ) {
     private val shown = MutableStateFlow(kept())
     private val asking_ = MutableStateFlow(false)
@@ -67,7 +70,8 @@ class BeatsMixes(
         if (!force && had != null && had.part == part && now() - had.askedAt < EVERY_MS) return had
         val s = settings()
         val path = "/api/v1/mixes?user=" + URLEncoder.encode(BeatsListens.listener(s), "UTF-8") +
-            "&tz=" + URLEncoder.encode(zone().id, "UTF-8") + "&size=$SIZE"
+            "&tz=" + URLEncoder.encode(zone().id, "UTF-8") + "&size=$SIZE" +
+            (runCatching { weather() }.getOrNull()?.let { "&weather=" + URLEncoder.encode(it, "UTF-8") } ?: "")
         asking_.value = had != null
         return runCatching {
             val o = get(path) as? JsonObject ?: throw ApiException("Siansa Beats sent an unexpected answer")

@@ -7,6 +7,7 @@ import app.siansa.net.BeatsApi
 import app.siansa.net.BeatsListens
 import app.siansa.net.BeatsSound
 import app.siansa.net.beatsScrobbleReady
+import app.siansa.net.beatsSkipsReady
 import app.siansa.net.beatsTakesListens
 import app.siansa.net.soundReady
 import app.siansa.servers.EveryServer
@@ -88,6 +89,36 @@ class ScrobbleToBeatsTest {
             assertEquals(server.name, JsonPrimitive(server.songId), now["id"])
             assertEquals(server.name, JsonPrimitive("Kerala"), now["title"])
         }
+    }
+
+    /** The owner, 22 Nov: "skips need to be registered by Beats". */
+    @Test fun aSkipIsASongLeftBeforeItCountedAndGoesToASiansaBeatsThatTakesThem() {
+        val song = 200_000L
+        assertTrue(skipCounts(song, 12_000, 50))
+        assertTrue(skipCounts(song, 99_000, 50))
+        assertFalse(skipCounts(song, 100_000, 50))  // it counted: a listen, no skip
+        assertTrue(skipCounts(song, 100_000, 75))  // by "When a song counts"
+        assertFalse(skipCounts(song, 900, 50))  // a flick through the queue
+        assertTrue(skipCounts(20_000, 15_000, 50))  // a song too short ever to count can still be skipped
+        // Sent only with the listens, and only to a Siansa Beats that says it takes skips (0.64).
+        val on = AppSettings(beatsUrl = "http://beats:8090", scrobbleBeats = true)
+        BeatsSound.heard(caps(takes).sound)
+        assertFalse(on.beatsSkipsReady)
+        val skips = """{"version":"0.64.0","api":1,"features":{"scrobbling":{"available":true,"listens":12,"skips":true}}}"""
+        assertEquals(setOf(BeatsListens.PATH, BeatsListens.SKIPS), caps(skips).sound)
+        BeatsSound.heard(caps(skips).sound)
+        assertTrue(on.beatsSkipsReady)
+        assertFalse(on.copy(scrobbleBeats = false).beatsSkipsReady)
+        assertFalse(BeatsSound.available)  // still not the songs' sound
+        for (server in EveryServer.all) {
+            val body = AppJson.parseToJsonElement(BeatsListens.skip("max", Song(id = server.songId, title = "Kerala", artist = "Bonobo"), 1_762_862_400, 12)) as JsonObject
+            assertEquals(server.name, JsonPrimitive("max"), body["user"])
+            assertEquals(server.name, mapOf("id" to JsonPrimitive(server.songId), "at" to JsonPrimitive(1_762_862_400L), "heard" to JsonPrimitive(12L)),
+                ((body["skips"] as JsonArray).single() as JsonObject).toMap())
+        }
+        // A skip kept from before this field existed, or a listen, reads back as before.
+        val kept = AppJson.decodeFromString(PendingListen.serializer(), """{"song":{"id":"s","title":"T","artist":"A"},"startedAtSec":5,"targets":["beats"]}""")
+        assertEquals(0L, kept.heardSec)
     }
 
     @Test fun theAlbumsArtistGoesWithAListenWhenKnown() {

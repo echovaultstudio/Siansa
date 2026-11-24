@@ -56,4 +56,45 @@ class PlayingAsTest {
         assertEquals("M4A" to null, PlayingAs.file(null, ".m4a", null))
         assertEquals("Unknown" to null, PlayingAs.file(null, null, 0))
     }
+
+    /** The owner, 23 Nov: "actually show what's being played, whether it's resampled or not. Because even in DJ mix it says playing same as file". */
+    @Test fun itSaysWhatThePhoneDoesWithTheSound() {
+        fun heard(hz: Int?, untouched: Boolean = false, blended: String? = null, opus: Int = 0, download: Int? = null, device: String? = null) =
+            PlayingAs.of(device, download, opus, cached = false, wifi = true, cacheOn = true, fileHz = hz, untouched = untouched, blended = blended)
+        val nb = "\u00A0"
+        // A 44.1 kHz file passes the mixer as it is.
+        assertEquals(PlayingAs("Same as the file", "Streamed as it is · Wi-Fi", differs = false, sound = "Unchanged at 44.1${nb}kHz"), heard(44_100))
+        // Any other rate is resampled there, and that isn't the file: lit, and said first.
+        val hiRes = heard(96_000)
+        assertEquals("Resampled to 44.1${nb}kHz", hiRes.title)
+        assertTrue(hiRes.differs)
+        assertEquals("From 96${nb}kHz, in Siansa's mixer", hiRes.sound)
+        assertEquals("From 48${nb}kHz, in Siansa's mixer", heard(48_000).sound)
+        // In a DJ mix or with crossfade the song is the file only between its blends.
+        val dj = heard(44_100, blended = "DJ mix")
+        assertEquals("Same as the file between blends", dj.title)
+        assertFalse(dj.differs)
+        assertEquals("Unchanged at 44.1${nb}kHz · blended at song changes (DJ mix)", dj.sound)
+        assertEquals("Resampled to 44.1${nb}kHz", heard(96_000, blended = "crossfade").title)
+        assertEquals("From 96${nb}kHz, in Siansa's mixer · blended at song changes (crossfade)", heard(96_000, blended = "crossfade").sound)
+        // Untouched playback: the file's own rate, nothing blended, whatever else is set.
+        assertEquals(PlayingAs("Same as the file", "Streamed as it is · Wi-Fi", differs = false, sound = "Untouched · 96${nb}kHz"), heard(96_000, untouched = true, blended = "crossfade"))
+        assertEquals("Untouched, at its own sample rate", heard(null, untouched = true).sound)
+        // The server didn't say the rate: no claim about resampling.
+        assertEquals("Through Siansa's mixer at 44.1${nb}kHz", heard(null).sound)
+        assertEquals("Same as the file", heard(null).title)
+        // Opus comes out at 48 kHz whatever the file was: converted by the server, then resampled by the mixer.
+        val opus = heard(44_100, opus = 256)
+        assertTrue(opus.title.startsWith("Opus"))
+        assertEquals("Resampled from 48${nb}kHz to 44.1${nb}kHz", opus.sound)
+        assertEquals("Untouched · 48${nb}kHz", heard(96_000, untouched = true, download = 192).sound)
+        // A download of the original plays as the file, whatever the stream would be converted to.
+        assertEquals("Unchanged at 44.1${nb}kHz", heard(44_100, opus = 256, download = 0).sound)
+        // On a TV or speaker the phone plays nothing.
+        assertEquals(null, heard(96_000, device = "Living room TV").sound)
+        // The rate comes with the song's details, after the rest: added then.
+        val later = PlayingAs.of(null, null, 0, cached = false, wifi = true).copy(told = PlayingAs.Told(null, null, 0, false, true, true, untouched = false, blended = "DJ mix"))
+        assertEquals("Resampled to 44.1${nb}kHz", later.heard(88_200).title)
+        assertEquals(dj.sound, later.heard(44_100).sound)
+    }
 }

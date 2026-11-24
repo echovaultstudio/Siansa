@@ -194,7 +194,7 @@ data class AppSettings(
     /** Opus kbit/s for downloads, or 0 for the original file. */
     val downloadKbps: Int = 0,
     val homeOrder: List<HomeSection> = HomeSection.default,
-    /** Settings › Now playing and Bottom bar (issue #346): the mini player's buttons, the bottom bar's tabs, and now playing's lyrics button. */
+    /** Settings › Player and Navigation (issue #346): the mini player's buttons, the bottom bar's tabs, and now playing's lyrics button. */
     val miniButtons: List<MiniButton> = MiniButton.default,
     val navTabs: List<NavTab> = NavTab.default,
     /** Home's menu, top to bottom (issue #872). */
@@ -219,18 +219,41 @@ data class AppSettings(
     val homeGridSizes: Map<HomeSection, Int> = emptyMap(),
     /** Home's sections shown without their title (issue #961). */
     val homeUntitled: Set<HomeSection> = emptySet(),
+    // The rows whose cards don't show their lines (the owner, 22 Nov): what's in a mix, an album's artist.
+    val homeNoLines: Set<HomeSection> = emptySet(),
+    /** Rows shown as a carousel with each mix's name and details on its cover, not under the row (the owner, 19 Nov). */
+    val homeCarouselOnCover: Set<HomeSection> = emptySet(),
+    /** Where each row's cards show their names (the owner, 21 Nov); see [cardNames]. */
+    val homeNames: Map<HomeSection, CardNames> = emptyMap(),
+    /** Rows shown as the compact carousel: smaller sleeves, three in view (the owner, 20 Nov), not the big one. */
+    val homeCarouselCompact: Set<HomeSection> = emptySet(),
+    /** Rows shown as the small carousel: a strip of squares, each named under it (the owner, 20 Nov). */
+    val homeCarouselSmall: Set<HomeSection> = emptySet(),
     /** How Home's coloured cards are painted (the owner, 13 Nov), and the cards with a look of their own. */
     val homeCardLook: CardLook = CardLook.DEFAULT,
     val homeCardLooks: Map<HomeSection, CardLook> = emptyMap(),
+    /** The columns and rows of each row shown as a cover grid (#1263); a row not in it has [CoverGridSize.DEFAULT]. */
+    val homeCoverGrids: Map<HomeSection, CoverGridSize> = emptyMap(),
+    /** Each row's way of laying out its look ([LookVariant], the owner, 20 Nov): shortcut tiles, featured, hero. */
+    val homeVariants: Map<HomeSection, LookVariant> = emptyMap(),
+    /** How each row's card pictures show (the owner, 20 Nov); a row not in it is [PictureStyle.AUTO]. */
+    val homePictures: Map<HomeSection, PictureStyle> = emptyMap(),
+    /** Where each row's picture colours come from (the owner, 20 Nov); a row not in it takes its covers'. */
+    // How the cards at a hero's foot show their pictures, apart from the hero's own (the owner, 22 Nov).
+    val homeHeroCardPictures: Map<HomeSection, PictureStyle> = emptyMap(),
+    val homePictureColours: Map<HomeSection, PictureColours> = emptyMap(),
     /** The gap between Home's sections (#554), as a step of the spacing scale: 0 tight … 4 airy. 2 is the default. */
     val homeGap: Int = HOME_GAP_DEFAULT,
+    /** Your listening's card on Home (issue #1347): the time it's set to ([app.siansa.mix.ListenRange.id]) and its colour ([ListenColour.id]). */
+    val listenRange: String = "month",
+    val listenColour: String = "teal",
     /** Show only music on the phone, across the whole app (issue #141). */
     val downloadedOnly: Boolean = false,
     /** The time machine lists songs that aren't in your library, marked (issue #234). */
     val timeMachineMissing: Boolean = true,
     /**
      * Now playing shows "Bad blend" during a DJ blend and for a minute after it, to mark a change that sounded wrong
-     * (Settings › Help & feedback; the owner, 12 Nov). On by default in Siansa Dev only.
+     * (Settings › Help; the owner, 12 Nov). On by default in Siansa Dev only.
      */
     val badBlendButton: Boolean = app.siansa.playback.LastBlend.onByDefault,
     /** How each kind of notice on Home shows (issue #784): pinned, automatic (the default) or off. */
@@ -250,6 +273,16 @@ data class AppSettings(
     /** The loudness, in LUFS, that measured levelling brings songs towards. */
     val loudnessTarget: Int = DEFAULT_LOUDNESS_TARGET,
     val crossfade: CrossfadeMode = CrossfadeMode.OFF,
+    /**
+     * Untouched playback (the owner, 22 Nov): each song goes straight to the phone's output at its own sample rate and
+     * bit depth, past Siansa's mixer and equaliser. Nothing can be blended then: crossfades and DJ blends are off.
+     */
+    val untouchedPlayback: Boolean = false,
+    /**
+     * Untouched playback set aside while a DJ mix plays (issue #1345; the owner, 23 Nov: "temporary… goes back off if
+     * new session without those is started"). Never saved: the switch stays on, and a restart starts untouched again.
+     */
+    val untouchedPaused: Boolean = false,
     /** How far a song radio may wander from its first song (issue #256). */
     val radioDrift: RadioDrift = RadioDrift.SOME,
     /** What plays when the queue is about to end (issue #337): nothing, songs like the last one, or a DJ-ordered set. */
@@ -271,6 +304,9 @@ data class AppSettings(
     /** How much louder the receiver plays Dolby Digital Plus songs sent to it, in dB (issue #930); 0 is off. TV app only. */
     val dolbyLouderDb: Int = 0,
 ) {
+    /** Whether songs go straight to the phone's output right now: Untouched playback on, and not set aside for a DJ mix. */
+    val untouchedNow: Boolean get() = untouchedPlayback && !untouchedPaused
+
     val lastFmReady: Boolean get() = lastFmEnabled && lastFmApiKey.isNotBlank() && lastFmSecret.isNotBlank() && lastFmSession.isNotBlank()
     val listenBrainzReady: Boolean get() = listenBrainzEnabled && listenBrainzToken.isNotBlank()
 
@@ -534,9 +570,21 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         homeLooks = HomeLook.parse(prefs.getString("home_looks", null)),
         homeCardLook = CardLook.of(prefs.getString("home_card_look", null))?.takeIf { it != CardLook.AS_HOME } ?: CardLook.DEFAULT,
         homeCardLooks = CardLook.parse(prefs.getString("home_card_looks", null)),
+        homeCoverGrids = CoverGridSize.parse(prefs.getString("home_cover_grid_sizes", null)),
+        homeVariants = LookVariant.parse(prefs.getString("home_variants", null)),
+        homePictures = PictureStyle.parse(prefs.getString("home_pictures", null)),
+        homeHeroCardPictures = PictureStyle.parse(prefs.getString("home_hero_card_pictures", null)),
+        homePictureColours = PictureColours.parse(prefs.getString("home_picture_colours", null)),
         homeGridSizes = HomeLook.parseGridSizes(prefs.getString("home_grid_sizes", null)),
         homeUntitled = HomeSection.parseHidden(prefs.getString("home_untitled", null)),
+        homeNoLines = HomeSection.parseHidden(prefs.getString("home_no_lines", null)),
+        homeCarouselOnCover = HomeSection.parseHidden(prefs.getString("home_carousel_on_cover", null)),
+        homeNames = CardNames.parse(prefs.getString("home_names", null)),
+        homeCarouselCompact = HomeSection.parseHidden(prefs.getString("home_carousel_compact", null)),
+        homeCarouselSmall = HomeSection.parseHidden(prefs.getString("home_carousel_small", null)),
         homeGap = prefs.getInt("home_gap", AppSettings.HOME_GAP_DEFAULT).coerceIn(0, AppSettings.HOME_GAP_MAX),
+        listenRange = prefs.getString("listen_range", null) ?: "month",
+        listenColour = prefs.getString("listen_colour", null) ?: "teal",
         downloadedOnly = prefs.getBoolean("downloaded_only", false),
         timeMachineMissing = prefs.getBoolean("time_machine_missing", true),
         badBlendButton = prefs.getBoolean("bad_blend_button", app.siansa.playback.LastBlend.onByDefault),
@@ -550,6 +598,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         loudnessSource = LoudnessSource.parse(prefs.getString("loudness_source", null)),
         loudnessTarget = prefs.getInt("loudness_target", AppSettings.DEFAULT_LOUDNESS_TARGET),
         crossfade = CrossfadeMode.parse(prefs.getString("crossfade", null)),
+        untouchedPlayback = prefs.getBoolean("untouched_playback", false),
         radioDrift = RadioDrift.parse(prefs.getString("radio_drift", null)),
         continuousPlay = ContinuousMode.parse(prefs.getString("continuous_play", null)),
         windDownSongs = prefs.getInt("wind_down_songs", AppSettings.DEFAULT_WIND_DOWN_SONGS)
@@ -796,11 +845,75 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         _state.value = _state.value.copy(homeShortcuts = kept)
     }
 
+    /**
+     * [section] as it came (the owner, 22 Nov: "Reset this row" under its cog): its look, its look's layout and sizes,
+     * its pictures, colours and names, its title and its cards' lines. Where it is on Home and whether it shows stay.
+     */
+    fun resetHomeRow(section: HomeSection) {
+        val now = _state.value
+        val next = now.copy(
+            homeLooks = now.homeLooks - section, homeGridSizes = now.homeGridSizes - section, homeVariants = now.homeVariants - section,
+            homeCoverGrids = now.homeCoverGrids - section, homePictures = now.homePictures - section,
+            homeHeroCardPictures = now.homeHeroCardPictures - section, homePictureColours = now.homePictureColours - section,
+            homeNames = now.homeNames - section, homeCardLooks = now.homeCardLooks - section,
+            homeCarouselOnCover = now.homeCarouselOnCover - section, homeCarouselCompact = now.homeCarouselCompact - section,
+            homeCarouselSmall = now.homeCarouselSmall - section, homeNoLines = now.homeNoLines - section, homeUntitled = now.homeUntitled - section,
+        )
+        prefs.edit()
+            .putString("home_looks", HomeLook.format(next.homeLooks)).putString("home_grid_sizes", HomeLook.formatGridSizes(next.homeGridSizes))
+            .putString("home_variants", LookVariant.format(next.homeVariants)).putString("home_cover_grid_sizes", CoverGridSize.format(next.homeCoverGrids))
+            .putString("home_pictures", PictureStyle.format(next.homePictures)).putString("home_hero_card_pictures", PictureStyle.format(next.homeHeroCardPictures))
+            .putString("home_picture_colours", PictureColours.format(next.homePictureColours)).putString("home_names", CardNames.format(next.homeNames))
+            .putString("home_card_looks", CardLook.format(next.homeCardLooks))
+            .putString("home_carousel_on_cover", HomeSection.formatHidden(next.homeCarouselOnCover))
+            .putString("home_carousel_compact", HomeSection.formatHidden(next.homeCarouselCompact))
+            .putString("home_carousel_small", HomeSection.formatHidden(next.homeCarouselSmall))
+            .putString("home_no_lines", HomeSection.formatHidden(next.homeNoLines)).putString("home_untitled", HomeSection.formatHidden(next.homeUntitled))
+            .apply()
+        _state.value = next
+    }
+
+    /** Shows or hides the lines of [section]'s cards (the owner, 22 Nov). */
+    fun setHomeLinesShown(section: HomeSection, shown: Boolean) {
+        val without = if (shown) _state.value.homeNoLines - section else _state.value.homeNoLines + section
+        prefs.edit().putString("home_no_lines", HomeSection.formatHidden(without)).apply()
+        _state.value = _state.value.copy(homeNoLines = without)
+    }
+
     /** Shows or hides [section]'s title on Home (issue #961). */
     fun setHomeTitleShown(section: HomeSection, shown: Boolean) {
         val untitled = if (shown) _state.value.homeUntitled - section else _state.value.homeUntitled + section
         prefs.edit().putString("home_untitled", HomeSection.formatHidden(untitled)).apply()
         _state.value = _state.value.copy(homeUntitled = untitled)
+    }
+
+    /** Whether [section]'s carousel shows each name and its details on the cover, or under the row (the owner, 19 Nov). */
+    fun setHomeCarouselOnCover(section: HomeSection, onCover: Boolean) {
+        val set = if (onCover) _state.value.homeCarouselOnCover + section else _state.value.homeCarouselOnCover - section
+        prefs.edit().putString("home_carousel_on_cover", HomeSection.formatHidden(set)).apply()
+        _state.value = _state.value.copy(homeCarouselOnCover = set)
+    }
+
+    /**
+     * Where [section]'s cards show their names (the owner, 21 Nov). It takes over a carousel's older "on the cover", so
+     * that is cleared for it.
+     */
+    fun setHomeNames(section: HomeSection, names: CardNames) {
+        val chosen = _state.value.homeNames + (section to names)
+        val onCover = _state.value.homeCarouselOnCover - section
+        prefs.edit().putString("home_names", CardNames.format(chosen)).putString("home_carousel_on_cover", HomeSection.formatHidden(onCover)).apply()
+        _state.value = _state.value.copy(homeNames = chosen - chosen.filterValues { it == CardNames.AUTO }.keys, homeCarouselOnCover = onCover)
+    }
+
+    /** [section]'s carousel: big, compact or small (the owner, 20 Nov). */
+    fun setHomeCarouselSize(section: HomeSection, size: CrateSize) {
+        val compact = if (size == CrateSize.COMPACT) _state.value.homeCarouselCompact + section else _state.value.homeCarouselCompact - section
+        val small = if (size == CrateSize.SMALL) _state.value.homeCarouselSmall + section else _state.value.homeCarouselSmall - section
+        prefs.edit()
+            .putString("home_carousel_compact", HomeSection.formatHidden(compact))
+            .putString("home_carousel_small", HomeSection.formatHidden(small))
+            .apply()
+        _state.value = _state.value.copy(homeCarouselCompact = compact, homeCarouselSmall = small)
     }
 
     fun setNavTabs(tabs: List<NavTab>) {
@@ -870,10 +983,45 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         _state.value = _state.value.copy(homeGridSizes = sizes)
     }
 
+    /** [section]'s way of laying out its look ([LookVariant]). */
+    fun setHomeVariant(section: HomeSection, variant: LookVariant) {
+        val variants = _state.value.homeVariants + (section to variant)
+        prefs.edit().putString("home_variants", LookVariant.format(variants)).apply()
+        _state.value = _state.value.copy(homeVariants = variants)
+    }
+
+    /** How the cards at the foot of [section]'s hero show their pictures (the owner, 22 Nov). */
+    fun setHomeHeroCardPicture(section: HomeSection, style: PictureStyle) {
+        val styles = _state.value.homeHeroCardPictures + (section to style)
+        prefs.edit().putString("home_hero_card_pictures", PictureStyle.format(styles)).apply()
+        _state.value = _state.value.copy(homeHeroCardPictures = styles - styles.filterValues { it == PictureStyle.AUTO }.keys)
+    }
+
+    /** How [section]'s card pictures show (the owner, 20 Nov). */
+    fun setHomePicture(section: HomeSection, style: PictureStyle) {
+        val styles = _state.value.homePictures + (section to style)
+        prefs.edit().putString("home_pictures", PictureStyle.format(styles)).apply()
+        _state.value = _state.value.copy(homePictures = styles - styles.filterValues { it == PictureStyle.AUTO }.keys)
+    }
+
+    /** Where [section]'s picture colours come from (the owner, 20 Nov). */
+    fun setHomePictureColours(section: HomeSection, colours: PictureColours) {
+        val chosen = _state.value.homePictureColours + (section to colours)
+        prefs.edit().putString("home_picture_colours", PictureColours.format(chosen)).apply()
+        _state.value = _state.value.copy(homePictureColours = chosen - chosen.filterValues { it == PictureColours.COVERS }.keys)
+    }
+
+    /** The columns and rows of [section] as a cover grid (#1263). */
+    fun setHomeCoverGrid(section: HomeSection, size: CoverGridSize) {
+        val sizes = _state.value.homeCoverGrids + (section to size)
+        prefs.edit().putString("home_cover_grid_sizes", CoverGridSize.format(sizes)).apply()
+        _state.value = _state.value.copy(homeCoverGrids = sizes)
+    }
+
     /** Every row back in its own look, and every card in Home's colour. */
     fun resetHomeLooks() {
-        prefs.edit().remove("home_looks").remove("home_grid_sizes").remove("home_card_look").remove("home_card_looks").apply()
-        _state.value = _state.value.copy(homeLooks = emptyMap(), homeGridSizes = emptyMap(), homeCardLook = CardLook.DEFAULT, homeCardLooks = emptyMap())
+        prefs.edit().remove("home_looks").remove("home_grid_sizes").remove("home_card_look").remove("home_card_looks").remove("home_carousel_on_cover").remove("home_carousel_compact").remove("home_carousel_small").remove("home_cover_grid_sizes").remove("home_variants").remove("home_pictures").remove("home_hero_card_pictures").remove("home_no_lines").remove("home_picture_colours").remove("home_names").apply()
+        _state.value = _state.value.copy(homeLooks = emptyMap(), homeGridSizes = emptyMap(), homeCardLook = CardLook.DEFAULT, homeCardLooks = emptyMap(), homeCarouselOnCover = emptySet(), homeCarouselCompact = emptySet(), homeCarouselSmall = emptySet(), homeCoverGrids = emptyMap(), homeVariants = emptyMap(), homePictures = emptyMap(), homeHeroCardPictures = emptyMap(), homePictureColours = emptyMap(), homeNames = emptyMap(), homeNoLines = emptySet())
     }
 
     /** How every coloured card on Home is painted (the owner, 13 Nov). */
@@ -932,6 +1080,32 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
      */
     private fun noteBlend(what: String, before: Any, after: Any) {
         if (before != after) app.siansa.log.AppLog.i("Settings", "$what: $before → $after")
+    }
+
+    fun setListenRange(id: String) {
+        app.siansa.log.AppLog.i("Settings", "Your listening shows: $id")
+        prefs.edit().putString("listen_range", id).apply()
+        _state.value = _state.value.copy(listenRange = id)
+    }
+
+    fun setListenColour(id: String) {
+        app.siansa.log.AppLog.i("Settings", "Your listening's colour: $id")
+        prefs.edit().putString("listen_colour", id).apply()
+        _state.value = _state.value.copy(listenColour = id)
+    }
+
+    fun setUntouchedPlayback(on: Boolean) {
+        app.siansa.log.AppLog.i("Settings", "Untouched playback: " + if (on) "on (crossfades, DJ blends and the equaliser are off)" else "off")
+        prefs.edit().putBoolean("untouched_playback", on).apply()
+        // Switched by hand: whatever was set aside for a DJ mix is over.
+        _state.value = _state.value.copy(untouchedPlayback = on, untouchedPaused = false)
+    }
+
+    /** Sets Untouched playback aside for a DJ mix, or takes it up again after it (issue #1345). The switch isn't touched. */
+    fun pauseUntouched(paused: Boolean) {
+        if (_state.value.untouchedPaused == paused) return
+        app.siansa.log.AppLog.i("Settings", "Untouched playback: " + if (paused) "paused for a DJ mix" else "on again, the DJ mix is over")
+        _state.value = _state.value.copy(untouchedPaused = paused)
     }
 
     fun setCrossfade(mode: CrossfadeMode = _state.value.crossfade, seconds: Int = _state.value.crossfadeSeconds) {
@@ -1041,3 +1215,17 @@ object BeatsUse {
     /** Home's mixes made from your listening (Siansa Beats 0.53), instead of your own carousels. */
     const val MIXES = "mixes"
 }
+
+/** The carousel's three sizes on Home (the owner, 20 Nov): big sleeves, compact (three in view), or a small strip. */
+enum class CrateSize(val label: String) { BIG("Big"), COMPACT("Compact"), SMALL("Small") }
+
+/** [section]'s carousel size, as kept. */
+fun AppSettings.carouselSize(section: HomeSection): CrateSize = when (section) {
+    in homeCarouselSmall -> CrateSize.SMALL
+    in homeCarouselCompact -> CrateSize.COMPACT
+    else -> CrateSize.BIG
+}
+
+/** Where [section]'s cards show their names: its own choice, a carousel's older "on the cover", or Auto. */
+fun AppSettings.cardNames(section: HomeSection): CardNames =
+    homeNames[section] ?: if (section in homeCarouselOnCover) CardNames.ON else CardNames.AUTO
