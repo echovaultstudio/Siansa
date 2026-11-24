@@ -101,8 +101,9 @@ fun HomeSettingsSheet(nav: androidx.navigation.NavController, startOnSources: Bo
     val beatsMakesMixes by app.siansa.net.BeatsSound.mixes.collectAsStateWithLifecycle()
     // The notices are the top of Home (issue #872), not a section to move: shown or not in Settings › Home › Top of Home.
     val beatsRows = beatsRows(beatsMakesMixes && s.beatsFor(app.siansa.data.BeatsUse.MIXES))
-    // More of you is Siansa Beats' alone: listed only while its mixes are on.
-    val offered = if (HomeSection.MORE_OF_YOU in beatsRows) emptySet() else setOf(HomeSection.NOTICES, HomeSection.MORE_OF_YOU)
+    // More of you is listed whoever makes Home's mixes (issue #1353): Siansa Beats', or this phone's On repeat and
+    // Discover for you.
+    val offered = setOf(HomeSection.NOTICES)
     ArrangeHomeSheet(s.homeOrder - offered - HomeSection.NOTICES, s.homeHidden, holds = beatsRows,
         sections = HomeSection.default - HomeSection.NOTICES - offered,
         listenColour = app.siansa.data.ListenColour.of(s.listenColour), onListenColour = { graph.settings.setListenColour(it.id) },

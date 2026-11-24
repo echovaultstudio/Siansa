@@ -320,6 +320,81 @@ fun HomeScreen(nav: NavController) {
             }
         }
     }
+    // Made for you and More of you when this phone makes Home's mixes, grouped as Siansa Beats groups its own (issue
+    // #1353; the owner, 24 Nov: "the grouping should be same as beats"): Made for you has the kinds of music you play
+    // most (this hour's vibe, Your sound) and your own cards; More of you has On repeat and Discover for you
+    // ([MixRules.personalIn]). Each in its row's own look.
+    val phoneMixRow: @Composable (HomeSection, HomeLook) -> Unit = { row, look ->
+        // The same tiles as plain items, for the other looks (issue #655).
+        val made: List<HomeItem> = buildList {
+            applicable.filter { aiMixes && row == HomeSection.MADE_FOR_YOU }.forEach { selector ->
+                val mix = todaysMixes.firstOrNull { it.selectorId == selector.id }
+                add(HomeItem(selector.id, mix?.title ?: "${selector.name} mix", madeForYouCaption(mix?.songs?.size, aiDown != null, "Tap to make today's mix"),
+                    mix?.songs?.firstOrNull()?.coverArt, open = { if (mix != null) nav.navigate("mix/${mix.id}") else build(selector, force = false, open = true) }, mosaic = mix?.songs?.map { it.cover }.orEmpty(), songs = mix?.songs.orEmpty()))
+            }
+            MixRules.personalIn(row).filter { kind ->
+                MixRules.showsPersonalTile(kind, homeSettings.soundReady, madeToday = todaysMixes.any { it.selectorId == kind.id }, notEnough = kind.id in notEnough)
+            }.forEach { kind ->
+                val mix = todaysMixes.firstOrNull { it.selectorId == kind.id }
+                add(HomeItem(kind.id, kind.title, madeForYouCaption(mix?.songs?.size, aiDown != null, "Tap to make it"),
+                    mix?.songs?.firstOrNull()?.coverArt, open = { if (mix != null) nav.navigate("mix/${mix.id}") else buildPersonal(kind, open = true) }, mosaic = mix?.songs?.map { it.cover }.orEmpty(), songs = mix?.songs.orEmpty()))
+            }
+            customCards.orEmpty().filter { row == HomeSection.MADE_FOR_YOU }.forEach { card -> add(HomeItem(card.id, card.title, open = { nav.navigate("card/${card.id}") })) }
+        }
+        val tiles: List<Pair<String, @Composable () -> Unit>> = buildList {
+            // The vibe's mix is an AI mix: only with AudioMuse (issue #486).
+            applicable.filter { aiMixes && row == HomeSection.MADE_FOR_YOU }.forEach { selector ->
+                add(selector.id to @Composable {
+                    val mix = todaysMixes.firstOrNull { it.selectorId == selector.id }
+                    // Just the title and track count (issue #338): the description is on the mix's page.
+                    GradientTile(
+                        title = mix?.title ?: "${selector.name} mix",
+                        colors = tileColors(selector.id),
+                        coverArt = mix?.songs?.firstOrNull()?.coverArt,
+                        caption = madeForYouCaption(mix?.songs?.size, aiDown != null, "Tap to make today's mix"),
+                        busy = busySelector == selector.id,
+                        onClick = { if (mix != null) nav.navigate("mix/${mix.id}") else build(selector, force = false, open = true) },
+                    )
+                })
+            }
+            MixRules.personalIn(row).filter { kind ->
+                MixRules.showsPersonalTile(
+                    kind, homeSettings.soundReady,
+                    madeToday = todaysMixes.any { it.selectorId == kind.id },
+                    notEnough = kind.id in notEnough,
+                )
+            }.forEach { kind ->
+                add(kind.id to @Composable {
+                    val mix = todaysMixes.firstOrNull { it.selectorId == kind.id }
+                    GradientTile(
+                        title = kind.title,
+                        colors = tileColors(kind.id),
+                        coverArt = mix?.songs?.firstOrNull()?.coverArt,
+                        caption = madeForYouCaption(mix?.songs?.size, aiDown != null, "Tap to make it"),
+                        busy = personalBusy == kind.id,
+                        onClick = { if (mix != null) nav.navigate("mix/${mix.id}") else buildPersonal(kind, open = true) },
+                    )
+                })
+            }
+            // Your own cards, added and named in Settings › Home › Cards (issue #274).
+            customCards.orEmpty().filter { row == HomeSection.MADE_FOR_YOU }.forEach { card ->
+                add(card.id to @Composable {
+                    GradientTile(
+                        title = card.title,
+                        colors = tileColors(card.id),
+                        onClick = { nav.navigate("card/${card.id}") },
+                    )
+                })
+            }
+        }
+        if (look != HomeLook.AS_IS) HomeLookRow(look, if (row == HomeSection.MADE_FOR_YOU) "made" else "more", row.label, made)
+        else Shelf(row.label, tiles, key = { it.first }) { it.second() }
+    }
+    // Whether a row has something of this phone's own: a mix from your listening that can be made or was made today;
+    // for Made for you, this hour's vibe or a card of your own too. A row with nothing isn't drawn, title and all.
+    fun phoneHas(row: HomeSection): Boolean = MixRules.personalIn(row).any { kind ->
+        MixRules.showsPersonalTile(kind, homeSettings.soundReady, madeToday = todaysMixes.any { it.selectorId == kind.id }, notEnough = kind.id in notEnough)
+    } || (row == HomeSection.MADE_FOR_YOU && ((aiMixes && applicable.isNotEmpty()) || customCards.orEmpty().isNotEmpty()))
     CompositionLocalProvider(LocalSectionGap provides homeGap(homeSettings.homeGap), LocalPictureMotion provides homeStill) {
     HomePullToRefresh(refreshing = pulling, onRefresh = pull) {
     LazyColumn(
@@ -469,74 +544,9 @@ fun HomeScreen(nav: NavController) {
                 // With Siansa Beats' mixes on: its Made for you, in this row's look (the owner, 17 Nov).
                 HomeSection.MADE_FOR_YOU -> if (beatsMixesShown) {
                     if (homeSettings.navidromeReady) titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, names = homeSettings.cardNames(section), crateSize = homeSettings.carouselSize(section), variant = homeSettings.homeVariants[section], picture = homeSettings.homePictures[section] ?: app.siansa.data.PictureStyle.AUTO, heroCardPicture = homeSettings.homeHeroCardPictures[section] ?: app.siansa.data.PictureStyle.AUTO, lines = section !in homeSettings.homeNoLines, pictureColours = homeSettings.homePictureColours[section] ?: app.siansa.data.PictureColours.COVERS, cardLook = cardLookOf(section), shortcutLook = shortcutLookOf(homeSettings.homeCardLooks[section], homeSettings.homePictureColours[section]), coverGrid = homeSettings.homeCoverGrids[section] ?: app.siansa.data.CoverGridSize.DEFAULT, key = "beats_made") { BeatsMixesHome(nav, setOf("daily"), look) }
-                } else {
-                    // Made for you: the vibe for this hour, then mixes from your own listening.
-                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, names = homeSettings.cardNames(section), crateSize = homeSettings.carouselSize(section), variant = homeSettings.homeVariants[section], picture = homeSettings.homePictures[section] ?: app.siansa.data.PictureStyle.AUTO, heroCardPicture = homeSettings.homeHeroCardPictures[section] ?: app.siansa.data.PictureStyle.AUTO, lines = section !in homeSettings.homeNoLines, pictureColours = homeSettings.homePictureColours[section] ?: app.siansa.data.PictureColours.COVERS, cardLook = cardLookOf(section), shortcutLook = shortcutLookOf(homeSettings.homeCardLooks[section], homeSettings.homePictureColours[section]), coverGrid = homeSettings.homeCoverGrids[section] ?: app.siansa.data.CoverGridSize.DEFAULT, key = "made") {
-                        // The same tiles as plain items, for the other looks (issue #655).
-                        val made: List<HomeItem> = buildList {
-                            applicable.filter { aiMixes }.forEach { selector ->
-                                val mix = todaysMixes.firstOrNull { it.selectorId == selector.id }
-                                add(HomeItem(selector.id, mix?.title ?: "${selector.name} mix", madeForYouCaption(mix?.songs?.size, aiDown != null, "Tap to make today's mix"),
-                                    mix?.songs?.firstOrNull()?.coverArt, open = { if (mix != null) nav.navigate("mix/${mix.id}") else build(selector, force = false, open = true) }, mosaic = mix?.songs?.map { it.cover }.orEmpty(), songs = mix?.songs.orEmpty()))
-                            }
-                            MixGenerator.Personal.entries.filter { kind ->
-                                MixRules.showsPersonalTile(kind, homeSettings.soundReady, madeToday = todaysMixes.any { it.selectorId == kind.id }, notEnough = kind.id in notEnough)
-                            }.forEach { kind ->
-                                val mix = todaysMixes.firstOrNull { it.selectorId == kind.id }
-                                add(HomeItem(kind.id, kind.title, madeForYouCaption(mix?.songs?.size, aiDown != null, "Tap to make it"),
-                                    mix?.songs?.firstOrNull()?.coverArt, open = { if (mix != null) nav.navigate("mix/${mix.id}") else buildPersonal(kind, open = true) }, mosaic = mix?.songs?.map { it.cover }.orEmpty(), songs = mix?.songs.orEmpty()))
-                            }
-                            customCards.orEmpty().forEach { card -> add(HomeItem(card.id, card.title, open = { nav.navigate("card/${card.id}") })) }
-                        }
-                        val tiles: List<Pair<String, @Composable () -> Unit>> = buildList {
-                            // The vibe's mix is an AI mix: only with AudioMuse (issue #486).
-                            applicable.filter { aiMixes }.forEach { selector ->
-                                add(selector.id to @Composable {
-                                    val mix = todaysMixes.firstOrNull { it.selectorId == selector.id }
-                                    // Just the title and track count (issue #338): the description is on the mix's page.
-                                    GradientTile(
-                                        title = mix?.title ?: "${selector.name} mix",
-                                        colors = tileColors(selector.id),
-                                        coverArt = mix?.songs?.firstOrNull()?.coverArt,
-                                        caption = madeForYouCaption(mix?.songs?.size, aiDown != null, "Tap to make today's mix"),
-                                        busy = busySelector == selector.id,
-                                        onClick = { if (mix != null) nav.navigate("mix/${mix.id}") else build(selector, force = false, open = true) },
-                                    )
-                                })
-                            }
-                            MixGenerator.Personal.entries.filter { kind ->
-                                MixRules.showsPersonalTile(
-                                    kind, homeSettings.soundReady,
-                                    madeToday = todaysMixes.any { it.selectorId == kind.id },
-                                    notEnough = kind.id in notEnough,
-                                )
-                            }.forEach { kind ->
-                                add(kind.id to @Composable {
-                                    val mix = todaysMixes.firstOrNull { it.selectorId == kind.id }
-                                    GradientTile(
-                                        title = kind.title,
-                                        colors = tileColors(kind.id),
-                                        coverArt = mix?.songs?.firstOrNull()?.coverArt,
-                                        caption = madeForYouCaption(mix?.songs?.size, aiDown != null, "Tap to make it"),
-                                        busy = personalBusy == kind.id,
-                                        onClick = { if (mix != null) nav.navigate("mix/${mix.id}") else buildPersonal(kind, open = true) },
-                                    )
-                                })
-                            }
-                            // Your own cards, added and named in Settings › Home › Cards (issue #274).
-                            customCards.orEmpty().forEach { card ->
-                                add(card.id to @Composable {
-                                    GradientTile(
-                                        title = card.title,
-                                        colors = tileColors(card.id),
-                                        onClick = { nav.navigate("card/${card.id}") },
-                                    )
-                                })
-                            }
-                        }
-                        if (look != HomeLook.AS_IS) HomeLookRow(look, "made", "Made for you", made)
-                        else Shelf("Made for you", tiles, key = { it.first }) { it.second() }
-                    }
+                } else if (phoneHas(section)) {
+                    // Made for you: the vibe for this hour and Your sound, then your own cards (phoneMixRow).
+                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, names = homeSettings.cardNames(section), crateSize = homeSettings.carouselSize(section), variant = homeSettings.homeVariants[section], picture = homeSettings.homePictures[section] ?: app.siansa.data.PictureStyle.AUTO, heroCardPicture = homeSettings.homeHeroCardPictures[section] ?: app.siansa.data.PictureStyle.AUTO, lines = section !in homeSettings.homeNoLines, pictureColours = homeSettings.homePictureColours[section] ?: app.siansa.data.PictureColours.COVERS, cardLook = cardLookOf(section), shortcutLook = shortcutLookOf(homeSettings.homeCardLooks[section], homeSettings.homePictureColours[section]), coverGrid = homeSettings.homeCoverGrids[section] ?: app.siansa.data.CoverGridSize.DEFAULT, key = "made") { phoneMixRow(section, look) }
                 }
                 HomeSection.CARDS -> {
                     // Your cards (issue #622), in the order set in Settings › Home › Cards; each is its own row.
@@ -667,9 +677,12 @@ fun HomeScreen(nav: NavController) {
                             })
                     }
                 }
-                // Siansa Beats' More of you, a row of its own (the owner, 17 Nov); nothing without its mixes.
-                HomeSection.MORE_OF_YOU -> if (beatsMixesShown && homeSettings.navidromeReady) {
-                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, names = homeSettings.cardNames(section), crateSize = homeSettings.carouselSize(section), variant = homeSettings.homeVariants[section], picture = homeSettings.homePictures[section] ?: app.siansa.data.PictureStyle.AUTO, heroCardPicture = homeSettings.homeHeroCardPictures[section] ?: app.siansa.data.PictureStyle.AUTO, lines = section !in homeSettings.homeNoLines, pictureColours = homeSettings.homePictureColours[section] ?: app.siansa.data.PictureColours.COVERS, cardLook = cardLookOf(section), shortcutLook = shortcutLookOf(homeSettings.homeCardLooks[section], homeSettings.homePictureColours[section]), coverGrid = homeSettings.homeCoverGrids[section] ?: app.siansa.data.CoverGridSize.DEFAULT, key = "beats_more") { BeatsMixesHome(nav, setOf("more"), look) }
+                // More of you, a row of its own (the owner, 17 Nov): Siansa Beats', or this phone's own.
+                HomeSection.MORE_OF_YOU -> if (beatsMixesShown) {
+                    if (homeSettings.navidromeReady) titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, names = homeSettings.cardNames(section), crateSize = homeSettings.carouselSize(section), variant = homeSettings.homeVariants[section], picture = homeSettings.homePictures[section] ?: app.siansa.data.PictureStyle.AUTO, heroCardPicture = homeSettings.homeHeroCardPictures[section] ?: app.siansa.data.PictureStyle.AUTO, lines = section !in homeSettings.homeNoLines, pictureColours = homeSettings.homePictureColours[section] ?: app.siansa.data.PictureColours.COVERS, cardLook = cardLookOf(section), shortcutLook = shortcutLookOf(homeSettings.homeCardLooks[section], homeSettings.homePictureColours[section]), coverGrid = homeSettings.homeCoverGrids[section] ?: app.siansa.data.CoverGridSize.DEFAULT, key = "beats_more") { BeatsMixesHome(nav, setOf("more"), look) }
+                } else if (phoneHas(section)) {
+                    // This phone's own (issue #1353): On repeat and Discover for you.
+                    titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, names = homeSettings.cardNames(section), crateSize = homeSettings.carouselSize(section), variant = homeSettings.homeVariants[section], picture = homeSettings.homePictures[section] ?: app.siansa.data.PictureStyle.AUTO, heroCardPicture = homeSettings.homeHeroCardPictures[section] ?: app.siansa.data.PictureStyle.AUTO, lines = section !in homeSettings.homeNoLines, pictureColours = homeSettings.homePictureColours[section] ?: app.siansa.data.PictureColours.COVERS, cardLook = cardLookOf(section), shortcutLook = shortcutLookOf(homeSettings.homeCardLooks[section], homeSettings.homePictureColours[section]), coverGrid = homeSettings.homeCoverGrids[section] ?: app.siansa.data.CoverGridSize.DEFAULT, key = "more") { phoneMixRow(section, look) }
                 }
                 HomeSection.RANDOM -> {
                     titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, names = homeSettings.cardNames(section), crateSize = homeSettings.carouselSize(section), variant = homeSettings.homeVariants[section], picture = homeSettings.homePictures[section] ?: app.siansa.data.PictureStyle.AUTO, heroCardPicture = homeSettings.homeHeroCardPictures[section] ?: app.siansa.data.PictureStyle.AUTO, lines = section !in homeSettings.homeNoLines, pictureColours = homeSettings.homePictureColours[section] ?: app.siansa.data.PictureColours.COVERS, cardLook = cardLookOf(section), shortcutLook = shortcutLookOf(homeSettings.homeCardLooks[section], homeSettings.homePictureColours[section]), coverGrid = homeSettings.homeCoverGrids[section] ?: app.siansa.data.CoverGridSize.DEFAULT, key = "random") {

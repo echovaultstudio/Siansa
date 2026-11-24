@@ -282,7 +282,9 @@ fun HomeHero(
             Text(title.uppercase(), style = MaterialTheme.typography.labelMedium.copy(letterSpacing = androidx.compose.ui.unit.TextUnit(1.5f, androidx.compose.ui.unit.TextUnitType.Sp)),
                 fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.8f))
             Row(horizontalArrangement = Arrangement.spacedBy(Space.Page), verticalAlignment = Alignment.Bottom) {
-                CardPicture(item.mosaic, item.coverArt, item.colors, item.title, Modifier.size(HERO_COVER), RoundedCornerShape(8.dp), 600, songIds = item.songIds, artists = item.artists)
+                // Its name stands beside it, so it's never on the picture as well (issue #1353: a mix not made yet, or
+                // an Aura, said "Wake up" twice).
+                CardPicture(item.mosaic, item.coverArt, item.colors, item.title, Modifier.size(HERO_COVER), RoundedCornerShape(8.dp), 600, names = false, songIds = item.songIds, artists = item.artists)
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
                     WholeWordsText(item.title, MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.ExtraBold), color = Color.White, maxLines = 3)
                     val line = listOf(item.subtitle, item.meta).filter { it.isNotBlank() }.joinToString(" · ")
