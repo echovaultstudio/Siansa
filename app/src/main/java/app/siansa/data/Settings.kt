@@ -130,6 +130,13 @@ data class AppSettings(
     /** Skipping in the book player, in seconds (issue #521): back 10, forward 30 by default; 10 to 90. */
     val bookSkipBackSec: Int = 10,
     val bookSkipForwardSec: Int = 30,
+    /**
+     * Fades for what the listener starts and stops (issue #1368), in ms, 0 for none: in when play is pressed and after
+     * a seek or a skip of their own, out at a pause or a stop and before a seek or a skip. Never between songs that
+     * follow on by themselves (gapless, a crossfade, a DJ blend).
+     */
+    val fadeInMs: Int = DEFAULT_FADE_IN_MS,
+    val fadeOutMs: Int = DEFAULT_FADE_OUT_MS,
     val aiTitles: Boolean = true,
     /**
      * Services switched off under Settings › Services (the owner, 13 Nov): [Service] ids. One that's off is left
@@ -380,6 +387,11 @@ data class AppSettings(
 
         /** The skips the book player offers, in seconds (issue #521). */
         val BOOK_SKIP_CHOICES = listOf(10, 15, 30, 45, 60, 90)
+
+        /** The lengths a fade can be set to, in ms; 0 is off (issue #1368). */
+        val FADE_CHOICES = listOf(0, 50, 100, 150, 250, 400, 600)
+        const val DEFAULT_FADE_IN_MS = 250
+        const val DEFAULT_FADE_OUT_MS = 150
         const val DEFAULT_MODEL = "google/gemini-2.5-flash"
         /** Close to what ReplayGain tags aim for, so switching where loudness comes from doesn't change the overall level. */
         const val DEFAULT_LOUDNESS_TARGET = -18
@@ -503,6 +515,8 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         audiobookshelfPassword = SecretBox.decrypt(shared.getString("abs_pass", "") ?: ""),
         bookSkipBackSec = prefs.getInt("book_skip_back", 10),
         bookSkipForwardSec = prefs.getInt("book_skip_fwd", 30),
+        fadeInMs = fadeChoice(prefs.getInt("fade_in_ms", AppSettings.DEFAULT_FADE_IN_MS)),
+        fadeOutMs = fadeChoice(prefs.getInt("fade_out_ms", AppSettings.DEFAULT_FADE_OUT_MS)),
         aiTitles = prefs.getBoolean("ai_titles", true),
         replayGain = runCatching { ReplayGainMode.valueOf(prefs.getString("rg", "TRACK") ?: "TRACK") }
             .getOrDefault(ReplayGainMode.TRACK),
@@ -651,6 +665,8 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
             audiobookshelfUser = input.audiobookshelfUser.trim(),
             bookSkipBackSec = input.bookSkipBackSec.coerceIn(10, 90),
             bookSkipForwardSec = input.bookSkipForwardSec.coerceIn(10, 90),
+            fadeInMs = fadeChoice(input.fadeInMs),
+            fadeOutMs = fadeChoice(input.fadeOutMs),
         )
     }
 
@@ -716,6 +732,8 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         prefs.edit().putString("am_server", s.audioMuseServer)
             .putInt("book_skip_back", s.bookSkipBackSec)
             .putInt("book_skip_fwd", s.bookSkipForwardSec)
+            .putInt("fade_in_ms", s.fadeInMs)
+            .putInt("fade_out_ms", s.fadeOutMs)
             .apply()
         _state.value = s
     }
@@ -1229,3 +1247,6 @@ fun AppSettings.carouselSize(section: HomeSection): CrateSize = when (section) {
 /** Where [section]'s cards show their names: its own choice, a carousel's older "on the cover", or Auto. */
 fun AppSettings.cardNames(section: HomeSection): CardNames =
     homeNames[section] ?: if (section in homeCarouselOnCover) CardNames.ON else CardNames.AUTO
+
+/** The fade length nearest to [ms] among the ones that can be chosen ([AppSettings.FADE_CHOICES]). */
+internal fun fadeChoice(ms: Int): Int = AppSettings.FADE_CHOICES.minBy { kotlin.math.abs(it - ms) }

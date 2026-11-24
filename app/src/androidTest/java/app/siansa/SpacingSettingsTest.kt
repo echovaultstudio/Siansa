@@ -436,4 +436,24 @@ class SpacingSettingsTest : SpacingCheck() {
         assertEven("Untouched playback: the margins left and right", row.left - screen.left, screen.right - row.right, 1.dp)
         assertEven("Untouched playback: the page's margin", row.left - screen.left, Space.Page, 1.dp)
     }
+
+    /** Playback's Fades (issue #1368): each row of chips sits the same way under its name, and both rows start at the same edge. */
+    @Test fun fadeChipsSitEvenlyUnderTheirNames() {
+        compose.setContent {
+            SiansaTheme {
+                Column(Modifier.padding(Space.Page)) {
+                    app.siansa.ui.FoldSection("Fades", "In 250 ms · out 150 ms", startOpen = true) {
+                        app.siansa.ui.FadesBody(app.siansa.data.AppSettings()) { _, _ -> }
+                    }
+                }
+            }
+        }
+        val inLabel = compose.onNodeWithTag("fadeInLabel").getBoundsInRoot()
+        val inChips = compose.onNodeWithTag("fadeIn").getBoundsInRoot()
+        val outLabel = compose.onNodeWithTag("fadeOutLabel").getBoundsInRoot()
+        val outChips = compose.onNodeWithTag("fadeOut").getBoundsInRoot()
+        assertEven("Fades: the gap between a name and its chips", inChips.top - inLabel.bottom, outChips.top - outLabel.bottom, 1.dp)
+        assertEven("Fades: both rows start at the same edge", inChips.left, outChips.left, 1.dp)
+        assertEven("Fades: a name starts where its chips do", inLabel.left, inChips.left, 1.dp)
+    }
 }

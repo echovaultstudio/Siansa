@@ -361,7 +361,15 @@ class PlaybackService : MediaLibraryService() {
                 .collect { withContext(Dispatchers.Main) { onQualitySettingsChanged() } }
         }
 
-        // Untouched playback switched in Settings › Playback: the sound takes its other way out now.
+        // The listener's fades (Settings › Playback › Fades, issue #1368): the engine has them for the next start or stop.
+        scope.launch {
+            graph.settings.state.map { it.fadeInMs to it.fadeOutMs }.distinctUntilChanged().collect { (fadeIn, fadeOut) ->
+                mixer?.fadeInMs = fadeIn
+                mixer?.fadeOutMs = fadeOut
+                AppLog.i("Engine", "Fades: in ${if (fadeIn == 0) "off" else "$fadeIn ms"}, out ${if (fadeOut == 0) "off" else "$fadeOut ms"}")
+            }
+        }
+
         scope.launch {
             graph.settings.state
                 .map { it.untouchedNow }
