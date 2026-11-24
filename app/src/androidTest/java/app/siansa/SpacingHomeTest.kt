@@ -297,11 +297,14 @@ class SpacingHomeTest : SpacingCheck() {
         compose.setContent {
             SiansaTheme {
                 androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalCoverDraw provides { _, _, modifier, _, _ -> androidx.compose.foundation.layout.Box(modifier) }) {
-                    app.siansa.ui.CardPicture(listOf("photo"), "photo", app.siansa.ui.tileColors("artist"), "Artist radio", Modifier.size(200.dp), round = true)
+                    // In a box with a tag of its own: the picture's tag names its look, which follows the row's Pictures.
+                    androidx.compose.foundation.layout.Box(Modifier.size(200.dp).testTag("roundCard")) {
+                        app.siansa.ui.CardPicture(listOf("photo"), "photo", app.siansa.ui.tileColors("artist"), "Artist radio", Modifier.size(200.dp), round = true)
+                    }
                 }
             }
         }
-        val whole = compose.onNodeWithTag("cardPicture-auto", useUnmergedTree = true).getBoundsInRoot()
+        val whole = compose.onNodeWithTag("roundCard", useUnmergedTree = true).getBoundsInRoot()
         val photo = compose.onNodeWithTag("cardPictureRound", useUnmergedTree = true).getBoundsInRoot()
         assertEven("Round photo: as wide as it's tall", photo.right - photo.left, photo.bottom - photo.top, 0.5.dp)
         assertEven("Round photo: room left and right", photo.left - whole.left, whole.right - photo.right, 0.5.dp)
