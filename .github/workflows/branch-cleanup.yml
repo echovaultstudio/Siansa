@@ -1,7 +1,9 @@
 name: Branch cleanup
 
-# Deletes branches whose work is already in main (every commit merged) and that have no open pull request,
-# so the branch list shows only work in progress. Branches with unmerged commits are listed, never deleted.
+# Deletes branches whose work is already in main or dev and that have no open pull request, so the branch list shows
+# only work in progress: a branch with every commit in main, or one whose pull request was merged (squashed too) and
+# that has nothing newer than what that pull request merged. Others are listed, never deleted. `dev` is always kept:
+# right after it goes to main, every commit of it is in main.
 # Runs weekly and on demand (Actions → Branch cleanup → Run workflow; "dry run" only lists).
 on:
   workflow_dispatch:
@@ -34,7 +36,7 @@ jobs:
         run: |
           set -euo pipefail
           # Branches the workflows and the release use, kept whatever their state.
-          keep=" main gh-pages "
+          keep=" main dev gh-pages showcase-shots "
           open=$(gh api "repos/${GITHUB_REPOSITORY}/pulls?state=open&per_page=100" --paginate --jq '.[].head.ref')
           deleted=0
           {
@@ -57,8 +59,22 @@ jobs:
               fi
               deleted=$((deleted + 1))
             else
-              ahead=$(git rev-list --count "origin/main..origin/$ref")
-              echo "- kept \`$ref\`: $ahead commits not in main" >> "$GITHUB_STEP_SUMMARY"
+              # Squashed into main or dev: its newest merged pull request's head is still the branch's tip.
+              tip=$(git rev-parse "origin/$ref")
+              merged=$(gh api -X GET "repos/${GITHUB_REPOSITORY}/pulls" -f state=closed -f head="${GITHUB_REPOSITORY_OWNER}:$ref" -f per_page=30 \
+                --jq '[.[] | select(.merged_at != null)] | max_by(.number) | .head.sha // empty')
+              if [ -n "$merged" ] && [ "$merged" = "$tip" ]; then
+                if [ "$DRY_RUN" = "true" ]; then
+                  echo "- would delete \`$ref\` (its pull request is merged)" >> "$GITHUB_STEP_SUMMARY"
+                else
+                  git push origin --delete "$ref"
+                  echo "- deleted \`$ref\` (its pull request is merged)" >> "$GITHUB_STEP_SUMMARY"
+                fi
+                deleted=$((deleted + 1))
+              else
+                ahead=$(git rev-list --count "origin/main..origin/$ref")
+                echo "- kept \`$ref\`: $ahead commits not in main, no merged pull request at its tip" >> "$GITHUB_STEP_SUMMARY"
+              fi
             fi
           done
           echo "Merged branches $( [ "$DRY_RUN" = "true" ] && echo 'that would be deleted' || echo deleted ): $deleted"
