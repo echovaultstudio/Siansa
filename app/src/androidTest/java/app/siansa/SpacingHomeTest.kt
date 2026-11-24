@@ -292,6 +292,22 @@ class SpacingHomeTest : SpacingCheck() {
         assertEven("Your listening: the gap between lists is a small step", dp(squares[1].left - squares[0].right), Space.Small, 1.dp)
     }
 
+    /** An artist's round photo (issue #1355): centred in its picture, the same room on every side, and as wide as it's tall. */
+    @Test fun anArtistsRoundPhotoIsCentredInItsPicture() {
+        compose.setContent {
+            SiansaTheme {
+                androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalCoverDraw provides { _, _, modifier, _, _ -> androidx.compose.foundation.layout.Box(modifier) }) {
+                    app.siansa.ui.CardPicture(listOf("photo"), "photo", app.siansa.ui.tileColors("artist"), "Artist radio", Modifier.size(200.dp), round = true)
+                }
+            }
+        }
+        val whole = compose.onNodeWithTag("cardPicture-auto", useUnmergedTree = true).getBoundsInRoot()
+        val photo = compose.onNodeWithTag("cardPictureRound", useUnmergedTree = true).getBoundsInRoot()
+        assertEven("Round photo: as wide as it's tall", photo.right - photo.left, photo.bottom - photo.top, 0.5.dp)
+        assertEven("Round photo: room left and right", photo.left - whole.left, whole.right - photo.right, 0.5.dp)
+        assertEven("Round photo: room above and below", photo.top - whole.top, whole.bottom - photo.bottom, 0.5.dp)
+    }
+
     /** Your listening's colours under its cog (issue #1347): three to a row, evenly spread, both rows alike. */
     @Test fun listenColoursAreEvenlySpread() {
         compose.setContent { SiansaTheme { Column(Modifier.padding(Space.Section)) { app.siansa.ui.ListenColourSwatches(app.siansa.data.ListenColour.TEAL) {} } } }

@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
@@ -500,6 +501,26 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     item("h4", "Easy Alternative Rock", "Steady alternative rock, sung"), item("h5", "Velvet Undertow", "Calm ambient, mostly instrumental"),
                 )
                 app.siansa.ui.HomeHero("For now", items.first(), play = {}, rowSongs = emptyList(), under = items.drop(1).take(3)) { _, _ -> }
+            },
+            // An artist's picture is round whatever the row's Pictures (issue #1355): as it comes, Frost and Stickers,
+            // then one with no photo, which keeps the row's own picture.
+            Scene("artist_round_pictures") {
+                val draw: app.siansa.ui.CoverDraw = { id, _, modifier, shape, _ ->
+                    val c = app.siansa.ui.tileColors(id ?: "none")
+                    Box(modifier.clip(shape).drawBehind { drawRect(Brush.linearGradient(listOf(c.first, c.second))) })
+                }
+                androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalCoverDraw provides draw) {
+                    Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Page)) {
+                        for (pair in listOf(app.siansa.data.PictureStyle.AUTO to app.siansa.data.PictureStyle.FROST, app.siansa.data.PictureStyle.PILE to app.siansa.data.PictureStyle.AURA)) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(Space.Page)) {
+                                for (style in listOf(pair.first, pair.second)) {
+                                    val photo = if (style == app.siansa.data.PictureStyle.AURA) null else "artist-$style"
+                                    app.siansa.ui.CardPicture(listOf(photo), photo, app.siansa.ui.tileColors("thornhill"), "Thornhill radio", Modifier.weight(1f).aspectRatio(1f), style = style, round = true)
+                                }
+                            }
+                        }
+                    }
+                }
             },
             // A hero in each Card colour of its row (issue #1351): Vivid, Soft, Plain, From the artwork, top to bottom.
             Scene("home_hero_card_colours") {
