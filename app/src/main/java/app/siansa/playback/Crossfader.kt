@@ -653,7 +653,7 @@ internal class Crossfader(
             }
             if (elapsed >= BeatMatch.EASE_MS) {
                 easingFrom = 0f
-                AppLog.d("Crossfade", "Beat-matching: held at %+.1f %% of the song's own speed, in $easeChanges steps".format(java.util.Locale.ROOT, (easingTo - 1) * 100))
+                AppLog.d("Crossfade", "Beat-matching: held at ${BeatMatch.percentOff(easingTo)} of the song's own speed, in $easeChanges steps")
             } else {
                 handler.postDelayed(this, EASE_TICK_MS)
             }
@@ -670,7 +670,7 @@ internal class Crossfader(
             "Crossfade",
             "Beat-matched blend done (${beat.shiftPercent} %): ${stepStats.describe()}, $jumps jump${if (jumps == 1) "" else "s"}, " +
                 "next song sent ${seekLag} ms ahead on this phone; " +
-                "held at %+.1f %% of the song's own speed".format(java.util.Locale.ROOT, (easingTo - 1) * 100),
+                "held at ${BeatMatch.percentOff(easingTo)} of the song's own speed",
         )
         handler.post(easeTick)
     }

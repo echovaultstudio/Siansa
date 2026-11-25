@@ -81,6 +81,12 @@ object BeatMatch {
     fun held(matched: Float): Float = matched.coerceIn(1f - HOLD_MAX, 1f + HOLD_MAX)
 
     /**
+     * A speed against a song's own as the log says it, "+1.6 %". Its own format, never a template's: a template with
+     * " %," in it crashed Siansa Dev ("Flags = ' ,'", the owner's log, 25 Nov).
+     */
+    fun percentOff(speed: Float): String = String.format(java.util.Locale.ROOT, "%+.1f", (speed - 1) * 100) + " %"
+
+    /**
      * The speed the next song plays at so its beats keep time with [outgoing]'s (1 = as it is), counting double
      * and half time as the same tempo; null when that would be more than [MAX_SHIFT] off.
      */
