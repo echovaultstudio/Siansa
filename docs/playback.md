@@ -178,9 +178,11 @@ blend them the way a DJ mixes:
   at the end of a phrase: a short last part-phrase (less than half a phrase) isn't played, so both songs' phrases
   end together. Without phrases, the blend starts on a bar of the song going out, the next song starts on its first
   downbeat, and the blend is the Blend length in whole bars. Either way the next song plays a touch faster or slower (up
-  to 8 %) so its beats keep time with the old song's, then eases back to its own speed over about 25
-  seconds, in small steps too slight to hear. A shift of more than 4 % is kept to 8 bars, however long the Blend
-  length, so the song is back at its own speed sooner.
+  to 8 %) so its beats keep time with the old song's, matched to the old song as it plays. After the blend the song
+  keeps that speed to its end, as a DJ leaves the deck's tempo where it is: nothing glides. A song matched more than
+  2 % off its own speed eases back to 2 % over about 25 seconds, in small steps, so a long mix never wanders off. A
+  song you start yourself plays at its own speed. A shift of more than 4 % is kept to 8 bars, however long the Blend
+  length.
 - **Smart picks how to blend (with Siansa Beats' readings at both ends, and the keys from AudioMuse-AI):**
   - **Long blend**, 32 bars with the bass swapped in the middle: tempos within 2 %, keys that mix, both ends sure of
     their beat, and 8 bars or more without bass at one end. With Siansa Beats 0.60 or newer, only where the two
@@ -263,9 +265,10 @@ both songs would sing at once, the mids still swap where only one voice is heard
 echo out keep their own way out, and a blend that isn't sure of its bars or phrases glides. The log names the style
 ("EQ: tease, then swap: …"), and **Mark the last blend** keeps it, so a style that doesn't suit your music shows up.
 
-Echo at the end and Keep the key are off for now and not shown in Settings: the blends play plain, and the next
-song's pitch moves with its speed (by at most two thirds of a semitone at 4 %, like a DJ's pitch fader), then glides
-back as it eases to its own speed.
+**Keep the key** (on as it comes) leaves a song's pitch where it is when a blend changes its speed: the sound is
+stretched in time instead. Off, the pitch moves with the speed, like a DJ's pitch fader (by at most two thirds of a
+semitone at 4 %). If sharp drums sound rough with it on, switch it off. Echo at the end is off for now and not shown
+in Settings.
 
 Tempos are counted the way a DJ counts: a beat the plugin read at half time (drum and bass at 87, house at 63)
 is doubled, so a blend's bars are real bars. Tracks of a continuous mix ("(Mixed)", "[Mixed]", a "DJ Mix" or

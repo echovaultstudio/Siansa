@@ -26,10 +26,10 @@ data class Blending(
         const val SMART_BARS = 16
 
         fun of(s: AppSettings): Blending = when (s.crossfade) {
-            // The bass always swaps; the echo at the end and keeping the key are off (the owner, 0.52.0-dev), with no
-            // setting any more: the audio engine keeps both, for later.
-            CrossfadeMode.SMART -> Blending(SMART_MAX_MS, SMART_BARS, bassSwap = true, echoTail = false, keepKey = false)
-            else -> Blending(s.crossfadeSeconds * 1000L, s.blendBars, bassSwap = true, echoTail = false, keepKey = false)
+            // The bass always swaps; the echo at the end is off (the owner, 0.52.0-dev). Keep the key is a setting again
+            // (the owner, 25 Nov), now a song keeps its matched speed after a blend.
+            CrossfadeMode.SMART -> Blending(SMART_MAX_MS, SMART_BARS, bassSwap = true, echoTail = false, keepKey = s.djKeepKey)
+            else -> Blending(s.crossfadeSeconds * 1000L, s.blendBars, bassSwap = true, echoTail = false, keepKey = s.djKeepKey)
         }
 
         /** Whether a change is beat-matched: in DJ playback, with crossfade on (Smart or Fixed). */

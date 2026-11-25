@@ -98,8 +98,16 @@ internal class MixedCrossfader(
     private var loggedStage = 0
     private var lateLogged = false
     private var easingFrom = 0f
+    private var easingTo = 1f
     private var easingSince = 0L
     private var easeChanges = 0
+    /**
+     * The song playing's speed against the listener's own ([baseSpeed]): what a blend matched it at, held after it
+     * ([BeatMatch.held], the owner, 25 Nov); 1 for a song that came in any other way.
+     */
+    private var held = 1f
+    /** A beat-matched blend's next song's speed against the listener's own: the old song's [held] times the match. */
+    private var blendSpeed = 1f
 
     override fun start() {
         main.addListener(this)
@@ -325,8 +333,10 @@ internal class MixedCrossfader(
             disarm()
             return
         }
-        baseSpeed = main.playbackParameters.speed.takeIf { it > 0f } ?: 1f
-        t.playbackParameters = BeatMatch.parameters(baseSpeed, baseSpeed, Blending.of(settings()).keepKey)
+        // The old song may be held at a blend's speed: the listener's own is that taken out, and its copy plays on at
+        // the same speed and pitch.
+        baseSpeed = (main.playbackParameters.speed.takeIf { it > 0f } ?: 1f) / held
+        t.playbackParameters = BeatMatch.parameters(baseSpeed * held, baseSpeed, Blending.of(settings()).keepKey)
         val cued = tMix.cueNow(handoverAt * 1000, gate, engine.outRate)
         if (cued == null) {
             AppLog.w("Crossfade", "The song's second copy couldn't be cued; playing on without a crossfade")
@@ -386,7 +396,9 @@ internal class MixedCrossfader(
         incomingFrom = from
         incomingMix = at?.let { ceil(it).toLong() } ?: (engine.writtenMix + MIN_CUE_FRAMES)
         if (beat != null) {
-            main.playbackParameters = BeatMatch.parameters(baseSpeed * beat.speed, baseSpeed, Blending.of(settings()).keepKey)
+            // Matched to the old song as it plays: at its held speed (issue: the owner, 25 Nov).
+            blendSpeed = held * beat.speed
+            main.playbackParameters = BeatMatch.parameters(baseSpeed * blendSpeed, baseSpeed, Blending.of(settings()).keepKey)
             if (Blending.of(settings()).bassSwap) {
                 mainMix.filter.shelfDb = DeckFilter.SHELF_START_DB
                 AppLog.d("Crossfade", "Bass swap over the first ${SWAP_FRACTION_PERCENT} % of the blend: next song's bass held back ${-DeckFilter.SHELF_START_DB.toInt()} dB, old song's cut up to ${DeckFilter.LOW_CUT_HZ.toInt()} Hz")
@@ -614,13 +626,13 @@ internal class MixedCrossfader(
         override fun run() {
             if (easingFrom == 0f) return
             val elapsed = SystemClock.elapsedRealtime() - easingSince
-            BeatMatch.easeStep(easingFrom, elapsed, main.playbackParameters.speed, baseSpeed)?.let {
+            BeatMatch.easeStep(easingFrom, elapsed, main.playbackParameters.speed, baseSpeed, easingTo)?.let {
                 easeChanges++
                 main.playbackParameters = BeatMatch.parameters(it, baseSpeed, Blending.of(settings()).keepKey)
             }
             if (elapsed >= BeatMatch.EASE_MS) {
                 easingFrom = 0f
-                AppLog.d("Crossfade", "Beat-matching: back at the song's own speed, in $easeChanges steps")
+                AppLog.d("Crossfade", "Beat-matching: held at %+.1f %% of the song's own speed, in $easeChanges steps".format(java.util.Locale.ROOT, (easingTo - 1) * 100))
             } else {
                 handler.postDelayed(this, EASE_TICK_MS)
             }
@@ -628,23 +640,34 @@ internal class MixedCrossfader(
     }
 
     private fun startEasing(beat: BeatMatch.Plan) {
-        easingFrom = beat.speed
+        easingFrom = blendSpeed
+        easingTo = BeatMatch.held(blendSpeed)
+        held = easingTo
         easingSince = SystemClock.elapsedRealtime()
         easeChanges = 0
         AppLog.i(
             "Crossfade",
-            "Beat-matched blend done (${beat.shiftPercent} %): ${stepStats.describe()}, on one clock (new audio engine); " +
-                "easing back to the song's own speed over ${BeatMatch.EASE_MS / 1000} s",
+            "Beat-matched blend done (${beat.shiftPercent} %, %+.1f %% of the song's own speed): ${stepStats.describe()}, on one clock (new audio engine); ".format(java.util.Locale.ROOT, (blendSpeed - 1) * 100) +
+                if (easingTo == blendSpeed) "held there" else "easing to %+.1f %% over ${BeatMatch.EASE_MS / 1000} s, held there".format(java.util.Locale.ROOT, (easingTo - 1) * 100),
         )
         handler.post(easeTick)
     }
 
+    /** Ends any easing at once, at the speed the song is held at (a seek, a new blend). */
     private fun stopEasing() {
         handler.removeCallbacks(easeTick)
         if (easingFrom != 0f) {
             easingFrom = 0f
-            main.playbackParameters = BeatMatch.parameters(baseSpeed, baseSpeed, Blending.of(settings()).keepKey)
+            main.playbackParameters = BeatMatch.parameters(baseSpeed * held, baseSpeed, Blending.of(settings()).keepKey)
         }
+    }
+
+    /** A song that came in any other way than a blend plays at the listener's own speed. */
+    private fun unhold() {
+        if (held == 1f) return
+        held = 1f
+        main.playbackParameters = BeatMatch.parameters(baseSpeed, baseSpeed, Blending.of(settings()).keepKey)
+        AppLog.d("Crossfade", "Beat-matching: a new song, back at its own speed")
     }
 
     // ---- Ending ----
@@ -765,7 +788,7 @@ internal class MixedCrossfader(
             if (beat != null && main.currentMediaItemIndex == incomingIndex) {
                 startEasing(beat)
             } else if (beat != null) {
-                main.playbackParameters = BeatMatch.parameters(baseSpeed, baseSpeed, Blending.of(settings()).keepKey)
+                main.playbackParameters = BeatMatch.parameters(baseSpeed * held, baseSpeed, Blending.of(settings()).keepKey)
             }
             // Stopped before the next song came in: the old song's main copy sounds again.
             if (main.currentMediaItemIndex != incomingIndex) uncut()
@@ -856,6 +879,7 @@ internal class MixedCrossfader(
             return
         }
         stopEasing()
+        unhold()
         skipped = null
         backToBackAt = if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) System.nanoTime() else 0L
         handler.removeCallbacks(soundCheck)
