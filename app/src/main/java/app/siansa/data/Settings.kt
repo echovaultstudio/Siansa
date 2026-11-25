@@ -137,6 +137,11 @@ data class AppSettings(
      */
     val fadeInMs: Int = DEFAULT_FADE_IN_MS,
     val fadeOutMs: Int = DEFAULT_FADE_OUT_MS,
+    /**
+     * A DJ blend's speed change leaves the next song's pitch as it is (time-stretched, the owner, 25 Nov: the pitch
+     * moving was heard); off, the pitch moves with the speed, as on a DJ's pitch fader.
+     */
+    val djKeepKey: Boolean = true,
     val aiTitles: Boolean = true,
     /**
      * Services switched off under Settings › Services (the owner, 13 Nov): [Service] ids. One that's off is left
@@ -519,6 +524,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         bookSkipForwardSec = prefs.getInt("book_skip_fwd", 30),
         fadeInMs = fadeChoice(prefs.getInt("fade_in_ms", AppSettings.DEFAULT_FADE_IN_MS)),
         fadeOutMs = fadeChoice(prefs.getInt("fade_out_ms", AppSettings.DEFAULT_FADE_OUT_MS)),
+        djKeepKey = prefs.getBoolean("dj_keep_key", true),
         aiTitles = prefs.getBoolean("ai_titles", true),
         replayGain = runCatching { ReplayGainMode.valueOf(prefs.getString("rg", "TRACK") ?: "TRACK") }
             .getOrDefault(ReplayGainMode.TRACK),
@@ -736,6 +742,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
             .putInt("book_skip_fwd", s.bookSkipForwardSec)
             .putInt("fade_in_ms", s.fadeInMs)
             .putInt("fade_out_ms", s.fadeOutMs)
+            .putBoolean("dj_keep_key", s.djKeepKey)
             .apply()
         _state.value = s
     }

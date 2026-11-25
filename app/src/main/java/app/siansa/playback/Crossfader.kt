@@ -121,8 +121,13 @@ internal class Crossfader(
     private var plannedWithNext = true
     /** After a beat-matched blend: the matched speed being eased back from, and since when. */
     private var easingFrom = 0f
+    private var easingTo = 1f
     private var easingSince = 0L
     private var easeChanges = 0
+    /** The song playing's speed against the listener's own, held after a blend ([BeatMatch.held]); 1 otherwise. */
+    private var held = 1f
+    /** A beat-matched blend's next song's speed against the listener's own: the old song's [held] times the match. */
+    private var blendSpeed = 1f
     /** The last 4-bar stage of a beat-matched blend logged. */
     private var loggedStage = 0
     /** When the silent tail's catch-up was last logged. */
@@ -401,7 +406,7 @@ internal class Crossfader(
         seekLead = null
         seekTarget = -1L
         stopEasing()
-        baseSpeed = main.playbackParameters.speed.takeIf { it > 0f } ?: 1f
+        baseSpeed = (main.playbackParameters.speed.takeIf { it > 0f } ?: 1f) / held
         phase = Phase.FADING
         if (planned.beat != null && Blending.of(settings()).echoTail) openEcho(t)
         val wasPrimed = primed && t.isPlaying
@@ -467,7 +472,8 @@ internal class Crossfader(
                         }
                         // The new song comes in at the matched speed, where it should be right now against the old
                         // song's beats (the old song's position is the tail's).
-                        setSpeed(main, baseSpeed * beat.speed)
+                        blendSpeed = held * beat.speed
+                        setSpeed(main, baseSpeed * blendSpeed)
                         // Sent ahead by what getting there takes on this phone, so it lands on the beat (issue #747).
                         val lead = seekLag
                         seekLead = lead
@@ -561,7 +567,7 @@ internal class Crossfader(
             return
         }
         // Only a change worth hearing is sent: re-tuning the time-stretcher every 50 ms is heard as a flutter (#773).
-        val wanted = baseSpeed * beat.speed * BeatMatch.nudge(error)
+        val wanted = baseSpeed * blendSpeed * BeatMatch.nudge(error)
         if (BeatMatch.worthChanging(main.playbackParameters.speed, wanted)) setSpeed(main, wanted)
     }
 
@@ -641,13 +647,13 @@ internal class Crossfader(
             if (easingFrom == 0f) return
             val elapsed = SystemClock.elapsedRealtime() - easingSince
             // Only steps worth hearing as a tempo change: each one re-tunes the resampler (issue #796).
-            BeatMatch.easeStep(easingFrom, elapsed, main.playbackParameters.speed, baseSpeed)?.let {
+            BeatMatch.easeStep(easingFrom, elapsed, main.playbackParameters.speed, baseSpeed, easingTo)?.let {
                 easeChanges++
                 setSpeed(main, it)
             }
             if (elapsed >= BeatMatch.EASE_MS) {
                 easingFrom = 0f
-                AppLog.d("Crossfade", "Beat-matching: back at the song's own speed, in $easeChanges steps")
+                AppLog.d("Crossfade", "Beat-matching: held at %+.1f %% of the song's own speed, in $easeChanges steps".format(java.util.Locale.ROOT, (easingTo - 1) * 100))
             } else {
                 handler.postDelayed(this, EASE_TICK_MS)
             }
@@ -655,32 +661,42 @@ internal class Crossfader(
     }
 
     private fun startEasing(beat: BeatMatch.Plan) {
-        easingFrom = beat.speed
+        easingFrom = blendSpeed
+        easingTo = BeatMatch.held(blendSpeed)
+        held = easingTo
         easingSince = SystemClock.elapsedRealtime()
         easeChanges = 0
         AppLog.i(
             "Crossfade",
             "Beat-matched blend done (${beat.shiftPercent} %): ${stepStats.describe()}, $jumps jump${if (jumps == 1) "" else "s"}, " +
                 "next song sent ${seekLag} ms ahead on this phone; " +
-                "easing back to the song's own speed over ${BeatMatch.EASE_MS / 1000} s",
+                "held at %+.1f %% of the song's own speed".format(java.util.Locale.ROOT, (easingTo - 1) * 100),
         )
         handler.post(easeTick)
     }
 
-    /** Ends any easing at once, back at the song's own speed (a skip, a seek, a new fade). */
+    /** Ends any easing at once, at the speed the song is held at (a seek, a new fade). */
     private fun stopEasing() {
         handler.removeCallbacks(easeTick)
         if (easingFrom != 0f) {
             easingFrom = 0f
-            setSpeed(main, baseSpeed)
+            setSpeed(main, baseSpeed * held)
         }
+    }
+
+    /** A song that came in any other way than a blend plays at the listener's own speed. */
+    private fun unhold() {
+        if (held == 1f) return
+        held = 1f
+        setSpeed(main, baseSpeed)
+        AppLog.d("Crossfade", "Beat-matching: a new song, back at its own speed")
     }
 
     private fun finish() {
         handler.removeCallbacks(fadeTick)
         val beat = plan?.beat
         if (beat != null && phase == Phase.FADING && switched) {
-            if (main.currentMediaItemIndex == incomingIndex) startEasing(beat) else setSpeed(main, baseSpeed)
+            if (main.currentMediaItemIndex == incomingIndex) startEasing(beat) else setSpeed(main, baseSpeed * held)
         }
         phase = Phase.IDLE
         primed = false
@@ -737,6 +753,7 @@ internal class Crossfader(
             return
         }
         stopEasing()
+        unhold()
         skipped = null
         if (phase == Phase.READY && mediaItem?.mediaId != outgoing) disarm()
         poke()

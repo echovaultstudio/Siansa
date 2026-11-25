@@ -162,6 +162,14 @@ fun CrossfadeScreen(nav: NavController) {
                 // DJ blends on Siansa Beats' beat grids: here with the fades (the owner, 17 Nov), not on Beats' page.
                 BeatsUseSwitch(graph, app.siansa.data.BeatsUse.DJ)
                 if (settings.crossfade != CrossfadeMode.OFF) {
+                    // A blend's speed change with or without the pitch (the owner, 25 Nov).
+                    SwitchRow(
+                        "Keep the key",
+                        "A DJ blend changes a song's speed a little to match the beats. On, its pitch stays the same; off, it moves with the speed, as on a DJ's deck.",
+                        settings.djKeepKey, tag = "djKeepKey",
+                    ) { graph.settings.save(graph.settings.current.copy(djKeepKey = it)) }
+                }
+                if (settings.crossfade != CrossfadeMode.OFF) {
                     Hint(
                         // The TV app plays on the TV itself and has no sleep timer (issue #860).
                         if (app.siansa.BuildConfig.TV_APP) "Not used with Repeat one, or for Dolby and DTS songs sent to your receiver."

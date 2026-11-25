@@ -68,8 +68,17 @@ object BeatMatch {
     const val STALL_MS = 400L
     /** How many step readings go into the smoothed error (at 20 ms ticks, a tenth of a second). */
     const val STEP_READINGS = 5
-    /** After the blend, the next song eases back to its own speed over this long. */
+    /** After the blend, the next song eases to the speed it's held at over this long. */
     const val EASE_MS = 25_000L
+    /**
+     * After a blend the next song keeps the speed it was matched at (the owner, 25 Nov: the glide back to its own speed
+     * was heard as the pitch moving), within this of its own speed: a bigger match eases only that far back, so the next
+     * blend never needs more than [MAX_SHIFT] and this together, and a long mix doesn't wander off.
+     */
+    const val HOLD_MAX = 0.02f
+
+    /** The speed a song is held at after a blend matched it at [matched] (both against its own speed, 1). */
+    fun held(matched: Float): Float = matched.coerceIn(1f - HOLD_MAX, 1f + HOLD_MAX)
 
     /**
      * The speed the next song plays at so its beats keep time with [outgoing]'s (1 = as it is), counting double
@@ -530,20 +539,20 @@ object BeatMatch {
     }
 
     /**
-     * The speed to send while easing back after a blend, [elapsedMs] after it ended, with the song playing at
-     * [playing] (both times [base], the listener's own speed); null when it isn't worth a change yet (issue #796).
-     * Every change re-tunes the time-stretcher and is heard (issue #773), so the ease goes in steps of [NUDGE_STEP]
-     * at least: about 20 for a 3 % match, where a change every 200 ms made 125 of them.
+     * The speed to send while easing after a blend, [elapsedMs] after it ended, from [matched] to [to] ([held]: the
+     * same, for a match within [HOLD_MAX]), with the song playing at [playing] (all times [base], the listener's own
+     * speed); null when it isn't worth a change yet (issue #796). Every change re-tunes the time-stretcher and is heard
+     * (issue #773), so the ease goes in steps of [NUDGE_STEP] at least.
      */
-    fun easeStep(matched: Float, elapsedMs: Long, playing: Float, base: Float = 1f): Float? {
-        if (elapsedMs >= EASE_MS) return if (playing != base) base else null
-        val wanted = base * eased(matched, elapsedMs)
+    fun easeStep(matched: Float, elapsedMs: Long, playing: Float, base: Float = 1f, to: Float = 1f): Float? {
+        if (elapsedMs >= EASE_MS) return (base * to).takeIf { playing != it }
+        val wanted = base * eased(matched, elapsedMs, to)
         return wanted.takeIf { abs(playing - it) >= NUDGE_STEP * base }
     }
 
-    /** The speed [elapsedMs] after the blend ended: from [matched] back to 1, a straight line over [EASE_MS]. */
-    fun eased(matched: Float, elapsedMs: Long): Float {
+    /** The speed [elapsedMs] after the blend ended: from [matched] to [to], a straight line over [EASE_MS]. */
+    fun eased(matched: Float, elapsedMs: Long, to: Float = 1f): Float {
         val t = (elapsedMs.toDouble() / EASE_MS).coerceIn(0.0, 1.0)
-        return (matched + (1f - matched) * t).toFloat()
+        return (matched + (to - matched) * t).toFloat()
     }
 }

@@ -25,7 +25,9 @@ class SmartBlendTest {
 
     @Test fun smartHasNothingToSetAndFixedTakesTheListenersChoices() {
         val s = AppSettings(crossfade = CrossfadeMode.SMART, crossfadeSeconds = 6, blendBars = 4)
-        assertEquals(Blending(Blending.SMART_MAX_MS, Blending.SMART_BARS, bassSwap = true, echoTail = false, keepKey = false), Blending.of(s))
+        assertEquals(Blending(Blending.SMART_MAX_MS, Blending.SMART_BARS, bassSwap = true, echoTail = false, keepKey = true), Blending.of(s))
+        // Keep the key is the listener's (the owner, 25 Nov): on as it comes.
+        assertFalse(Blending.of(s.copy(djKeepKey = false)).keepKey)
         val fixed = Blending.of(s.copy(crossfade = CrossfadeMode.FIXED))
         assertEquals(6_000L, fixed.maxMs)
         assertEquals(4, fixed.blendBars)
