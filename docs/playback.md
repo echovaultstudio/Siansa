@@ -58,7 +58,7 @@ match it; Bluetooth then compresses the sound. A USB DAC or a wired output gets 
 
 ## Downloads
 
-**Settings › Storage › Downloads** (or the download button on an album or playlist): music you download stays on the phone
+**Settings › Storage › Downloads** (or **Download** in an album's ⊕, or the download button on a playlist): music you download stays on the phone
 and plays without a connection. It isn't part of the song cache and is never removed by itself.
 
 - **Download on Wi-Fi only** (on by default).
@@ -391,6 +391,7 @@ Player › About this song**.
 Turn on **Settings › Player › Star ratings** to rate songs from one to five stars. Tap a star to give that many;
 tap the rating again to take it off. The stars show in **About this song**, in the lower part of now playing, and
 under the title as well if you switch that on. A song's **⋮** menu has **Rate** too, in now playing and in every list.
+Albums can be rated as well, from the **⊕** on an album's page ([An album's page](home-and-mixes.md#an-albums-page)).
 
 Ratings are kept on your server with `setRating`, so other apps see them, and Siansa shows what the server has (a copy
 on the phone shows at once and offline). A rating needs the connection: if the server can't be reached, the stars go

@@ -607,6 +607,7 @@ class SubsonicApi(
         isCompilation = o.bool("isCompilation") == true || isVariousArtists(o.str("artist") ?: o.str("displayArtist").orEmpty()),
         played = o.str("played"),
         labels = o.arr("recordLabels").mapNotNull { it.str("name")?.trim()?.takeIf(String::isNotEmpty) }.distinct(),
+        userRating = o.int("userRating")?.takeIf { it in 1..5 },
     )
 
     private fun parsePlaylist(o: JsonObject) = Playlist(

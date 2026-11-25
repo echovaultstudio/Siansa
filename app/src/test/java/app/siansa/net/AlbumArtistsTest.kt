@@ -36,6 +36,23 @@ class AlbumArtistsTest {
         assertEquals("a1", album.artistId)
     }
 
+    /** Your rating of an album (issue #1334): OpenSubsonic's userRating with the album; 0 or none is not rated. */
+    @Test fun navidromeSaysYourRatingOfAnAlbum() = runBlocking {
+        fun albumOf(rating: String): app.siansa.data.Album {
+            val answer = """{"subsonic-response": {"status": "ok", "version": "1.16.1", "openSubsonic": true, "album": {
+                "id": "al1", "name": "Glass Rivers", "artist": "Halden Vale", "artistId": "a1"$rating, "song": []}}}"""
+            val http = OkHttpClient.Builder().addInterceptor(Interceptor { chain ->
+                Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1).code(200).message("OK")
+                    .body(answer.toResponseBody("application/json".toMediaType())).build()
+            }).build()
+            val settings = AppSettings(navidromeUrl = "http://192.168.32.129:4533", navidromeUser = "max", navidromePassword = "sesame")
+            return kotlinx.coroutines.runBlocking { SubsonicApi(http) { settings }.album("al1").album }
+        }
+        assertEquals(4, albumOf(""", "userRating": 4""").userRating)
+        assertEquals(null, albumOf("").userRating)
+        assertEquals(null, albumOf(""", "userRating": 0""").userRating)
+    }
+
     @Test fun embyAndJellyfinListEachAlbumArtist() {
         val item = AppJson.parseToJsonElement("""{"Id": "al1", "Name": "9 months & 50 hours", "AlbumArtist": "Fred again..",
             "AlbumArtists": [{"Id": "a1", "Name": "Fred again.."}, {"Id": "a2", "Name": "LATIN MAFIA"}]}""") as JsonObject

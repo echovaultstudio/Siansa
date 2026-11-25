@@ -405,6 +405,22 @@ and **Stations**. **Favourites** has Liked songs, your favourite albums and arti
   restarts: Playlists can be a grid while Music's Artists stay a list. Albums, Artists and Songs under Music each
   keep their own.
 
+## An album's page
+
+The **⊕** under the album's title opens everything you do with the album, in one sheet:
+
+- **Your rating**: tap a star to give the album that many; tap it again to take the rating off. It's kept on your
+  server with OpenSubsonic's `setRating`, as for songs (see [Star ratings](playback.md#star-ratings)). Shown with star
+  ratings on, on Navidrome and other Subsonic servers; Emby and Jellyfin keep no ratings.
+- **Play next**: the whole album after the song playing, in its order.
+- **Add to queue**: the whole album after what you queued before.
+- **Add to playlist**: the playlists to pick from, or a new one.
+- **Download** (or **Downloaded**, tap to remove): for listening without a connection. The line under the title says
+  **Downloaded**, or how far the download has got.
+- **Clear all images**: gets the album's pictures again from the server. Holding the cover does it too.
+
+Beside the ⊕ is the heart, for your favourite albums; on the right, similar albums, shuffle and Play.
+
 ## Long lists
 
 Liked songs, playlists, albums, favourite albums and artists, and the full lists behind Home's shelves have a

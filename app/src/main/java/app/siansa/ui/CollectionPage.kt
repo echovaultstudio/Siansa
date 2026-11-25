@@ -138,6 +138,8 @@ fun CollectionPage(
     lastPlayed: Pair<Int, String>? = null,
     // An album's own bar (issue #965): Download, Similar albums, Shuffle and Play spread evenly, no queue button.
     albumBar: Boolean = false,
+    /** The album's ⊕ (issue #1331): opens its sheet. Without it the plus adds the album to a playlist. */
+    onAlbumPlus: (() -> Unit)? = null,
     // Where Play continues an album you stopped part way (issue #965, was "Continue from" #367): Play shows it.
     resume: PlayResume? = null,
     // Shuffle slides onto Play for a DJ mix of just these songs, as an album's does: on playlists, radios, mixes and
@@ -337,7 +339,7 @@ fun CollectionPage(
                         // Only when a DJ mix's needs are met (AudioMuse and Siansa Beats): otherwise a plain Shuffle.
                         onDjMix = if (((albumBar && onSimilar != null) || djMix) && djPossible && playAs == null) ({ DjNeedsBlends.then(graph) { graph.scope.launch { app.siansa.mix.AlbumDjMix.start(graph, title, songs.orEmpty()) } } }) else null,
                         djSlide = djSlide, onDjSlide = { djSlide = it }, dim = slideDim, albumBar = albumBar, resume = resume,
-                        rowExtras = rowExtras,
+                        rowExtras = rowExtras, onAlbumPlus = onAlbumPlus,
                     )
                     }
                 }
@@ -491,6 +493,7 @@ private fun ActionRow(
     radioColour: Color? = null,
     radioRow: @Composable RowScope.() -> Unit = { Spacer(Modifier.weight(1f)) },
     rowExtras: @Composable () -> Unit = {},
+    onAlbumPlus: (() -> Unit)? = null,
 ) {
     val graph = LocalGraph.current
     // A list too long to play whole (a genre): one button, its radio, in the page's own colour (the owner, 10 Nov).
@@ -546,7 +549,8 @@ private fun ActionRow(
         mixOn = mixOn,
         albumBar = albumBar,
         rowExtras = rowExtras,
-        onAddToPlaylist = if (albumBar && songs.isNotEmpty()) ({ adding = true }) else null,
+        onAddToPlaylist = if (albumBar && songs.isNotEmpty()) (onAlbumPlus ?: { adding = true }) else null,
+        plusOpensSheet = onAlbumPlus != null,
         resume = resume?.takeIf { !playback.loaded && it.index in songs.indices }?.let { it to songs.size },
     )
 }
@@ -576,6 +580,8 @@ internal fun ActionButtons(
     onPlayFromStart: (() -> Unit)? = null,
     // An album's plus: the whole album into a playlist you pick.
     onAddToPlaylist: (() -> Unit)? = null,
+    /** The plus opens the album's sheet (issue #1331), with Download in it: the bar has no Download of its own. */
+    plusOpensSheet: Boolean = false,
     // False for a list too long to queue whole (a genre): no Add all to queue.
     queueAll: Boolean = true,
     // An album's bar: what stands beside Download (its heart).
@@ -630,11 +636,12 @@ internal fun ActionButtons(
                     enabled = enabled,
                     modifier = Modifier.offset(x = -ICON_INSET).alpha(dim).testTag("albumAddToPlaylist"),  // spacing: exact (the icon in line with the text above)
                 ) {
-                    Icon(Icons.Rounded.AddCircleOutline, "Add to a playlist", Modifier.size(ICON_SIZE))
+                    Icon(Icons.Rounded.AddCircleOutline, if (plusOpensSheet) "Album options" else "Add to a playlist", Modifier.size(ICON_SIZE))
                 }
             }
             val shift = if (onAddToPlaylist != null) -ICON_INSET else 0.dp
-            Box(Modifier.offset(x = shift).alpha(dim)) { download() }  // spacing: exact
+            // Download is in the album's sheet now (issue #1331): its state shows under the title instead.
+            if (!plusOpensSheet) Box(Modifier.offset(x = shift).alpha(dim)) { download() }  // spacing: exact
             // Moved as far as the two before it, so the three stand evenly apart.
             Box(Modifier.offset(x = shift).alpha(dim)) { rowExtras() }  // spacing: exact
             Spacer(Modifier.weight(1f))
