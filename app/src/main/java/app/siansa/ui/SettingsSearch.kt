@@ -68,6 +68,7 @@ object SettingsIndex {
         SettingEntry("Downloads", "Storage", "settings/streaming", "downloads", "wi-fi only quality storage limit remove all offline"),
         SettingEntry("Covers on the phone", "Storage", "settings/streaming", "covers-on-the-phone", "image cache download all covers artist pictures clear"),
         SettingEntry("Library on the phone", "Storage", "settings/streaming", "other-data-on-this-phone", "database space"),
+        SettingEntry("Fades", "Playback", "settings/sound", "fades", "fade in fade out play pause skip seek milliseconds smooth"),
         SettingEntry("Book skips", "Playback", "settings/sound", "book-skips", "back forward seconds book player"),
         SettingEntry("Shortcuts", "Home", "settings/home", "top-of-home", "played last quick"),
         SettingEntry("Notices", "Home", "settings/home", "top-of-home", "chips pinned automatic new music carry on downloads"),

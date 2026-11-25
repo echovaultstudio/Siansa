@@ -38,7 +38,14 @@ class DeckOutput(
     private val listeners = CopyOnWriteArraySet<AudioOutput.Listener>()
     @Volatile private var parameters = PlaybackParameters.DEFAULT
 
+    private var paused = false
+
     init {
+        // The listener's fades (issue #1368). In: only when this follows something cut short (a skip, a seek, a stop,
+        // or nothing yet), not a song that played to its end and is followed by the next. Out: whenever it's paused
+        // or let go with sound still to play.
+        stream.fadeInMs = fadeIn(deck.cutShort, engine.fadeInMs)
+        stream.fadeOutMs = maxOf(engine.fadeOutMs.toDouble(), DeckStream.RAMP_MS)
         deck.add(stream)
         engine.outputs[stream] = this
         // Each output's life in the log (0.52.0-dev: songs played back to back came out silent): whether Media3 keeps
@@ -55,11 +62,18 @@ class DeckOutput(
     }
 
     override fun play() {
+        // Played again after a pause: the listener's, so it fades in whatever it started as.
+        if (paused) stream.fadeInMs = fadeIn(true, engine.fadeInMs)
+        paused = false
         stream.play()
         engine.wake()
     }
 
-    override fun pause() = stream.pause()
+    override fun pause() {
+        stream.fadeOutMs = maxOf(engine.fadeOutMs.toDouble(), DeckStream.RAMP_MS)
+        paused = true
+        stream.pause()
+    }
 
     override fun write(buffer: ByteBuffer, encodedAccessUnitCount: Int, presentationTimeUs: Long): Boolean {
         val all = stream.write(buffer)
@@ -78,7 +92,10 @@ class DeckOutput(
     }
 
     override fun release() {
-        AppLog.d("Engine", "Deck ${deck.name}: output ${id()} released")
+        // Let go with sound still to play: cut short by the listener. Played out: the next one follows it whole.
+        deck.cutShort = cutShort(stream.bufferedFrames, config.sampleRate)
+        AppLog.d("Engine", "Deck ${deck.name}: output ${id()} released, ${if (deck.cutShort) "cut short" else "played out"}")
+        stream.fadeOutMs = maxOf(engine.fadeOutMs.toDouble(), DeckStream.RAMP_MS)
         stream.release()
         engine.outputs.remove(stream)
         listeners.forEach { it.onReleased() }
@@ -127,6 +144,21 @@ class DeckOutput(
     override fun setAuxEffectSendLevel(level: Float) = Unit
 
     override fun setPreferredDevice(preferredDevice: AudioDeviceInfo?) = Unit
+
+    companion object {
+        /** What's left of a song that played to its end is less than this: Media3 lets an output go once it's heard. */
+        const val PLAYED_OUT_MS = 60
+
+        /** Whether a stream let go with [buffered] frames still to play (at [rate]) was cut short, not played out. */
+        internal fun cutShort(buffered: Long, rate: Int): Boolean = buffered * 1_000 / rate >= PLAYED_OUT_MS
+
+        /**
+         * How long a stream takes to come in: the listener's fade ([chosen] ms) when the listener started it ([own]: after
+         * a skip, a seek, a stop or a pause), the ramp that keeps it from clicking otherwise.
+         */
+        internal fun fadeIn(own: Boolean, chosen: Int): Double =
+            if (own) maxOf(chosen.toDouble(), DeckStream.RAMP_MS) else DeckStream.RAMP_MS
+    }
 }
 
 /** Hands each music player's sound to its [MixCore.Deck] in the [AudioEngine] (issue #826): PCM only, as decoded. */

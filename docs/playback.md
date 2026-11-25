@@ -87,6 +87,23 @@ size, so they stay gapless too.
 
 Details: [How it works › Levelling](how-it-works.md#levelling).
 
+## Fades
+
+A short fade for what you start and stop yourself, so music eases in and dips away instead of being cut
+(**Settings › Playback › Fades**):
+
+- **Fade in** when you press play, and after you seek or skip: 250 ms unless you change it.
+- **Fade out** when you pause or stop, and before you seek or skip: 150 ms unless you change it.
+
+Each is a slider, from Off up to 600 ms in steps of 25 ms. A skip doesn't take longer for it: the old song fades while the next one loads.
+
+Fades are only for what you do yourself. Songs that follow on by themselves play as before: gapless albums run on
+without a gap, and crossfades and DJ blends aren't touched.
+
+With [Untouched playback](#untouched-playback) on, the fades work too: the song itself stays as it is, and only the
+output's volume moves for that moment. There a skip or a seek waits for the fade out to finish before the next song
+loads. Where a phone's output plays bit for bit and ignores the volume (some USB DACs), there's no fade.
+
 ## Crossfade
 
 Same page. **Off**, **Fixed**, or **Smart**:

@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.FilterChip
@@ -38,6 +39,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -135,6 +138,10 @@ fun CrossfadeScreen(nav: NavController) {
                 Hint(levellingHint(settings))
             }
             HorizontalDivider()
+            FoldSection("Fades", fadesSummary(settings)) {
+                FadesBody(settings) { fadeIn, fadeOut -> graph.settings.save(graph.settings.current.copy(fadeInMs = fadeIn, fadeOutMs = fadeOut)) }
+            }
+            HorizontalDivider()
             FoldSection("Crossfade & DJ blends", crossfadeFoldSummary(settings)) {
                 // Untouched, a song goes straight to the phone's output: there's nothing to blend it with.
                 if (settings.untouchedPlayback) {
@@ -177,6 +184,65 @@ fun CrossfadeScreen(nav: NavController) {
             HorizontalDivider()
             MixingDocsLink()
         }
+    }
+}
+
+/** What the Fades section says folded: each fade's length, or that it's off. */
+internal fun fadesSummary(s: AppSettings): String = when {
+    s.fadeInMs == 0 && s.fadeOutMs == 0 -> "Off"
+    else -> "In ${fadeLabel(s.fadeInMs)} · out ${fadeLabel(s.fadeOutMs)}"
+}
+
+/** A fade's length as its chip says it: "Off", or its milliseconds. */
+internal fun fadeLabel(ms: Int): String = if (ms == 0) "off" else "$ms ms"
+
+/**
+ * The Fades section's inside (issue #1368): a length for the fade in and one for the fade out, and what they're for.
+ * [save] gets both lengths.
+ */
+@Composable
+internal fun FadesBody(settings: AppSettings, save: (Int, Int) -> Unit) {
+    // Both names as wide as the wider one at this text size, so the two sliders start and end together.
+    val measurer = androidx.compose.ui.text.rememberTextMeasurer()
+    val style = MaterialTheme.typography.bodyMedium
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val nameWidth = with(density) { listOf("Fade in", "Fade out").maxOf { measurer.measure(it, style).size.width }.toDp() }
+    FadeSlider("Fade in", settings.fadeInMs, "fadeIn", nameWidth) { save(it, settings.fadeOutMs) }
+    Hint("When you press play, and after you seek or skip.")
+    FadeSlider("Fade out", settings.fadeOutMs, "fadeOut", nameWidth) { save(settings.fadeInMs, it) }
+    Hint("When you pause or stop, and before you seek or skip.")
+    Hint("Only for what you start and stop yourself. Songs that follow on by themselves play as before: gapless albums, crossfades and DJ blends aren't touched.")
+    // Untouched (issue #1370): the output's volume moves, the song's sound doesn't, and a skip waits for the fade out.
+    if (settings.untouchedPlayback) {
+        Hint("With Untouched playback the song itself stays as it is: only the volume moves for that moment. A skip or a seek waits for the fade out first.")
+    }
+}
+
+/**
+ * A fade's length on a slider (the owner, 25 Nov: "a sliding bar instead of the buttons"): Off at the left, up to
+ * 600 ms in steps of 25, its length beside it. Saved when the finger lets go.
+ */
+@Composable
+internal fun FadeSlider(name: String, ms: Int, tag: String, nameWidth: androidx.compose.ui.unit.Dp, onDone: (Int) -> Unit) {
+    var value by remember(ms) { mutableFloatStateOf(ms.toFloat()) }
+    val range = AppSettings.FADE_MS
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.testTag("${tag}Row")) {
+        // On one line whatever the text size: the slider gives way, not the name.
+        Text(name, style = MaterialTheme.typography.bodyMedium, maxLines = 1, softWrap = false,
+            modifier = Modifier.width(nameWidth + Space.Small).padding(end = Space.Small).testTag("${tag}Label"))
+        Slider(
+            value = value,
+            onValueChange = { value = app.siansa.data.fadeChoice(it.roundToInt()).toFloat() },
+            onValueChangeFinished = { onDone(value.roundToInt()) },
+            // Snapped to 25 ms steps as it moves (fadeChoice), without 24 tick marks along the bar.
+            valueRange = range.first.toFloat()..range.last.toFloat(),
+            modifier = Modifier.weight(1f).testTag(tag).semantics { stateDescription = fadeLabel(value.roundToInt()) },
+        )
+        Text(
+            fadeLabel(value.roundToInt()).replaceFirstChar { it.uppercase() },
+            style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.End, maxLines = 1, softWrap = false,
+            modifier = Modifier.widthIn(min = 64.dp).padding(start = Space.Small).testTag("${tag}Value"),
+        )
     }
 }
 

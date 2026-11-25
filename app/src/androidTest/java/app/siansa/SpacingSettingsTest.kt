@@ -436,4 +436,30 @@ class SpacingSettingsTest : SpacingCheck() {
         assertEven("Untouched playback: the margins left and right", row.left - screen.left, screen.right - row.right, 1.dp)
         assertEven("Untouched playback: the page's margin", row.left - screen.left, Space.Page, 1.dp)
     }
+
+    /** Playback's Fades (issue #1368; sliders, the owner, 25 Nov): both rows alike, each name on one line, the sliders ending together, each value at the right. */
+    @Test fun fadeSlidersLineUp() {
+        compose.setContent {
+            SiansaTheme {
+                Column(Modifier.padding(Space.Page)) {
+                    app.siansa.ui.FoldSection("Fades", "In 250 ms · out 150 ms", startOpen = true) {
+                        app.siansa.ui.FadesBody(app.siansa.data.AppSettings()) { _, _ -> }
+                    }
+                }
+            }
+        }
+        val inRow = compose.onNodeWithTag("fadeInRow").getBoundsInRoot()
+        val outRow = compose.onNodeWithTag("fadeOutRow").getBoundsInRoot()
+        val inBar = compose.onNodeWithTag("fadeIn").getBoundsInRoot()
+        val outBar = compose.onNodeWithTag("fadeOut").getBoundsInRoot()
+        val inValue = compose.onNodeWithTag("fadeInValue").getBoundsInRoot()
+        val outValue = compose.onNodeWithTag("fadeOutValue").getBoundsInRoot()
+        assertEven("Fades: both rows as tall", inRow.bottom - inRow.top, outRow.bottom - outRow.top, 1.dp)
+        assertEven("Fades: each name on one line", compose.onNodeWithTag("fadeOutLabel").getBoundsInRoot().let { it.bottom - it.top },
+            compose.onNodeWithTag("fadeInLabel").getBoundsInRoot().let { it.bottom - it.top }, 1.dp)
+        assertEven("Fades: the sliders end at the same place", inBar.right, outBar.right, 1.dp)
+        assertEven("Fades: the sliders start together", inBar.left, outBar.left, 1.dp)
+        assertEven("Fades: the values end at the row's edge", inValue.right, inRow.right, 1.dp)
+        assertEven("Fades: both values end alike", inValue.right, outValue.right, 1.dp)
+    }
 }

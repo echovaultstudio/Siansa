@@ -58,6 +58,15 @@ class AudioEngine(context: Context) {
     @Volatile private var movedNs = 0L
     @Volatile private var reopenWanted = false
 
+    /**
+     * The fades the listener chose for what they start and stop themselves (Settings › Playback › Fades, issue #1368),
+     * in ms; 0 is none (the [DeckStream.RAMP_MS] that keeps it from clicking stays).
+     */
+    @Volatile var fadeInMs = 0
+    @Volatile var fadeOutMs = 0
+    // Frames of silence written since the mix last had something to play (only the mixer's thread counts them).
+    private var idleFrames = 0
+
     /** The player output each stream belongs to, told when its stream first sounds. */
     internal val outputs = ConcurrentHashMap<DeckStream, DeckOutput>()
 
@@ -109,8 +118,20 @@ class AudioEngine(context: Context) {
         val block = FloatArray(BLOCK * 2)
         while (running) {
             if (!core.active) {
-                rest()
-                continue
+                // Nothing to play. What the output still holds is played out first, with silence written after it:
+                // paused at once, it kept its last moments and played them when the next song started (the owner,
+                // 24 Nov: "the song leak or glitch into next song when changing tracks"), a skip's old song in front
+                // of the new one. The limiter's held-back frames go out with it.
+                val held = track
+                if (held == null || !trackPlaying || !playsOut(idleFrames, held.bufferSizeInFrames, core.latencyFrames, outRate)) {
+                    if (idleFrames > 0) AppLog.d("Engine", "Output played out (${idleFrames * 1000L / outRate} ms of silence after the last sound), resting")
+                    idleFrames = 0
+                    rest()
+                    continue
+                }
+                idleFrames += BLOCK
+            } else {
+                idleFrames = 0
             }
             if (reopenWanted) {
                 reopenWanted = false
@@ -159,7 +180,7 @@ class AudioEngine(context: Context) {
         close()
     }
 
-    /** Nothing to play: the output pauses (what it holds plays out first) and the thread waits to be woken. */
+    /** Nothing to play, and what the output held has played out: it pauses and the thread waits to be woken. */
     private fun rest() {
         track?.let { t ->
             if (trackPlaying) {
@@ -316,6 +337,15 @@ class AudioEngine(context: Context) {
          * memory, and the music had a silence each time; nobody hears half a second's delay there, so it holds more.
          */
         val BUFFER_MS: Int = bufferMs(app.siansa.BuildConfig.TV_APP)
+
+        /**
+         * Whether silence is still to be written after the last sound, [idle] frames of it so far: until everything the
+         * output held when the sound ended ([buffer] frames at most, and the [latency] frames the limiter holds back)
+         * has gone out, and a little more ([PLAY_OUT_MARGIN_MS]) for the way to the speaker.
+         */
+        internal fun playsOut(idle: Int, buffer: Int, latency: Int, rate: Int): Boolean =
+            idle < buffer + latency + rate * PLAY_OUT_MARGIN_MS / 1_000
+        const val PLAY_OUT_MARGIN_MS = 60
 
         /** [BUFFER_MS] for a phone or for a TV. */
         internal fun bufferMs(tv: Boolean): Int = if (tv) TV_BUFFER_MS else PHONE_BUFFER_MS
