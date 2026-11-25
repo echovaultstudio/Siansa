@@ -8,6 +8,9 @@ on:
   pull_request:
   push:
     branches: [main, dev]
+  # Emby's beta only here, once a night and by hand: pull requests and merges test the stable releases (the owner, 25 Nov).
+  schedule:
+    - cron: "17 3 * * *"
   workflow_dispatch:
     inputs:
       emby:
@@ -26,27 +29,18 @@ concurrency:
 
 jobs:
   servers:
-    # Each set at once: the newest releases (so a new Emby or Jellyfin is tested the day it's out), Emby's beta, and
-    # the oldest versions Siansa supports (Jellyfin 10.9 and later, issue #703). Each run names the versions it tested.
+    # The newest releases (so a new Emby or Jellyfin is tested the day it's out) and the oldest versions Siansa supports
+    # (Jellyfin 10.9 and later, issue #703) on every pull request and push. Emby's beta only in the nightly run and by
+    # hand, so a beta's own faults never stand in a pull request's checks. Each run names the versions it tested.
     name: ${{ matrix.set }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - set: Newest releases
-            navidrome: latest
-            emby: latest
-            jellyfin: latest
-          - set: Emby beta
-            navidrome: latest
-            emby: beta
-            jellyfin: latest
-          - set: Oldest supported
-            navidrome: 0.64.2
-            emby: 4.8.10.0
-            jellyfin: 10.10.7
+        include: ${{ fromJSON(format('[{0}{1}]',
+          '{"set":"Newest releases","navidrome":"latest","emby":"latest","jellyfin":"latest"},{"set":"Oldest supported","navidrome":"0.64.2","emby":"4.8.10.0","jellyfin":"10.10.7"}',
+          (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && ',{"set":"Emby beta","navidrome":"latest","emby":"beta","jellyfin":"latest"}' || '')) }}
     steps:
       - uses: actions/checkout@v7
 
