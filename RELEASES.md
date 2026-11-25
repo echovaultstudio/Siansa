@@ -3,6 +3,17 @@
 Every release of Siansa and the pull requests in it, newest first. CI updates this page after each
 release (`scripts/release_prs.py`); what changed for the app's user is in `CHANGELOG.md`.
 
+## [1.7.1](https://github.com/echovaultstudio/Siansa/releases/tag/v1.7.1) — 2026-11-25
+
+- [#1365](https://github.com/echovaultstudio/Siansa/pull/1365) Branch cleanup keeps dev, and removes branches whose pull request was squashed (@Th3K1ngP1n)
+- [#1367](https://github.com/echovaultstudio/Siansa/pull/1367) The output plays out what it holds before it pauses (@Th3K1ngP1n)
+- [#1369](https://github.com/echovaultstudio/Siansa/pull/1369) Fades: a short fade in and out for what you start and stop yourself (@Th3K1ngP1n)
+- [#1371](https://github.com/echovaultstudio/Siansa/pull/1371) Fades with Untouched playback: the output's volume moves, the song doesn't (@Th3K1ngP1n)
+- [#1373](https://github.com/echovaultstudio/Siansa/pull/1373) Fades: a slider for each length instead of chips (@Th3K1ngP1n)
+- [#1374](https://github.com/echovaultstudio/Siansa/pull/1374) Release 1.7.1: the notes, with 1.7.0's news kept (@Th3K1ngP1n)
+- [#1375](https://github.com/echovaultstudio/Siansa/pull/1375) 1.7.1's notes carry 1.7's main notes, with the fades and the skip fix (@Th3K1ngP1n)
+- [#1376](https://github.com/echovaultstudio/Siansa/pull/1376) dev into main: Siansa 1.7.1 (fades, and no moment of the old song on a skip) (@Th3K1ngP1n)
+
 ## [1.7.0](https://github.com/echovaultstudio/Siansa/releases/tag/v1.7.0) — 2026-11-24
 
 - [#1219](https://github.com/echovaultstudio/Siansa/pull/1219) What's new after an update: a short summary over Home, once (@Th3K1ngP1n)
