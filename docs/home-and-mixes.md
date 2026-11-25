@@ -41,16 +41,11 @@ Their order is yours: **Settings › Home › Home menu**, hold a row and drag i
 
 Arrange is a sheet of its own (the Sources sheet is another), in three parts: **Cards**, **Spacing** and **Sections**.
 
-**Cards** is how every coloured card on Home is painted — Today's mix, the book and podcast cards, Made for you,
+**Cards** is the colour of every coloured card on Home — Today's mix, the book and podcast cards, Made for you,
 Radios and the other generated tiles. Shortcut tiles stay plain unless their section has a colour of its own (under
-its cog). Four small cards show the choice:
-
-| Look | What it does |
-|---|---|
-| **Vivid** | Each card in its own full colour (the default). |
-| **Soft** | The same colours at a third of their strength over the dark surface: the card keeps its colour, the page keeps its calm. |
-| **Plain** | Every card the same grey as the shortcut tiles; colour only in the artwork and the play button. |
-| **From the artwork** | A muted colour taken from the card's own artwork, as the listening pages' headers do; a card without artwork is painted soft. |
+its cog). The choices are the same as Your listening's card, each a round swatch: **Teal** (as it comes), **Plum**,
+**Ink**, **Ember**, **Moss**, or **From its cover** (the colour of each card's own picture; a card without one is a
+dark grey). Each card is that colour fading darker towards its foot, with white words.
 
 **Spacing** sets the gap between every section at once, from Tight to Airy. **Sections** is a row per section, with
 the handle at the left to move it, the eye to hide it and the cog for its look. **Reset** puts the order, the hidden
@@ -63,7 +58,7 @@ it; tap the line to open its options under it, and again to close them. Only wha
 - **Look**: the **Look** (small pictures of each, below), then what that look has of its own: its **Style** or
   **Layout**, **Tiles**, **Columns and rows**, **Size**.
 - **Cards**: **Pictures** (for a hero with cards under it, **Picture of the big card** and **Pictures of the cards
-  under it**), **Colours**, **Names** and **Card colour**.
+  under it**), **Colours**, **Names** and **Card colour** (**As Home**, or one of the same six swatches as Cards above).
 
 **Reset this row** at its foot puts that section's look, pictures, colours, names, title and descriptions back as they
 came; where it is on Home and whether it shows stay.
@@ -74,7 +69,7 @@ The looks:
 |---|---|
 | **As it is** | The section's own look (the default). |
 | **Tiles** | A row of covers to swipe through. **Size**: **Big** (as tiles have always been), **Compact** or **Small**, for more in view. |
-| **Banner** | One wide card with the first covers and a button. Its **Style**: **Card**, or **Hero**: a big card at the top of the section in the first mix's own colours, its covers big, its name and line, **Play** and **Shuffle**. **Hero and 3 cards** or **Hero and 4 cards** puts the row's next three or four at its foot on the same colours, each with its name on its picture and its line under it. Then **Picture of the big card** and **Pictures of the cards under it** are chosen apart (stickers on top and Aura under, say). The hero takes its row's **Card colour**: Vivid is its picture's colour with its own mixed in, From the artwork the picture's colour alone, Soft a dark grey with a little of it, Plain dark grey; and its row's **Colours** (By mood, Siansa, Mono) in place of its picture's. |
+| **Banner** | One wide card with the first covers and a button. Its **Style**: **Card**, or **Hero**: a big card at the top of the section in the first mix's own colours, its covers big, its name and line, **Play** and **Shuffle**. **Hero and 3 cards** or **Hero and 4 cards** puts the row's next three or four at its foot on the same colours, each with its name on its picture and its line under it. Then **Picture of the big card** and **Pictures of the cards under it** are chosen apart (stickers on top and Aura under, say). The hero takes its row's **Card colour**: that colour's fade, or From its cover its picture's colour; with no colour of its own, its row's **Colours** (By mood, Siansa, Mono) when they're chosen. |
 | **List** | The first five, listed; the title opens the rest. |
 | **Play button** | A slim card: its ▶ plays the section; a tap anywhere else on the card opens it. |
 | **Cover rows** | Covers with their details beside them, three to a column, to swipe through: the same look as a custom card's. The cover plays that album or opens that item; the row opens it. Books and podcasts show how far you are along the cover. A radio or genre shows its colours instead of a cover. |
@@ -118,7 +113,7 @@ The same cog has **Show its title**: turn it off and the section shows without t
 look, and **As Home** follows the choice made under Cards, or pick one for this section alone. For Shortcuts, As Home
 keeps its tiles plain; a colour of its own paints them, as it does a Shortcut grid in any section. A row's **Colours**
 and **Pictures** act on its shortcut tiles too: with Colours set to **By mood**, **Siansa** or **Mono** the tiles take
-those colours (painted Vivid until the row has a Card colour of its own; By mood needs a mix, and other tiles keep
+those colours (in those colours themselves until the row has a Card colour of its own; By mood needs a mix, and other tiles keep
 their covers' colours), and a picture style other than Auto draws each tile's small picture that way.
 
 | Section | What it shows |

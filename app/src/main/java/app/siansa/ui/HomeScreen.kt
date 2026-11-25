@@ -1014,7 +1014,7 @@ internal fun androidx.compose.foundation.lazy.LazyListScope.titledItem(
     // Tiles of the row when it's set to the shortcut grid (the owner, 10 Nov).
     gridSize: Int = GRID_LOOK_MOST,
     // How its coloured cards are painted (the owner, 13 Nov).
-    cardLook: CardLook = CardLook.VIVID,
+    cardLook: CardLook = CardLook.DEFAULT,
     // As a carousel: each name and its details on the cover, not under the row (the owner, 19 Nov).
     // Where its cards show their names (the owner, 21 Nov).
     names: app.siansa.data.CardNames = app.siansa.data.CardNames.AUTO,

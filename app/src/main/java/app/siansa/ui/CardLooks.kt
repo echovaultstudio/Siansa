@@ -33,6 +33,7 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.Shape
 import app.siansa.data.CardLook
@@ -45,7 +46,7 @@ import app.siansa.data.CardLook
  */
 
 /** The look of the cards in the section being drawn; Home's choice where nothing narrower is given. */
-val LocalCardLook = compositionLocalOf { CardLook.VIVID }
+val LocalCardLook = compositionLocalOf { CardLook.DEFAULT }
 
 /**
  * The colour of the shortcut tiles in the section being drawn (#1261): null keeps them plain, as they always were; a
@@ -56,34 +57,35 @@ val LocalShortcutLook = compositionLocalOf<CardLook?> { null }
 /** How to fill a card: a solid under a wash (either may be all there is), and what its words are drawn in. */
 class CardPaint(val base: Color, val wash: Brush?, val text: Color, val faint: Color)
 
-/** Soft: the card's colours at this much over the surface. */
-internal const val SOFT_ALPHA = 0.32f
-
-/** From the artwork: the picture's colour, this much at the card's start and end. */
-internal const val ARTWORK_FROM = 0.55f
-internal const val ARTWORK_TO = 0.22f
-
 /**
- * The paint for a card of [colors] (its own two, as the generated tiles have), in the look of the section around it.
- * [picture] is the card's artwork, for the look that takes its colour from it; a card with none is painted soft then.
+ * The paint for a card in the colour of the section around it (the owner, 25 Nov: the same colours as Your listening's
+ * card): the colour's fade from top to foot, with white words. From its cover takes the fade from [picture] (the card's
+ * artwork) as Your listening does from its top song; a card with none shows that colour's own. [colors], the card's own
+ * two, are kept for the shortcut tiles' chosen colours ([shortcutPaint]).
  */
 @Composable
+@Suppress("UNUSED_PARAMETER")
 fun cardPaint(colors: Pair<Color, Color>, picture: String? = null, label: String = "card", look: CardLook = LocalCardLook.current): CardPaint {
-    val scheme = MaterialTheme.colorScheme
-    val quiet = CardPaint(scheme.surfaceContainerHigh, null, scheme.onSurface, scheme.onSurfaceVariant)
-    return when (look) {
-        CardLook.VIVID, CardLook.AS_HOME -> CardPaint(colors.first, Brush.linearGradient(listOf(colors.first, colors.second)), Color.White, Color.White.copy(alpha = 0.85f))
-        CardLook.SOFT -> soft(colors, quiet)
-        CardLook.PLAIN -> quiet
-        CardLook.ARTWORK -> if (picture == null) soft(colors, quiet) else {
-            val tint = rememberHeaderTint(picture, label)
-            CardPaint(quiet.base, Brush.linearGradient(listOf(tint.copy(alpha = ARTWORK_FROM), tint.copy(alpha = ARTWORK_TO))), quiet.text, quiet.faint)
-        }
-    }
+    val (top, foot) = cardFade(look, picture, label)
+    return CardPaint(top, Brush.verticalGradient(listOf(top, foot)), Color.White, Color.White.copy(alpha = 0.85f))
 }
 
-private fun soft(colors: Pair<Color, Color>, quiet: CardPaint) =
-    CardPaint(quiet.base, Brush.linearGradient(listOf(colors.first.copy(alpha = SOFT_ALPHA), colors.second.copy(alpha = SOFT_ALPHA))), quiet.text, quiet.faint)
+/** [look]'s top and foot, [picture]'s for From its cover. As Home here (nothing narrower given) is the default. */
+@Composable
+internal fun cardFade(look: CardLook, picture: String?, label: String): Pair<Color, Color> {
+    val colour = (look.colour ?: CardLook.DEFAULT.colour)!!
+    if (colour != app.siansa.data.ListenColour.COVER || picture == null) return Color(colour.top) to Color(colour.foot)
+    val tint = rememberHeaderTint(picture, label)
+    return lerp(tint, Color.Black, COVER_TOP) to lerp(tint, Color.Black, COVER_FOOT)
+}
+
+/** From its cover: the picture's colour darkened this much at the top and at the foot, as Your listening's card. */
+internal const val COVER_TOP = 0.55f
+internal const val COVER_FOOT = 0.86f
+
+/** A card filled with [colors] themselves: a shortcut tile in its row's chosen colours (By mood, Siansa, Mono). */
+private fun filled(colors: Pair<Color, Color>) =
+    CardPaint(colors.first, Brush.linearGradient(listOf(colors.first, colors.second)), Color.White, Color.White.copy(alpha = 0.85f))
 
 /**
  * The colour a row's shortcut tiles take (the owner, 23 Nov: "shortcuts don't get their colour changes at all. All
@@ -92,7 +94,7 @@ private fun soft(colors: Pair<Color, Color>, quiet: CardPaint) =
  * tiles stay plain as they came (#1261).
  */
 internal fun shortcutLookOf(cardColour: CardLook?, colours: app.siansa.data.PictureColours?): CardLook? =
-    cardColour ?: CardLook.VIVID.takeIf { colours != null && colours != app.siansa.data.PictureColours.COVERS }
+    cardColour ?: CardLook.AS_HOME.takeIf { colours != null && colours != app.siansa.data.PictureColours.COVERS }
 
 /**
  * The two colours a shortcut tile's row gives it ([LocalPictureColours]: its songs' moods for a mix, [songIds], or a
@@ -111,11 +113,11 @@ internal fun shortcutColours(title: String, songIds: List<String> = emptyList())
  */
 @Composable
 internal fun shortcutPaint(own: Pair<Color, Color>, chosen: Pair<Color, Color>?, picture: String?, title: String, look: CardLook): CardPaint {
-    if (chosen == null) return cardPaint(own, picture, title, look)
-    val paint = cardPaint(chosen, null, title, look)
-    // Vivid fills the tile with the colours themselves: pale ones (Siansa's frost, Mono's light greys) take dark words.
-    val filled = look == CardLook.VIVID || look == CardLook.AS_HOME
-    return if (filled && wordsDarkOn(chosen)) CardPaint(paint.base, paint.wash, DARK_WORDS, DARK_WORDS.copy(alpha = 0.75f)) else paint
+    // A row's own Card colour paints its tiles in it; without one (As Home), they take its chosen colours themselves.
+    if (chosen == null || look != CardLook.AS_HOME) return cardPaint(own, picture, title, look)
+    val paint = filled(chosen)
+    // Pale ones (Siansa's frost, Mono's light greys) take dark words.
+    return if (wordsDarkOn(chosen)) CardPaint(paint.base, paint.wash, DARK_WORDS, DARK_WORDS.copy(alpha = 0.75f)) else paint
 }
 
 /** Whether words on a fill of [colours] should be dark: the fill is light where the words begin. */
@@ -132,9 +134,8 @@ fun Modifier.cardFill(paint: CardPaint, shape: Shape): Modifier {
     return background(paint.base, shape).then(wash)
 }
 
-/** The sample card's own colours, and the ones standing in for a picture's in the look that takes the picture's. */
+/** The sample card's own colours. */
 private val SAMPLE_COLOURS = Color(0xFFD6338A) to Color(0xFF4A1470)
-private val SAMPLE_ARTWORK = Color(0xFF8A6A2E) to Color(0xFF5A4420)
 
 /**
  * A small card in [look], for choosing one by eye (the owner, 13 Nov): an artwork square, two lines and the play
@@ -144,7 +145,7 @@ private val SAMPLE_ARTWORK = Color(0xFF8A6A2E) to Color(0xFF5A4420)
 fun CardLookSample(look: CardLook, modifier: Modifier = Modifier, big: Boolean = false, chosen: Boolean = false) {
     val shape = RoundedCornerShape(if (big) 16.dp else 10.dp)
     CompositionLocalProvider(LocalCardLook provides look) {
-        val paint = cardPaint(if (look == CardLook.ARTWORK) SAMPLE_ARTWORK else SAMPLE_COLOURS)
+        val paint = cardPaint(SAMPLE_COLOURS, null)
         Box(
             modifier
                 .then(if (chosen) Modifier.border(2.dp, Accent, shape) else Modifier)
@@ -185,31 +186,8 @@ private fun Line(colour: Color, fraction: Float, height: Dp) {
     )
 }
 
-/** Four small cards to pick a look from, [chosen] ringed in the accent colour, each named under it. */
+/** Home's card colours to pick from (the owner, 25 Nov): Your listening's swatches, [chosen] ringed and in bold. */
 @Composable
 fun CardLookChooser(chosen: CardLook, options: List<CardLook>, modifier: Modifier = Modifier, onPick: (CardLook) -> Unit) {
-    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Space.Medium)) {
-        options.forEach { look ->
-            Column(
-                Modifier.weight(1f)
-                    .clickable(onClickLabel = look.label) { onPick(look) }
-                    .semantics { selected = look == chosen }
-                    .testTag("cardLook-${look.id}"),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                CardLookSample(look, Modifier.fillMaxWidth().aspectRatio(SAMPLE_ASPECT), chosen = look == chosen)
-                Spacer(Modifier.height(Space.Small))
-                Text(
-                    look.label, style = MaterialTheme.typography.labelMedium,
-                    fontWeight = if (look == chosen) FontWeight.SemiBold else FontWeight.Normal,
-                    color = if (look == chosen) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-                    // Two lines, so "From the artwork" is never cut to "From the" (the owner, 19 Nov).
-                    maxLines = 2, textAlign = TextAlign.Center,
-                )
-            }
-        }
-    }
+    ColourSwatches(options, chosen, { cardSwatchFade(it, chosen) }, { it.label }, { "cardLook-${it.id}" }, modifier.testTag("homeCardColours"), onPick = onPick)
 }
-
-/** A small sample card's width to its height. */
-private const val SAMPLE_ASPECT = 1.45f

@@ -151,23 +151,37 @@ fun <T> List<T>.moved(from: Int, to: Int): List<T> {
 }
 
 /**
- * How the coloured cards on Home are painted (the owner, 13 Nov: some were too dominant): Today's mix, the book and
- * podcast cards, Made for you, Radios and the other generated tiles. Never the shortcut grid. One choice for the whole
- * of Home under Arrange Home, and a card's own under its cog ([AS_HOME] follows Home's).
+ * The colour of Home's coloured cards (the owner, 13 Nov: some were too dominant; 25 Nov: the same choices, names and
+ * swatches as Your listening's card, [ListenColour]): Today's mix, the book and podcast cards, Made for you, Radios and
+ * the other generated tiles. One choice for the whole of Home under Arrange Home, and a row's own under its cog
+ * ([AS_HOME] follows Home's). Each is [colour]'s fade, top to foot; [COVER] takes it from the card's own picture.
  */
-enum class CardLook(val id: String, val label: String, val hint: String) {
-    AS_HOME("as_home", "As Home", "The choice made for the whole of Home"),
-    VIVID("vivid", "Vivid", "Its own full colour"),
-    SOFT("soft", "Soft", "Its colour at a third of its strength over the dark surface"),
-    PLAIN("plain", "Plain", "The same grey as the shortcut tiles; colour only in the artwork"),
-    ARTWORK("artwork", "From the artwork", "A muted colour taken from its own artwork, as the listening pages' headers");
+enum class CardLook(val id: String, val colour: ListenColour?) {
+    AS_HOME("as_home", null),
+    TEAL("teal", ListenColour.TEAL),
+    PLUM("plum", ListenColour.PLUM),
+    INK("ink", ListenColour.INK),
+    EMBER("ember", ListenColour.EMBER),
+    MOSS("moss", ListenColour.MOSS),
+    COVER("cover", ListenColour.COVER);
+
+    val label: String get() = colour?.label ?: "As Home"
 
     companion object {
         /** The choices for the whole of Home: all but [AS_HOME]. */
         val forHome: List<CardLook> = entries.filter { it != AS_HOME }
-        val DEFAULT = VIVID
+        val DEFAULT = TEAL
 
-        fun of(id: String?): CardLook? = entries.firstOrNull { it.id == id }
+        /**
+         * The look saved as [id]; the strengths chosen before 25 Nov are read as the nearest colour: Vivid as the
+         * default, Soft and Plain as Ink, From the artwork as From its cover.
+         */
+        fun of(id: String?): CardLook? = entries.firstOrNull { it.id == id } ?: when (id) {
+            "vivid" -> DEFAULT
+            "soft", "plain" -> INK
+            "artwork" -> COVER
+            else -> null
+        }
 
         /** Reads the saved cards' looks ("today:soft,radios:plain"); unknown sections and looks are dropped. */
         fun parse(saved: String?): Map<HomeSection, CardLook> {
