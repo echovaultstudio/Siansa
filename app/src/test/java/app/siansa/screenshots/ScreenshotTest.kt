@@ -397,7 +397,7 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     }
                 }
             },
-            // Playback's Fades (issue #1368): a length for each, as chips, and what they're for; with Untouched
+            // Playback's Fades (issue #1368): a slider for each length, and what they're for; with Untouched
             // playback on (issue #1370), the line that says only the volume moves.
             Scene("playback_fades") {
                 Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {

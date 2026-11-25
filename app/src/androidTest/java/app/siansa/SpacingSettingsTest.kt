@@ -437,8 +437,8 @@ class SpacingSettingsTest : SpacingCheck() {
         assertEven("Untouched playback: the page's margin", row.left - screen.left, Space.Page, 1.dp)
     }
 
-    /** Playback's Fades (issue #1368): each row of chips sits the same way under its name, and both rows start at the same edge. */
-    @Test fun fadeChipsSitEvenlyUnderTheirNames() {
+    /** Playback's Fades (issue #1368; sliders, the owner, 25 Nov): both rows alike, names and sliders lined up, each value at the right. */
+    @Test fun fadeSlidersLineUp() {
         compose.setContent {
             SiansaTheme {
                 Column(Modifier.padding(Space.Page)) {
@@ -448,12 +448,16 @@ class SpacingSettingsTest : SpacingCheck() {
                 }
             }
         }
-        val inLabel = compose.onNodeWithTag("fadeInLabel").getBoundsInRoot()
-        val inChips = compose.onNodeWithTag("fadeIn").getBoundsInRoot()
-        val outLabel = compose.onNodeWithTag("fadeOutLabel").getBoundsInRoot()
-        val outChips = compose.onNodeWithTag("fadeOut").getBoundsInRoot()
-        assertEven("Fades: the gap between a name and its chips", inChips.top - inLabel.bottom, outChips.top - outLabel.bottom, 1.dp)
-        assertEven("Fades: both rows start at the same edge", inChips.left, outChips.left, 1.dp)
-        assertEven("Fades: a name starts where its chips do", inLabel.left, inChips.left, 1.dp)
+        val inRow = compose.onNodeWithTag("fadeInRow").getBoundsInRoot()
+        val outRow = compose.onNodeWithTag("fadeOutRow").getBoundsInRoot()
+        val inBar = compose.onNodeWithTag("fadeIn").getBoundsInRoot()
+        val outBar = compose.onNodeWithTag("fadeOut").getBoundsInRoot()
+        val inValue = compose.onNodeWithTag("fadeInValue").getBoundsInRoot()
+        val outValue = compose.onNodeWithTag("fadeOutValue").getBoundsInRoot()
+        assertEven("Fades: both rows as tall", inRow.bottom - inRow.top, outRow.bottom - outRow.top, 1.dp)
+        assertEven("Fades: the sliders start at the same place", inBar.left, outBar.left, 1.dp)
+        assertEven("Fades: the sliders end at the same place", inBar.right, outBar.right, 1.dp)
+        assertEven("Fades: the values end at the row's edge", inValue.right, inRow.right, 1.dp)
+        assertEven("Fades: both values end alike", inValue.right, outValue.right, 1.dp)
     }
 }

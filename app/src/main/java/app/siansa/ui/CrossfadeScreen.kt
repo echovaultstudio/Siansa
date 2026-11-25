@@ -38,6 +38,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -199,11 +201,9 @@ internal fun fadeLabel(ms: Int): String = if (ms == 0) "off" else "$ms ms"
  */
 @Composable
 internal fun FadesBody(settings: AppSettings, save: (Int, Int) -> Unit) {
-    Text("Fade in", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.testTag("fadeInLabel"))
-    FadeChips(settings.fadeInMs, "fadeIn") { save(it, settings.fadeOutMs) }
+    FadeSlider("Fade in", settings.fadeInMs, "fadeIn") { save(it, settings.fadeOutMs) }
     Hint("When you press play, and after you seek or skip.")
-    Text("Fade out", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.testTag("fadeOutLabel"))
-    FadeChips(settings.fadeOutMs, "fadeOut") { save(settings.fadeInMs, it) }
+    FadeSlider("Fade out", settings.fadeOutMs, "fadeOut") { save(settings.fadeInMs, it) }
     Hint("When you pause or stop, and before you seek or skip.")
     Hint("Only for what you start and stop yourself. Songs that follow on by themselves play as before: gapless albums, crossfades and DJ blends aren't touched.")
     // Untouched (issue #1370): the output's volume moves, the song's sound doesn't, and a skip waits for the fade out.
@@ -212,18 +212,30 @@ internal fun FadesBody(settings: AppSettings, save: (Int, Int) -> Unit) {
     }
 }
 
-/** The lengths a fade can have, as chips (issue #1368): Off, then each of [AppSettings.FADE_CHOICES]. */
+/**
+ * A fade's length on a slider (the owner, 25 Nov: "a sliding bar instead of the buttons"): Off at the left, up to
+ * 600 ms in steps of 25, its length beside it. Saved when the finger lets go.
+ */
 @Composable
-internal fun FadeChips(selected: Int, tag: String, onPick: (Int) -> Unit) {
-    Row(Modifier.tvFocusGroup().horizontalScroll(rememberScrollState()).testTag(tag), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
-        AppSettings.FADE_CHOICES.forEach { ms ->
-            FilterChip(
-                selected = selected == ms,
-                onClick = { onPick(ms) },
-                label = { Text(if (ms == 0) "Off" else "$ms ms") },
-                modifier = Modifier.testTag("$tag-$ms"),
-            )
-        }
+internal fun FadeSlider(name: String, ms: Int, tag: String, onDone: (Int) -> Unit) {
+    var value by remember(ms) { mutableFloatStateOf(ms.toFloat()) }
+    val range = AppSettings.FADE_MS
+    val steps = (range.last - range.first) / AppSettings.FADE_STEP_MS - 1
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.testTag("${tag}Row")) {
+        Text(name, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.width(72.dp).testTag("${tag}Label"))
+        Slider(
+            value = value,
+            onValueChange = { value = app.siansa.data.fadeChoice(it.roundToInt()).toFloat() },
+            onValueChangeFinished = { onDone(value.roundToInt()) },
+            valueRange = range.first.toFloat()..range.last.toFloat(),
+            steps = steps,
+            modifier = Modifier.weight(1f).testTag(tag).semantics { stateDescription = fadeLabel(value.roundToInt()) },
+        )
+        Text(
+            fadeLabel(value.roundToInt()).replaceFirstChar { it.uppercase() },
+            style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.End,
+            modifier = Modifier.width(64.dp).testTag("${tag}Value"),
+        )
     }
 }
 

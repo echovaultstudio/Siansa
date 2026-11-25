@@ -388,8 +388,10 @@ data class AppSettings(
         /** The skips the book player offers, in seconds (issue #521). */
         val BOOK_SKIP_CHOICES = listOf(10, 15, 30, 45, 60, 90)
 
-        /** The lengths a fade can be set to, in ms; 0 is off (issue #1368). */
-        val FADE_CHOICES = listOf(0, 50, 100, 150, 250, 400, 600)
+        /** How long a fade can be, in ms, on its slider (issue #1368); 0 is off. */
+        val FADE_MS = 0..600
+        /** A fade's slider moves in steps this long. */
+        const val FADE_STEP_MS = 25
         const val DEFAULT_FADE_IN_MS = 250
         const val DEFAULT_FADE_OUT_MS = 150
         const val DEFAULT_MODEL = "google/gemini-2.5-flash"
@@ -1248,5 +1250,9 @@ fun AppSettings.carouselSize(section: HomeSection): CrateSize = when (section) {
 fun AppSettings.cardNames(section: HomeSection): CardNames =
     homeNames[section] ?: if (section in homeCarouselOnCover) CardNames.ON else CardNames.AUTO
 
-/** The fade length nearest to [ms] among the ones that can be chosen ([AppSettings.FADE_CHOICES]). */
-internal fun fadeChoice(ms: Int): Int = AppSettings.FADE_CHOICES.minBy { kotlin.math.abs(it - ms) }
+/** [ms] as a fade's length can be: within [AppSettings.FADE_MS], on a step of [AppSettings.FADE_STEP_MS]. */
+internal fun fadeChoice(ms: Int): Int {
+    val step = AppSettings.FADE_STEP_MS
+    val stepped = ((ms.coerceIn(AppSettings.FADE_MS) + step / 2) / step) * step
+    return stepped.coerceIn(AppSettings.FADE_MS)
+}

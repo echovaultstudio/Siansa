@@ -95,7 +95,7 @@ A short fade for what you start and stop yourself, so music eases in and dips aw
 - **Fade in** when you press play, and after you seek or skip: 250 ms unless you change it.
 - **Fade out** when you pause or stop, and before you seek or skip: 150 ms unless you change it.
 
-Each can be Off or 50 to 600 ms. A skip doesn't take longer for it: the old song fades while the next one loads.
+Each is a slider, from Off up to 600 ms in steps of 25 ms. A skip doesn't take longer for it: the old song fades while the next one loads.
 
 Fades are only for what you do yourself. Songs that follow on by themselves play as before: gapless albums run on
 without a gap, and crossfades and DJ blends aren't touched.

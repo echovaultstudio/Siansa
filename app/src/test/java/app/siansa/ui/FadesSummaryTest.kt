@@ -15,10 +15,14 @@ class FadesSummaryTest {
     }
 
     @Test fun aLengthIsOneOfTheChoices() {
+        // On the slider's steps of 25 ms, from Off to 600 ms (the owner, 25 Nov: a sliding bar).
         assertEquals(250, fadeChoice(250))
         assertEquals(0, fadeChoice(-20))
         assertEquals(600, fadeChoice(5_000))
         assertEquals(150, fadeChoice(160))
-        assertEquals(listOf(0, 50, 100, 150, 250, 400, 600), AppSettings.FADE_CHOICES)
+        assertEquals(175, fadeChoice(163))
+        assertEquals(0, fadeChoice(12))
+        assertEquals(25, fadeChoice(13))
+        assertEquals(0..600, AppSettings.FADE_MS)
     }
 }
