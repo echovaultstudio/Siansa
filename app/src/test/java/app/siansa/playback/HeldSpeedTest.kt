@@ -36,4 +36,14 @@ class HeldSpeedTest {
         }
         assertEquals(1f + BeatMatch.HOLD_MAX, held, 1e-6f)
     }
+
+    /** Siansa Dev crashed at the end of every held blend (the owner's log, 25 Nov: "Flags = ' ,'"). */
+    @Test fun theLogSaysTheSpeedWithoutAFormatTemplate() {
+        assertEquals("+1.6 %", BeatMatch.percentOff(1.016f))
+        assertEquals("-2.0 %", BeatMatch.percentOff(0.98f))
+        assertEquals("+0.0 %", BeatMatch.percentOff(1f))
+        // The line as the blend's end logs it, with a percent sign before the held speed: built, not formatted.
+        val line = "Beat-matched blend done (1.6 %, ${BeatMatch.percentOff(1.016f)} of the song's own speed)"
+        assertEquals("Beat-matched blend done (1.6 %, +1.6 % of the song's own speed)", line)
+    }
 }
