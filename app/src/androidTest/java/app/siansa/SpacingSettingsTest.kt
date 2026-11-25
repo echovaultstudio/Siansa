@@ -458,7 +458,7 @@ class SpacingSettingsTest : SpacingCheck() {
         assertEven("Fades: each name on one line", compose.onNodeWithTag("fadeOutLabel").getBoundsInRoot().let { it.bottom - it.top },
             compose.onNodeWithTag("fadeInLabel").getBoundsInRoot().let { it.bottom - it.top }, 1.dp)
         assertEven("Fades: the sliders end at the same place", inBar.right, outBar.right, 1.dp)
-        assertEven("Fades: the sliders as wide", inBar.right - inBar.left, outBar.right - outBar.left, 4.dp)
+        assertEven("Fades: the sliders start together", inBar.left, outBar.left, 1.dp)
         assertEven("Fades: the values end at the row's edge", inValue.right, inRow.right, 1.dp)
         assertEven("Fades: both values end alike", inValue.right, outValue.right, 1.dp)
     }

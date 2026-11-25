@@ -202,9 +202,14 @@ internal fun fadeLabel(ms: Int): String = if (ms == 0) "off" else "$ms ms"
  */
 @Composable
 internal fun FadesBody(settings: AppSettings, save: (Int, Int) -> Unit) {
-    FadeSlider("Fade in", settings.fadeInMs, "fadeIn") { save(it, settings.fadeOutMs) }
+    // Both names as wide as the wider one at this text size, so the two sliders start and end together.
+    val measurer = androidx.compose.ui.text.rememberTextMeasurer()
+    val style = MaterialTheme.typography.bodyMedium
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val nameWidth = with(density) { listOf("Fade in", "Fade out").maxOf { measurer.measure(it, style).size.width }.toDp() }
+    FadeSlider("Fade in", settings.fadeInMs, "fadeIn", nameWidth) { save(it, settings.fadeOutMs) }
     Hint("When you press play, and after you seek or skip.")
-    FadeSlider("Fade out", settings.fadeOutMs, "fadeOut") { save(settings.fadeInMs, it) }
+    FadeSlider("Fade out", settings.fadeOutMs, "fadeOut", nameWidth) { save(settings.fadeInMs, it) }
     Hint("When you pause or stop, and before you seek or skip.")
     Hint("Only for what you start and stop yourself. Songs that follow on by themselves play as before: gapless albums, crossfades and DJ blends aren't touched.")
     // Untouched (issue #1370): the output's volume moves, the song's sound doesn't, and a skip waits for the fade out.
@@ -218,13 +223,13 @@ internal fun FadesBody(settings: AppSettings, save: (Int, Int) -> Unit) {
  * 600 ms in steps of 25, its length beside it. Saved when the finger lets go.
  */
 @Composable
-internal fun FadeSlider(name: String, ms: Int, tag: String, onDone: (Int) -> Unit) {
+internal fun FadeSlider(name: String, ms: Int, tag: String, nameWidth: androidx.compose.ui.unit.Dp, onDone: (Int) -> Unit) {
     var value by remember(ms) { mutableFloatStateOf(ms.toFloat()) }
     val range = AppSettings.FADE_MS
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.testTag("${tag}Row")) {
         // On one line whatever the text size: the slider gives way, not the name.
         Text(name, style = MaterialTheme.typography.bodyMedium, maxLines = 1, softWrap = false,
-            modifier = Modifier.widthIn(min = 72.dp).padding(end = Space.Small).testTag("${tag}Label"))
+            modifier = Modifier.width(nameWidth + Space.Small).padding(end = Space.Small).testTag("${tag}Label"))
         Slider(
             value = value,
             onValueChange = { value = app.siansa.data.fadeChoice(it.roundToInt()).toFloat() },
