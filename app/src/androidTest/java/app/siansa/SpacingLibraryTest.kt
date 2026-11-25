@@ -165,7 +165,7 @@ class SpacingLibraryTest : SpacingCheck() {
 
     /**
      * The album's ⊕ (issue #1331): its plus opens the sheet and Download is in there, so the heart comes straight after
-     * the plus, as far from it as it was from Download; and the sheet's lines are all as tall, their icons in one column.
+     * the plus, as far from it as it was from Download; and the sheet's one-line lines are all as tall, with no gaps between lines.
      */
     @Test fun albumSheetAndItsBarLineUp() {
         compose.setContent {
@@ -192,8 +192,10 @@ class SpacingLibraryTest : SpacingCheck() {
         val heart = compose.onNodeWithTag("heart").getBoundsInRoot()
         assertTrue("The heart right after the plus", heart.left >= plus.right - 0.5.dp && heart.left - plus.right < 24.dp)
         val lines = listOf("albumPlayNext", "albumQueue", "albumPlaylist", "albumDownload").map { compose.onNodeWithTag(it).getBoundsInRoot() }
+        // The one-line lines are all as tall; Download has a note under it, so it's a two-line line and taller.
         val height = lines[0].bottom - lines[0].top
-        lines.forEach { assertEven("The sheet's lines as tall", it.bottom - it.top, height, 1.dp) }
+        lines.take(3).forEach { assertEven("The sheet's one-line lines as tall", it.bottom - it.top, height, 1.dp) }
+        assertTrue("Download, with its note, at least as tall", lines[3].bottom - lines[3].top >= height - 0.5.dp)
         lines.zipWithNext().forEach { (a, b) -> assertEven("No gap between lines", b.top, a.bottom, 1.dp) }
         val stars = compose.onNodeWithTag("albumStars").getBoundsInRoot()
         val row = compose.onNodeWithTag("albumRating").getBoundsInRoot()
