@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.FilterChip
@@ -220,21 +221,22 @@ internal fun FadesBody(settings: AppSettings, save: (Int, Int) -> Unit) {
 internal fun FadeSlider(name: String, ms: Int, tag: String, onDone: (Int) -> Unit) {
     var value by remember(ms) { mutableFloatStateOf(ms.toFloat()) }
     val range = AppSettings.FADE_MS
-    val steps = (range.last - range.first) / AppSettings.FADE_STEP_MS - 1
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.testTag("${tag}Row")) {
-        Text(name, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.width(72.dp).testTag("${tag}Label"))
+        // On one line whatever the text size: the slider gives way, not the name.
+        Text(name, style = MaterialTheme.typography.bodyMedium, maxLines = 1, softWrap = false,
+            modifier = Modifier.widthIn(min = 72.dp).padding(end = Space.Small).testTag("${tag}Label"))
         Slider(
             value = value,
             onValueChange = { value = app.siansa.data.fadeChoice(it.roundToInt()).toFloat() },
             onValueChangeFinished = { onDone(value.roundToInt()) },
+            // Snapped to 25 ms steps as it moves (fadeChoice), without 24 tick marks along the bar.
             valueRange = range.first.toFloat()..range.last.toFloat(),
-            steps = steps,
             modifier = Modifier.weight(1f).testTag(tag).semantics { stateDescription = fadeLabel(value.roundToInt()) },
         )
         Text(
             fadeLabel(value.roundToInt()).replaceFirstChar { it.uppercase() },
-            style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.End,
-            modifier = Modifier.width(64.dp).testTag("${tag}Value"),
+            style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.End, maxLines = 1, softWrap = false,
+            modifier = Modifier.widthIn(min = 64.dp).padding(start = Space.Small).testTag("${tag}Value"),
         )
     }
 }

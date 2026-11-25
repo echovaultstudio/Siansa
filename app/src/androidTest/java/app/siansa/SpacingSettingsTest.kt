@@ -437,7 +437,7 @@ class SpacingSettingsTest : SpacingCheck() {
         assertEven("Untouched playback: the page's margin", row.left - screen.left, Space.Page, 1.dp)
     }
 
-    /** Playback's Fades (issue #1368; sliders, the owner, 25 Nov): both rows alike, names and sliders lined up, each value at the right. */
+    /** Playback's Fades (issue #1368; sliders, the owner, 25 Nov): both rows alike, each name on one line, the sliders ending together, each value at the right. */
     @Test fun fadeSlidersLineUp() {
         compose.setContent {
             SiansaTheme {
@@ -455,8 +455,10 @@ class SpacingSettingsTest : SpacingCheck() {
         val inValue = compose.onNodeWithTag("fadeInValue").getBoundsInRoot()
         val outValue = compose.onNodeWithTag("fadeOutValue").getBoundsInRoot()
         assertEven("Fades: both rows as tall", inRow.bottom - inRow.top, outRow.bottom - outRow.top, 1.dp)
-        assertEven("Fades: the sliders start at the same place", inBar.left, outBar.left, 1.dp)
+        assertEven("Fades: each name on one line", compose.onNodeWithTag("fadeOutLabel").getBoundsInRoot().let { it.bottom - it.top },
+            compose.onNodeWithTag("fadeInLabel").getBoundsInRoot().let { it.bottom - it.top }, 1.dp)
         assertEven("Fades: the sliders end at the same place", inBar.right, outBar.right, 1.dp)
+        assertEven("Fades: the sliders as wide", inBar.right - inBar.left, outBar.right - outBar.left, 4.dp)
         assertEven("Fades: the values end at the row's edge", inValue.right, inRow.right, 1.dp)
         assertEven("Fades: both values end alike", inValue.right, outValue.right, 1.dp)
     }
