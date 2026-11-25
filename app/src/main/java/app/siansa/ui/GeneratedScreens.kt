@@ -144,7 +144,6 @@ private fun GenreScreenContent(nav: NavController, name: String) {
         songs = list,
         error = (songs as? Load.Err)?.message ?: if (list != null && list.isEmpty()) "No songs of $name on the phone" else null,
         shortcutCover = false,
-        djMix = false,
         cover = { m -> GeneratedCover(name, colors, m) },
         radioColour = colors.first,
         // Its name is on its cover: under it only what the genre is, with a little history (Siansa Beats, from

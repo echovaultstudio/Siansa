@@ -142,9 +142,6 @@ fun CollectionPage(
     onAlbumPlus: (() -> Unit)? = null,
     // Where Play continues an album you stopped part way (issue #965, was "Continue from" #367): Play shows it.
     resume: PlayResume? = null,
-    // Shuffle slides onto Play for a DJ mix of just these songs, as an album's does: on playlists, radios, mixes and
-    // every other list of songs (the owner, 9 Nov); not on search results.
-    djMix: Boolean = true,
     // What the quick-scroll handle says for a song (a letter, a month); by default where it is in the list.
     scrollLabel: ((index: Int, song: Song) -> String?)? = null,
     footer: LazyListScope.() -> Unit = {},
@@ -168,10 +165,6 @@ fun CollectionPage(
     rowExtras: @Composable () -> Unit = {},
 ) {
     val graph = LocalGraph.current
-    val djSettings by graph.settings.state.collectAsStateWithLifecycle()
-    val djConnection by graph.connection.state.collectAsStateWithLifecycle()
-    val djBeats by graph.djReady.beats.collectAsStateWithLifecycle()
-    val djPossible = app.siansa.mix.DjReady.problem(djSettings, djConnection, djBeats) == null
     val player by graph.player.state.collectAsStateWithLifecycle()
     // This page as Home's shortcuts open it again (issue #271): its route with the ids filled in.
     val route = remember(nav.currentBackStackEntry) { nav.currentBackStackEntry?.let { routeOf(it.destination.route, it.arguments) } }
@@ -184,9 +177,6 @@ fun CollectionPage(
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
-    // A slide from an album's shuffle button onto Play (issue #965): DJ mix on the cover, the rest of the page dimmed.
-    var djSlide by remember { mutableStateOf<DjSlide?>(null) }
-    val slideDim by androidx.compose.animation.core.animateFloatAsState(if (djSlide != null) SLIDE_OTHERS else 1f, label = "slideDim")
     val coverSize = (LocalConfiguration.current.screenWidthDp * 0.62f).dp
     val coverPx = with(density) { coverSize.toPx() }
     val scrolled by remember {
@@ -302,15 +292,11 @@ fun CollectionPage(
                         contentAlignment = Alignment.Center,
                     ) {
                         Box(Modifier.size(coverSize).shadow(18.dp, RoundedCornerShape(6.dp)).clip(RoundedCornerShape(6.dp))) {
-                            // The same name on the cover as now playing's play button slides (the owner, issue #965).
-                            val label = djSlide?.let { SlideLabel(PlaySlide.DJ_MIX, it.way, it.armed) }
-                            val blur by androidx.compose.animation.core.animateDpAsState(slideBlur(label), label = "slideBlur")
-                            cover(Modifier.size(coverSize).then(if (blur > 0.dp) Modifier.blur(blur) else Modifier))
-                            SlideCoverLabel(label, Modifier.fillMaxSize())
+                            cover(Modifier.size(coverSize))
                         }
                     }
                     Spacer(Modifier.height(Space.Page))
-                    Column(Modifier.alpha(slideDim)) {
+                    Column {
                         if (showTitle) {
                             // It scrolls with the page, and fades out as it goes under the bar, whose own comes in.
                             Text(
@@ -334,11 +320,8 @@ fun CollectionPage(
                         playAs = playAs,
                         radioColour = radioColour,
                         radioRow = radioRow,
-                        // An album's shuffle slides right onto Play for a DJ mix of its own songs (issue #965); it needs
-                        // AudioMuse, as similar albums does.
-                        // Only when a DJ mix's needs are met (AudioMuse and Siansa Beats): otherwise a plain Shuffle.
-                        onDjMix = if (((albumBar && onSimilar != null) || djMix) && djPossible && playAs == null) ({ DjNeedsBlends.then(graph) { graph.scope.launch { app.siansa.mix.AlbumDjMix.start(graph, title, songs.orEmpty()) } } }) else null,
-                        djSlide = djSlide, onDjSlide = { djSlide = it }, dim = slideDim, albumBar = albumBar, resume = resume,
+                        // Shuffle is a plain shuffle: a DJ mix starts only from now playing (the owner, 25 Nov).
+                        albumBar = albumBar, resume = resume,
                         rowExtras = rowExtras, onAlbumPlus = onAlbumPlus,
                     )
                     }
@@ -483,10 +466,6 @@ private fun ActionRow(
     onSimilar: (() -> Unit)?,
     onPlayed: () -> Unit = {},
     saveAs: String? = null,
-    onDjMix: (() -> Unit)? = null,
-    djSlide: DjSlide? = null,
-    onDjSlide: (DjSlide?) -> Unit = {},
-    dim: Float = 1f,
     albumBar: Boolean = false,
     resume: PlayResume? = null,
     playAs: ((first: Song?) -> Unit)? = null,
@@ -507,10 +486,6 @@ private fun ActionRow(
     var saving by remember { mutableStateOf(false) }
     // ⏸ while this page's songs play; it pauses them rather than starting over (issue #644).
     val playback = rememberListPlayback(songs)
-    // The album's DJ mix playing (issue #965): Play keeps its grooves until something else plays or playback ends.
-    val playerState by graph.player.state.collectAsStateWithLifecycle()
-    val albumMix by app.siansa.mix.AlbumDjMix.playing.collectAsStateWithLifecycle()
-    val mixOn = onDjMix != null && playerState.hasMedia && app.siansa.mix.albumMixPlaying(playerState.queue, songs, albumMix)
     if (saving && saveAs != null) SaveAsPlaylistDialog(saveAs, songs) { saving = false }
     // An album's plus (the owner's layout): the album into a playlist.
     var adding by remember { mutableStateOf(false) }
@@ -542,11 +517,6 @@ private fun ActionRow(
         },
         onPlayFromStart = if (resume != null) ({ AppLog.i("Album", "Play from the start"); graph.player.play(songs); onPlayed() }) else null,
         playing = playback.playing,
-        onDjMix = onDjMix?.let { mix -> { mix(); onPlayed() } },
-        djSlide = djSlide,
-        onDjSlide = onDjSlide,
-        dim = dim,
-        mixOn = mixOn,
         albumBar = albumBar,
         rowExtras = rowExtras,
         onAddToPlaylist = if (albumBar && songs.isNotEmpty()) (onAlbumPlus ?: { adding = true }) else null,
@@ -566,13 +536,7 @@ internal fun ActionButtons(
     onPlay: () -> Unit,
     onSave: (() -> Unit)? = null,
     playing: Boolean = false,
-    // An album's DJ mix (issue #965): sliding from shuffle onto Play starts it.
-    onDjMix: (() -> Unit)? = null,
-    djSlide: DjSlide? = null,
-    onDjSlide: (DjSlide?) -> Unit = {},
     dim: Float = 1f,
-    // The album's DJ mix is playing: Play has the record grooves, turning while it plays.
-    mixOn: Boolean = false,
     // An album's bar (issue #965): Download, Similar albums, Shuffle and Play spread evenly, no queue button.
     albumBar: Boolean = false,
     // Where Play continues, with the album's length: Play shows a ring for how far you got and "from 10" under it.
@@ -587,37 +551,20 @@ internal fun ActionButtons(
     // An album's bar: what stands beside Download (its heart).
     rowExtras: @Composable () -> Unit = {},
 ) {
-    // How far right of shuffle's middle Play's near edge is: sliding there starts the DJ mix.
-    var shuffleX by remember { mutableStateOf<Float?>(null) }
-    var playLeft by remember { mutableStateOf<Float?>(null) }
-    // Once the finger is on Play, it lights up as now playing's record and turns from the moment the mix plays, still
-    // while it's paused (the owner, issue #965).
-    val onPlayButton = djSlide?.armed == true
     val playButton: @Composable () -> Unit = {
-        Box(Modifier.onGloballyPositioned { playLeft = it.positionInRoot().x }.alpha(if (onPlayButton) 1f else dim)) {
+        Box(Modifier.alpha(dim)) {
             BigPlayButton(
-                enabled, playing = playing, grooves = onPlayButton || mixOn, turning = mixOn && playing,
-                progress = resume?.let { (at, of) -> if (of > 0) at.index.toFloat() / of else 0f }?.takeIf { !onPlayButton && !mixOn },
+                enabled, playing = playing,
+                progress = resume?.let { (at, of) -> if (of > 0) at.index.toFloat() / of else 0f },
                 onLongPlay = onPlayFromStart,
                 onPlay = onPlay,
             )
         }
     }
     val shuffleButton: @Composable () -> Unit = {
-        if (onDjMix != null) {
-            ShuffleDjButton(
-                enabled = enabled,
-                onShuffle = onShuffle,
-                onDjMix = onDjMix,
-                onSliding = onDjSlide,
-                playLeftPx = shuffleX?.let { x -> playLeft?.let { it - x } },
-                modifier = Modifier.onGloballyPositioned { shuffleX = it.positionInRoot().x + it.size.width / 2f },
-            )
-        } else {
-            IconButton(onClick = onShuffle, enabled = enabled, modifier = Modifier.testTag("shuffleAll")) {
-                // Plain, as Radio and Shuffle on an artist's page: only Play takes the page's colour (the owner, 10 Nov).
-                Icon(Icons.Rounded.Shuffle, "Shuffle", tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(30.dp))
-            }
+        IconButton(onClick = onShuffle, enabled = enabled, modifier = Modifier.testTag("shuffleAll")) {
+            // Plain, as Radio and Shuffle on an artist's page: only Play takes the page's colour (the owner, 10 Nov).
+            Icon(Icons.Rounded.Shuffle, "Shuffle", tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(30.dp))
         }
     }
     val similarButton: @Composable () -> Unit = {
@@ -646,7 +593,7 @@ internal fun ActionButtons(
             Box(Modifier.offset(x = shift).alpha(dim)) { rowExtras() }  // spacing: exact
             Spacer(Modifier.weight(1f))
             Box(Modifier.alpha(dim)) { similarButton() }
-            Box(Modifier.alpha(if (djSlide != null) 1f else dim)) { shuffleButton() }
+            Box(Modifier.alpha(dim)) { shuffleButton() }
             Spacer(Modifier.width(Space.Small))
             playButton()
         }
@@ -901,7 +848,6 @@ private val LAST_PLAYED_LINE = 3.dp
 
 
 /** The page around an album's shuffle while it slides onto Play (issue #965): dimmed like now playing's controls. */
-private const val SLIDE_OTHERS = 0.3f
 
 /** Where Play continues an album you stopped part way (issue #965): the song's position and its label ("10", "2-3"). */
 data class PlayResume(val index: Int, val label: String)

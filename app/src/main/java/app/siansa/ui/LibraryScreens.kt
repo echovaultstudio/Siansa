@@ -364,7 +364,6 @@ fun AlbumScreen(nav: NavController, id: String) {
     val download = rememberAlbumDownload(d?.album, d?.songs)
     CollectionPage(
         // An album slides to its DJ mix only with AudioMuse, as similar albums (issue #965).
-        djMix = false,
         nav = nav,
         title = d?.album?.name ?: "Album",
         color = rememberCoverColor(d?.album?.coverArt),

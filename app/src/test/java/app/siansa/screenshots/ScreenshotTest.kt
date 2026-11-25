@@ -1348,25 +1348,9 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     val download: @Composable () -> Unit = { androidx.compose.material3.Icon(Icons.Rounded.DownloadForOffline, "Download", Modifier.size(28.dp)) }
                     // The album's heart beside Download (the owner, 14 Nov), off and on.
                     val heart: @Composable () -> Unit = { androidx.compose.material3.IconButton(onClick = {}) { androidx.compose.material3.Icon(Icons.Rounded.FavoriteBorder, "Favourite", Modifier.size(28.dp)) } }
-                    app.siansa.ui.ActionButtons(enabled = true, onQueue = {}, download = download, onSimilar = {}, onShuffle = {}, onPlay = {}, onDjMix = {}, albumBar = true, onAddToPlaylist = {}, rowExtras = heart)
-                    app.siansa.ui.ActionButtons(enabled = true, onQueue = {}, download = download, onSimilar = {}, onShuffle = {}, onPlay = {}, onDjMix = {}, albumBar = true, onAddToPlaylist = {}, rowExtras = heart,
+                    app.siansa.ui.ActionButtons(enabled = true, onQueue = {}, download = download, onSimilar = {}, onShuffle = {}, onPlay = {}, albumBar = true, onAddToPlaylist = {}, rowExtras = heart)
+                    app.siansa.ui.ActionButtons(enabled = true, onQueue = {}, download = download, onSimilar = {}, onShuffle = {}, onPlay = {}, albumBar = true, onAddToPlaylist = {}, rowExtras = heart,
                         resume = app.siansa.ui.PlayResume(9, "10") to 24)
-                    app.siansa.ui.ActionButtons(enabled = true, onQueue = {}, download = download, onSimilar = {}, onShuffle = {}, onPlay = {}, onDjMix = {}, albumBar = true, onAddToPlaylist = {}, rowExtras = heart,
-                        djSlide = app.siansa.ui.DjSlide(armed = true), dim = 0.3f)
-                    app.siansa.ui.ActionButtons(enabled = true, onQueue = {}, download = download, onSimilar = {}, onShuffle = {}, onPlay = {}, onDjMix = {}, albumBar = true, onAddToPlaylist = {}, rowExtras = heart,
-                        mixOn = true)  // paused: a turning glint never lets the picture settle
-                    Row(horizontalArrangement = Arrangement.spacedBy(Space.Page)) {
-                        listOf(true, false).forEach { armed ->
-                            Box(
-                                Modifier.size(160.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp))
-                                    .background(androidx.compose.ui.graphics.Brush.linearGradient(listOf(Color(0xFFD4813A), Color(0xFF1E2A6B)))),
-                            ) {
-                                app.siansa.ui.SlideCoverLabel(
-                                    app.siansa.ui.SlideLabel(app.siansa.ui.PlaySlide.DJ_MIX, app.siansa.ui.SlideWay.RIGHT, armed), Modifier.fillMaxSize(),
-                                )
-                            }
-                        }
-                    }
                 }
             },
             // Now playing's dynamic colours (issue #970): a seek bar and Play in each cover's colour, on its backdrop; a cool

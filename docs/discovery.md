@@ -102,10 +102,7 @@ On an album's page, the buttons under its details: **add to a playlist** (the pl
 - **Play** carries on where you stopped, when you left the album part way: a ring round it shows how far you got,
   and the details line says **Continue from 8**. Press and hold Play to start from the first song instead.
 - The **plus** adds the whole album to a playlist you pick.
-- **Shuffle** plays the album shuffled. With AudioMuse-AI and Siansa Beats answering, **slide right** from it all the way onto Play for a **DJ mix
-  of the album**: its own songs only, in an order that blends well (tempo and key, as a DJ mix orders them), played
-  with DJ blends. It picks among the orders that blend best, so it doesn't always start from the same song. Nothing
-  else is added, so the mix ends with the album.
+- **Shuffle** plays the album shuffled.
 
 While you slide, the cover says **DJ mix**, as in now playing, and the rest of the page dims. Once your finger is on
 Play, it turns into a record and the phone clicks; letting go starts the mix. Play stays a turning record while the
