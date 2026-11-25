@@ -596,7 +596,8 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         homeVariants = LookVariant.parse(prefs.getString("home_variants", null)),
         homePictures = PictureStyle.parse(prefs.getString("home_pictures", null)),
         homeHeroCardPictures = PictureStyle.parse(prefs.getString("home_hero_card_pictures", null)),
-        homePictureColours = PictureColours.parse(prefs.getString("home_picture_colours", null)),
+        // One Colour per row (the owner, 25 Nov): a row's own card colour wins over a set chosen before.
+        homePictureColours = PictureColours.parse(prefs.getString("home_picture_colours", null)) - CardLook.parse(prefs.getString("home_card_looks", null)).keys,
         homeGridSizes = HomeLook.parseGridSizes(prefs.getString("home_grid_sizes", null)),
         homeUntitled = HomeSection.parseHidden(prefs.getString("home_untitled", null)),
         homeNoLines = HomeSection.parseHidden(prefs.getString("home_no_lines", null)),

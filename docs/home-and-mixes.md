@@ -58,7 +58,9 @@ it; tap the line to open its options under it, and again to close them. Only wha
 - **Look**: the **Look** (small pictures of each, below), then what that look has of its own: its **Style** or
   **Layout**, **Tiles**, **Columns and rows**, **Size**.
 - **Cards**: **Pictures** (for a hero with cards under it, **Picture of the big card** and **Pictures of the cards
-  under it**), **Colours**, **Names** and **Card colour** (**As Home**, or one of the same six swatches as Cards above).
+  under it**), **Names** and **Colour**: one choice for the cards and their pictures, as round swatches. **As Home**;
+  one of the same six as Cards above (the card in that colour, its pictures from the covers); or a set, **By mood**,
+  **Siansa** or **Mono**, each card taking its own colour from it, card and picture.
 
 **Reset this row** at its foot puts that section's look, pictures, colours, names, title and descriptions back as they
 came; where it is on Home and whether it shows stay.
@@ -69,7 +71,7 @@ The looks:
 |---|---|
 | **As it is** | The section's own look (the default). |
 | **Tiles** | A row of covers to swipe through. **Size**: **Big** (as tiles have always been), **Compact** or **Small**, for more in view. |
-| **Banner** | One wide card with the first covers and a button. Its **Style**: **Card**, or **Hero**: a big card at the top of the section in the first mix's own colours, its covers big, its name and line, **Play** and **Shuffle**. **Hero and 3 cards** or **Hero and 4 cards** puts the row's next three or four at its foot on the same colours, each with its name on its picture and its line under it. Then **Picture of the big card** and **Pictures of the cards under it** are chosen apart (stickers on top and Aura under, say). The hero takes its row's **Card colour**: that colour's fade, or From its cover its picture's colour; with no colour of its own, its row's **Colours** (By mood, Siansa, Mono) when they're chosen. |
+| **Banner** | One wide card with the first covers and a button. Its **Style**: **Card**, or **Hero**: a big card at the top of the section in the first mix's own colours, its covers big, its name and line, **Play** and **Shuffle**. **Hero and 3 cards** or **Hero and 4 cards** puts the row's next three or four at its foot on the same colours, each with its name on its picture and its line under it. Then **Picture of the big card** and **Pictures of the cards under it** are chosen apart (stickers on top and Aura under, say). The hero takes its row's **Colour**: that colour's fade, From its cover its picture's colour, or a set's (By mood, Siansa, Mono). |
 | **List** | The first five, listed; the title opens the rest. |
 | **Play button** | A slim card: its ▶ plays the section; a tap anywhere else on the card opens it. |
 | **Cover rows** | Covers with their details beside them, three to a column, to swipe through: the same look as a custom card's. The cover plays that album or opens that item; the row opens it. Books and podcasts show how far you are along the cover. A radio or genre shows its colours instead of a cover. |
@@ -111,10 +113,10 @@ screen. Moving cards stand still while Home scrolls, and when Android's "Remove 
 The same cog has **Show its title**: turn it off and the section shows without the heading above it ("Your evening",
 "Recently played"), keeping the gap where it was. And its **Colour**: a card shows the section's cards in the chosen
 look, and **As Home** follows the choice made under Cards, or pick one for this section alone. For Shortcuts, As Home
-keeps its tiles plain; a colour of its own paints them, as it does a Shortcut grid in any section. A row's **Colours**
-and **Pictures** act on its shortcut tiles too: with Colours set to **By mood**, **Siansa** or **Mono** the tiles take
-those colours (in those colours themselves until the row has a Card colour of its own; By mood needs a mix, and other tiles keep
-their covers' colours), and a picture style other than Auto draws each tile's small picture that way.
+keeps its tiles plain; a colour of its own paints them, as it does a Shortcut grid in any section. A row's **Colour**
+and **Pictures** act on its shortcut tiles too: with Colour set to **By mood**, **Siansa** or **Mono** the tiles take
+those colours (By mood needs a mix, and other tiles keep their covers' colours), and a picture style other than Auto
+draws each tile's small picture that way.
 
 | Section | What it shows |
 |---|---|

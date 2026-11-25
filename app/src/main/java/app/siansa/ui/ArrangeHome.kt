@@ -667,16 +667,6 @@ internal fun HomeLookDialog(
                     ValueLine("Pictures of the cards under it", heroCardStyle.label, "cards" in open, "rowHeroCardPicture") { toggle("cards") }
                     if ("cards" in open) PictureChips(heroCardStyle, "heroCardPictureStyle") { heroCardStyle = it; onHeroCardPicture(it) }
                 }
-                SheetRule()
-                ValueLine("Colours", pictureColour.label, "colours" in open, "rowPictureColours", swatch = { ColoursSwatch(pictureColour) }) { toggle("colours") }
-                if ("colours" in open) {
-                    androidx.compose.foundation.layout.FlowRow(Modifier.padding(bottom = Space.Medium).testTag("pictureColours"), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
-                        for (option in app.siansa.data.PictureColours.entries) {
-                            FilterChip(selected = option == pictureColour, onClick = { pictureColour = option; onPictureColours(option) },
-                                label = { Text(option.label) }, leadingIcon = { ColoursSwatch(option) }, modifier = Modifier.testTag("pictureColours-${option.id}"))
-                        }
-                    }
-                }
                 if (look in HomeLook.NAMED) {
                     SheetRule()
                     ValueLine("Names", cardNames.label, "names" in open, "rowNames") { toggle("names") }
@@ -686,14 +676,20 @@ internal fun HomeLookDialog(
                 }
                 SheetRule()
             }
-            // Every row has a colour (#1261), Shortcuts too: its tiles stay plain until it has one of its own.
-            ValueLine("Card colour", if (colour == CardLook.AS_HOME) "As Home (${asHome.label})" else colour.label, "colour" in open, "rowCardColour") { toggle("colour") }
+            // One Colour for the row (the owner, 25 Nov: "x2 colour selectors and its impossible to know what does
+            // what"): the card's colour and its pictures' in one choice, Your listening's swatches, As Home first and
+            // the sets of colours last. Every row has one (#1261); Shortcuts' tiles stay plain until it has its own.
+            val chosenColour = RowColour.of(colour, pictureColour)
+            val colourOptions = if (onOpenSettings == null) RowColour.all else RowColour.all.filter { it.set == app.siansa.data.PictureColours.COVERS }
+            ValueLine("Colour", chosenColour.label(asHome), "colour" in open, "rowColour", swatch = { RowColourDot(chosenColour, asHome) }) { toggle("colour") }
             if ("colour" in open) {
-                // The same swatches as Your listening's (the owner, 25 Nov), As Home first.
                 ColourSwatches(
-                    CardLook.entries, colour, { cardSwatchFade(it, asHome) }, { if (it == CardLook.AS_HOME) "As Home (${asHome.label})" else it.label },
-                    { "cardLook-${it.id}" }, Modifier.padding(bottom = Space.Medium).testTag("rowCardColours"),
-                ) { colour = it; onCardLook(it) }
+                    colourOptions, chosenColour, { it.fade(asHome) }, { it.label(asHome) },
+                    { "rowColour-${it.id}" }, Modifier.padding(bottom = Space.Medium).testTag("rowColours"),
+                ) {
+                    colour = it.look; pictureColour = it.set
+                    onCardLook(it.look); onPictureColours(it.set)
+                }
             }
 
             if (onOpenSettings == null) {
@@ -870,6 +866,43 @@ private fun ColoursSwatch(colours: app.siansa.data.PictureColours) {
 }
 
 private val SWATCH = 18.dp
+
+/**
+ * A row's one Colour (the owner, 25 Nov): a card colour ([look], with pictures from the covers), or a set of colours
+ * ([set]: By mood, Siansa, Mono) each card takes its own from, card and picture, with no card colour of its own.
+ */
+internal data class RowColour(val look: CardLook, val set: app.siansa.data.PictureColours) {
+    val id: String get() = if (set != app.siansa.data.PictureColours.COVERS) set.id else look.id
+
+    fun label(asHome: CardLook): String = when {
+        set != app.siansa.data.PictureColours.COVERS -> set.label
+        look == CardLook.AS_HOME -> "As Home (${asHome.label})"
+        else -> look.label
+    }
+
+    /** Its swatch: the colour's fade, or a set's first two colours. */
+    fun fade(asHome: CardLook): Pair<androidx.compose.ui.graphics.Color, androidx.compose.ui.graphics.Color> =
+        if (set == app.siansa.data.PictureColours.COVERS) cardSwatchFade(look, asHome)
+        else swatchOf(set).let { it.first() to it.getOrElse(1) { _ -> it.first() } }
+
+    companion object {
+        /** As Home, Your listening's six, then the sets. */
+        val all: List<RowColour> = CardLook.entries.map { RowColour(it, app.siansa.data.PictureColours.COVERS) } +
+            app.siansa.data.PictureColours.entries.filter { it != app.siansa.data.PictureColours.COVERS }.map { RowColour(CardLook.AS_HOME, it) }
+
+        /** What a row has: its own card colour first (it wins over a set chosen before the two were one), else its set. */
+        fun of(look: CardLook, set: app.siansa.data.PictureColours): RowColour =
+            if (look != CardLook.AS_HOME) RowColour(look, app.siansa.data.PictureColours.COVERS) else RowColour(CardLook.AS_HOME, set)
+    }
+}
+
+/** The small dot on a row's Colour line. */
+@Composable
+private fun RowColourDot(c: RowColour, asHome: CardLook) {
+    if (c.set != app.siansa.data.PictureColours.COVERS) return ColoursSwatch(c.set)
+    val (top, foot) = c.fade(asHome)
+    Box(Modifier.size(SWATCH).clip(CircleShape).background(Brush.verticalGradient(listOf(top, foot))))
+}
 
 /** How many tiles a shortcut grid has (the owner, 10 Nov): 2, 4, 6 or 8, two to a row. */
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
