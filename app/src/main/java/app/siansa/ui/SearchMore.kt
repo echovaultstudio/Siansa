@@ -80,7 +80,6 @@ fun SearchMoreScreen(nav: NavController, kindId: String?, query: String) {
                 // the cover says what was searched for, the title what's listed.
                 coverColour = colors.first,
                 header = {},
-                djMix = false,
             )
         }
         SearchMore.ARTISTS, SearchMore.ALBUMS -> {

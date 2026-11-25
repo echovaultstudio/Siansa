@@ -134,7 +134,7 @@ class SpacingLibraryTest : SpacingCheck() {
                 Column {
                     Text("Album · 2019", Modifier.testTag("details"))
                     app.siansa.ui.ActionButtons(
-                        enabled = true, onQueue = {}, onSimilar = {}, onShuffle = {}, onPlay = {}, onDjMix = {}, albumBar = true,
+                        enabled = true, onQueue = {}, onSimilar = {}, onShuffle = {}, onPlay = {}, albumBar = true,
                         download = { androidx.compose.foundation.layout.Box(Modifier.size(48.dp).testTag("download")) },
                         resume = app.siansa.ui.PlayResume(7, "8") to 12,
                         onAddToPlaylist = {},

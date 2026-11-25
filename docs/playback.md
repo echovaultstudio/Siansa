@@ -162,11 +162,11 @@ own beat and the next drops in on its first downbeat, as a DJ does it (it needs 
 A blend is planned early enough for the longest one (32 bars); when there's no time left for the one picked, because
 you moved near the end of the song, a quick one is made instead, or a short blend of whatever is left.
 
-DJ radio, Keep playing in DJ mode and the DJ mix of an album or playlist leave out songs longer than 15 minutes (a
+DJ radio, Keep playing in DJ mode and a DJ mix leave out songs longer than 15 minutes (a
 whole DJ set or a live recording in one file): they're mixes themselves. You can still start one from such a song.
 
-In DJ playback only: DJ radio, songs Keep playing adds in DJ mode, and the DJ mix of an album or playlist (slide
-Shuffle onto Play). An album or playlist playing on its own never beat-matches. Needs Siansa Beats, or the Siansa plugin
+In DJ playback only: DJ radio, songs Keep playing adds in DJ mode, and a DJ mix started from now playing. An album or
+playlist playing on its own never beat-matches. Needs Siansa Beats, or the Siansa plugin
 on AudioMuse-AI. Two songs that both keep a beat can clash at the changeover when their beats land at different moments,
 like a bad DJ set. The Siansa plugin for AudioMuse measures the beat grid at each end of every song, so Siansa can
 blend them the way a DJ mixes:
