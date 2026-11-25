@@ -336,6 +336,32 @@ fun AlbumScreen(nav: NavController, id: String) {
     val playingId = player.current?.id
     val pickUp by loadState(d to playingId) { d?.let { PickUps.find(it.songs, graph.history.all(), System.currentTimeMillis()) } }
     val pick = pickUp.valueOrNull()?.takeIf { d != null && d.songs.none { it.id == playingId } }
+    // Your rating of the album (issue #1334), as the server has it, for its sheet.
+    LaunchedEffect(fromServer?.album?.id, fromServer?.album?.userRating) {
+        fromServer?.album?.let { graph.ratings.learn(it.id, it.userRating) }
+    }
+    // Clear all images (the owner, 21 Nov): every picture kept of the album, its songs' own and its shortcut's included,
+    // cleared and fetched fresh, here, in Shortcuts, recent plays and the mini player. From the cover held, or ⊕.
+    val coverLoader = coil3.SingletonImageLoader.get(LocalContext.current)
+    val pageSnack = LocalSnack.current
+    val pageScope = rememberCoroutineScope()
+    val clearImages: (() -> Unit)? = d?.let { album ->
+        {
+            val standIn = album.album.id.takeIf { graph.settings.current.sourceKind.albumIdIsCover }
+            graph.scope.launch {
+                AppLog.i("Covers", "Clearing the pictures of album ${album.album.id}")
+                // Its shortcut's cover too, which may be from before the picture changed; it shows the album's own after.
+                val shortcut = graph.recentPlays.refreshCover("album/${album.album.id}", album.album.coverArt)
+                val ids = albumCoverIds(album.album, album.songs, standIn) + shortcut
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { app.siansa.covers.CoverCache.clearAll(coverLoader, ids) }
+            }
+            pageScope.launch { pageSnack.showSnackbar("Album images cleared. Getting them again.") }
+        }
+    }
+    // The album's ⊕ (issue #1331): its sheet, with your rating, the queue, playlists, its download and its images.
+    var albumSheet by remember { mutableStateOf(false) }
+    if (albumSheet && d != null) AlbumActionsSheet(fromServer?.album ?: d.album, d.songs, clearImages) { albumSheet = false }
+    val download = rememberAlbumDownload(d?.album, d?.songs)
     CollectionPage(
         // An album slides to its DJ mix only with AudioMuse, as similar albums (issue #965).
         djMix = false,
@@ -357,13 +383,9 @@ fun AlbumScreen(nav: NavController, id: String) {
         cover = { m ->
             // The album's id stands in for a missing cover only where that works (issue #792).
             val standIn = d?.album?.id?.takeIf { graph.settings.current.sourceKind.albumIdIsCover }
-            // Held: a card with what can be done with the cover (the owner, 21 Nov: "a card pop", more to come there).
-            // Clear all images: every picture kept of the album, its songs' own and its shortcut's included, is cleared
-            // and fetched fresh, here, in Shortcuts, recent plays and the mini player.
-            val loader = coil3.SingletonImageLoader.get(LocalContext.current)
+            // Held: a card with what can be done with the cover (the owner, 21 Nov: "a card pop"; 25 Nov: it stays, beside
+            // the same in the album's ⊕).
             val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
-            val snack = LocalSnack.current
-            val scope = rememberCoroutineScope()
             var coverCard by remember { mutableStateOf(false) }
             val held = d?.let {
                 val open = {
@@ -374,17 +396,7 @@ fun AlbumScreen(nav: NavController, id: String) {
                     .pointerInput(it.album.id) { detectTapGestures(onLongPress = { open() }) }
                     .semantics { onLongClick(label = "Album cover options") { open(); true } }
             } ?: Modifier
-            if (coverCard && d != null) AlbumCoverSheet(d.album.name, onDismiss = { coverCard = false }, onClearImages = {
-                val album = d
-                graph.scope.launch {
-                    AppLog.i("Covers", "Clearing the pictures of album ${album.album.id}, chosen from its cover's card")
-                    // Its shortcut's cover too, which may be from before the picture changed; it shows the album's own after.
-                    val shortcut = graph.recentPlays.refreshCover("album/${album.album.id}", album.album.coverArt)
-                    val ids = albumCoverIds(album.album, album.songs, standIn) + shortcut
-                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { app.siansa.covers.CoverCache.clearAll(loader, ids) }
-                }
-                scope.launch { snack.showSnackbar("Album images cleared. Getting them again.") }
-            })
+            if (coverCard && d != null && clearImages != null) AlbumCoverSheet(d.album.name, onDismiss = { coverCard = false }, onClearImages = clearImages)
             BigCover(d?.album?.coverArt, d?.album?.coverArt ?: standIn, m.then(held), RoundedCornerShape(6.dp))
         },
         header = {
@@ -396,8 +408,12 @@ fun AlbumScreen(nav: NavController, id: String) {
                         { openArtists { albumArtistsOf(graph, d.album, fromServer?.album?.artists.orEmpty().ifEmpty { d.album.artists }, artistId) } }
                     },
                     albumHeadline(d.album, fromServer?.info ?: d.info),
-                    // Where Play carries on, in the details line (the owner, 7 Nov).
-                    note = pick?.let { "Continue from ${PickUps.trackLabel(d.songs, it.continueIndex)}" },
+                    // Where Play carries on, in the details line (the owner, 7 Nov), and the download's state since
+                    // Download went into the ⊕ (issue #1331).
+                    note = listOfNotNull(
+                        pick?.let { "Continue from ${PickUps.trackLabel(d.songs, it.continueIndex)}" },
+                        download?.let { downloadNote(it) },
+                    ).joinToString(" · ").ifEmpty { null },
                 )
             }
         },
@@ -409,6 +425,7 @@ fun AlbumScreen(nav: NavController, id: String) {
         // A heart for favourite albums, starred in Navidrome (issue #275): beside Download, and in the title bar before
         // Play once the buttons have scrolled away, as on an artist's page (the owner, 14 Nov; it was at the top right).
         rowExtras = { d?.album?.let { FavouriteAlbumButton(it) } },
+        onAlbumPlus = if (d != null) ({ albumSheet = true }) else null,
         // "Find similar albums" beside Shuffle (issue #228), through any of its songs; needs AudioMuse.
         onSimilar = d?.songs?.firstOrNull()?.id?.takeIf { graph.settings.current.soundReady }?.let { id -> { nav.openSimilarAlbums(id) } },
         // Genres, labels, the version and the length at the foot of the page (#558).

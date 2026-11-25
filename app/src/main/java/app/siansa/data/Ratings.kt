@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 /**
- * Songs' star ratings (issue #1043), kept on the server (Navidrome and other Subsonic servers, `setRating`) so other
+ * Star ratings of songs (issue #1043) and albums (issue #1334), kept on the server (Navidrome and other Subsonic servers, `setRating`) so other
  * apps see them too, with a copy on the phone for showing at once and offline. Works like [FavouriteArtists]: the stars
  * change straight away, and a change the server refuses is undone.
  */
@@ -48,7 +48,7 @@ class Ratings(
         set(id, next)
         scope.launch {
             runCatching { source.setRating(id, next) }
-                .onSuccess { AppLog.i("Ratings", "Song $id: ${StarRatings.words(next).lowercase()}") }
+                .onSuccess { AppLog.i("Ratings", "$id: ${StarRatings.words(next).lowercase()}") }
                 .onFailure {
                     AppLog.w("Ratings", "Rating $id with $next stars failed: ${it.message}")
                     set(id, before)

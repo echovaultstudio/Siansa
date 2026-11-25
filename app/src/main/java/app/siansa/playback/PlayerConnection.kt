@@ -199,6 +199,48 @@ class PlayerConnection(
     }
 
     /**
+     * A whole list (an album, issue #1332) to play next, in its order, after the song playing. Without network only the
+     * downloaded ones. How many went in.
+     */
+    fun playNext(songs: List<Song>): Int {
+        val list = limited()?.let { songs.filter { isDownloaded(it.id) } } ?: songs
+        if (list.isEmpty()) return 0
+        SongRegistry.register(list)
+        withController { c ->
+            val items = list.map { it.toMediaItem(api) }
+            if (c.mediaItemCount == 0) {
+                c.setMediaItems(items)
+                c.prepare()
+                c.play()
+            } else {
+                c.addMediaItems(c.currentMediaItemIndex + 1, items)
+            }
+            AppLog.d("Player", "${list.size} songs to play next")
+        }
+        return list.size
+    }
+
+    /** A whole list (an album, issue #1332) to the queue, in its order, as [addToQueue] does for one. How many went in. */
+    fun addToQueue(songs: List<Song>): Int {
+        val list = limited()?.let { songs.filter { isDownloaded(it.id) } } ?: songs
+        if (list.isEmpty()) return 0
+        SongRegistry.register(list)
+        withController { c ->
+            val items = list.map { it.toMediaItem(api, queued = true) }
+            if (c.mediaItemCount == 0) {
+                c.setMediaItems(items)
+                c.prepare()
+                c.play()
+                return@withController
+            }
+            val at = queueInsertIndex(c.currentMediaItemIndex, c.mediaItemCount) { c.getMediaItemAt(it).isQueued() }
+            c.addMediaItems(at, items)
+            AppLog.d("Player", "Added ${list.size} songs to the queue at ${at + 1} of ${c.mediaItemCount}")
+        }
+        return list.size
+    }
+
+    /**
      * "Add to queue": the song plays after the current one and after songs queued before it,
      * ahead of the rest of the album or playlist. With nothing playing, it starts playing.
      */

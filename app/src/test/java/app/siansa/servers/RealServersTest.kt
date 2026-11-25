@@ -306,6 +306,17 @@ class RealServersTest(private val server: String) {
         assertEquals("$server: the rating taken off", null, source.songDetails(s.id).userRating)
     }
 
+    /** An album's star rating (issue #1334): kept by Navidrome with OpenSubsonic's setRating, read back with the album. */
+    @Test fun albumRatingsAreKeptWhereTheServerHasThem() = runBlocking {
+        val source = source()
+        assumeTrue("$server has no five-star rating", source.keepsRatings)
+        val album = source.albums("alphabeticalByName", 50, 0).first { it.name == "Two Discs" }
+        source.setRating(album.id, 3)
+        assertEquals("$server: the album rated", 3, source.album(album.id).album.userRating)
+        source.setRating(album.id, 0)
+        assertEquals("$server: the album's rating taken off", null, source.album(album.id).album.userRating)
+    }
+
     @Test fun randomSongsAndDetails() = runBlocking {
         assertTrue("$server: random songs", source().randomSongs(5).isNotEmpty())
         source().songDetails(song("Loose Ends").id)

@@ -106,6 +106,22 @@ class RatingsOnEveryServerTest {
         assertEquals(4, again.of(server.songId))
     }
 
+    /** An album's rating (issue #1334) goes the same way, by the album's id; none where the server keeps none. */
+    @Test fun anAlbumsRatingGoesToTheServerByItsId() {
+        EveryServer.all.forEach { server ->
+            val keeps = server.source().keepsRatings
+            assertEquals(server.name, keeps, ratingShown(on = true, kept = keeps, songId = "al-1"))
+            if (!keeps) return@forEach
+            val keeping = Keeping(server.source())
+            val r = ratings(keeping)
+            r.rate("al-1", 5)
+            assertEquals(server.name, listOf("al-1" to 5), keeping.sent)
+            assertEquals(5, r.of("al-1"))
+            r.learn("al-1", null)  // the album as the server has it, not rated
+            assertEquals(0, r.of("al-1"))
+        }
+    }
+
     @Test fun theServersRatingIsReadFromASongsDetails() {
         fun details(json: String) = parseSongDetails(Json.parseToJsonElement(json).jsonObject)
         assertEquals(4, details("""{"id":"1","suffix":"flac","userRating":4}""").userRating)

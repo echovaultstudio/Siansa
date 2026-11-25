@@ -163,6 +163,43 @@ class SpacingLibraryTest : SpacingCheck() {
         assertTrue("Nothing hangs under Play", compose.onAllNodesWithTag("playFrom").fetchSemanticsNodes().isEmpty())
     }
 
+    /**
+     * The album's ⊕ (issue #1331): its plus opens the sheet and Download is in there, so the heart comes straight after
+     * the plus, as far from it as it was from Download; and the sheet's lines are all as tall, their icons in one column.
+     */
+    @Test fun albumSheetAndItsBarLineUp() {
+        compose.setContent {
+            SiansaTheme {
+                Column {
+                    app.siansa.ui.ActionButtons(
+                        enabled = true, onQueue = {}, onSimilar = {}, onShuffle = {}, onPlay = {}, albumBar = true,
+                        download = { androidx.compose.foundation.layout.Box(Modifier.size(48.dp).testTag("download")) },
+                        onAddToPlaylist = {}, plusOpensSheet = true,
+                        rowExtras = { androidx.compose.foundation.layout.Box(Modifier.size(48.dp).testTag("heart")) },
+                    )
+                    androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalCoverDraw provides { _, _, m, _, _ -> androidx.compose.foundation.layout.Box(m) }) {
+                        app.siansa.ui.AlbumActions(
+                            app.siansa.data.Album("al1", "Glass Rivers", "Halden Vale", year = 2021), 12, stars = 3,
+                            download = app.siansa.ui.AlbumDownload(false, 0, 12),
+                            onRate = {}, onPlayNext = {}, onQueue = {}, onPlaylist = {}, onDownload = {}, onClearImages = {},
+                        )
+                    }
+                }
+            }
+        }
+        assertTrue("No Download on the bar", compose.onAllNodesWithTag("download").fetchSemanticsNodes().isEmpty())
+        val plus = compose.onNodeWithTag("albumAddToPlaylist").getBoundsInRoot()
+        val heart = compose.onNodeWithTag("heart").getBoundsInRoot()
+        assertTrue("The heart right after the plus", heart.left >= plus.right - 0.5.dp && heart.left - plus.right < 24.dp)
+        val lines = listOf("albumPlayNext", "albumQueue", "albumPlaylist", "albumDownload").map { compose.onNodeWithTag(it).getBoundsInRoot() }
+        val height = lines[0].bottom - lines[0].top
+        lines.forEach { assertEven("The sheet's lines as tall", it.bottom - it.top, height, 1.dp) }
+        lines.zipWithNext().forEach { (a, b) -> assertEven("No gap between lines", b.top, a.bottom, 1.dp) }
+        val stars = compose.onNodeWithTag("albumStars").getBoundsInRoot()
+        val row = compose.onNodeWithTag("albumRating").getBoundsInRoot()
+        assertEven("The stars in the middle of their line", (stars.top + stars.bottom) / 2, (row.top + row.bottom) / 2, 1.dp)
+    }
+
     /** Album page (issue #240): room under the big Play button before the first song, marked when it's playing. */
     @Test fun roomBelowThePlayButton() {
         compose.setContent {

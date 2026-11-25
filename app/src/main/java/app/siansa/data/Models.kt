@@ -70,6 +70,8 @@ data class Album(
     val folderId: String? = null,
     /** Its record labels (Navidrome's recordLabels, Emby's Studios), kept so a label's page can list its albums (#558). */
     val labels: List<String> = emptyList(),
+    /** Your rating of it, 1 to 5 stars (OpenSubsonic's userRating, issue #1334); null when not rated or not said. */
+    val userRating: Int? = null,
     /**
      * Every album artist, as the server lists them (OpenSubsonic's "artists", Emby's and Jellyfin's AlbumArtists): an
      * album by "Fred again.. • LATIN MAFIA" has both, while [artistId] is the first. From the server only; not kept in

@@ -646,6 +646,18 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                 }
             },
             // Holding an album's cover: its card (the owner, 21 Nov), with a long name.
+            // The album's ⊕ (issue #1331): your rating, the queue, playlists, its download and its images, with a long name.
+            Scene("album_actions") {
+                Column {
+                    val album = app.siansa.data.Album("al1", "Grand Theft Auto VI: The Album (Original Soundtrack, Deluxe Edition)", "Various Artists", year = 2026)
+                    androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalCoverDraw provides { _, _, m, shape, _ ->
+                        androidx.compose.foundation.layout.Box(m.clip(shape).background(androidx.compose.ui.graphics.Color(0xFF0E7490)))
+                    }) {
+                        app.siansa.ui.AlbumActions(album, 24, stars = 4, download = app.siansa.ui.AlbumDownload(true, 9, 24),
+                            onRate = {}, onPlayNext = {}, onQueue = {}, onPlaylist = {}, onDownload = {}, onClearImages = {})
+                    }
+                }
+            },
             Scene("album_cover_sheet") {
                 app.siansa.ui.AlbumCoverChoices("Grand Theft Auto VI: The Album (Original Soundtrack, Deluxe Edition)") {}
             },
