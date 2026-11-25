@@ -44,10 +44,10 @@ class LookVariantTest {
         assertEquals(null, look(null, null))
         assertEquals(null, look(null, PictureColours.COVERS))
         // Colours chosen for the row show on its tiles, without a Card colour having to be picked first.
-        for (chosen in listOf(PictureColours.MOOD, PictureColours.SIANSA, PictureColours.MONO)) assertEquals(app.siansa.data.CardLook.VIVID, look(null, chosen))
-        // The row's own Card colour stays the look, Plain too, whatever its Colours.
-        assertEquals(app.siansa.data.CardLook.SOFT, look(app.siansa.data.CardLook.SOFT, PictureColours.MONO))
-        assertEquals(app.siansa.data.CardLook.PLAIN, look(app.siansa.data.CardLook.PLAIN, PictureColours.SIANSA))
+        for (chosen in listOf(PictureColours.MOOD, PictureColours.SIANSA, PictureColours.MONO)) assertEquals(app.siansa.data.CardLook.AS_HOME, look(null, chosen))
+        // The row's own Card colour stays the look, whatever its Colours.
+        assertEquals(app.siansa.data.CardLook.PLUM, look(app.siansa.data.CardLook.PLUM, PictureColours.MONO))
+        assertEquals(app.siansa.data.CardLook.INK, look(app.siansa.data.CardLook.INK, PictureColours.SIANSA))
         // Words stay readable on the colours: dark on pale ones (frost, light grey), white on deep ones.
         val c = { v: Long -> androidx.compose.ui.graphics.Color(v) }
         assertTrue(app.siansa.ui.wordsDarkOn(c(0xFFD8E3EC) to c(0xFF6F86A0)))

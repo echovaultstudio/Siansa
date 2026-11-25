@@ -56,10 +56,10 @@ class HomeLookTest {
     }
 
     @Test fun shortcutTilesArePlainAsHomeEveryOtherRowTakesHomesColour() {
-        // #1261: Shortcuts has a colour now; As Home keeps its tiles as they were.
-        assertEquals(CardLook.PLAIN, app.siansa.ui.asHomeCardLook(HomeSection.QUICK, CardLook.VIVID))
-        assertEquals(CardLook.SOFT, app.siansa.ui.asHomeCardLook(HomeSection.RECENT, CardLook.SOFT))
-        assertEquals(mapOf(HomeSection.CARDS to CardLook.SOFT, HomeSection.QUICK to CardLook.ARTWORK), CardLook.parse("cards:soft,quick:artwork"))
+        // #1261: Shortcuts has a colour now; As Home keeps its tiles dark.
+        assertEquals(CardLook.INK, app.siansa.ui.asHomeCardLook(HomeSection.QUICK, CardLook.TEAL))
+        assertEquals(CardLook.PLUM, app.siansa.ui.asHomeCardLook(HomeSection.RECENT, CardLook.PLUM))
+        assertEquals(mapOf(HomeSection.CARDS to CardLook.MOSS, HomeSection.QUICK to CardLook.COVER), CardLook.parse("cards:moss,quick:cover"))
     }
 
     @Test fun anyRowCanBeACarousel() {

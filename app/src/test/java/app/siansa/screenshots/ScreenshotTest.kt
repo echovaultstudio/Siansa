@@ -494,7 +494,7 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                         Triple(app.siansa.data.PictureColours.SIANSA, null, null),
                         Triple(app.siansa.data.PictureColours.MONO, null, null),
                         Triple(app.siansa.data.PictureColours.SIANSA, null, app.siansa.data.LookVariant.CHIPS),
-                        Triple(app.siansa.data.PictureColours.MONO, app.siansa.data.CardLook.SOFT, null),
+                        Triple(app.siansa.data.PictureColours.MONO, app.siansa.data.CardLook.PLUM, null),
                     )) {
                         CompositionLocalProvider(app.siansa.ui.LocalPictureColours provides colours, app.siansa.ui.LocalShortcutLook provides app.siansa.ui.shortcutLookOf(card, colours)) {
                             app.siansa.ui.ShortcutTiles(tiles, variant, Modifier.padding(horizontal = Space.Page))
@@ -533,11 +533,11 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     }
                 }
             },
-            // A hero in each Card colour of its row (issue #1351): Vivid, Soft, Plain, From the artwork, top to bottom.
+            // A hero in each Card colour of its row (issue #1351; the owner, 25 Nov: Your listening's six), top to bottom.
             Scene("home_hero_card_colours") {
                 val item = app.siansa.ui.HomeItem("h1", "Clear-sky mix", "High-energy music, sung", open = {}, colors = Color(0xFF3A6FB0) to Color(0xFF30206A))
                 Column {
-                    for (look in listOf(app.siansa.data.CardLook.VIVID, app.siansa.data.CardLook.SOFT, app.siansa.data.CardLook.PLAIN, app.siansa.data.CardLook.ARTWORK)) {
+                    for (look in app.siansa.data.CardLook.forHome) {
                         androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalCardLook provides look) {
                             app.siansa.ui.HomeHero(look.label, item, play = {}, rowSongs = emptyList(), tint = Color(0xFF3A6FB0)) { _, _ -> }
                         }
@@ -809,7 +809,7 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     hidden = emptySet(), onChange = {}, onHiddenChange = {}, onDismiss = {}, asPage = true,
                     holds = app.siansa.ui.beatsRows(true),
                     looks = mapOf(app.siansa.data.HomeSection.MORE_OF_YOU to app.siansa.data.HomeLook.COVER_ROWS),
-                    cardLooks = mapOf(app.siansa.data.HomeSection.QUICK to app.siansa.data.CardLook.SOFT),
+                    cardLooks = mapOf(app.siansa.data.HomeSection.QUICK to app.siansa.data.CardLook.EMBER),
                 )
             },
             // A row as a cover grid (#1263): 3 columns with names (round artists among them, a long name), then 5 without.
@@ -828,7 +828,7 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
             // Shortcut tiles in their row's own colour (#1261), a long name among them; plain without one.
             Scene("shortcut_tiles_coloured") {
                 Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
-                    for (look in listOf(null, app.siansa.data.CardLook.VIVID, app.siansa.data.CardLook.SOFT)) {
+                    for (look in listOf(null, app.siansa.data.CardLook.TEAL, app.siansa.data.CardLook.EMBER)) {
                         androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalShortcutLook provides look) {
                             Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
                                 app.siansa.ui.QuickTile("Liked songs", null, Color(0xFF4B2BD6) to Color(0xFF8FD3C8), {}, Modifier.weight(1f))
@@ -906,18 +906,18 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
             },
             // Arrange Home's spacing ("Compact", issue #694).
             Scene("arrange_spacing") { SpacingRow(gap = 1) {} },
-            // The cards' colour (the owner, 13 Nov): the four small cards to pick from, Soft chosen; and Today's mix in each
-            // look, as the cog's dialog shows it.
+            // The cards' colour (the owner, 13 Nov; 25 Nov: Your listening's six swatches), Plum chosen; and Today's mix in
+            // each colour, as the cog's sheet shows it.
             Scene("card_looks") {
                 Column(Modifier.padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Page)) {
-                    app.siansa.ui.CardLookChooser(app.siansa.data.CardLook.SOFT, app.siansa.data.CardLook.forHome) {}
+                    app.siansa.ui.CardLookChooser(app.siansa.data.CardLook.PLUM, app.siansa.data.CardLook.forHome) {}
                     app.siansa.data.CardLook.forHome.forEach { app.siansa.ui.CardLookSample(it, Modifier.fillMaxWidth(), big = true) }
                 }
             },
             // A card painted after its own padding, as Today's mix is (the owner, 13 Nov: the wash sat a padding inside
             // the solid, a grey frame): the colour must reach the rounded edge.
             Scene("card_fill_edge") {
-                androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalCardLook provides app.siansa.data.CardLook.SOFT) {
+                androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalCardLook provides app.siansa.data.CardLook.MOSS) {
                     val paint = app.siansa.ui.cardPaint(Color(0xFFD6338A) to Color(0xFF4A1470))
                     Box(
                         Modifier.fillMaxWidth().padding(horizontal = Space.Page, vertical = Space.Medium)

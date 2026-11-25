@@ -397,21 +397,39 @@ class SpacingHomeTest : SpacingCheck() {
         }
     }
 
-    /** Arrange Home's Cards (the owner, 13 Nov): four small cards of one size, an even gap apart, page margins at the ends. */
-    @Test fun cardLookChooserIsFourEvenCards() {
+    /** Arrange Home's Cards (the owner, 25 Nov: Your listening's swatches): three a row, each as wide, an even gap, page margins. */
+    @Test fun cardLookChooserIsEvenSwatches() {
         compose.setContent {
             SiansaTheme {
-                app.siansa.ui.CardLookChooser(app.siansa.data.CardLook.SOFT, app.siansa.data.CardLook.forHome, Modifier.padding(horizontal = Space.Page)) {}
+                app.siansa.ui.CardLookChooser(app.siansa.data.CardLook.PLUM, app.siansa.data.CardLook.forHome, Modifier.padding(horizontal = Space.Page)) {}
             }
         }
         val screen = compose.onRoot().getBoundsInRoot()
         val cards = app.siansa.data.CardLook.forHome.map { compose.onNodeWithTag("cardLook-${it.id}").getBoundsInRoot() }
-        assertEven("Cards: left margin", cards.first().left - screen.left, Space.Page, 1.dp)
-        assertEven("Cards: right margin", screen.right - cards.last().right, Space.Page, 1.dp)
         val width = cards[0].right - cards[0].left
         cards.forEach { assertEven("Cards: each as wide as the first", it.right - it.left, width, 1.dp) }
-        val gaps = cards.zipWithNext { a, b -> b.left - a.right }
-        gaps.forEach { assertEven("Cards: the gap between them", it, Space.Medium, 1.dp) }
+        cards.chunked(3).forEach { row ->
+            assertEven("Cards: left margin", row.first().left - screen.left, Space.Page, 1.dp)
+            assertEven("Cards: right margin", screen.right - row.last().right, Space.Page, 1.dp)
+            row.zipWithNext { a, b -> b.left - a.right }.forEach { assertEven("Cards: the gap between them", it, Space.Small, 1.dp) }
+        }
+    }
+
+    /** A row's Card colour (the owner, 25 Nov): As Home and the six, in one grid of even columns; the lone last one keeps the width. */
+    @Test fun rowCardColoursAreEvenSwatches() {
+        compose.setContent {
+            SiansaTheme {
+                app.siansa.ui.ColourSwatches(
+                    app.siansa.data.CardLook.entries, app.siansa.data.CardLook.AS_HOME, { app.siansa.ui.cardSwatchFade(it, app.siansa.data.CardLook.TEAL) },
+                    { it.label }, { "rowColour-${it.id}" }, Modifier.padding(horizontal = Space.Page),
+                ) {}
+            }
+        }
+        val cells = app.siansa.data.CardLook.entries.map { compose.onNodeWithTag("rowColour-${it.id}").getBoundsInRoot() }
+        val width = cells[0].right - cells[0].left
+        cells.forEach { assertEven("Row colours: each as wide as the first", it.right - it.left, width, 1.dp) }
+        // Columns line up from row to row, the lone one under the first.
+        cells.chunked(3).forEach { row -> row.forEachIndexed { i, c -> assertEven("Row colours: in column $i", c.left, cells[i].left, 1.dp) } }
     }
 
     /** A slider of choices (the owner, 23 Nov: "perfect text spacing"): each name centred under its stop, the outer two inside the edges. */

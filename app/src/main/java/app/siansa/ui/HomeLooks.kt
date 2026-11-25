@@ -266,7 +266,9 @@ fun HomeHero(
     // effect"): the row's Colours when they're a set or the songs' moods, else its picture's; filled as the row's
     // Card colour says ([heroColours]).
     val chosen = shortcutColours(item.title, item.songIds)
-    val fill = heroColours(LocalCardLook.current, chosen?.first ?: tint ?: item.colors.first, chosen ?: item.colors, fromPicture = chosen == null)
+    // A row with no colour of its own and its Colours chosen takes them ([shortcutLookOf] gives As Home then).
+    val look = if (chosen != null && LocalShortcutLook.current == app.siansa.data.CardLook.AS_HOME) app.siansa.data.CardLook.AS_HOME else LocalCardLook.current
+    val fill = heroColours(look, chosen?.first ?: tint ?: item.colors.first, chosen ?: item.colors, fromPicture = chosen == null)
     val onPlay: (() -> Unit)? = item.play ?: songs.takeIf { it.isNotEmpty() }?.let { { playSongs(it, false) } } ?: play
     Box(
         Modifier
@@ -340,25 +342,23 @@ private fun HeroCards(cards: List<HomeItem>) {
 }
 
 /**
- * A hero's fill, top and foot, in its row's Card colour [look] (issue #1351): from [tint] (its picture's colour, or the
- * first of the row's chosen colours) and its [own] two.
- * - Vivid (and Home's own): the tint with its own colours mixed in, deeper towards the foot, as it always was.
- * - From the artwork: the tint itself, nearly whole, one colour from top to foot.
- * - Soft: a dark grey with a little of the tint.
- * - Plain: dark grey, no colour.
- * Its words are white in both themes, so each fill is kept dark enough to read them on ([readableUnderWhite]); all
- * but Vivid from its picture ([fromPicture]), which stays exactly as it was.
+ * A hero's fill, top and foot, in its row's Card colour [look] (issue #1351; the owner, 25 Nov: Your listening's colours):
+ * - Teal, Plum, Ink, Ember, Moss: that colour's own fade, as on Your listening's card.
+ * - From its cover: [tint] (its picture's colour) darkened, as Your listening's card from its top song.
+ * - As Home with the row's Colours chosen (By mood, Siansa, Mono; [fromPicture] false): [tint], the first of them, with
+ *   its [own] two mixed in, deeper towards the foot.
+ * Its words are white in both themes, so each fill is kept dark enough to read them on ([readableUnderWhite]).
  */
 internal fun heroColours(look: app.siansa.data.CardLook, tint: Color, own: Pair<Color, Color>, fromPicture: Boolean = true): Pair<Color, Color> {
-    val vivid = look == app.siansa.data.CardLook.VIVID || look == app.siansa.data.CardLook.AS_HOME
-    val (top, foot) = when (look) {
-        app.siansa.data.CardLook.VIVID, app.siansa.data.CardLook.AS_HOME ->
+    val colour = look.colour
+    val (top, foot) = when {
+        colour == null && !fromPicture ->
             lerp(lerp(tint, own.first, 0.35f), Color.Black, 0.25f) to lerp(lerp(tint, own.second, 0.5f), Color.Black, 0.5f)
-        app.siansa.data.CardLook.ARTWORK -> lerp(tint, Color.Black, 0.1f) to lerp(tint, Color.Black, 0.35f)
-        app.siansa.data.CardLook.SOFT -> lerp(HERO_GREY, tint, 0.38f) to lerp(HERO_GREY_FOOT, tint, 0.16f)
-        app.siansa.data.CardLook.PLAIN -> HERO_GREY to HERO_GREY_FOOT
+        (colour ?: app.siansa.data.CardLook.DEFAULT.colour) == app.siansa.data.ListenColour.COVER ->
+            lerp(tint, Color.Black, COVER_TOP) to lerp(tint, Color.Black, COVER_FOOT)
+        else -> (colour ?: app.siansa.data.CardLook.DEFAULT.colour!!).let { Color(it.top) to Color(it.foot) }
     }
-    return if (vivid && fromPicture) top to foot else readableUnderWhite(top) to readableUnderWhite(foot)
+    return readableUnderWhite(top) to readableUnderWhite(foot)
 }
 
 /** [colour], made darker until white words read on it (a pale tint: Siansa's frost, Mono's light greys, a white cover). */
@@ -368,8 +368,6 @@ internal fun readableUnderWhite(colour: Color): Color {
     return c
 }
 
-private val HERO_GREY = Color(0xFF2A2A2E)
-private val HERO_GREY_FOOT = Color(0xFF141416)
 private const val HERO_LIGHTEST = 0.2f
 
 /** The side of each of [count] cards, in px, sharing a row [width] wide with [gap] between them. */

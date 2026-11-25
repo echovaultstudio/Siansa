@@ -402,7 +402,7 @@ fun ArrangeHomeSheet(
                         cardLook != CardLook.DEFAULT || cardLooks.isNotEmpty(),
                 ) { Text("Reset") }
             }
-            // The cards' colour (the owner, 13 Nov): four small cards to pick by eye; never the shortcut grid.
+            // The cards' colour (the owner, 13 Nov; 25 Nov: Your listening's swatches); never the shortcut grid.
             SheetLabel("Cards")
             CardLookChooser(cardLook, CardLook.forHome, Modifier.padding(horizontal = Space.Page), onPick = onCardLookChange)
             Text(
@@ -689,12 +689,11 @@ internal fun HomeLookDialog(
             // Every row has a colour (#1261), Shortcuts too: its tiles stay plain until it has one of its own.
             ValueLine("Card colour", if (colour == CardLook.AS_HOME) "As Home (${asHome.label})" else colour.label, "colour" in open, "rowCardColour") { toggle("colour") }
             if ("colour" in open) {
-                androidx.compose.foundation.layout.FlowRow(Modifier.padding(bottom = Space.Medium), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
-                    CardLook.entries.forEach { option ->
-                        FilterChip(selected = option == colour, onClick = { colour = option; onCardLook(option) },
-                            label = { Text(if (option == CardLook.AS_HOME) "As Home (${asHome.label})" else option.label) }, modifier = Modifier.testTag("cardLook-${option.id}"))
-                    }
-                }
+                // The same swatches as Your listening's (the owner, 25 Nov), As Home first.
+                ColourSwatches(
+                    CardLook.entries, colour, { cardSwatchFade(it, asHome) }, { if (it == CardLook.AS_HOME) "As Home (${asHome.label})" else it.label },
+                    { "cardLook-${it.id}" }, Modifier.padding(bottom = Space.Medium).testTag("rowCardColours"),
+                ) { colour = it; onCardLook(it) }
             }
 
             if (onOpenSettings == null) {
@@ -898,9 +897,9 @@ internal fun GridSizeChips(size: Int, modifier: Modifier = Modifier, onPick: (In
  */
 internal fun beatsLook(saved: HomeLook?): HomeLook = if (saved == null || saved == HomeLook.AS_IS) HomeLook.CAROUSEL else saved
 
-/** What "As Home" means for [section]'s colour: Home's choice, but Shortcuts' tiles are plain unless given their own. */
+/** What "As Home" means for [section]'s colour: Home's choice, but Shortcuts' tiles stay dark (Ink) unless given their own. */
 internal fun asHomeCardLook(section: HomeSection, homeCardLook: CardLook): CardLook =
-    if (section == HomeSection.QUICK) CardLook.PLAIN else homeCardLook
+    if (section == HomeSection.QUICK) CardLook.INK else homeCardLook
 
 internal fun beatsRows(on: Boolean): Map<HomeSection, String> =
     if (!on) emptyMap() else mapOf(
@@ -963,32 +962,64 @@ internal fun ListenColourDialog(chosen: app.siansa.data.ListenColour, onPick: (a
 /** The swatches, three to a row, evenly spread. */
 @Composable
 internal fun ListenColourSwatches(chosen: app.siansa.data.ListenColour, onPick: (app.siansa.data.ListenColour) -> Unit) {
-    Column(Modifier.fillMaxWidth().testTag("listenColours"), verticalArrangement = Arrangement.spacedBy(Space.Page)) {
-        Text("Colour", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        app.siansa.data.ListenColour.entries.chunked(3).forEach { row ->
+    ColourSwatches(
+        app.siansa.data.ListenColour.entries, chosen, { androidx.compose.ui.graphics.Color(it.top) to androidx.compose.ui.graphics.Color(it.foot) },
+        { it.label }, { "listenColour-${it.id}" }, Modifier.testTag("listenColours"), title = "Colour", onPick = onPick,
+    )
+}
+
+/**
+ * Colours to pick by eye (issue #1347; the owner, 25 Nov: every card's colours as Your listening's): each a round swatch
+ * of its [fade], top to foot, named under it; [chosen] ringed and named in bold. Three to a row, evenly spread; a row
+ * that isn't full keeps the others' widths. [title] above them, when given.
+ */
+@Composable
+internal fun <T> ColourSwatches(
+    options: List<T>,
+    chosen: T,
+    fade: (T) -> Pair<androidx.compose.ui.graphics.Color, androidx.compose.ui.graphics.Color>,
+    label: (T) -> String,
+    tag: (T) -> String,
+    modifier: Modifier = Modifier,
+    title: String? = null,
+    onPick: (T) -> Unit,
+) {
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Space.Page)) {
+        if (title != null) Text(title, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        options.chunked(SWATCHES_A_ROW).forEach { row ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
                 row.forEach { c ->
                     val on = c == chosen
+                    val (top, foot) = fade(c)
                     Column(
                         Modifier.weight(1f).clip(RoundedCornerShape(LISTEN_SWATCH_CORNER))
                             .selectable(selected = on, role = androidx.compose.ui.semantics.Role.RadioButton) { onPick(c) }
-                            .padding(vertical = Space.Small).testTag("listenColour-${c.id}"),
+                            .padding(vertical = Space.Small).testTag(tag(c)),
                         horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Space.Small),
                     ) {
                         Box(
                             Modifier.size(LISTEN_SWATCH)
                                 .border(if (on) 2.dp else 1.dp, if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant, CircleShape)
                                 .padding(Space.Tight).clip(CircleShape)
-                                .background(Brush.verticalGradient(listOf(androidx.compose.ui.graphics.Color(c.top), androidx.compose.ui.graphics.Color(c.foot)))),
+                                .background(Brush.verticalGradient(listOf(top, foot))),
                         )
-                        Text(c.label, style = MaterialTheme.typography.labelMedium, fontWeight = if (on) FontWeight.Bold else FontWeight.Normal,
+                        Text(label(c), style = MaterialTheme.typography.labelMedium, fontWeight = if (on) FontWeight.Bold else FontWeight.Normal,
                             color = if (on) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center, maxLines = 2)
                     }
                 }
+                repeat(SWATCHES_A_ROW - row.size) { Spacer(Modifier.weight(1f)) }
             }
         }
     }
+}
+
+private const val SWATCHES_A_ROW = 3
+
+/** A card colour's fade for its swatch: As Home shows Home's own. */
+internal fun cardSwatchFade(look: CardLook, home: CardLook): Pair<androidx.compose.ui.graphics.Color, androidx.compose.ui.graphics.Color> {
+    val c = (look.colour ?: home.colour ?: CardLook.DEFAULT.colour)!!
+    return androidx.compose.ui.graphics.Color(c.top) to androidx.compose.ui.graphics.Color(c.foot)
 }
 
 private val LISTEN_SWATCH = 52.dp
