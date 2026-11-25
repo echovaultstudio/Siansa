@@ -241,7 +241,8 @@ fun CollectionPage(
     // mix, a card) takes its own cover's colour, so every Play button follows the switch (the owner, 10 Nov).
     val backdrop = pageBackdrop(surface, color)
     val fromCover = rememberPageColours(coverId, backdrop, where = "Page \"$title\"", tint = color)
-    val dynamicOn = djSettings.dynamicColours
+    val pageSettings by graph.settings.state.collectAsStateWithLifecycle()
+    val dynamicOn = pageSettings.dynamicColours
     val ownColours = remember(coverId, coverColour, color, backdrop, dynamicOn) {
         if (dynamicOn && coverId == null) DynamicAccent.of(coverColour ?: color, backdrop) else null
     }
