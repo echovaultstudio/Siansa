@@ -309,7 +309,8 @@ same day; Siansa tells you which one already has them.
 
 Custom cards you make yourself (**Settings › Home › Cards › Custom cards**), shown on Home in its **Your cards** section
 (move it under Arrange Home; the cards' own order is set in Settings). **Add a custom card** or tap one to change it,
-on a page of its own:
+on a page of its own. **Duplicate** (the two-sheets button under a card) makes a copy with everything it has, named
+"(copy)", right under it, and opens it to change:
 
 - **Shows**: **Songs**, or whole **Albums**. Playing an album card plays its first albums in turn; its page lists
   every album. With Audiobookshelf set up, also **Audiobooks**, **Podcast episodes** (the newest few of your

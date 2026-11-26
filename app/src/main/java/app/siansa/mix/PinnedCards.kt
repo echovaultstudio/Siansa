@@ -146,6 +146,14 @@ data class PinnedCard(
         get() = allRules.isNotEmpty()
 
     companion object {
+        /** [list] with a copy of card [id] under it, as [newId] named "<name> (copy)", and the copy; [list] as it is without it. */
+        fun duplicated(list: List<PinnedCard>, id: String, newId: String): Pair<List<PinnedCard>, PinnedCard?> {
+            val i = list.indexOfFirst { it.id == id }
+            if (i < 0) return list to null
+            val copy = list[i].copy(id = newId, title = "${list[i].title} (copy)")
+            return list.toMutableList().apply { add(i + 1, copy) } to copy
+        }
+
         fun new(title: String = "") = PinnedCard(id = "pin-" + UUID.randomUUID().toString().take(8), title = title)
 
         /** At most this many songs on a card. */
@@ -316,6 +324,17 @@ class PinnedCards(private val graph: AppGraph, context: Context) {
     suspend fun remove(id: String) {
         json.update { list -> list.filterNot { it.id == id } }
         AppLog.i("Cards", "Removed custom card $id")
+    }
+
+    /**
+     * A copy of card [id] with everything it has, as "<name> (copy)", right under it on Home (the owner, 26 Nov: "it
+     * should also be possible then to duplicate the card"); null when there's no such card.
+     */
+    suspend fun duplicate(id: String): PinnedCard? {
+        var copy: PinnedCard? = null
+        json.update { list -> PinnedCard.duplicated(list, id, PinnedCard.new().id).let { (changed, made) -> copy = made; changed } }
+        copy?.let { AppLog.i("Cards", "Duplicated custom card $id as \"${it.title}\"") }
+        return copy
     }
 
     suspend fun move(id: String, by: Int) {
