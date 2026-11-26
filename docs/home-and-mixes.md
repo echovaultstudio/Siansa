@@ -43,9 +43,10 @@ Arrange is a sheet of its own (the Sources sheet is another), in three parts: **
 
 **Cards** is the colour of every coloured card on Home — Today's mix, the book and podcast cards, Made for you,
 Radios and the other generated tiles. Shortcut tiles stay plain unless their section has a colour of its own (under
-its cog). The choices are the same as Your listening's card, each a round swatch: **Teal** (as it comes), **Plum**,
-**Ink**, **Ember**, **Moss**, or **From its cover** (the colour of each card's own picture; a card without one is a
-dark grey). Each card is that colour fading darker towards its foot, with white words.
+its cog). Each choice is a round swatch: **Vivid** (as it comes: each card in its own full colours), then the same
+as Your listening's card: **Teal**, **Plum**, **Ink**, **Ember**, **Moss**, or **From its cover** (the colour of each
+card's own picture; a card without one is a dark grey). With one of those six, each card is that colour fading darker
+towards its foot, with white words.
 
 **Spacing** sets the gap between every section at once, from Tight to Airy. **Sections** is a row per section, with
 the handle at the left to move it, the eye to hide it and the cog for its look. The rows on Home come first, in the
@@ -61,7 +62,7 @@ it; tap the line to open its options under it, and again to close them. Only wha
   **Layout**, **Tiles**, **Columns and rows**, **Size**.
 - **Cards**: **Pictures** (for a hero with cards under it, **Picture of the big card** and **Pictures of the cards
   under it**), **Names** and **Colour**: one choice for the cards and their pictures, as round swatches. **As Home**;
-  one of the same six as Cards above (the card in that colour, its pictures from the covers); or a set, **By mood**,
+  one of the same seven as Cards above (Vivid, or the card in that colour; its pictures from the covers); or a set, **By mood**,
   **Siansa** or **Mono**, each card taking its own colour from it, card and picture.
 
 **Reset this row** at its foot puts that section's look, pictures, colours, names, title and descriptions back as they

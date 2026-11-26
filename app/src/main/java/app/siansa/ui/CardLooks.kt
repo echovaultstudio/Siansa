@@ -64,8 +64,9 @@ class CardPaint(val base: Color, val wash: Brush?, val text: Color, val faint: C
  * two, are kept for the shortcut tiles' chosen colours ([shortcutPaint]).
  */
 @Composable
-@Suppress("UNUSED_PARAMETER")
 fun cardPaint(colors: Pair<Color, Color>, picture: String? = null, label: String = "card", look: CardLook = LocalCardLook.current): CardPaint {
+    // Vivid: the card's own two colours, full (pale ones take dark words).
+    if (look.resolved == CardLook.VIVID) return filledReadable(colors)
     val (top, foot) = cardFade(look, picture, label)
     return CardPaint(top, Brush.verticalGradient(listOf(top, foot)), Color.White, Color.White.copy(alpha = 0.85f))
 }
@@ -73,7 +74,7 @@ fun cardPaint(colors: Pair<Color, Color>, picture: String? = null, label: String
 /** [look]'s top and foot, [picture]'s for From its cover. As Home here (nothing narrower given) is the default. */
 @Composable
 internal fun cardFade(look: CardLook, picture: String?, label: String): Pair<Color, Color> {
-    val colour = (look.colour ?: CardLook.DEFAULT.colour)!!
+    val colour = look.resolved.colour ?: return VIVID_SAMPLE
     if (colour != app.siansa.data.ListenColour.COVER || picture == null) return Color(colour.top) to Color(colour.foot)
     val tint = rememberHeaderTint(picture, label)
     return lerp(tint, Color.Black, COVER_TOP) to lerp(tint, Color.Black, COVER_FOOT)
@@ -83,9 +84,18 @@ internal fun cardFade(look: CardLook, picture: String?, label: String): Pair<Col
 internal const val COVER_TOP = 0.55f
 internal const val COVER_FOOT = 0.86f
 
-/** A card filled with [colors] themselves: a shortcut tile in its row's chosen colours (By mood, Siansa, Mono). */
+/** A card filled with [colors] themselves: Vivid, or a shortcut tile in its row's chosen colours (By mood, Siansa, Mono). */
 private fun filled(colors: Pair<Color, Color>) =
     CardPaint(colors.first, Brush.linearGradient(listOf(colors.first, colors.second)), Color.White, Color.White.copy(alpha = 0.85f))
+
+/** [filled], with dark words on pale colours (Siansa's frost, Mono's light greys). */
+private fun filledReadable(colors: Pair<Color, Color>): CardPaint {
+    val paint = filled(colors)
+    return if (wordsDarkOn(colors)) CardPaint(paint.base, paint.wash, DARK_WORDS, DARK_WORDS.copy(alpha = 0.75f)) else paint
+}
+
+/** Vivid's swatch and stand-in fade: a full pink to purple, as its sample card. */
+internal val VIVID_SAMPLE = Color(0xFFD6338A) to Color(0xFF4A1470)
 
 /**
  * The colour a row's shortcut tiles take (the owner, 23 Nov: "shortcuts don't get their colour changes at all. All
@@ -113,11 +123,10 @@ internal fun shortcutColours(title: String, songIds: List<String> = emptyList())
  */
 @Composable
 internal fun shortcutPaint(own: Pair<Color, Color>, chosen: Pair<Color, Color>?, picture: String?, title: String, look: CardLook): CardPaint {
-    // A row's own Card colour paints its tiles in it; without one (As Home), they take its chosen colours themselves.
-    if (chosen == null || look != CardLook.AS_HOME) return cardPaint(own, picture, title, look)
-    val paint = filled(chosen)
-    // Pale ones (Siansa's frost, Mono's light greys) take dark words.
-    return if (wordsDarkOn(chosen)) CardPaint(paint.base, paint.wash, DARK_WORDS, DARK_WORDS.copy(alpha = 0.75f)) else paint
+    // A row's own Card colour paints its tiles in it; without one (As Home) or in Vivid, they take its chosen colours
+    // themselves.
+    if (chosen == null || (look != CardLook.AS_HOME && look != CardLook.VIVID)) return cardPaint(own, picture, title, look)
+    return filledReadable(chosen)
 }
 
 /** Whether words on a fill of [colours] should be dark: the fill is light where the words begin. */

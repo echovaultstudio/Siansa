@@ -7,9 +7,9 @@ import org.junit.Test
 
 /** A row's one Colour (the owner, 25 Nov: "There is x2 colour selectors and its impossible to know what does what"). */
 class RowColourTest {
-    @Test fun asHomeYourListeningsSixThenTheSets() {
+    @Test fun asHomeVividYourListeningsSixThenTheSets() {
         assertEquals(
-            listOf("as_home", "teal", "plum", "ink", "ember", "moss", "cover", "mood", "siansa", "mono"),
+            listOf("as_home", "vivid", "teal", "plum", "ink", "ember", "moss", "cover", "mood", "siansa", "mono"),
             RowColour.all.map { it.id },
         )
         // A card colour comes with pictures from the covers; a set with no card colour of its own.
@@ -25,6 +25,8 @@ class RowColourTest {
 
     @Test fun itsNameSaysWhatItIs() {
         assertEquals("As Home (Teal)", RowColour.all.first().label(CardLook.TEAL))
+        assertEquals("As Home (Vivid)", RowColour.all.first().label(CardLook.VIVID))
+        assertEquals("Vivid", RowColour.of(CardLook.VIVID, PictureColours.COVERS).label(CardLook.TEAL))
         assertEquals("Ember", RowColour.of(CardLook.EMBER, PictureColours.COVERS).label(CardLook.TEAL))
         assertEquals("By mood", RowColour.of(CardLook.AS_HOME, PictureColours.MOOD).label(CardLook.TEAL))
     }

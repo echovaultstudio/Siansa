@@ -907,7 +907,7 @@ internal data class RowColour(val look: CardLook, val set: app.siansa.data.Pictu
         else swatchOf(set).let { it.first() to it.getOrElse(1) { _ -> it.first() } }
 
     companion object {
-        /** As Home, Your listening's six, then the sets. */
+        /** As Home, Vivid, Your listening's six, then the sets. */
         val all: List<RowColour> = CardLook.entries.map { RowColour(it, app.siansa.data.PictureColours.COVERS) } +
             app.siansa.data.PictureColours.entries.filter { it != app.siansa.data.PictureColours.COVERS }.map { RowColour(CardLook.AS_HOME, it) }
 
@@ -1092,7 +1092,7 @@ private const val SWATCHES_A_ROW = 3
 
 /** A card colour's fade for its swatch: As Home shows Home's own. */
 internal fun cardSwatchFade(look: CardLook, home: CardLook): Pair<androidx.compose.ui.graphics.Color, androidx.compose.ui.graphics.Color> {
-    val c = (look.colour ?: home.colour ?: CardLook.DEFAULT.colour)!!
+    val c = (if (look == CardLook.AS_HOME) home else look).resolved.colour ?: return VIVID_SAMPLE
     return androidx.compose.ui.graphics.Color(c.top) to androidx.compose.ui.graphics.Color(c.foot)
 }
 
