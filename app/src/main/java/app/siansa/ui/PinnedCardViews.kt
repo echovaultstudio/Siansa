@@ -56,6 +56,11 @@ import app.siansa.mix.PinnedCard
  */
 @Composable
 fun PinnedCardSection(nav: NavController, card: PinnedCard, aiDown: String?) {
+    // Siansa Beats' mixes you picked (the owner, 26 Nov).
+    if (card.source == CardSource.BEATS) {
+        BeatsCardRow(nav, card)
+        return
+    }
     val graph = LocalGraph.current
     val version by graph.library.version.collectAsStateWithLifecycle()
     // A card by sound needs AudioMuse; while it can't be reached the card says so instead of trying.
@@ -145,7 +150,7 @@ private fun PinnedCardLook(card: PinnedCard, content: CardContent, open: () -> U
         return
     }
     when (card.look) {
-        CardLook.TILES -> Shelf(card.title, songs.take(TILES), key = { it.id }, onOpenAll = open) { song ->
+        CardLook.TILES, CardLook.CAROUSEL -> Shelf(card.title, songs.take(TILES), key = { it.id }, onOpenAll = open) { song ->
             AlbumTile(song.title, song.artist, song.cover, onClick = { play(songs, songs.indexOf(song), false) }, modifier = Modifier.width(140.dp))
         }
         CardLook.ALBUMS -> Shelf(card.title, content.albums, key = { it.id }, onOpenAll = open) { album ->

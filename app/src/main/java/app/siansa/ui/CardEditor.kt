@@ -52,6 +52,7 @@ import androidx.navigation.NavController
 import app.siansa.log.AppLog
 import app.siansa.mix.CardContents
 import app.siansa.mix.CardLook
+import app.siansa.mix.BeatsKind
 import app.siansa.mix.BOOK_SORTS
 import app.siansa.mix.CardRule
 import app.siansa.mix.CardSort
@@ -168,7 +169,11 @@ fun CardEditorScreen(nav: NavController, id: String) {
 
             if (c.contents == CardContents.SONGS && !c.notice) {
                 EditorHeading("Comes from")
-                ChipRow(CardSource.entries, c.source, { it.label }, "source") { change(c.copy(source = it)) }
+                ChipRow(CardSource.entries, c.source, { it.label }, "source") { source ->
+                    // A Siansa Beats card starts with your own sound's mixes, as a carousel.
+                    change(if (source == CardSource.BEATS && c.source != CardSource.BEATS) c.copy(source = source, look = CardLook.CAROUSEL,
+                        beats = c.beats.ifEmpty { BeatsKind.FIRST.map { it.id } }) else c.copy(source = source, look = if (c.look == CardLook.CAROUSEL) CardLook.TILES else c.look))
+                }
                 Hint(c.source.hint)
             }
 
@@ -196,6 +201,16 @@ fun CardEditorScreen(nav: NavController, id: String) {
                 }
                 NumberField("How many songs, at most", c.size.toString(), Modifier.fillMaxWidth().testTag("cardSize")) { v ->
                     change(c.copy(size = v.toIntOrNull()?.coerceIn(0, PinnedCard.SIZE) ?: 0))
+                }
+            } else if (c.source == CardSource.BEATS && c.contents == CardContents.SONGS) {
+                // Which of Siansa Beats' mixes, each on or off (the owner, 26 Nov).
+                val beatsOn by app.siansa.net.BeatsSound.mixes.collectAsStateWithLifecycle()
+                if (!beatsOn || !graph.settings.current.beatsFor(app.siansa.data.BeatsUse.MIXES)) Hint("Needs Siansa Beats making Home's mixes, set up in Settings › Services.")
+                EditorHeading("Mixes")
+                BeatsKind.entries.forEach { kind ->
+                    SwitchRow(kind.label, kind.hint, kind.id in c.beats, tag = "beatsKind-${kind.id}") { on ->
+                        change(c.copy(beats = BeatsKind.entries.filter { if (it == kind) on else it.id in c.beats }.map { it.id }))
+                    }
                 }
             } else if (c.source == CardSource.SOUND && c.contents == CardContents.SONGS) {
                 if (!audioMuseReady) Hint("Needs ${app.siansa.data.Offered.soundServices}, set up in Settings › Services.")
@@ -239,8 +254,10 @@ fun CardEditorScreen(nav: NavController, id: String) {
             // An album card's tiles are its albums, so it has no separate album row.
             val looks = when {
                 c.contents.fromBooks -> listOf(CardLook.COVER_ROWS)
-                c.contents == CardContents.ALBUMS -> CardLook.entries - CardLook.ALBUMS
-                else -> CardLook.entries
+                c.contents == CardContents.ALBUMS -> CardLook.entries - CardLook.ALBUMS - CardLook.CAROUSEL
+                // Mixes: no album row; the carousel first, as Siansa Beats' own rows.
+                c.source == CardSource.BEATS -> listOf(CardLook.CAROUSEL) + (CardLook.entries - CardLook.ALBUMS - CardLook.CAROUSEL)
+                else -> CardLook.entries - CardLook.CAROUSEL
             }
             FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.Small), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
                 looks.forEach { look ->
