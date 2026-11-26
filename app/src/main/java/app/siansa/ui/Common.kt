@@ -1062,13 +1062,18 @@ fun ShortcutChip(
     }
 }
 
+/** A shelf's Play button beside its title, and the sign in it. */
+private val SHELF_PLAY = 40.dp
+private val SHELF_PLAY_ICON = 24.dp
+
 /** A shortcut pill's height and its picture: a touch target, the picture inside it with room round it. */
 val QUICK_CHIP_HEIGHT = 44.dp
 val QUICK_CHIP_PICTURE = 32.dp
 
 /**
  * A horizontal shelf of tiles under a section title. With [onOpenAll], a shelf with more than a handful of
- * items gets a tappable title that opens the full list (no arrow, issue #268).
+ * items gets a tappable title that opens the full list (no arrow, issue #268). With [onPlay], a round Play button at
+ * the title's end plays them all (Forgotten artists, the owner, 26 Nov).
  */
 @Composable
 fun <T> Shelf(
@@ -1076,12 +1081,22 @@ fun <T> Shelf(
     items: List<T>,
     key: (T) -> Any,
     onOpenAll: (() -> Unit)? = null,
+    onPlay: (() -> Unit)? = null,
     content: @Composable (T) -> Unit,
 ) {
     if (items.isEmpty()) return
     Column {
         if (!LocalSectionTitleShown.current) {
             HiddenTitleGap()
+        } else if (onPlay != null) {
+            Row(
+                Modifier.fillMaxWidth().padding(start = Space.Page, end = Space.Page, top = LocalSectionGap.current, bottom = Space.Medium),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f))
+                RoundPlayButton(false, "Play $title", SHELF_PLAY, SHELF_PLAY_ICON, Modifier.testTag("shelfPlay"), onClick = onPlay)
+            }
         } else if (onOpenAll != null && homeRowOpensFullList(items.size)) {
             Row(
                 Modifier

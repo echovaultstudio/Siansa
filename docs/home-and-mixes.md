@@ -232,7 +232,9 @@ zone). Three shelves, the same as on Siansa Beats' page:
 - **For now**: this part of the day, as you listen in it.
 - **Made for you**: the kinds of music you play most, each with more like it.
 - **More of you**: On repeat, Rediscover, New for you, Deep cuts, Forgotten artists, Your high energy, Your wind down
-  and the Smooth runs (Siansa Beats 0.65). A Smooth run plays in its order.
+  and the Smooth runs (Siansa Beats 0.65). A Smooth run plays in its order. **Forgotten artists** (Siansa Beats 0.66)
+  is a row of its own under More of you: the artists themselves as round photos, each saying how long since you played
+  them, and opening on its page. **Play** at the row's title plays a mix of them.
 
 If you'd rather have them together, **Mix settings › In Siansa › All in one row** (Siansa Beats 0.62) puts every mix in one row, in For now's place, and **How many cards** says how many it has at most. The other two rows then stay away.
 

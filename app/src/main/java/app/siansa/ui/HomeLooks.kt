@@ -452,7 +452,7 @@ internal fun coverRowOf(item: HomeItem): app.siansa.mix.CoverRow = app.siansa.mi
 private fun argb(c: Color): Long = c.toArgb().toLong() and 0xFFFFFFFFL
 
 @Composable
-private fun HomeItemTile(item: HomeItem, tile: androidx.compose.ui.unit.Dp = TILE) {
+internal fun HomeItemTile(item: HomeItem, tile: androidx.compose.ui.unit.Dp = TILE) {
     val names = LocalCardNames.current
     if (!item.round && (item.mosaic.isNotEmpty() || names == app.siansa.data.CardNames.ON)) {
         // A mix (or, with names on the picture, any cover): its picture in the row's style, its name and line under it
