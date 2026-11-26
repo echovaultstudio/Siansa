@@ -88,6 +88,18 @@ class BeatsMixesTest {
         assertEquals("From Siansa Beats: On repeat, Rediscover, New for you", rows[app.siansa.data.HomeSection.MORE_OF_YOU])
     }
 
+    /** The owner, 26 Nov: "The mixes made by siansa could have a small tag or text in the arrange cards". */
+    @Test fun arrangeHomeTagsTheRowsSiansaBeatsFills() {
+        val rows = app.siansa.ui.beatsRows(true)
+        assertEquals("Siansa Beats", app.siansa.ui.arrangeTag(app.siansa.data.HomeSection.CAROUSEL, rows))
+        assertEquals("Siansa Beats", app.siansa.ui.arrangeTag(app.siansa.data.HomeSection.MORE_OF_YOU, rows))
+        assertEquals("Empty with Siansa Beats", app.siansa.ui.arrangeTag(app.siansa.data.HomeSection.TODAY, rows))
+        assertEquals(null, app.siansa.ui.arrangeTag(app.siansa.data.HomeSection.BOOKS, rows))
+        // Without Siansa Beats' mixes, no tags.
+        assertEquals(null, app.siansa.ui.arrangeTag(app.siansa.data.HomeSection.TODAY, app.siansa.ui.beatsRows(false)))
+        assertEquals(null, app.siansa.ui.arrangeTag(app.siansa.data.HomeSection.CAROUSEL, app.siansa.ui.beatsRows(false)))
+    }
+
     @Test fun twoRowsAskingAtOnceAskOnce() = runBlocking {
         BeatsSound.restoreMixes(true)
         kotlinx.coroutines.coroutineScope {
