@@ -99,16 +99,7 @@ fun BeatsMixesHome(nav: NavController, shelves: Set<String>, look: HomeLook) {
             val title = BeatsMixes.title(shelf)
             // Its own look is the carousel; Tiles has four of each mix's covers; every other look as any row has it
             // (#1261, the owner, 19 Nov: every row gets every option).
-            if (mixes.isNotEmpty()) when (val shownLook = beatsLook(look)) {
-                HomeLook.TILES -> Shelf(title, mixes, key = { it.key }) { m -> MixMosaicTile(m) }
-                HomeLook.CAROUSEL -> {
-                    // Just the title: the mixes say the rest (the owner, 17 Nov: no line under it).
-                    SectionTitle(title, top = if (i == 0) LocalSectionGap.current else Space.Section)
-                    RecordCrate(mixes)
-                }
-                else -> HomeLookRow(shownLook, "beats-${shelf.key}", title, mixes.map(::homeItemOf),
-                    play = { graph.player.play(mixes.first().songs) }, songs = mixes.first().songs)
-            }
+            if (mixes.isNotEmpty()) BeatsMixesRow("beats-${shelf.key}", title, mixes, beatsLook(look), top = if (i == 0) LocalSectionGap.current else Space.Section)
         }
     }
         if (remaking) {
@@ -118,6 +109,49 @@ fun BeatsMixesHome(nav: NavController, shelves: Set<String>, look: HomeLook) {
             )
         }
     }
+}
+
+/** Siansa Beats' [mixes] as a row in [look]: its carousel, tiles of four covers, or as any row has that look. */
+@Composable
+private fun BeatsMixesRow(key: String, title: String, mixes: List<CrateRecord>, look: HomeLook, top: androidx.compose.ui.unit.Dp = LocalSectionGap.current) {
+    val graph = LocalGraph.current
+    when (look) {
+        HomeLook.TILES -> Shelf(title, mixes, key = { it.key }) { m -> MixMosaicTile(m) }
+        HomeLook.CAROUSEL -> {
+            // Just the title: the mixes say the rest (the owner, 17 Nov: no line under it).
+            SectionTitle(title, top = top)
+            RecordCrate(mixes)
+        }
+        else -> HomeLookRow(look, key, title, mixes.map(::homeItemOf), play = { graph.player.play(mixes.first().songs) }, songs = mixes.first().songs)
+    }
+}
+
+/** A Siansa Beats card's look on Home as a row's: its carousel, or the look of the same name. */
+internal fun beatsCardLook(look: app.siansa.mix.CardLook): HomeLook = when (look) {
+    app.siansa.mix.CardLook.CAROUSEL -> HomeLook.CAROUSEL
+    app.siansa.mix.CardLook.TILES, app.siansa.mix.CardLook.ALBUMS -> HomeLook.TILES
+    app.siansa.mix.CardLook.BANNER -> HomeLook.BANNER
+    app.siansa.mix.CardLook.LIST -> HomeLook.LIST
+    app.siansa.mix.CardLook.BUTTON -> HomeLook.BUTTON
+    app.siansa.mix.CardLook.COVER_ROWS -> HomeLook.COVER_ROWS
+    app.siansa.mix.CardLook.GRID -> HomeLook.GRID
+}
+
+/**
+ * A Siansa Beats card (the owner, 26 Nov): the mixes of the kinds it has switched on, from every part of Siansa Beats'
+ * answer, as one row in the card's look and name. Nothing shows until Siansa Beats has made them.
+ */
+@Composable
+fun BeatsCardRow(nav: NavController, card: app.siansa.mix.PinnedCard) {
+    val graph = LocalGraph.current
+    val made by graph.beatsMixes.state.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) { graph.beatsMixes.refresh() }
+    val answer = made ?: return
+    val chosen = remember(answer, card.beats) { app.siansa.mix.BeatsKind.mixes(answer, card.beats) }
+    val songs by produceState(emptyMap<String, List<Song>>(), chosen) { value = chosen.associate { it.id to graph.library.songs(it.songIds) } }
+    val mixes = chosen.mapNotNull { mix -> homeMix(mix, songs[mix.id].orEmpty(), answer.keepDays, nav, graph) }
+    if (mixes.isEmpty()) return
+    BeatsMixesRow("pinned-${card.id}", card.title, mixes, beatsCardLook(card.look))
 }
 
 /** A shelf's mixes' songs, and the artists of a mix that has them (Forgotten artists), by mix id. */

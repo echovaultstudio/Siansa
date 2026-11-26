@@ -37,6 +37,8 @@ enum class CardLook(val label: String, val hint: String) {
     COVER_ROWS("Cover rows", "Covers with their details beside them, three to a column, to swipe through"),
     // The owner, 10 Nov: any card as the Shortcuts card is, two small tiles a row, 2 to 8 of them.
     GRID("Shortcut grid", "Small tiles two to a row, as Shortcuts: tap one to play it"),
+    // A Siansa Beats card's own (the owner, 26 Nov): its mixes as big covers to flick through. A song card shows it as tiles.
+    CAROUSEL("Carousel", "Big covers to flick through, the one in the middle in focus"),
 }
 
 /** Where a custom card's songs come from. */
@@ -45,6 +47,8 @@ enum class CardSource(val label: String, val hint: String) {
     SOUND("By sound", "Describe a sound, like \"rainy jazz piano\", and AudioMuse-AI finds songs that match"),
     // The owner, 10 Nov: a radio you hearted, its songs on Home.
     RADIO("A favourite radio", "A radio you hearted on its page: its songs, new each day"),
+    // The owner, 26 Nov: Siansa Beats' mixes you pick, in a card of your own.
+    BEATS("Siansa Beats", "Siansa Beats' mixes you pick, new as it makes them"),
 }
 
 /**
@@ -61,6 +65,8 @@ data class PinnedCard(
     val source: CardSource = CardSource.LIBRARY,
     /** The sound described to AudioMuse ([CardSource.SOUND]). */
     val sound: String = "",
+    /** Siansa Beats' kinds of mix ([CardSource.BEATS], [BeatsKind] ids). */
+    val beats: List<String> = emptyList(),
     val genre: String = "",
     val fromYear: Int? = null,
     val toYear: Int? = null,
@@ -129,6 +135,7 @@ data class PinnedCard(
             contents.fromBooks -> "${contents.label} · ${sort.label}"
             source == CardSource.SOUND -> "Sound: ${sound.trim()}"
             source == CardSource.RADIO -> "Radio: ${radioTitle.ifBlank { radio }}"
+            source == CardSource.BEATS -> "Siansa Beats: " + beats.mapNotNull { BeatsKind.byId(it)?.label }.joinToString(", ").ifEmpty { "no mixes yet" }
             rules.isNotEmpty() -> (if (contents == CardContents.ALBUMS) "Albums · " else "") +
                 allRules.take(3).joinToString(if (matchAll) " · " else " or ") { it.text } + (if (allRules.size > 3) " …" else "")
             else -> (if (contents == CardContents.ALBUMS) "Albums · " else "") + buildList {
@@ -347,6 +354,8 @@ class PinnedCards(private val graph: AppGraph, context: Context) {
 
     /** Today's songs for [card] and their albums; [round] above 0 makes a new set. */
     suspend fun content(card: PinnedCard, round: Int = 0): CardContent {
+        // A Siansa Beats card shows its mixes, not songs of its own.
+        if (card.source == CardSource.BEATS) return CardContent(emptyList(), emptyList())
         val day = LocalDate.now()
         val key = "$day-${card.id}-${card.hashCode()}-$round"
         made[key]?.let { return it }

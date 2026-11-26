@@ -205,6 +205,7 @@ internal fun lookIcon(look: CardLook) = when (look) {
     CardLook.BUTTON -> Icons.Rounded.PlayCircle
     CardLook.COVER_ROWS -> Icons.Rounded.ViewAgenda
     CardLook.GRID -> Icons.Rounded.GridView
+    CardLook.CAROUSEL -> Icons.Rounded.Album
 }
 
 /** Picking what a new card shows: a kind, and a genre or years where it needs one. */

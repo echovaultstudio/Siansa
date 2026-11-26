@@ -367,6 +367,12 @@ first time you change it. A random card's page has a button for a new set right 
 anywhere but its ▶) for everything on it, ready to play or save as a playlist. A card can be kept but taken off
 Home with its switch in Settings.
 
+**A Siansa Beats card** (with Siansa Beats making Home's mixes): under **Comes from**, pick **Siansa Beats**, then
+switch on the mixes it shows: **For now**, **Made for you**, **On repeat**, **Rediscover**, **New for you**, **Deep
+cuts**, **Your energy** and **Smooth run** (a new one starts with the last six). They come from Siansa Beats' answer,
+new as it makes them, as one row in the card's name and look: **Carousel** as it comes, or any other look. Make a few
+(a "Daily" one, a "Deep listening" one) and **Duplicate** one to start the next. Forgotten artists are in Artist radios.
+
 ## Radios
 
 - **Mood radios** are AudioMuse-AI sound searches, kept varied. Their page has the radio's name on its cover, and its
