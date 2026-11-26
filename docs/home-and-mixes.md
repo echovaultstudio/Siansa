@@ -48,7 +48,9 @@ its cog). The choices are the same as Your listening's card, each a round swatch
 dark grey). Each card is that colour fading darker towards its foot, with white words.
 
 **Spacing** sets the gap between every section at once, from Tight to Airy. **Sections** is a row per section, with
-the handle at the left to move it, the eye to hide it and the cog for its look. **Reset** puts the order, the hidden
+the handle at the left to move it, the eye to hide it and the cog for its look. The rows on Home come first, in the
+order Home shows them; hidden ones move under a **Hidden** heading at the foot, and one shown again goes back to its
+place. **Reset** puts the order, the hidden
 sections, the spacing, the looks and the cards' colour back.
 
 The **cog** on a section opens its settings, a sheet in three parts. Each choice is one line with what's chosen on
@@ -247,7 +249,7 @@ Siansa Beats groups its: this part of the day's in For now, the kinds of music y
 repeat and Discover for you in More of you.
 
 In **Arrange Home**, the rows have the same names as on Siansa Beats' Mixes page: For now is in **For now**, Made for you in **Made for you**, and
-More of you has a row of its own, **More of you**. While Siansa Beats makes them, each row says so under its name. Move or hide them as any other; their cog picks any look: **As it is** is the **Carousel** (big covers to
+More of you has a row of its own, **More of you**. While Siansa Beats makes them, each row has a small **Siansa Beats** tag under its name, and **Today's mix**, empty then, says **Empty with Siansa Beats**. Move or hide them as any other; their cog picks any look: **As it is** is the **Carousel** (big covers to
 flick through), **Tiles** is a row of tiles each with four of the mix's covers, and the others are as for any section
 (Play in a banner or the play button card plays the first mix).
 

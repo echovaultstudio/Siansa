@@ -333,12 +333,15 @@ fun ArrangeHomeSheet(
         val current = visible.firstOrNull { it.key == section.id } ?: return
         val middle = current.offset + offset + current.size / 2f
         val target = visible.firstOrNull { it.key != section.id && middle >= it.offset && middle <= it.offset + it.size } ?: return
+        // Within its own group: the rows on Home, or the hidden ones under them (the owner, 26 Nov); not onto the heading.
+        val over = items.firstOrNull { it.id == target.key } ?: return
+        if ((over in hiddenItems) != (section in hiddenItems)) return
         // Moving to or from the top row: stay at the same position, not with the row that was first, or the moved
         // row ends up above the screen and seems to vanish (#614).
         if (movesFirstVisible(current.index, target.index, list.firstVisibleItemIndex)) {
             list.requestScrollToItem(list.firstVisibleItemIndex, list.firstVisibleItemScrollOffset)
         }
-        items = items.moved(current.index, target.index)
+        items = items.moved(items.indexOf(section), items.indexOf(over))
         // The row is laid out at its new place next frame; keep it under the finger meanwhile.
         offset += current.offset - target.offset
         haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -412,13 +415,8 @@ fun ArrangeHomeSheet(
             )
             SheetLabel("Spacing")
             SpacingRow(gap, onGapChange)
-            SheetLabel("Sections", "hold to move")
-            // One grouped list (the owner, 13 Nov): the rows on a raised surface, a hairline between them.
-            LazyColumn(
-                state = list, userScrollEnabled = dragging == null,
-                modifier = Modifier.padding(horizontal = Space.Page).clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surfaceContainer).testTag("arrangeSections"),
-            ) {
-                items(items, key = { it.id }) { section ->
+            @Composable
+            fun androidx.compose.foundation.lazy.LazyItemScope.SectionLine(section: HomeSection, first: Boolean) {
                     val lifted = section == dragging
                     val isHidden = section in hiddenItems
                     // Plain rows (the owner, 12 Nov): only the one being held is a lifted card.
@@ -444,7 +442,7 @@ fun ArrangeHomeSheet(
                             },
                     ) {
                         // At least a row's height, taller when the line under the name wraps (the owner, 19 Nov: it was cut off).
-                        Row(Modifier.heightIn(min = 52.dp).padding(start = Space.Small).then(if (!lifted && section != items.first()) Modifier.hairlineAbove() else Modifier), verticalAlignment = Alignment.CenterVertically) {
+                        Row(Modifier.heightIn(min = 52.dp).padding(start = Space.Small).then(if (!lifted && !first) Modifier.hairlineAbove() else Modifier), verticalAlignment = Alignment.CenterVertically) {
                             // The handle moves straight away, without the hold.
                             Icon(
                                 Icons.Rounded.DragIndicator,
@@ -469,8 +467,8 @@ fun ArrangeHomeSheet(
                                     style = MaterialTheme.typography.bodyLarge,
                                     color = if (isHidden) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
                                 )
-                                // Only "Hidden" under a name: what a row holds and how it looks are under its cog (the owner, 20 Nov).
-                                if (isHidden) Text("Hidden", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.testTag("homeLookLabel"))
+                                // Rows Siansa Beats fills carry a small tag (the owner, 26 Nov), and Today's mix, empty then, says so.
+                                arrangeTag(section, holds)?.let { RowTag(it) }
                             }
                             IconButton(onClick = {
                                 hiddenItems = if (isHidden) hiddenItems - section else hiddenItems + section
@@ -496,6 +494,29 @@ fun ArrangeHomeSheet(
                             }
                         }
                     }
+            }
+            SheetLabel("Sections", "hold to move")
+            // One grouped list (the owner, 13 Nov): the rows on a raised surface, a hairline between them.
+            LazyColumn(
+                state = list, userScrollEnabled = dragging == null,
+                modifier = Modifier.padding(horizontal = Space.Page).clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surfaceContainer).testTag("arrangeSections"),
+            ) {
+                // The rows on Home in their order, then the hidden ones under their own heading (the owner, 26 Nov: "the
+                // visible ones reflect actually whats seen on home screen"). Each keeps its place in the order, so one
+                // shown again goes back where it was.
+                val onHome = items.filter { it !in hiddenItems }
+                val off = items.filter { it in hiddenItems }
+                items(onHome, key = { it.id }) { section -> SectionLine(section, first = section == onHome.firstOrNull()) }
+                if (off.isNotEmpty()) {
+                    item(key = "hiddenHeading") {
+                        Text(
+                            "Hidden".uppercase(), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant, letterSpacing = androidx.compose.ui.unit.TextUnit(0.08f, androidx.compose.ui.unit.TextUnitType.Em),
+                            modifier = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null).fillMaxWidth().hairlineAbove()
+                                .padding(start = Space.Page, end = Space.Page, top = Space.Page, bottom = Space.Small).testTag("arrangeHiddenHeading"),
+                        )
+                    }
+                    items(off, key = { it.id }) { section -> SectionLine(section, first = section == off.first()) }
                 }
             }
         }
@@ -933,6 +954,26 @@ internal fun beatsLook(saved: HomeLook?): HomeLook = if (saved == null || saved 
 /** What "As Home" means for [section]'s colour: Home's choice, but Shortcuts' tiles stay dark (Ink) unless given their own. */
 internal fun asHomeCardLook(section: HomeSection, homeCardLook: CardLook): CardLook =
     if (section == HomeSection.QUICK) CardLook.INK else homeCardLook
+
+/**
+ * The small tag on a row in Arrange Home's list (the owner, 26 Nov: "the mixes made by siansa could have a small tag"):
+ * the rows Siansa Beats fills ([holds]), and Today's mix, which stays empty while it does; null for the others.
+ */
+internal fun arrangeTag(section: HomeSection, holds: Map<HomeSection, String>): String? = when {
+    section in holds -> "Siansa Beats"
+    section == HomeSection.TODAY && holds.isNotEmpty() -> "Empty with Siansa Beats"
+    else -> null
+}
+
+/** A small tag under a row's name. */
+@Composable
+private fun RowTag(text: String) {
+    Text(
+        text, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(top = Space.Tight).clip(RoundedCornerShape(6.dp)).background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
+            .padding(horizontal = Space.Small, vertical = 2.dp).testTag("arrangeRowTag"),  // spacing: exact (a tag's inner)
+    )
+}
 
 internal fun beatsRows(on: Boolean): Map<HomeSection, String> =
     if (!on) emptyMap() else mapOf(
