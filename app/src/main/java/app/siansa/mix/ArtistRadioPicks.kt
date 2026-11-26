@@ -52,3 +52,35 @@ object ArtistRadioPicks {
     /** Recent artists whose similar artists are looked up. */
     const val SIMILAR_FROM = 3
 }
+
+/** Whose artists Home's Artist radios are (the owner, 26 Nov: "replace artists radios with ones beats suggest?"). */
+enum class ArtistsFrom(val id: String, val label: String) {
+    MINE("mine", "Your listening"),
+    BEATS("beats", "Siansa Beats"),
+    BOTH("both", "Both");
+
+    companion object {
+        fun of(id: String?): ArtistsFrom = entries.firstOrNull { it.id == id } ?: BOTH
+
+        /**
+         * Artist radios from [mine] (played lately and like them) and Siansa Beats' [beats] (Forgotten artists), [count]
+         * in all, each once: Both is yours first, then up to half of them Beats'; Siansa Beats alone falls back on yours
+         * while it has none. With each, whether it's Beats'.
+         */
+        fun <A> pick(from: ArtistsFrom, mine: List<A>, beats: List<A>, count: Int, id: (A) -> String): List<Pair<A, Boolean>> {
+            val theirs = beats.distinctBy(id)
+            val picked = when {
+                from == MINE || theirs.isEmpty() -> mine.take(count).map { it to false }
+                from == BEATS -> theirs.take(count).map { it to true }
+                else -> {
+                    val beatsShare = minOf(theirs.size, count / 2)
+                    val ids = theirs.take(beatsShare).mapTo(HashSet(), id)
+                    val yours = mine.filter { id(it) !in ids }.take(count - beatsShare)
+                    yours.map { it to false } + theirs.take(count - yours.size).map { it to true }
+                }
+            }
+            return picked.distinctBy { id(it.first) }
+        }
+    }
+}
+

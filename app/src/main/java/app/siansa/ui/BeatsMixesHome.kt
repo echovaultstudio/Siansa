@@ -68,6 +68,7 @@ fun BeatsMixesHome(nav: NavController, shelves: Set<String>, look: HomeLook) {
         }
     }
     val answer = made ?: return
+    val artistsFrom = app.siansa.mix.ArtistsFrom.of(graph.settings.state.collectAsStateWithLifecycle().value.artistRadiosFrom)
     val shown = answer.shelves.filter { it.key in shelves }
     if (shown.isEmpty()) return
     // Each mix's songs, from the phone's copy of the library (the ids are the music server's own); and Forgotten
@@ -93,8 +94,8 @@ fun BeatsMixesHome(nav: NavController, shelves: Set<String>, look: HomeLook) {
     androidx.compose.foundation.layout.Box(Modifier.fillMaxWidth()) {
     Column(Modifier.fillMaxWidth().graphicsLayer { alpha = dim }.testTag("beatsMixes")) {
         shown.forEachIndexed { i, shelf ->
-            // A mix shown as its artists stands in a row of its own, after the shelf's mixes.
-            val mixes = shelf.mixes.filter { it.id !in found.artists }.mapNotNull { mix -> homeMix(mix, songs[mix.id].orEmpty(), answer.keepDays, nav, graph) }
+            // Forgotten artists' artists are in Artist radios (the owner, 26 Nov), unless that's your listening only.
+            val mixes = shelf.mixes.filter { it.id !in found.artists || artistsFrom == app.siansa.mix.ArtistsFrom.MINE }.mapNotNull { mix -> homeMix(mix, songs[mix.id].orEmpty(), answer.keepDays, nav, graph) }
             val title = BeatsMixes.title(shelf)
             // Its own look is the carousel; Tiles has four of each mix's covers; every other look as any row has it
             // (#1261, the owner, 19 Nov: every row gets every option).
@@ -108,10 +109,6 @@ fun BeatsMixesHome(nav: NavController, shelves: Set<String>, look: HomeLook) {
                 else -> HomeLookRow(shownLook, "beats-${shelf.key}", title, mixes.map(::homeItemOf),
                     play = { graph.player.play(mixes.first().songs) }, songs = mixes.first().songs)
             }
-            shelf.mixes.forEach { mix ->
-                val artists = found.artists[mix.id] ?: return@forEach
-                ForgottenArtistsRow(mix, artists, songs[mix.id].orEmpty(), beatsLook(look), nav)
-            }
         }
     }
         if (remaking) {
@@ -123,11 +120,19 @@ fun BeatsMixesHome(nav: NavController, shelves: Set<String>, look: HomeLook) {
     }
 }
 
-/** A shelf's mixes' songs, and the artists of a mix shown as its artists, by mix id. */
+/** A shelf's mixes' songs, and the artists of a mix that has them (Forgotten artists), by mix id. */
 private class Found(val songs: Map<String, List<Song>>, val artists: Map<String, List<ForgottenArtist>>)
 
-/** A forgotten artist as Home shows it: the library's [artist] (for its page and photo), and how long since. */
+/** A forgotten artist as Artist radios shows it: the library's [artist] (for its radio, page and photo), and how long since. */
 internal data class ForgottenArtist(val artist: app.siansa.data.Artist, val person: BeatsMixes.Person)
+
+/**
+ * Siansa Beats' artists for Artist radios (the owner, 26 Nov): every mix's in [answer] that names them (Forgotten
+ * artists), found on the phone, each once.
+ */
+internal suspend fun beatsArtists(answer: BeatsMixes.Shelves?, songsOf: suspend (List<String>) -> List<Song>, artistOf: suspend (String) -> app.siansa.data.Artist?): List<ForgottenArtist> =
+    answer?.shelves.orEmpty().flatMap { it.mixes }.filter { it.people.isNotEmpty() }
+        .flatMap { mix -> forgottenArtists(mix, songsOf(mix.songIds), artistOf) }.distinctBy { it.artist.id }
 
 /**
  * [mix]'s artists ([BeatsMixes.BeatsMix.people]) found in the library by a song of theirs in [songs], in Siansa
@@ -141,30 +146,6 @@ internal suspend fun forgottenArtists(mix: BeatsMixes.BeatsMix, songs: List<Song
         val artist = artistOf(id) ?: app.siansa.data.Artist(id, song.artist.ifBlank { person.name })
         ForgottenArtist(artist, person)
     }.distinctBy { it.artist.id }
-}
-
-/**
- * Forgotten artists as artists (the owner, 26 Nov): round photos, each opening its artist's page, with how long since
- * you played them; Play plays the mix's songs. In the row's look; its carousel and Tiles show the photos in a row.
- */
-@Composable
-private fun ForgottenArtistsRow(mix: BeatsMixes.BeatsMix, artists: List<ForgottenArtist>, songs: List<Song>, look: HomeLook, nav: NavController) {
-    val graph = LocalGraph.current
-    val now = remember { System.currentTimeMillis() }
-    val items = remember(artists) {
-        artists.map { a ->
-            HomeItem(a.artist.id, a.artist.name, BeatsMixes.forgottenLine(a.person.last, now), a.artist.picture, round = true,
-                open = { nav.navigate("artist/${a.artist.id}") })
-        }
-    }
-    val play = { graph.player.play(songs) }
-    when (look) {
-        HomeLook.TILES, HomeLook.CAROUSEL, HomeLook.AS_IS -> {
-            val tile = tileWidth(LocalCrateSize.current)
-            Shelf(mix.name, items, key = { it.key }, onPlay = play) { HomeItemTile(it, tile) }
-        }
-        else -> HomeLookRow(look, "beats-${mix.id}", mix.name, items, play = play, songs = songs)
-    }
 }
 
 /** A mix as a tile: four of its covers two by two, its name, and what's in it. */

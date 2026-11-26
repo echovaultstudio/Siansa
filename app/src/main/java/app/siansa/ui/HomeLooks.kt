@@ -30,6 +30,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
@@ -70,6 +71,8 @@ data class HomeItem(
     val songs: List<Song> = emptyList(),
     /** Its songs' ids, for its colours by mood (the owner, 20 Nov); its [songs]' when not given. */
     val songIdList: List<String> = emptyList(),
+    /** Held: an artist radio opens its artist (the owner, 26 Nov). Tiles and cover grids have it. */
+    val hold: (() -> Unit)? = null,
 ) {
     val songIds: List<String> get() = songIdList.ifEmpty { songs.map { it.id } }
     val artists: String get() = artistLine(songs)
@@ -384,7 +387,7 @@ private fun CoverGridCell(item: HomeItem, named: Boolean, modifier: Modifier) {
     val shape = if (item.round) androidx.compose.foundation.shape.CircleShape else RoundedCornerShape(8.dp)
     Column(
         modifier
-            .clickable(onClickLabel = "Open ${item.title}", onClick = item.open)
+            .combinedClickable(onClickLabel = "Open ${item.title}", onClick = item.open, onLongClick = item.hold)
             .semantics(mergeDescendants = true) { if (!named) contentDescription = item.title }
             .testTag("homeCoverGridCell"),
     ) {
@@ -468,7 +471,7 @@ internal fun HomeItemTile(item: HomeItem, tile: androidx.compose.ui.unit.Dp = TI
             if (!on) TileNames(item.title, item.subtitle, showTitle = !named)
         }
     } else if (item.coverArt != null) {
-        AlbumTile(item.title, item.subtitle, item.coverArt, item.open, Modifier.width(tile).testTag("homeLookTile"), round = item.round)
+        AlbumTile(item.title, item.subtitle, item.coverArt, item.open, Modifier.width(tile).testTag("homeLookTile"), round = item.round, onLongClick = item.hold)
     } else {
         GradientTile(title = item.title, colors = item.colors, onClick = item.open, size = tile, modifier = Modifier.testTag("homeLookTile"))
     }

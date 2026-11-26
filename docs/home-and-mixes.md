@@ -135,7 +135,7 @@ draws each tile's small picture that way.
 | **Radios** | Mood radios: Chill, Energy, Focus, Feel good, Party, Melancholy, Workout, Late night, Acoustic, Romance. |
 | **Your playlists** | Playlists on your server and ones kept only on the phone. |
 | **Recently played** | Albums you played lately, only from music the source filter shows. |
-| **Artist radios** | Artists you played lately, mixed with artists like them. |
+| **Artist radios** | Artists you played lately, mixed with artists like them. With Siansa Beats making Home's mixes, its cog has **Artists from**: **Your listening**, **Siansa Beats** (its Forgotten artists, each saying how long since you played them) or **Both** (as it comes: yours first, then Beats'). A tap plays the artist's radio; hold one to open the artist. |
 | **Recently added** | The newest albums on your server. |
 | **Your genres** | Genre radios from your library: the songs tagged with that genre. With Siansa Beats, every song that sounds like it, whatever its tags say (a remix tagged with its album's genre, but sounding like trance, plays in Trance), as long as the genre is among the song's three best guesses (Siansa Beats 0.36: a faint fourth guess doesn't count); without Siansa Beats, or until it has heard enough of them, the tags as always. |
 | **Random picks** | A random selection to dig into. |
@@ -233,8 +233,7 @@ zone). Three shelves, the same as on Siansa Beats' page:
 - **Made for you**: the kinds of music you play most, each with more like it.
 - **More of you**: On repeat, Rediscover, New for you, Deep cuts, Forgotten artists, Your high energy, Your wind down
   and the Smooth runs (Siansa Beats 0.65). A Smooth run plays in its order. **Forgotten artists** (Siansa Beats 0.66)
-  is a row of its own under More of you: the artists themselves as round photos, each saying how long since you played
-  them, and opening on its page. **Play** at the row's title plays a mix of them.
+  join **Artist radios** instead (below), unless that row is set to your listening only.
 
 If you'd rather have them together, **Mix settings › In Siansa › All in one row** (Siansa Beats 0.62) puts every mix in one row, in For now's place, and **How many cards** says how many it has at most. The other two rows then stay away.
 

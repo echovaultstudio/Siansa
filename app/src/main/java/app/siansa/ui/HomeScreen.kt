@@ -48,6 +48,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
+import app.siansa.net.BeatsMixes
+import app.siansa.data.picture
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -272,6 +274,12 @@ fun HomeScreen(nav: NavController) {
     val playlists by loadState(version to "playlists") { graph.library.refreshPlaylists { graph.source.playlists() }.let(graph.playlists.removed::visible) }
     val recentAlbums by loadState(version to "recent") { recentlyPlayedAlbums(graph) }
     val recentArtists by loadState(version to "artists") { artistRadioArtists(graph) }
+    // Siansa Beats' artists beside yours (the owner, 26 Nov): Forgotten artists, while Siansa Beats makes Home's mixes.
+    val beatsAnswer by graph.beatsMixes.state.collectAsStateWithLifecycle()
+    val beatsArtistPicks by produceState(emptyList<ForgottenArtist>(), beatsAnswer, beatsMakesMixes) {
+        value = if (!beatsMakesMixes || !graph.settings.current.beatsFor(app.siansa.data.BeatsUse.MIXES)) emptyList()
+            else beatsArtists(beatsAnswer, { graph.library.songs(it) }) { graph.library.artist(it) }
+    }
     val freshCovers by graph.artistPhotos.covers.collectAsStateWithLifecycle()
     val newest by loadState(version to "newest") {
         if (graph.library.isSynced) graph.library.albums("newest").take(20)
@@ -616,23 +624,23 @@ fun HomeScreen(nav: NavController) {
                 }
                 HomeSection.ARTIST_RADIOS -> {
                     titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, names = homeSettings.cardNames(section), crateSize = homeSettings.carouselSize(section), variant = homeSettings.homeVariants[section], picture = homeSettings.homePictures[section] ?: app.siansa.data.PictureStyle.AUTO, heroCardPicture = homeSettings.homeHeroCardPictures[section] ?: app.siansa.data.PictureStyle.AUTO, lines = section !in homeSettings.homeNoLines, pictureColours = homeSettings.homePictureColours[section] ?: app.siansa.data.PictureColours.COVERS, cardLook = cardLookOf(section), shortcutLook = shortcutLookOf(homeSettings.homeCardLooks[section], homeSettings.homePictureColours[section]), coverGrid = homeSettings.homeCoverGrids[section] ?: app.siansa.data.CoverGridSize.DEFAULT, key = "artist_radios") {
+                        // Yours (played lately and like them), Siansa Beats' (Forgotten artists), or both (the owner,
+                        // 26 Nov). A tap plays the artist's radio; held, the artist's page opens.
+                        val from = app.siansa.mix.ArtistsFrom.of(homeSettings.artistRadiosFrom)
+                        val now = remember { System.currentTimeMillis() }
+                        val beatsById = beatsArtistPicks.associateBy { it.artist.id }
+                        val radios = app.siansa.mix.ArtistsFrom.pick(from, recentArtists.valueOrNull().orEmpty(), beatsArtistPicks.map { it.artist },
+                            app.siansa.mix.ArtistRadioPicks.HOME) { it.id }
+                        val items = radios.map { (artist, fromBeats) ->
+                            val line = beatsById[artist.id]?.takeIf { fromBeats }?.let { BeatsMixes.forgottenLine(it.person.last, now) }?.ifBlank { null }
+                            HomeItem(artist.id, "${artist.name} radio", line ?: "With similar artists", freshCovers[artist.id] ?: artist.picture, round = true,
+                                open = { launch.progressivePicks("${artist.name} radio", { graph.radios.artistStart(artist) }) { graph.radios.artistMore(artist, it) } },
+                                hold = { nav.navigate("artist/${artist.id}") })
+                        }
                         if (look != HomeLook.AS_IS) {
-                            HomeLookRow(look, "artist_radios", "Artist radios", recentArtists.valueOrNull().orEmpty().map { artist ->
-                                HomeItem(artist.id, "${artist.name} radio", "With similar artists", freshCovers[artist.id] ?: artist.coverArt, round = true, open = {
-                                    launch.progressivePicks("${artist.name} radio", { graph.radios.artistStart(artist) }) { graph.radios.artistMore(artist, it) }
-                                })
-                            }, openAll = nav.openAll(app.siansa.ui.HomeSection.ArtistRadios))
-                        } else Shelf("Artist radios", recentArtists.valueOrNull().orEmpty(), key = { it.id }, onOpenAll = nav.openAll(app.siansa.ui.HomeSection.ArtistRadios)) { artist ->
-                            AlbumTile(
-                                name = "${artist.name} radio",
-                                subtitle = "With similar artists",
-                                coverArt = freshCovers[artist.id] ?: artist.coverArt,
-                                onClick = {
-                                    launch.progressivePicks("${artist.name} radio", { graph.radios.artistStart(artist) }) { graph.radios.artistMore(artist, it) }
-                                },
-                                modifier = Modifier.width(140.dp),
-                                round = true,
-                            )
+                            HomeLookRow(look, "artist_radios", "Artist radios", items, openAll = nav.openAll(app.siansa.ui.HomeSection.ArtistRadios))
+                        } else Shelf("Artist radios", items, key = { it.key }, onOpenAll = nav.openAll(app.siansa.ui.HomeSection.ArtistRadios)) { item ->
+                            AlbumTile(item.title, item.subtitle, item.coverArt, item.open, Modifier.width(140.dp), round = true, onLongClick = item.hold)
                         }
                     }
                 }

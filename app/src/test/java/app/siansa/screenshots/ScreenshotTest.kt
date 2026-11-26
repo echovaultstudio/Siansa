@@ -622,30 +622,6 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                         }
                 }
             },
-            // Forgotten artists as artists (the owner, 26 Nov): round photos, how long since, Play at the title's end.
-            Scene("beats_forgotten_artists") {
-                val fakes = mapOf("ar-1" to Color(0xFF1F6F78), "ar-2" to Color(0xFFC2185B), "ar-3" to Color(0xFFE8D44D))
-                val draw: app.siansa.ui.CoverDraw = { id, _, modifier, shape, filter ->
-                    val c = fakes[id] ?: Color.DarkGray
-                    Box(modifier.clip(shape).drawBehind { drawRect(Brush.linearGradient(listOf(c, Color.Black)), colorFilter = filter) })
-                }
-                val items = listOf("Loathe" to "Not played for 8 months", "Neo-Classical Downtempo Velvet Undertow Orchestra" to "Not played for 3 years",
-                    "Deftones" to "Not played for a year").mapIndexed { i, (name, line) ->
-                    app.siansa.ui.HomeItem("${i + 1}", name, line, "ar-${i + 1}", round = true, open = {})
-                }
-                androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalCoverDraw provides draw) {
-                    Column {
-                        // The photos themselves need the app's covers: plain rounds here; the title with its Play is what's new.
-                        app.siansa.ui.Shelf("Forgotten artists, the ones you used to play the most", items, key = { it.key }, onPlay = {}) { item ->
-                            Column(Modifier.width(140.dp)) {
-                                app.siansa.ui.LocalCoverDraw.current(item.coverArt, 0, Modifier.fillMaxWidth().aspectRatio(1f), androidx.compose.foundation.shape.CircleShape, null)
-                                Text(item.title, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-                                Text(item.subtitle, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-                            }
-                        }
-                    }
-                }
-            },
             // Each set of picture colours on a Colour picture and a sticker pile (the owner, 20 Nov).
             Scene("picture_colours") {
                 val fakes = mapOf("a" to Color(0xFFE8D44D), "b" to Color(0xFF1F6F78), "c" to Color(0xFFF2F2F3), "d" to Color(0xFFC2185B))
@@ -1228,6 +1204,29 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     linesShown = false, onPick = {}, onDismiss = {}, variant = app.siansa.data.LookVariant.HERO_THREE,
                     picture = app.siansa.data.PictureStyle.PILE, heroCardPicture = app.siansa.data.PictureStyle.AURA,
                     pictureColours = app.siansa.data.PictureColours.MOOD, sheet = false, opened = setOf("look", "style", "cards"))
+            },
+            // Artist radios' cog (the owner, 26 Nov): whose artists, while Siansa Beats makes Home's mixes.
+            Scene("row_settings_artist_radios") {
+                app.siansa.ui.HomeLookDialog(app.siansa.data.HomeSection.ARTIST_RADIOS, app.siansa.data.HomeLook.AS_IS, titleShown = true, onTitleShown = {},
+                    onPick = {}, onDismiss = {}, artistsFrom = app.siansa.mix.ArtistsFrom.BOTH, sheet = false, opened = setOf("from"))
+            },
+            // Artist radios with Siansa Beats' artists (the owner, 26 Nov): names and lines centred under the photos, whole
+            // on two lines.
+            Scene("artist_radios_tiles") {
+                val fakes = mapOf("ar-1" to Color(0xFF1F6F78), "ar-2" to Color(0xFFC2185B), "ar-3" to Color(0xFFE8D44D))
+                val draw: app.siansa.ui.CoverDraw = { id, _, modifier, shape, filter ->
+                    val c = fakes[id] ?: Color.DarkGray
+                    Box(modifier.clip(shape).drawBehind { drawRect(Brush.linearGradient(listOf(c, Color.Black)), colorFilter = filter) })
+                }
+                val radios = listOf("Loathe radio" to "Not played for 8 months", "Neo-Classical Downtempo Velvet Undertow Orchestra radio" to "Not played for 3 years",
+                    "Björk radio" to "With similar artists")
+                androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalCoverDraw provides draw) {
+                    Column {
+                        app.siansa.ui.Shelf("Artist radios", radios.withIndex().toList(), key = { it.index }) { (i, r) ->
+                            app.siansa.ui.AlbumTile(r.first, r.second, "ar-${i + 1}", {}, Modifier.width(140.dp), round = true, onLongClick = {})
+                        }
+                    }
+                }
             },
             Scene("row_settings_carousel_open") {
                 app.siansa.ui.HomeLookDialog(app.siansa.data.HomeSection.CAROUSEL, app.siansa.data.HomeLook.CAROUSEL, titleShown = false, onTitleShown = {},
