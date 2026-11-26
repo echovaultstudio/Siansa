@@ -60,6 +60,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
@@ -825,27 +826,40 @@ fun AlbumTile(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     round: Boolean = false,
+    // Held: an artist's radio opens the artist (the owner, 26 Nov).
+    onLongClick: (() -> Unit)? = null,
 ) {
     @Suppress("NAME_SHADOWING")
     val subtitle = if (LocalCardLines.current) subtitle else ""
+    // An artist's name and line sit centred under its round photo, whole on two lines (the owner, 26 Nov: "perfectly
+    // centred and readable"); an album's stay at the left, one line each.
+    val align = if (round) androidx.compose.ui.text.style.TextAlign.Center else null
+    val lines = if (round) 2 else 1
+    val tap = if (onLongClick == null) Modifier.clickable(onClick = onClick)
+        else Modifier.combinedClickable(onClick = onClick, onLongClick = onLongClick, onLongClickLabel = "Open the artist")
     // The name sits a step under the cover, and the subtitle straight under the name, as one block (issue #338):
     // an even gap between all three left the artist floating away from the album name.
-    Column(modifier.clickable(onClick = onClick).padding(LocalTileInset.current)) {
-        Cover(
+    Column(modifier.then(tap).padding(LocalTileInset.current), horizontalAlignment = if (round) Alignment.CenterHorizontally else Alignment.Start) {
+        // Through LocalCoverDraw (the app's covers, a sample in the screenshot test).
+        LocalCoverDraw.current(
             coverArt,
             300,
             Modifier.fillMaxWidth().aspectRatio(1f).testTag("albumTileCover"),
             if (round) androidx.compose.foundation.shape.CircleShape else RoundedCornerShape(8.dp),
+            null,
         )
         Spacer(Modifier.height(Space.Small))
-        Text(name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(name, style = MaterialTheme.typography.bodyMedium, fontWeight = if (round) FontWeight.SemiBold else FontWeight.Medium, maxLines = lines,
+            overflow = TextOverflow.Ellipsis, textAlign = align, modifier = Modifier.fillMaxWidth().testTag("albumTileName"))
         if (subtitle.isNotBlank()) {
             Text(
                 subtitle,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
+                maxLines = lines,
                 overflow = TextOverflow.Ellipsis,
+                textAlign = align,
+                modifier = Modifier.fillMaxWidth().testTag("albumTileLine"),
             )
         }
     }
@@ -1062,18 +1076,13 @@ fun ShortcutChip(
     }
 }
 
-/** A shelf's Play button beside its title, and the sign in it. */
-private val SHELF_PLAY = 40.dp
-private val SHELF_PLAY_ICON = 24.dp
-
 /** A shortcut pill's height and its picture: a touch target, the picture inside it with room round it. */
 val QUICK_CHIP_HEIGHT = 44.dp
 val QUICK_CHIP_PICTURE = 32.dp
 
 /**
  * A horizontal shelf of tiles under a section title. With [onOpenAll], a shelf with more than a handful of
- * items gets a tappable title that opens the full list (no arrow, issue #268). With [onPlay], a round Play button at
- * the title's end plays them all (Forgotten artists, the owner, 26 Nov).
+ * items gets a tappable title that opens the full list (no arrow, issue #268).
  */
 @Composable
 fun <T> Shelf(
@@ -1081,22 +1090,12 @@ fun <T> Shelf(
     items: List<T>,
     key: (T) -> Any,
     onOpenAll: (() -> Unit)? = null,
-    onPlay: (() -> Unit)? = null,
     content: @Composable (T) -> Unit,
 ) {
     if (items.isEmpty()) return
     Column {
         if (!LocalSectionTitleShown.current) {
             HiddenTitleGap()
-        } else if (onPlay != null) {
-            Row(
-                Modifier.fillMaxWidth().padding(start = Space.Page, end = Space.Page, top = LocalSectionGap.current, bottom = Space.Medium),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f))
-                RoundPlayButton(false, "Play $title", SHELF_PLAY, SHELF_PLAY_ICON, Modifier.testTag("shelfPlay"), onClick = onPlay)
-            }
         } else if (onOpenAll != null && homeRowOpensFullList(items.size)) {
             Row(
                 Modifier

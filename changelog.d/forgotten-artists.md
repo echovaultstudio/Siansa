@@ -1,3 +1,4 @@
 ### Changed
 
-- With Siansa Beats 0.66, Forgotten artists on Home shows the artists themselves instead of a mix: round photos, how long since you played each, and a tap opens the artist. Play at the row's title plays a mix of them.
+- With Siansa Beats 0.66, its Forgotten artists join Home's Artist radios, each saying how long since you played them. Under Artist radios' cog, **Artists from** picks your listening, Siansa Beats or both (as it comes). Tap one to play its radio, hold it to open the artist.
+- Artists' names and lines sit centred under their round photos, whole on two lines.

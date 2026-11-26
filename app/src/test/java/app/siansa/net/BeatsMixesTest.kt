@@ -243,4 +243,22 @@ class BeatsMixesTest {
         assertEquals("A", found[1].artist.name)
         assertEquals("ar-ar1", found[1].artist.picture)
     }
+
+    /** Artist radios take Siansa Beats' artists from every mix that names them, each once. */
+    @Test fun beatsArtistsComeFromEveryMixThatNamesThem() = runBlocking {
+        fun mix(id: String, vararg people: BeatsMixes.Person) =
+            BeatsMixes.BeatsMix(id, id, "", false, emptyList(), emptyList(), null, people.map { it.song }, 0, people = people.toList())
+        val answer = BeatsMixes.Shelves(part = "evening", said = "evening", based = "", basis = "slot", daylight = null, askedAt = 1L, shelves = listOf(
+            BeatsMixes.Shelf("more", "More of you", "", listOf(mix("forgotten", BeatsMixes.Person("A", 9, 1, "s1"), BeatsMixes.Person("B", 5, 1, "s2")), mix("deep"))),
+            BeatsMixes.Shelf("daily", "Made for you", "", listOf(mix("other", BeatsMixes.Person("A", 9, 1, "s3")))),
+        ))
+        val songs = mapOf(
+            "s1" to app.siansa.data.Song("s1", "One", artist = "A", artistId = "ar1"),
+            "s2" to app.siansa.data.Song("s2", "Two", artist = "B", artistId = "ar2"),
+            "s3" to app.siansa.data.Song("s3", "Three", artist = "A", artistId = "ar1"),
+        )
+        val found = app.siansa.ui.beatsArtists(answer, { ids -> ids.mapNotNull { songs[it] } }) { null }
+        assertEquals(listOf("ar1", "ar2"), found.map { it.artist.id })
+        assertEquals(emptyList<String>(), app.siansa.ui.beatsArtists(null, { emptyList() }) { null }.map { it.artist.id })
+    }
 }

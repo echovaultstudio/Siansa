@@ -123,6 +123,12 @@ fun HomeSettingsSheet(nav: androidx.navigation.NavController, startOnSources: Bo
             AppLog.i("Home", "${section.label}: reset to how it came")
             graph.settings.resetHomeRow(section)
         },
+        // Artist radios' artists: yours, Siansa Beats', or both, while Siansa Beats makes Home's mixes (the owner, 26 Nov).
+        artistsFrom = app.siansa.mix.ArtistsFrom.of(s.artistRadiosFrom).takeIf { beatsMakesMixes && s.beatsFor(app.siansa.data.BeatsUse.MIXES) },
+        onArtistsFrom = {
+            AppLog.i("Home", "Artist radios from: ${it.label}")
+            graph.settings.save(graph.settings.current.copy(artistRadiosFrom = it.id))
+        },
         shortcutRows = shortcutRows(s.homeShortcuts),
         onShortcutRows = { rows ->
             AppLog.i("Home", "Shortcuts: $rows ${if (rows == 1) "row" else "rows"}")
@@ -232,6 +238,8 @@ fun ArrangeHomeSheet(
     // How many rows of tiles Shortcuts shows (the owner, 23 Nov), set in its cog.
     shortcutRows: Int = SHORTCUT_ROWS.last,
     onShortcutRows: (Int) -> Unit = {},
+    artistsFrom: app.siansa.mix.ArtistsFrom? = null,
+    onArtistsFrom: (app.siansa.mix.ArtistsFrom) -> Unit = {},
     // Your listening's colour (issue #1347), set in its cog.
     listenColour: app.siansa.data.ListenColour = app.siansa.data.ListenColour.TEAL,
     onListenColour: (app.siansa.data.ListenColour) -> Unit = {},
@@ -290,6 +298,8 @@ fun ArrangeHomeSheet(
             onReset = { onResetRow(section) },
             shortcutRows = shortcutRows.takeIf { section == HomeSection.QUICK },
             onShortcutRows = onShortcutRows,
+            artistsFrom = artistsFrom.takeIf { section == HomeSection.ARTIST_RADIOS },
+            onArtistsFrom = onArtistsFrom,
             onDismiss = { picking = null },
             // Your cards each have their own look, chosen in Settings › Home › Cards: a way there.
             onOpenSettings = if (section.lookable) null else { { picking = null; onOpenSettings(section) } },
@@ -555,6 +565,9 @@ internal fun HomeLookDialog(
     // Shortcuts alone: how many rows of tiles it shows (the owner, 23 Nov); null for every other row.
     shortcutRows: Int? = null,
     onShortcutRows: (Int) -> Unit = {},
+    // Artist radios: whose artists (null: not offered).
+    artistsFrom: app.siansa.mix.ArtistsFrom? = null,
+    onArtistsFrom: (app.siansa.mix.ArtistsFrom) -> Unit = {},
     // Its cards' colour (the owner, 13 Nov): its own, or [CardLook.AS_HOME], which is [homeCardLook].
     cardLook: CardLook = CardLook.AS_HOME,
     homeCardLook: CardLook = CardLook.DEFAULT,
@@ -591,6 +604,7 @@ internal fun HomeLookDialog(
     var cardNames by remember(section) { mutableStateOf(names) }
     var size by remember(section) { mutableStateOf(crateSize) }
     var colour by remember(section) { mutableStateOf(cardLook) }
+    var from by remember(section) { mutableStateOf(artistsFrom ?: app.siansa.mix.ArtistsFrom.BOTH) }
     // One sheet in three parts (the owner, 22 Nov, from the mockup): switches for what shows, then the look, then the
     // cards. Each choice is one line with what's chosen on it; a tap opens its options under it. Only what the chosen
     // look has is listed.
@@ -624,6 +638,13 @@ internal fun HomeLookDialog(
                 SheetRule()
                 // Its cards' lines (the owner, 22 Nov): what's in a mix, an album's artist, on the card or under it.
                 SwitchLine("Descriptions", "The small line on or under each card", lines, "homeCardLines") { lines = it; onLinesShown(it) }
+            }
+            if (artistsFrom != null) {
+                SheetRule()
+                ValueLine("Artists from", from.label, "from" in open, "rowArtistsFrom") { toggle("from") }
+                if ("from" in open) {
+                    SegmentBar(app.siansa.mix.ArtistsFrom.entries, from, { it.label }, { "artistsFrom-${it.id}" }, Modifier.padding(bottom = Space.Medium)) { from = it; onArtistsFrom(it) }
+                }
             }
 
             SheetPart("Look")
