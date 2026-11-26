@@ -606,6 +606,15 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                             app.siansa.ui.CardPicture(emptyList(), null, Color(0xFF5B2A86) to Color(0xFF1E1E22), "No covers yet", Modifier.size(104.dp), style = app.siansa.data.PictureStyle.GLOW, showName = true)
                             Text("No covers", style = MaterialTheme.typography.labelMedium)
                         }
+                        // Shape with Siansa Beats' numbers (issue #153): a lively mix and a calm one.
+                        for ((label, values) in listOf("High energy" to listOf(0.92f, 0.81f, 0.55f, 0.12f, 0.7f), "Wind down" to listOf(0.1f, 0.2f, 0.35f, 0.9f, 0.4f))) {
+                            val ids = listOf("shape-$label-1", "shape-$label-2")
+                            app.siansa.ui.MixShapes.put(ids, values, first = true)
+                            Column(Modifier.width(104.dp), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
+                                app.siansa.ui.CardPicture(covers, null, Color(0xFF5B2A86) to Color(0xFF1E1E22), "Your $label", Modifier.size(104.dp), songIds = ids, showName = true)
+                                Text("Shape: $label", style = MaterialTheme.typography.labelMedium)
+                            }
+                        }
                     }
                 }
             },

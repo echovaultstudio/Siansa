@@ -12,7 +12,8 @@ object MixRules {
     fun showsAiMixes(audioMuseReady: Boolean): Boolean = audioMuseReady
 
     /** A mix from your listening: those that need AudioMuse (Your sound, Discover for you) only with it. */
-    fun showsPersonal(kind: MixGenerator.Personal, audioMuseReady: Boolean): Boolean = audioMuseReady || !kind.needsAudioMuse
+    fun showsPersonal(kind: MixGenerator.Personal, audioMuseReady: Boolean, smoothOn: Boolean = true): Boolean =
+        (audioMuseReady || !kind.needsAudioMuse) && (kind != MixGenerator.Personal.SMOOTH || smoothOn)
 
     /**
      * The mixes from your listening that stand in [row] of Home when this phone makes Home's mixes, grouped as Siansa
@@ -22,7 +23,7 @@ object MixRules {
      */
     fun personalIn(row: app.siansa.data.HomeSection): List<MixGenerator.Personal> = when (row) {
         app.siansa.data.HomeSection.MADE_FOR_YOU -> listOf(MixGenerator.Personal.SOUND)
-        app.siansa.data.HomeSection.MORE_OF_YOU -> listOf(MixGenerator.Personal.REPEAT, MixGenerator.Personal.DISCOVER)
+        app.siansa.data.HomeSection.MORE_OF_YOU -> listOf(MixGenerator.Personal.REPEAT, MixGenerator.Personal.DISCOVER, MixGenerator.Personal.SMOOTH)
         else -> emptyList()
     }
 
@@ -30,8 +31,8 @@ object MixRules {
      * Its tile on Home: hidden once making it said there isn't enough to go on ([notEnough], e.g. On repeat without
      * plays in the last 30 days, issue #495), unless a mix of it was made today anyway.
      */
-    fun showsPersonalTile(kind: MixGenerator.Personal, audioMuseReady: Boolean, madeToday: Boolean, notEnough: Boolean): Boolean =
-        showsPersonal(kind, audioMuseReady) && (madeToday || !notEnough)
+    fun showsPersonalTile(kind: MixGenerator.Personal, audioMuseReady: Boolean, madeToday: Boolean, notEnough: Boolean, smoothOn: Boolean = true): Boolean =
+        showsPersonal(kind, audioMuseReady, smoothOn) && (madeToday || !notEnough)
 
     /**
      * Today's mixes Home lists: made [today], for a vibe that applies now ([applicableIds]) or from your listening

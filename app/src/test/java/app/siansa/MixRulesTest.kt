@@ -78,7 +78,7 @@ class MixRulesTest {
         val more = MixRules.personalIn(app.siansa.data.HomeSection.MORE_OF_YOU)
         // Made for you: the kinds of music you play most. More of you: On repeat and what's new for you.
         assertEquals(listOf("Your sound"), made.map { it.title })
-        assertEquals(listOf("On repeat", "Discover for you"), more.map { it.title })
+        assertEquals(listOf("On repeat", "Discover for you", "Smooth run"), more.map { it.title })
         // Every mix from your listening is in exactly one of the two rows, and in no other.
         assertEquals(MixGenerator.Personal.entries.toSet(), (made + more).toSet())
         assertEquals(MixGenerator.Personal.entries.size, made.size + more.size)
@@ -87,5 +87,15 @@ class MixRulesTest {
         }
         // The part of the day's row is named For now whoever makes its mixes.
         assertEquals("For now", app.siansa.ui.FOR_NOW)
+    }
+
+    /** Issue #1389: the phone's Smooth run needs AudioMuse-AI and its switch. */
+    @Test fun thePhonesSmoothRunHasItsOwnSwitch() {
+        val smooth = MixGenerator.Personal.SMOOTH
+        assertTrue(MixRules.showsPersonal(smooth, audioMuseReady = true))
+        assertFalse(MixRules.showsPersonal(smooth, audioMuseReady = true, smoothOn = false))
+        assertFalse(MixRules.showsPersonal(smooth, audioMuseReady = false))
+        // The switch is the Smooth run's alone.
+        assertTrue(MixRules.showsPersonal(MixGenerator.Personal.REPEAT, audioMuseReady = true, smoothOn = false))
     }
 }

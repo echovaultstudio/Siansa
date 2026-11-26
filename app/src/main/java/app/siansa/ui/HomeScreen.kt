@@ -254,7 +254,7 @@ fun HomeScreen(nav: NavController) {
         if (beatsMixesShown) return@LaunchedEffect
         delay(1500)
         val today = LocalDate.now().toString()
-        for (kind in MixGenerator.Personal.entries.filter { MixRules.showsPersonal(it, graph.settings.current.soundReady) }) {
+        for (kind in MixGenerator.Personal.entries.filter { MixRules.showsPersonal(it, graph.settings.current.soundReady, graph.settings.current.phoneSmoothRun) }) {
             if (graph.mixes.get("$today-${kind.id}") != null) continue
             while (busySelector != null || personalBusy != null) delay(500)
             buildPersonal(kind, open = false, quiet = true)
@@ -334,7 +334,7 @@ fun HomeScreen(nav: NavController) {
                     mix?.songs?.firstOrNull()?.coverArt, open = { if (mix != null) nav.navigate("mix/${mix.id}") else build(selector, force = false, open = true) }, mosaic = mix?.songs?.map { it.cover }.orEmpty(), songs = mix?.songs.orEmpty()))
             }
             MixRules.personalIn(row).filter { kind ->
-                MixRules.showsPersonalTile(kind, homeSettings.soundReady, madeToday = todaysMixes.any { it.selectorId == kind.id }, notEnough = kind.id in notEnough)
+                MixRules.showsPersonalTile(kind, homeSettings.soundReady, madeToday = todaysMixes.any { it.selectorId == kind.id }, notEnough = kind.id in notEnough, smoothOn = homeSettings.phoneSmoothRun)
             }.forEach { kind ->
                 val mix = todaysMixes.firstOrNull { it.selectorId == kind.id }
                 add(HomeItem(kind.id, kind.title, madeForYouCaption(mix?.songs?.size, aiDown != null, "Tap to make it"),
@@ -363,6 +363,7 @@ fun HomeScreen(nav: NavController) {
                     kind, homeSettings.soundReady,
                     madeToday = todaysMixes.any { it.selectorId == kind.id },
                     notEnough = kind.id in notEnough,
+                    smoothOn = homeSettings.phoneSmoothRun,
                 )
             }.forEach { kind ->
                 add(kind.id to @Composable {
@@ -394,7 +395,7 @@ fun HomeScreen(nav: NavController) {
     // Whether a row has something of this phone's own: a mix from your listening that can be made or was made today;
     // for Made for you, this hour's vibe or a card of your own too. A row with nothing isn't drawn, title and all.
     fun phoneHas(row: HomeSection): Boolean = MixRules.personalIn(row).any { kind ->
-        MixRules.showsPersonalTile(kind, homeSettings.soundReady, madeToday = todaysMixes.any { it.selectorId == kind.id }, notEnough = kind.id in notEnough)
+        MixRules.showsPersonalTile(kind, homeSettings.soundReady, madeToday = todaysMixes.any { it.selectorId == kind.id }, notEnough = kind.id in notEnough, smoothOn = homeSettings.phoneSmoothRun)
     } || (row == HomeSection.MADE_FOR_YOU && ((aiMixes && applicable.isNotEmpty()) || customCards.orEmpty().isNotEmpty()))
     CompositionLocalProvider(LocalSectionGap provides homeGap(homeSettings.homeGap), LocalPictureMotion provides homeStill) {
     HomePullToRefresh(onRefresh = pull) {

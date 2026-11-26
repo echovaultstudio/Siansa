@@ -141,6 +141,8 @@ private const val REMAKING_AFTER_MS = 600L
  */
 private fun homeMix(mix: BeatsMixes.BeatsMix, songs: List<Song>, keepDays: Int, nav: NavController, graph: AppGraph): CrateRecord? {
     if (songs.isEmpty()) return null
+    // Its shape, for its picture (issue #153): any card of these songs finds it.
+    MixShapes.put(songs.map { it.id }, mix.shape, mix.shapeFirst)
     val today = LocalDate.now().toString()
     val id = beatsMixId(mix, today)
     fun saved() = Mix(id, "beats-${mix.id}", today, mix.name, beatsMixDescription(mix), "", songs,
