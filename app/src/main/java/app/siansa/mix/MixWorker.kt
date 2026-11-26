@@ -29,7 +29,7 @@ class MixWorker(context: Context, params: WorkerParameters) : CoroutineWorker(co
         // While Siansa Beats makes Home's other mixes, the phone makes none of them (the owner, 17 Nov).
         if (settings.beatsReady && settings.beatsFor(app.siansa.data.BeatsUse.MIXES) && app.siansa.net.BeatsSound.mixes.value) return Result.success()
         // Today's personal mixes too (each is made once a day; later runs find them ready).
-        MixGenerator.Personal.entries.filter { MixRules.showsPersonal(it, settings.soundReady) }
+        MixGenerator.Personal.entries.filter { MixRules.showsPersonal(it, settings.soundReady, settings.phoneSmoothRun) }
             .forEach { kind -> runCatching { graph.generator.ensurePersonal(kind) } }
         return Result.success()
     }

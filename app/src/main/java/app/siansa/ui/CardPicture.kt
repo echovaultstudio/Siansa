@@ -111,8 +111,10 @@ fun CardPicture(
     val top = remember(covers, cover) { topCover(covers, cover) }
     val mix = covers.isNotEmpty()
     // Decided once for these covers, so a card doesn't change while it's on screen.
-    val shown = remember(style, distinct, top, mix) {
-        pictureShown(style, distinct.size, top != null, mix) { distinct.take(4).map { CoverToneStore.get(it)?.main } }
+    // Its sound's shape, when Siansa Beats sent one for these songs (issue #153).
+    val sound = remember(songIds) { MixShapes.of(songIds) }
+    val shown = remember(style, distinct, top, mix, sound) {
+        pictureShown(style, distinct.size, top != null, mix, hasShape = sound != null, shapeFirst = sound?.first == true) { distinct.take(4).map { CoverToneStore.get(it)?.main } }
     }
     val mood = if (palette == app.siansa.data.PictureColours.MOOD) rememberMoodPaint(songIds) else null
     val paint = remember(palette, mood, distinct, top, colors, title) {
@@ -131,6 +133,7 @@ fun CardPicture(
             }
             PictureStyle.COVER, PictureStyle.AUTO -> draw(top, px, Modifier.fillMaxSize(), RectangleShape, null)
             PictureStyle.AURA -> AuraPicture(paint, title, ownName)
+            PictureStyle.SHAPE -> ShapePicture(paint, sound?.values.orEmpty())
             PictureStyle.FROST -> FrostPicture(paint, top, title, artists, ownName, px)
             PictureStyle.POSTER -> PosterPicture(paint, distinct.ifEmpty { listOfNotNull(top) }, title, artists, ownName, px)
             PictureStyle.GLOW -> {
@@ -158,7 +161,7 @@ internal fun pictureNamesItself(style: PictureStyle, covers: List<String?>, cove
 
 private val SELF_NAMED = setOf(PictureStyle.AURA, PictureStyle.FROST, PictureStyle.POSTER)
 
-private val UNNAMED = setOf(PictureStyle.AUTO, PictureStyle.MOSAIC, PictureStyle.COVER, PictureStyle.GLOW)
+private val UNNAMED = setOf(PictureStyle.AUTO, PictureStyle.MOSAIC, PictureStyle.COVER, PictureStyle.GLOW, PictureStyle.SHAPE)
 
 @Composable
 private fun androidx.compose.foundation.layout.BoxScope.NameOnPicture(title: String, line: String, paint: PicturePaint) {
@@ -457,10 +460,16 @@ private fun Stickers(kind: PictureStyle, covers: List<String>, paint: PicturePai
  * mix its mosaic only when [tones] (the first four covers' main colours, null where not known yet) sit well together,
  * else Glow (the owner, 20 Nov: one flat cover looked poor).
  */
-internal fun pictureShown(style: PictureStyle, distinct: Int, hasCover: Boolean, mix: Boolean = true, tones: () -> List<Color?>): PictureStyle {
+internal fun pictureShown(
+    style: PictureStyle, distinct: Int, hasCover: Boolean, mix: Boolean = true,
+    // Siansa Beats sent its shape (issue #153); [shapeFirst]: a mix Auto shows as its shape (Your energy).
+    hasShape: Boolean = false, shapeFirst: Boolean = false,
+    tones: () -> List<Color?>,
+): PictureStyle {
     val one = if (hasCover) PictureStyle.COVER else PictureStyle.AURA
     return when (style) {
         PictureStyle.AUTO -> when {
+            hasShape && shapeFirst -> PictureStyle.SHAPE
             !hasCover -> PictureStyle.AURA
             !mix -> PictureStyle.COVER
             distinct >= 4 && mosaicSitsWell(tones()) -> PictureStyle.MOSAIC
@@ -470,6 +479,64 @@ internal fun pictureShown(style: PictureStyle, distinct: Int, hasCover: Boolean,
         PictureStyle.PILE, PictureStyle.TAPED, PictureStyle.CUTOUTS -> if (distinct >= 2) style else one
         PictureStyle.COVER, PictureStyle.GLOW, PictureStyle.FROST, PictureStyle.POSTER -> if (hasCover) style else PictureStyle.AURA
         PictureStyle.AURA -> style
+        // Without a shape, as Auto would show it.
+        PictureStyle.SHAPE -> if (hasShape) style else pictureShown(PictureStyle.AUTO, distinct, hasCover, mix, tones = tones)
+    }
+}
+
+/**
+ * The shapes of Siansa Beats' mixes (issue #153): five shares, 0 to 1 ([SHAPE_AXES]), by the mix's songs, put here as
+ * its mixes are read, so any card of those songs can draw it without each card being told. [first]: Auto shows it.
+ */
+object MixShapes {
+    data class Shape(val values: List<Float>, val first: Boolean)
+
+    private val shapes = java.util.concurrent.ConcurrentHashMap<String, Shape>()
+
+    private fun keyOf(songIds: List<String>) = songIds.sorted().joinToString(",").hashCode().toString() + ":" + songIds.size
+
+    fun put(songIds: List<String>, values: List<Float>?, first: Boolean) {
+        if (songIds.isEmpty() || values == null || values.size != SHAPE_AXES.size) return
+        shapes[keyOf(songIds)] = Shape(values.map { it.coerceIn(0f, 1f) }, first)
+    }
+
+    fun of(songIds: List<String>): Shape? = if (songIds.isEmpty() || shapes.isEmpty()) null else shapes[keyOf(songIds)]
+}
+
+/** The shape's five sides, in the order Siansa Beats sends them. */
+val SHAPE_AXES = listOf("energy", "danceable", "happy", "relaxed", "voice")
+
+/**
+ * A mix's sound as a shape (issue #153; the owner, 26 Nov: like the Listening fingerprint, without lag): five points
+ * on its colours' light, filled, with two faint rings behind. Drawn once and kept in the card's layer: no animation,
+ * nothing fetched.
+ */
+@Composable
+private fun ShapePicture(paint: PicturePaint, values: List<Float>) {
+    androidx.compose.foundation.Canvas(Modifier.fillMaxSize().meshFill(paint).testTag("shapePicture")) {
+        val centre = Offset(size.width / 2, size.height * 0.52f)
+        val radius = size.minDimension * 0.36f
+        fun at(i: Int, share: Float): Offset {
+            val angle = Math.toRadians(-90.0 + i * 360.0 / SHAPE_AXES.size)
+            return Offset(centre.x + (radius * share * kotlin.math.cos(angle)).toFloat(), centre.y + (radius * share * kotlin.math.sin(angle)).toFloat())
+        }
+        fun ring(share: Float) = androidx.compose.ui.graphics.Path().apply {
+            SHAPE_AXES.indices.forEach { i -> val p = at(i, share); if (i == 0) moveTo(p.x, p.y) else lineTo(p.x, p.y) }
+            close()
+        }
+        val faint = Color.White.copy(alpha = 0.16f)
+        val hair = 1.dp.toPx()  // spacing: exact (a line's width)
+        drawPath(ring(1f), faint, style = androidx.compose.ui.graphics.drawscope.Stroke(hair))
+        drawPath(ring(0.5f), faint, style = androidx.compose.ui.graphics.drawscope.Stroke(hair))
+        SHAPE_AXES.indices.forEach { i -> drawLine(faint, centre, at(i, 1f), hair) }
+        if (values.size != SHAPE_AXES.size) return@Canvas
+        val shape = androidx.compose.ui.graphics.Path().apply {
+            values.forEachIndexed { i, v -> val p = at(i, 0.15f + 0.85f * v); if (i == 0) moveTo(p.x, p.y) else lineTo(p.x, p.y) }
+            close()
+        }
+        drawPath(shape, Color.White.copy(alpha = 0.28f))
+        drawPath(shape, Color.White.copy(alpha = 0.9f), style = androidx.compose.ui.graphics.drawscope.Stroke(2.dp.toPx(), join = androidx.compose.ui.graphics.StrokeJoin.Round))  // spacing: exact
+        values.forEachIndexed { i, v -> drawCircle(Color.White, 3.dp.toPx(), at(i, 0.15f + 0.85f * v)) }  // spacing: exact
     }
 }
 

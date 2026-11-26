@@ -372,6 +372,8 @@ class MixGenerator(private val graph: AppGraph) {
         SOUND("you-sound", "Your sound", true),
         REPEAT("you-repeat", "On repeat", false),
         DISCOVER("you-discover", "Discover for you", true),
+        // Issue #1389 (the owner, 26 Nov): the sound of what you play most, ordered by key and tempo.
+        SMOOTH("you-smooth", "Smooth run", true),
     }
 
     /** Today's personal mix of this kind, built if it doesn't exist yet. */
@@ -387,6 +389,7 @@ class MixGenerator(private val graph: AppGraph) {
             Personal.SOUND -> soundMix(skipped)
             Personal.REPEAT -> repeatMix(taste, skipped)
             Personal.DISCOVER -> discoverMix(taste, skipped)
+            Personal.SMOOTH -> smoothMix(skipped)
         }
         if (songs.isEmpty()) throw MixException("Not enough listening history yet. Play some more and try again later.")
         AppLog.i("Mix", "${kind.title}: ${songs.size} songs")
@@ -404,6 +407,32 @@ class MixGenerator(private val graph: AppGraph) {
         )
         graph.mixes.save(mix)
         mix
+    }
+
+    /**
+     * Smooth run (issue #1389): the songs nearest the sound of what you play most (AudioMuse-AI), ordered so each flows
+     * into the next by key and tempo ([SmoothRun]). The keys and tempos are the songs' profiles (Siansa Beats or the
+     * plugin), as for blends; without them there's no run.
+     */
+    private suspend fun smoothMix(skipped: Set<String>): Pair<List<Song>, String> {
+        val s = graph.settings.current
+        if (!s.soundReady) throw MixException("Set up AudioMuse-AI in Settings first")
+        if (!graph.profiles.active) throw MixException("Smooth run needs Siansa Beats (or the Siansa plugin) for the songs' keys and tempos")
+        val recent = graph.history.playedSince(System.currentTimeMillis() - 2 * DAY_MS)
+        val hits = graph.audioMuse.sonicFingerprint(150, s.fingerprintUser, s.fingerprintPassword)
+            .filter { it.id !in skipped && it.id !in recent }
+        val songs = resolveHits(capPerArtist(hits.map { it to it.similarity }, 3, 120))
+        val profiles = graph.profiles.fetch(songs.map { it.id })
+        val near = hits.associate { it.id to (1.0 - it.similarity) }
+        val steps = songs.map { song ->
+            val p = profiles[song.id]
+            SmoothRun.Step(song.id, (p?.intro ?: p?.outro)?.bpm, SmoothRun.camelot(p?.key, p?.scale), near[song.id] ?: 1.0)
+        }
+        val order = SmoothRun.order(steps, SMOOTH_LENGTH)
+        AppLog.i("Mix", "Smooth run: ${order.size} of ${songs.size} songs in a run (${steps.count { it.bpm != null && it.key != null }} with a key and tempo)")
+        if (order.size < SmoothRun.FEWEST) throw MixException("Not enough songs with a known key and tempo for a smooth run yet")
+        val byId = songs.associateBy { it.id }
+        return order.mapNotNull { byId[it] } to "The sound of what you play most, each song flowing into the next by key and tempo"
     }
 
     /** AudioMuse's sonic fingerprint: the songs closest to the sound of what you play most. */
@@ -819,6 +848,8 @@ class MixGenerator(private val graph: AppGraph) {
         const val GENRE_SONGS = 2_000
         /** Albums played lately whose songs On repeat looks at (issue #495). */
         const val RECENT_ALBUMS = 40
+        /** The phone's Smooth run: up to this many songs, shorter rather than a jolt. */
+        const val SMOOTH_LENGTH = 40
         /** Songs of the music shown looked at for a mix from the library. */
         const val LIBRARY_CANDIDATES = 3000
         val SYSTEM_PROMPT = """

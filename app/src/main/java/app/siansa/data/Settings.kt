@@ -146,6 +146,8 @@ data class AppSettings(
      * moving was heard); off, the pitch moves with the speed, as on a DJ's pitch fader.
      */
     val djKeepKey: Boolean = true,
+    /** The phone's own Smooth run in More of you (issue #1389), while this phone makes Home's mixes. */
+    val phoneSmoothRun: Boolean = true,
     val aiTitles: Boolean = true,
     /**
      * Services switched off under Settings › Services (the owner, 13 Nov): [Service] ids. One that's off is left
@@ -529,6 +531,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         fadeInMs = fadeChoice(prefs.getInt("fade_in_ms", AppSettings.DEFAULT_FADE_IN_MS)),
         fadeOutMs = fadeChoice(prefs.getInt("fade_out_ms", AppSettings.DEFAULT_FADE_OUT_MS)),
         djKeepKey = prefs.getBoolean("dj_keep_key", true),
+        phoneSmoothRun = prefs.getBoolean("phone_smooth_run", true),
         aiTitles = prefs.getBoolean("ai_titles", true),
         // Smart as it comes (the owner, 26 Nov); a mode chosen before stays.
         replayGain = runCatching { ReplayGainMode.valueOf(prefs.getString("rg", "SMART") ?: "SMART") }
@@ -749,6 +752,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
             .putInt("fade_in_ms", s.fadeInMs)
             .putInt("fade_out_ms", s.fadeOutMs)
             .putBoolean("dj_keep_key", s.djKeepKey)
+            .putBoolean("phone_smooth_run", s.phoneSmoothRun)
             .apply()
         _state.value = s
     }

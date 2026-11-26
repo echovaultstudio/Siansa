@@ -390,11 +390,15 @@ fun RadiosScreen(nav: NavController) {
                     }
                 }
                 if (beatsOn) {
-                    Hint("While Siansa Beats makes them, the phone makes none of its own: no hourly Today's mix, no mixes in the background.")
+                    Hint("While Siansa Beats makes them, the phone makes none of its own carousels, Made for you or More of you. Today's mix is still the phone's.")
                     PageLink("Mix settings", "Which mixes, how long, what's left out, how long they're kept", "radiosMixSettings") { nav.navigate("settings/beats/mixes") }
                 } else {
                     if (!byBeats) Hint(if (settings.beatsReady) "Needs Siansa Beats 0.53 or newer to make them instead." else "With Siansa Beats set up, it can make them from your listening instead.")
                     PageLink("Today's mix and vibes", if (settings.dailyMix.autoUpdate) "Auto update on" else "Auto update off", "radiosVibes") { nav.navigate("vibes") }
+                    // Issue #1389: the phone's own Smooth run, in More of you.
+                    SwitchRow("Smooth run in More of you: the sound you play most, flowing by key and tempo", settings.phoneSmoothRun) {
+                        graph.settings.save(graph.settings.current.copy(phoneSmoothRun = it))
+                    }
                 }
             }
             HorizontalDivider()

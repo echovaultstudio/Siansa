@@ -94,7 +94,9 @@ that move: **Aura** (its colours drifting like light through water, slow for a c
 name big at the foot), **Frost** (its cover blurred and slowly breathing, the sleeve floating on it, its name and main
 artists on glass) and **Poster** (three of its covers washed in one bold colour, its name in heavy type with its
 artists), and three made of its covers: **Stickers** (stuck on at angles, with white edges), **Taped** (taped on paper,
-its name on a label) and **Cut-outs** (circles and squares, like a scrapbook). Where each sticker sits comes from the card itself, so no two look
+its name on a label) and **Cut-outs** (circles and squares, like a scrapbook). **Shape** draws a Siansa Beats mix's
+sound as a still five-sided shape (energy, danceable, happy, relaxed, voice); on Auto, Your high energy and Your wind
+down show theirs, and a card without one shows what Auto would. Where each sticker sits comes from the card itself, so no two look
 the same and one always looks the same. A card without enough covers for its style shows one cover, or Aura when it has
 none. An artist keeps its round photo.
 
@@ -127,7 +129,7 @@ draws each tile's small picture that way.
 | **For now** | Three or four mixes of your own for each part of the day, side by side. The row says **For now** whichever part of the day it is. |
 | **Your listening** | One card with four pages; swipe sideways or tap a name at its top. A drop-down on the card sets the time for the first three: **Last 7 days**, **Last 30 days** (as it comes), **Last year** (the past 365 days) or **All time**; it's remembered. **Songs**: your most played song of that time, big, with Play and Shuffle for the 50 most played, and the next four under it, each with a bar for its plays; tap one to play from there. **Artists**: your most played artist big, the next four listed with their plays; tap one to open it. **Genres**: a ring with your top five genres' shares of the plays (by Siansa Beats' genres where it has them, else the songs' tags). **Look back**: this time last year, this day last year, last month and last year, from your [Time Machine](your-listening.md#time-machine); a list with too few plays is left out and Two years ago or Five years ago takes its place. Nothing moves when you tap: Songs (the big song, or **See all**) and each Look back list open a page of their songs, with Play and **Create memory**. A time with nothing played says so. **Its colour** is under its cog in Arrange Home: Teal, Plum, Ink, Ember, Moss, or **From its cover** (the colour of your top song's cover). The rest of its look is fixed; it's moved and hidden like any row. It's kept on the phone, so it's there at once, and made again once a day in the background. The card shows nothing until you have a listening history. |
 | **Made for you** | The kinds of music you play most: the mix for this hour's vibe and Your sound, then cards of your own. |
-| **More of you** | On repeat and Discover for you. |
+| **More of you** | On repeat, Discover for you and Smooth run. |
 | **Rediscover** | Albums you used to play a lot and haven't in a while. |
 | **Radios** | Mood radios: Chill, Energy, Focus, Feel good, Party, Melancholy, Workout, Late night, Acoustic, Romance. |
 | **Your playlists** | Playlists on your server and ones kept only on the phone. |
@@ -228,7 +230,8 @@ zone). Three shelves, the same as on Siansa Beats' page:
 
 - **For now**: this part of the day, as you listen in it.
 - **Made for you**: the kinds of music you play most, each with more like it.
-- **More of you**: On repeat, Rediscover and New for you.
+- **More of you**: On repeat, Rediscover, New for you, Deep cuts, Forgotten artists, Your high energy, Your wind down
+  and the Smooth runs (Siansa Beats 0.65). A Smooth run plays in its order.
 
 If you'd rather have them together, **Mix settings › In Siansa › All in one row** (Siansa Beats 0.62) puts every mix in one row, in For now's place, and **How many cards** says how many it has at most. The other two rows then stay away.
 
@@ -247,7 +250,7 @@ makes none of its own carousels, Made for you or More of you; **Today's mix** is
 AudioMuse-AI for the hour's vibe, beside Siansa Beats' For now. Set it to **This phone** for your own
 carousels, Today's mix, Made for you and More of you, which stay as you set them. The phone's own mixes are grouped as
 Siansa Beats groups its: this part of the day's in For now, the kinds of music you play most in Made for you, and On
-repeat and Discover for you in More of you.
+repeat, Discover for you and Smooth run in More of you.
 
 In **Arrange Home**, the rows have the same names as on Siansa Beats' Mixes page: For now is in **For now**, Made for you in **Made for you**, and
 More of you has a row of its own, **More of you**. While Siansa Beats makes them, each row has a small **Siansa Beats** tag under its name. Move or hide them as any other; their cog picks any look: **As it is** is the **Carousel** (big covers to
@@ -258,7 +261,8 @@ flick through), **Tiles** is a row of tiles each with four of the mix's covers, 
 mixes by itself, from what you play, the time of day, the season and the light outside: change only what you want.
 The page has three parts, one line each:
 
-- **Mixes**: For now and Made for you. **Your sound**: On repeat, Rediscover and New for you. Each line has a switch
+- **Mixes**: For now and Made for you. **Your sound**: On repeat, Rediscover, New for you, Deep cuts, Forgotten artists,
+  Your energy and Smooth run. Each line has a switch
   and says **AUTO** while it's as it comes, **TUNED** once you've changed something of it.
 - **For all mixes**: **What's in a mix** (songs in a mix, how many you know, songs by one artist), **Leave out**
   (songs played lately, genres, artists), **Made around** (the part of the day, weekends, the dark, this time of year,
@@ -291,6 +295,10 @@ same day; Siansa tells you which one already has them.
   Koito, ListenBrainz or Last.fm when you use them. It opens straight away and checks your server for changes while
   the cog turns, like a playlist. Until there's enough to go on, it isn't shown.
 - **Discover for you**: songs that sound like your taste, from artists you don't play much (only with AudioMuse-AI).
+- **Smooth run**: the sound you play most, ordered so each song flows into the next: the same key, a step round the
+  circle of fifths or its relative major or minor, and a tempo within 6 % (or half or double). It stops sooner rather
+  than jolt. Needs AudioMuse-AI and Siansa Beats (or the Siansa plugin) for the songs' keys and tempos; switch it off
+  in **Settings › Mixes › Home's mixes**.
 - **Cards of your own** (**Settings › Home › Cards › Made for you**): pick what a card shows (for example a genre or a
   period) and name it. Each card gets new songs every day.
 
