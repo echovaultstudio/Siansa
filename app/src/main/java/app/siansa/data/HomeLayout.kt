@@ -155,9 +155,11 @@ fun <T> List<T>.moved(from: Int, to: Int): List<T> {
  * swatches as Your listening's card, [ListenColour]): Today's mix, the book and podcast cards, Made for you, Radios and
  * the other generated tiles. One choice for the whole of Home under Arrange Home, and a row's own under its cog
  * ([AS_HOME] follows Home's). Each is [colour]'s fade, top to foot; [COVER] takes it from the card's own picture.
+ * [VIVID] (the owner, 26 Nov: "missing the vivid option") has no colour of its own: each card in its own full colours.
  */
 enum class CardLook(val id: String, val colour: ListenColour?) {
     AS_HOME("as_home", null),
+    VIVID("vivid", null),
     TEAL("teal", ListenColour.TEAL),
     PLUM("plum", ListenColour.PLUM),
     INK("ink", ListenColour.INK),
@@ -165,19 +167,22 @@ enum class CardLook(val id: String, val colour: ListenColour?) {
     MOSS("moss", ListenColour.MOSS),
     COVER("cover", ListenColour.COVER);
 
-    val label: String get() = colour?.label ?: "As Home"
+    val label: String get() = colour?.label ?: if (this == VIVID) "Vivid" else "As Home"
+
+    /** What it paints with: [AS_HOME] alone, with nothing narrower given, as [DEFAULT]. */
+    val resolved: CardLook get() = if (this == AS_HOME) DEFAULT else this
 
     companion object {
         /** The choices for the whole of Home: all but [AS_HOME]. */
         val forHome: List<CardLook> = entries.filter { it != AS_HOME }
-        val DEFAULT = TEAL
+        /** Vivid, as Home's cards always were before 25 Nov (the owner, 26 Nov). */
+        val DEFAULT = VIVID
 
         /**
-         * The look saved as [id]; the strengths chosen before 25 Nov are read as the nearest colour: Vivid as the
-         * default, Soft and Plain as Ink, From the artwork as From its cover.
+         * The look saved as [id]; the strengths chosen before 25 Nov are read as the nearest colour: Soft and Plain as
+         * Ink, From the artwork as From its cover. Vivid is a choice again.
          */
         fun of(id: String?): CardLook? = entries.firstOrNull { it.id == id } ?: when (id) {
-            "vivid" -> DEFAULT
             "soft", "plain" -> INK
             "artwork" -> COVER
             else -> null

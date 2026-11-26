@@ -343,6 +343,7 @@ private fun HeroCards(cards: List<HomeItem>) {
 
 /**
  * A hero's fill, top and foot, in its row's Card colour [look] (issue #1351; the owner, 25 Nov: Your listening's colours):
+ * - Vivid: its [own] two colours, full (the owner, 26 Nov).
  * - Teal, Plum, Ink, Ember, Moss: that colour's own fade, as on Your listening's card.
  * - From its cover: [tint] (its picture's colour) darkened, as Your listening's card from its top song.
  * - As Home with the row's Colours chosen (By mood, Siansa, Mono; [fromPicture] false): [tint], the first of them, with
@@ -350,13 +351,14 @@ private fun HeroCards(cards: List<HomeItem>) {
  * Its words are white in both themes, so each fill is kept dark enough to read them on ([readableUnderWhite]).
  */
 internal fun heroColours(look: app.siansa.data.CardLook, tint: Color, own: Pair<Color, Color>, fromPicture: Boolean = true): Pair<Color, Color> {
-    val colour = look.colour
+    val colour = look.resolved.colour
     val (top, foot) = when {
-        colour == null && !fromPicture ->
+        look == app.siansa.data.CardLook.AS_HOME && !fromPicture ->
             lerp(lerp(tint, own.first, 0.35f), Color.Black, 0.25f) to lerp(lerp(tint, own.second, 0.5f), Color.Black, 0.5f)
-        (colour ?: app.siansa.data.CardLook.DEFAULT.colour) == app.siansa.data.ListenColour.COVER ->
+        colour == null -> own
+        colour == app.siansa.data.ListenColour.COVER ->
             lerp(tint, Color.Black, COVER_TOP) to lerp(tint, Color.Black, COVER_FOOT)
-        else -> (colour ?: app.siansa.data.CardLook.DEFAULT.colour!!).let { Color(it.top) to Color(it.foot) }
+        else -> Color(colour.top) to Color(colour.foot)
     }
     return readableUnderWhite(top) to readableUnderWhite(foot)
 }

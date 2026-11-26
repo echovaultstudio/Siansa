@@ -20,6 +20,11 @@ class HeroColoursTest {
         assertEquals(heroColours(CardLook.DEFAULT, tint, own), heroColours(CardLook.AS_HOME, tint, own))
     }
 
+    /** Vivid (the owner, 26 Nov): the hero's own two colours, full. */
+    @Test fun vividIsTheHerosOwnColours() {
+        assertEquals(readableUnderWhite(own.first) to readableUnderWhite(own.second), heroColours(CardLook.VIVID, tint, own))
+    }
+
     @Test fun aColourIsItsOwnFadeWhateverThePicture() {
         val plum = app.siansa.data.ListenColour.PLUM
         assertEquals(Color(plum.top) to Color(plum.foot), heroColours(CardLook.PLUM, tint, own))

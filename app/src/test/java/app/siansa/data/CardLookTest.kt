@@ -19,17 +19,24 @@ class CardLookTest {
     }
 
     /** The owner, 25 Nov: "the card colours choices for all possible cards should follow listening card choices, names and same design". */
-    @Test fun theChoicesAreYourListeningsColours() {
-        assertEquals(ListenColour.entries, CardLook.forHome.map { it.colour })
-        assertEquals(ListenColour.entries.map { it.label }, CardLook.forHome.map { it.label })
-        assertEquals(ListenColour.entries.map { it.id }, CardLook.forHome.map { it.id })
-        assertEquals(CardLook.TEAL, CardLook.DEFAULT)
+    @Test fun theChoicesAreVividThenYourListeningsColours() {
+        val six = CardLook.forHome.drop(1)
+        assertEquals(ListenColour.entries, six.map { it.colour })
+        assertEquals(ListenColour.entries.map { it.label }, six.map { it.label })
+        assertEquals(ListenColour.entries.map { it.id }, six.map { it.id })
+        // The owner, 26 Nov: "missing the vivid option entirely". First, and the default, as before 25 Nov.
+        assertEquals(CardLook.VIVID, CardLook.forHome.first())
+        assertEquals("Vivid", CardLook.VIVID.label)
+        assertEquals(CardLook.VIVID, CardLook.DEFAULT)
+        assertEquals(CardLook.VIVID, CardLook.AS_HOME.resolved)
+        assertEquals(CardLook.PLUM, CardLook.PLUM.resolved)
         assertEquals("As Home", CardLook.AS_HOME.label)
         assertNull(CardLook.of("edge"))
     }
 
     @Test fun lookChosenBeforeAreReadAsTheNearestColour() {
-        assertEquals(CardLook.DEFAULT, CardLook.of("vivid"))
+        assertEquals(CardLook.VIVID, CardLook.of("vivid"))
+        assertEquals(mapOf(HomeSection.TODAY to CardLook.VIVID), CardLook.parse("today:vivid"))
         assertEquals(CardLook.INK, CardLook.of("soft"))
         assertEquals(CardLook.INK, CardLook.of("plain"))
         assertEquals(CardLook.COVER, CardLook.of("artwork"))
