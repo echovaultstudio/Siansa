@@ -22,11 +22,12 @@ class MixWorker(context: Context, params: WorkerParameters) : CoroutineWorker(co
         if (!settings.navidromeReady) return Result.success()
         // Home's Time Machine card for today (issue #1341): made once a day; later runs find it ready.
         if (app.siansa.data.HomeSection.TIME_MACHINE !in settings.homeHidden) runCatching { graph.timeCards.refresh() }
-        // While Siansa Beats makes Home's mixes, the phone makes none of its own (the owner, 17 Nov).
-        if (settings.beatsReady && settings.beatsFor(app.siansa.data.BeatsUse.MIXES) && app.siansa.net.BeatsSound.mixes.value) return Result.success()
         // The vibe's mix is an AI mix: only with AudioMuse (issue #486).
-        // Only the day's first mix: a new vibe for the hour doesn't replace the one you have (beta testers #37).
+        // Only the day's first mix: a new vibe for the hour doesn't replace the one you have (beta testers #37). Made
+        // whoever makes the other mixes: Today's mix is the phone's own (the owner, 26 Nov).
         if (MixRules.showsAiMixes(settings.wordsReady)) runCatching { graph.generator.ensureToday() }
+        // While Siansa Beats makes Home's other mixes, the phone makes none of them (the owner, 17 Nov).
+        if (settings.beatsReady && settings.beatsFor(app.siansa.data.BeatsUse.MIXES) && app.siansa.net.BeatsSound.mixes.value) return Result.success()
         // Today's personal mixes too (each is made once a day; later runs find them ready).
         MixGenerator.Personal.entries.filter { MixRules.showsPersonal(it, settings.soundReady) }
             .forEach { kind -> runCatching { graph.generator.ensurePersonal(kind) } }
