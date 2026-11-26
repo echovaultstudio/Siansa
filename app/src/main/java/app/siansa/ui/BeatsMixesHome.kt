@@ -96,10 +96,9 @@ fun BeatsMixesHome(nav: NavController, shelves: Set<String>, look: HomeLook) {
             // A mix shown as its artists stands in a row of its own, after the shelf's mixes.
             val mixes = shelf.mixes.filter { it.id !in found.artists }.mapNotNull { mix -> homeMix(mix, songs[mix.id].orEmpty(), answer.keepDays, nav, graph) }
             val title = BeatsMixes.title(shelf)
-            if (mixes.isNotEmpty())
             // Its own look is the carousel; Tiles has four of each mix's covers; every other look as any row has it
             // (#1261, the owner, 19 Nov: every row gets every option).
-            when (val shownLook = beatsLook(look)) {
+            if (mixes.isNotEmpty()) when (val shownLook = beatsLook(look)) {
                 HomeLook.TILES -> Shelf(title, mixes, key = { it.key }) { m -> MixMosaicTile(m) }
                 HomeLook.CAROUSEL -> {
                     // Just the title: the mixes say the rest (the owner, 17 Nov: no line under it).
