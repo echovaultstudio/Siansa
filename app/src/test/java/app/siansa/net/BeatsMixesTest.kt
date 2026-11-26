@@ -93,7 +93,8 @@ class BeatsMixesTest {
         val rows = app.siansa.ui.beatsRows(true)
         assertEquals("Siansa Beats", app.siansa.ui.arrangeTag(app.siansa.data.HomeSection.CAROUSEL, rows))
         assertEquals("Siansa Beats", app.siansa.ui.arrangeTag(app.siansa.data.HomeSection.MORE_OF_YOU, rows))
-        assertEquals("Empty with Siansa Beats", app.siansa.ui.arrangeTag(app.siansa.data.HomeSection.TODAY, rows))
+        // Today's mix is the phone's own, made beside them (the owner, 26 Nov): no tag.
+        assertEquals(null, app.siansa.ui.arrangeTag(app.siansa.data.HomeSection.TODAY, rows))
         assertEquals(null, app.siansa.ui.arrangeTag(app.siansa.data.HomeSection.BOOKS, rows))
         // Without Siansa Beats' mixes, no tags.
         assertEquals(null, app.siansa.ui.arrangeTag(app.siansa.data.HomeSection.TODAY, app.siansa.ui.beatsRows(false)))

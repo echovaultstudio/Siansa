@@ -243,13 +243,14 @@ A mix you open stays on the phone, and once played it's in your shortcuts on Hom
 7 days, or what **Keep mixes for** on its Mixes page says (Siansa Beats 0.55).
 
 They're on while **Home's mixes** is set to **Siansa Beats** (Settings › Mixes). While they are, the phone
-makes none of its own: no hourly Today's mix and no mixes in the background. Set it to **This phone** for your own
+makes none of its own carousels, Made for you or More of you; **Today's mix** is still the phone's, made with
+AudioMuse-AI for the hour's vibe, beside Siansa Beats' For now. Set it to **This phone** for your own
 carousels, Today's mix, Made for you and More of you, which stay as you set them. The phone's own mixes are grouped as
 Siansa Beats groups its: this part of the day's in For now, the kinds of music you play most in Made for you, and On
 repeat and Discover for you in More of you.
 
 In **Arrange Home**, the rows have the same names as on Siansa Beats' Mixes page: For now is in **For now**, Made for you in **Made for you**, and
-More of you has a row of its own, **More of you**. While Siansa Beats makes them, each row has a small **Siansa Beats** tag under its name, and **Today's mix**, empty then, says **Empty with Siansa Beats**. Move or hide them as any other; their cog picks any look: **As it is** is the **Carousel** (big covers to
+More of you has a row of its own, **More of you**. While Siansa Beats makes them, each row has a small **Siansa Beats** tag under its name. Move or hide them as any other; their cog picks any look: **As it is** is the **Carousel** (big covers to
 flick through), **Tiles** is a row of tiles each with four of the mix's covers, and the others are as for any section
 (Play in a banner or the play button card plays the first mix).
 

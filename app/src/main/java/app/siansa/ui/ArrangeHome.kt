@@ -957,11 +957,11 @@ internal fun asHomeCardLook(section: HomeSection, homeCardLook: CardLook): CardL
 
 /**
  * The small tag on a row in Arrange Home's list (the owner, 26 Nov: "the mixes made by siansa could have a small tag"):
- * the rows Siansa Beats fills ([holds]), and Today's mix, which stays empty while it does; null for the others.
+ * the rows Siansa Beats fills ([holds]); null for the others, Today's mix too (made on the phone, the owner, 26 Nov).
  */
 internal fun arrangeTag(section: HomeSection, holds: Map<HomeSection, String>): String? = when {
     section in holds -> "Siansa Beats"
-    section == HomeSection.TODAY && holds.isNotEmpty() -> "Empty with Siansa Beats"
+    // Today's mix is the phone's own, whoever makes the others (the owner, 26 Nov).
     else -> null
 }
 

@@ -240,11 +240,14 @@ fun HomeScreen(nav: NavController) {
     val beatsMixesShown = beatsMakesMixes && homeSettings.beatsFor(BeatsUse.MIXES)
     // While Siansa Beats makes Home's mixes, the phone makes none of its own (the owner, 17 Nov).
     val aiMixes = MixRules.showsAiMixes(homeSettings.wordsReady) && !beatsMixesShown
-    LaunchedEffect(hour, aiMixes) {
+    // Today's mix is the phone's own, made with AudioMuse-AI, beside Siansa Beats' For now (the owner, 26 Nov: "Bring
+    // Today's mix back").
+    val todayMix = MixRules.showsAiMixes(homeSettings.wordsReady)
+    LaunchedEffect(hour, todayMix) {
         graph.mixes.all()
         graph.selectors.all()
         current = null
-        if (aiMixes) build(null, force = false, open = false)
+        if (todayMix) build(null, force = false, open = false)
     }
     // Today's personal mixes are made quietly in the background once the page is up; not while Siansa Beats makes them.
     LaunchedEffect(aiMixes, beatsMixesShown) {
@@ -485,7 +488,7 @@ fun HomeScreen(nav: NavController) {
                     }
                 }
                 // The phone's Today's mix: not while Siansa Beats makes Home's mixes (the owner, 17 Nov).
-                HomeSection.TODAY -> if (!beatsMixesShown) {
+                HomeSection.TODAY -> run {
                     titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, names = homeSettings.cardNames(section), crateSize = homeSettings.carouselSize(section), variant = homeSettings.homeVariants[section], picture = homeSettings.homePictures[section] ?: app.siansa.data.PictureStyle.AUTO, heroCardPicture = homeSettings.homeHeroCardPictures[section] ?: app.siansa.data.PictureStyle.AUTO, lines = section !in homeSettings.homeNoLines, pictureColours = homeSettings.homePictureColours[section] ?: app.siansa.data.PictureColours.COVERS, cardLook = cardLookOf(section), shortcutLook = shortcutLookOf(homeSettings.homeCardLooks[section], homeSettings.homePictureColours[section]), coverGrid = homeSettings.homeCoverGrids[section] ?: app.siansa.data.CoverGridSize.DEFAULT, key = "today") {
                         val mix = current
                         when {
@@ -514,13 +517,13 @@ fun HomeScreen(nav: NavController) {
                             busySelector == "current" -> BuildingCard()
                             aiDown != null -> AiUnavailable(aiDown, Modifier.padding(horizontal = Space.Page, vertical = Space.Small))
                             // Auto update off (issue #776): a tile that makes the mix when you ask.
-                            !homeSettings.dailyMix.autoUpdate && aiMixes && error == null -> MakeTodayCard(onMake = { build(null, force = true, open = false) })
+                            !homeSettings.dailyMix.autoUpdate && todayMix && error == null -> MakeTodayCard(onMake = { build(null, force = true, open = false) })
                             else -> Unit
                         }
                     }
                     // While AudioMuse can't be reached the card above says so; no error and Try again as well. Without
                     // AudioMuse at all there's no today's mix (issue #486).
-                    error?.takeIf { aiDown == null && aiMixes }?.let { message ->
+                    error?.takeIf { aiDown == null && todayMix }?.let { message ->
                         titledItem(section !in homeSettings.homeUntitled, gridSize = homeSettings.homeGridSizes[section] ?: GRID_LOOK_MOST, names = homeSettings.cardNames(section), crateSize = homeSettings.carouselSize(section), variant = homeSettings.homeVariants[section], picture = homeSettings.homePictures[section] ?: app.siansa.data.PictureStyle.AUTO, heroCardPicture = homeSettings.homeHeroCardPictures[section] ?: app.siansa.data.PictureStyle.AUTO, lines = section !in homeSettings.homeNoLines, pictureColours = homeSettings.homePictureColours[section] ?: app.siansa.data.PictureColours.COVERS, cardLook = cardLookOf(section), shortcutLook = shortcutLookOf(homeSettings.homeCardLooks[section], homeSettings.homePictureColours[section]), coverGrid = homeSettings.homeCoverGrids[section] ?: app.siansa.data.CoverGridSize.DEFAULT, key = "today_error") {
                             Column(Modifier.padding(horizontal = Space.Page)) {
                                 ErrorText(message, Modifier)
