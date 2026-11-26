@@ -1,5 +1,8 @@
 package app.siansa.ui
 
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.currentStateAsState
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.shape.CircleShape
@@ -223,7 +226,11 @@ private fun animationsOn(): Boolean {
 @Composable
 private fun rememberDrift(periodMs: Int, seed: Int): androidx.compose.runtime.State<Float> {
     val phase = remember { androidx.compose.runtime.mutableFloatStateOf(Math.floorMod(seed, 1000) / 1000f) }
-    val moving = LocalPictureMotion.current && animationsOn()
+    // Only while Siansa is on screen: a frame clock keeps ticking behind it, and Android stopped Siansa for using
+    // too much CPU after an hour in the background with drifting cards on Home (the owner's log, 25 Nov).
+    val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+    val onScreen by lifecycle.currentStateAsState()
+    val moving = LocalPictureMotion.current && animationsOn() && driftsWhen(onScreen)
     androidx.compose.runtime.LaunchedEffect(moving, periodMs) {
         if (!moving) return@LaunchedEffect
         var last = androidx.compose.animation.core.withInfiniteAnimationFrameNanos { it }
@@ -237,6 +244,9 @@ private fun rememberDrift(periodMs: Int, seed: Int): androidx.compose.runtime.St
     }
     return phase
 }
+
+/** Whether a moving card moves in this state of the screen: only while it's started (shown), never behind other apps. */
+internal fun driftsWhen(state: androidx.lifecycle.Lifecycle.State): Boolean = state.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)
 
 /** A mix's main artists, most songs first: "Sleep Token, Deftones, Loathe". */
 fun artistLine(songs: List<app.siansa.data.Song>, most: Int = 3): String =
