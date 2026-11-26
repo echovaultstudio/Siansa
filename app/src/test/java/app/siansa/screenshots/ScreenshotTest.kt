@@ -635,7 +635,14 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                 }
                 androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalCoverDraw provides draw) {
                     Column {
-                        app.siansa.ui.Shelf("Forgotten artists", items, key = { it.key }, onPlay = {}) { app.siansa.ui.HomeItemTile(it, 140.dp) }
+                        // The photos themselves need the app's covers: plain rounds here; the title with its Play is what's new.
+                        app.siansa.ui.Shelf("Forgotten artists, the ones you used to play the most", items, key = { it.key }, onPlay = {}) { item ->
+                            Column(Modifier.width(140.dp)) {
+                                app.siansa.ui.LocalCoverDraw.current(item.coverArt, 0, Modifier.fillMaxWidth().aspectRatio(1f), androidx.compose.foundation.shape.CircleShape, null)
+                                Text(item.title, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                                Text(item.subtitle, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                            }
+                        }
                     }
                 }
             },
