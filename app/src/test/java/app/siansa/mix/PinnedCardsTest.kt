@@ -304,4 +304,14 @@ class PinnedCardsTest {
         assertEquals(card, Json.decodeFromString(PinnedCard.serializer(), Json.encodeToString(PinnedCard.serializer(), card)))
         assertEquals("shown unless switched off", true, PinnedCard.new().noticeCount)
     }
+
+    /** Duplicate (the owner, 26 Nov): everything the card has, a new id, "(copy)", right under it. */
+    @Test fun aDuplicateIsTheCardUnderItself() {
+        val a = PinnedCard("a", "Rainy jazz", look = CardLook.BANNER, source = CardSource.SOUND, sound = "rainy jazz piano", shown = false)
+        val b = PinnedCard("b", "Other")
+        val (list, copy) = PinnedCard.duplicated(listOf(a, b), "a", "c")
+        assertEquals(a.copy(id = "c", title = "Rainy jazz (copy)"), copy)
+        assertEquals(listOf("a", "c", "b"), list.map { it.id })
+        assertEquals(listOf(a, b) to null, PinnedCard.duplicated(listOf(a, b), "nope", "c"))
+    }
 }

@@ -16,6 +16,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.ContentCopy
+import kotlinx.coroutines.withContext
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
@@ -157,6 +159,13 @@ fun CardsSettingsScreen(nav: NavController) {
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     IconButton(onClick = { nav.navigate("settings/cards/edit/${card.id}") }) { Icon(Icons.Rounded.Edit, "Change ${card.title}") }
+                    // A copy under it with everything it has, opened to change (the owner, 26 Nov).
+                    IconButton(onClick = {
+                        scope.launch {
+                            val copy = graph.pinnedCards.duplicate(card.id) ?: return@launch
+                            withContext(kotlinx.coroutines.Dispatchers.Main) { nav.navigate("settings/cards/edit/${copy.id}") }
+                        }
+                    }, modifier = Modifier.testTag("pinnedDuplicate-${card.id}")) { Icon(Icons.Rounded.ContentCopy, "Duplicate ${card.title}") }
                     IconButton(onClick = { scope.launch { graph.pinnedCards.move(card.id, -1) } }, enabled = i > 0) { Icon(Icons.Rounded.KeyboardArrowUp, "Move up") }
                     IconButton(onClick = { scope.launch { graph.pinnedCards.move(card.id, 1) } }, enabled = i < pins.size - 1) { Icon(Icons.Rounded.KeyboardArrowDown, "Move down") }
                     IconButton(onClick = { scope.launch { graph.pinnedCards.remove(card.id) } }) { Icon(Icons.Rounded.Delete, "Remove ${card.title}") }
