@@ -36,6 +36,7 @@ import app.siansa.data.Mix
 import app.siansa.data.HomeLook
 import app.siansa.data.Song
 import app.siansa.data.cover
+import app.siansa.data.picture
 import app.siansa.log.AppLog
 import app.siansa.net.BeatsMixes
 import java.time.LocalDate
@@ -69,10 +70,16 @@ fun BeatsMixesHome(nav: NavController, shelves: Set<String>, look: HomeLook) {
     val answer = made ?: return
     val shown = answer.shelves.filter { it.key in shelves }
     if (shown.isEmpty()) return
-    // Each mix's songs, from the phone's copy of the library (the ids are the music server's own).
-    val songs by produceState<Map<String, List<Song>>>(emptyMap(), shown) {
-        value = shown.flatMap { it.mixes }.associate { it.id to graph.library.songs(it.songIds) }
+    // Each mix's songs, from the phone's copy of the library (the ids are the music server's own); and Forgotten
+    // artists' artists, found by a song of theirs (the owner, 26 Nov: "show actual artists instead of tracks").
+    val found by produceState(Found(emptyMap(), emptyMap()), shown) {
+        val songs = shown.flatMap { it.mixes }.associate { it.id to graph.library.songs(it.songIds) }
+        val artists = shown.flatMap { it.mixes }.filter { it.people.isNotEmpty() }.associate { mix ->
+            mix.id to forgottenArtists(mix, songs[mix.id].orEmpty()) { id -> graph.library.artist(id) }
+        }.filterValues { it.isNotEmpty() }
+        value = Found(songs, artists)
     }
+    val songs = found.songs
     // Being made again (the part of the day turned, or settings changed): the last ones stay, a little dimmed, with a
     // small spinner, instead of vanishing and popping back (the owner, 17 Nov). Only after a moment, so the quick
     // asks every quarter of an hour don't flicker it; nothing runs while they aren't being made.
@@ -86,12 +93,12 @@ fun BeatsMixesHome(nav: NavController, shelves: Set<String>, look: HomeLook) {
     androidx.compose.foundation.layout.Box(Modifier.fillMaxWidth()) {
     Column(Modifier.fillMaxWidth().graphicsLayer { alpha = dim }.testTag("beatsMixes")) {
         shown.forEachIndexed { i, shelf ->
-            val mixes = shelf.mixes.mapNotNull { mix -> homeMix(mix, songs[mix.id].orEmpty(), answer.keepDays, nav, graph) }
-            if (mixes.isEmpty()) return@forEachIndexed
+            // A mix shown as its artists stands in a row of its own, after the shelf's mixes.
+            val mixes = shelf.mixes.filter { it.id !in found.artists }.mapNotNull { mix -> homeMix(mix, songs[mix.id].orEmpty(), answer.keepDays, nav, graph) }
             val title = BeatsMixes.title(shelf)
             // Its own look is the carousel; Tiles has four of each mix's covers; every other look as any row has it
             // (#1261, the owner, 19 Nov: every row gets every option).
-            when (val shownLook = beatsLook(look)) {
+            if (mixes.isNotEmpty()) when (val shownLook = beatsLook(look)) {
                 HomeLook.TILES -> Shelf(title, mixes, key = { it.key }) { m -> MixMosaicTile(m) }
                 HomeLook.CAROUSEL -> {
                     // Just the title: the mixes say the rest (the owner, 17 Nov: no line under it).
@@ -101,6 +108,10 @@ fun BeatsMixesHome(nav: NavController, shelves: Set<String>, look: HomeLook) {
                 else -> HomeLookRow(shownLook, "beats-${shelf.key}", title, mixes.map(::homeItemOf),
                     play = { graph.player.play(mixes.first().songs) }, songs = mixes.first().songs)
             }
+            shelf.mixes.forEach { mix ->
+                val artists = found.artists[mix.id] ?: return@forEach
+                ForgottenArtistsRow(mix, artists, songs[mix.id].orEmpty(), beatsLook(look), nav)
+            }
         }
     }
         if (remaking) {
@@ -109,6 +120,50 @@ fun BeatsMixesHome(nav: NavController, shelves: Set<String>, look: HomeLook) {
                 modifier = Modifier.align(Alignment.TopEnd).padding(top = Space.Section, end = Space.Page).size(REMAKING_SPINNER).testTag("beatsMixesRemaking"),
             )
         }
+    }
+}
+
+/** A shelf's mixes' songs, and the artists of a mix shown as its artists, by mix id. */
+private class Found(val songs: Map<String, List<Song>>, val artists: Map<String, List<ForgottenArtist>>)
+
+/** A forgotten artist as Home shows it: the library's [artist] (for its page and photo), and how long since. */
+internal data class ForgottenArtist(val artist: app.siansa.data.Artist, val person: BeatsMixes.Person)
+
+/**
+ * [mix]'s artists ([BeatsMixes.BeatsMix.people]) found in the library by a song of theirs in [songs], in Siansa
+ * Beats' order; one whose song isn't on the phone, or has no artist, is left out.
+ */
+internal suspend fun forgottenArtists(mix: BeatsMixes.BeatsMix, songs: List<Song>, artistOf: suspend (String) -> app.siansa.data.Artist?): List<ForgottenArtist> {
+    val byId = songs.associateBy { it.id }
+    return mix.people.mapNotNull { person ->
+        val song = byId[person.song] ?: return@mapNotNull null
+        val id = song.artistId ?: return@mapNotNull null
+        val artist = artistOf(id) ?: app.siansa.data.Artist(id, song.artist.ifBlank { person.name })
+        ForgottenArtist(artist, person)
+    }.distinctBy { it.artist.id }
+}
+
+/**
+ * Forgotten artists as artists (the owner, 26 Nov): round photos, each opening its artist's page, with how long since
+ * you played them; Play plays the mix's songs. In the row's look; its carousel and Tiles show the photos in a row.
+ */
+@Composable
+private fun ForgottenArtistsRow(mix: BeatsMixes.BeatsMix, artists: List<ForgottenArtist>, songs: List<Song>, look: HomeLook, nav: NavController) {
+    val graph = LocalGraph.current
+    val now = remember { System.currentTimeMillis() }
+    val items = remember(artists) {
+        artists.map { a ->
+            HomeItem(a.artist.id, a.artist.name, BeatsMixes.forgottenLine(a.person.last, now), a.artist.picture, round = true,
+                open = { nav.navigate("artist/${a.artist.id}") })
+        }
+    }
+    val play = { graph.player.play(songs) }
+    when (look) {
+        HomeLook.TILES, HomeLook.CAROUSEL, HomeLook.AS_IS -> {
+            val tile = tileWidth(LocalCrateSize.current)
+            Shelf(mix.name, items, key = { it.key }, onPlay = play) { HomeItemTile(it, tile) }
+        }
+        else -> HomeLookRow(look, "beats-${mix.id}", mix.name, items, play = play, songs = songs)
     }
 }
 

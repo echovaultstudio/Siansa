@@ -622,6 +622,30 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                         }
                 }
             },
+            // Forgotten artists as artists (the owner, 26 Nov): round photos, how long since, Play at the title's end.
+            Scene("beats_forgotten_artists") {
+                val fakes = mapOf("ar-1" to Color(0xFF1F6F78), "ar-2" to Color(0xFFC2185B), "ar-3" to Color(0xFFE8D44D))
+                val draw: app.siansa.ui.CoverDraw = { id, _, modifier, shape, filter ->
+                    val c = fakes[id] ?: Color.DarkGray
+                    Box(modifier.clip(shape).drawBehind { drawRect(Brush.linearGradient(listOf(c, Color.Black)), colorFilter = filter) })
+                }
+                val items = listOf("Loathe" to "Not played for 8 months", "Neo-Classical Downtempo Velvet Undertow Orchestra" to "Not played for 3 years",
+                    "Deftones" to "Not played for a year").mapIndexed { i, (name, line) ->
+                    app.siansa.ui.HomeItem("${i + 1}", name, line, "ar-${i + 1}", round = true, open = {})
+                }
+                androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalCoverDraw provides draw) {
+                    Column {
+                        // The photos themselves need the app's covers: plain rounds here; the title with its Play is what's new.
+                        app.siansa.ui.Shelf("Forgotten artists, the ones you used to play the most", items, key = { it.key }, onPlay = {}) { item ->
+                            Column(Modifier.width(140.dp)) {
+                                app.siansa.ui.LocalCoverDraw.current(item.coverArt, 0, Modifier.fillMaxWidth().aspectRatio(1f), androidx.compose.foundation.shape.CircleShape, null)
+                                Text(item.title, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                                Text(item.subtitle, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                            }
+                        }
+                    }
+                }
+            },
             // Each set of picture colours on a Colour picture and a sticker pile (the owner, 20 Nov).
             Scene("picture_colours") {
                 val fakes = mapOf("a" to Color(0xFFE8D44D), "b" to Color(0xFF1F6F78), "c" to Color(0xFFF2F2F3), "d" to Color(0xFFC2185B))

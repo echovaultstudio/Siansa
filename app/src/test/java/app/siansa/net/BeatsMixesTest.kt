@@ -3,6 +3,7 @@ package app.siansa.net
 import app.siansa.data.AppJson
 import app.siansa.data.AppSettings
 import app.siansa.data.BeatsUse
+import app.siansa.data.picture
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.jsonObject
@@ -199,5 +200,47 @@ class BeatsMixesTest {
         app.siansa.ui.MixShapes.put(listOf("s2", "s1"), mixes[0].shape, mixes[0].shapeFirst)
         assertEquals(mixes[0].shape, app.siansa.ui.MixShapes.of(listOf("s1", "s2"))?.values)
         assertNull(app.siansa.ui.MixShapes.of(listOf("s1")))
+    }
+
+    /** Forgotten artists' artists (Siansa Beats 0.66, the owner, 26 Nov): read in order; one without a name or song is dropped. */
+    @Test fun forgottenArtistsPeopleAreRead() {
+        val answer = """{"part":"evening","said":"evening","based":"","basis":"slot","shelves":[{"key":"more","title":"More of you","note":"","mixes":[
+            {"id":"forgotten","name":"Forgotten artists","why":"","tags":[],"genres":[],"artists":[],"own":2,"songs":[{"id":"s1"},{"id":"s2"}],
+             "people":[{"name":"Loathe","plays":40,"last":1700000000,"song":"s1"},{"name":"Deftones","plays":12,"last":1690000000,"song":"s2"},
+                       {"name":"","plays":3,"last":1,"song":"s3"},{"name":"No song","plays":3,"last":1}]},
+            {"id":"deep","name":"Deep cuts","why":"","tags":[],"genres":[],"artists":[],"own":0,"songs":[{"id":"s3"}]}]}]}"""
+        val mixes = BeatsMixes.parse(AppJson.parseToJsonElement(answer).jsonObject, 1L).shelves.single().mixes
+        assertEquals(listOf(BeatsMixes.Person("Loathe", 40, 1_700_000_000L, "s1"), BeatsMixes.Person("Deftones", 12, 1_690_000_000L, "s2")), mixes[0].people)
+        // An older Siansa Beats, or another mix: none.
+        assertEquals(emptyList<BeatsMixes.Person>(), mixes[1].people)
+    }
+
+    @Test fun howLongSinceAForgottenArtistIsSaidPlainly() {
+        val now = 1_800_000_000_000L
+        fun daysAgo(d: Long) = now / 1000 - d * 86_400
+        assertEquals("Not played for 40 days", BeatsMixes.forgottenLine(daysAgo(40), now))
+        assertEquals("Not played for 6 months", BeatsMixes.forgottenLine(daysAgo(190), now))
+        assertEquals("Not played for a year", BeatsMixes.forgottenLine(daysAgo(400), now))
+        assertEquals("Not played for 3 years", BeatsMixes.forgottenLine(daysAgo(3 * 365 + 20), now))
+        assertEquals("", BeatsMixes.forgottenLine(0, now))
+    }
+
+    /** Each artist found by a song of theirs on the phone, in Siansa Beats' order; one not on the phone is left out. */
+    @Test fun forgottenArtistsAreFoundByTheirSongs() = runBlocking {
+        val mix = BeatsMixes.BeatsMix("forgotten", "Forgotten artists", "", false, emptyList(), emptyList(), null, listOf("s1", "s2", "s9"), 0,
+            people = listOf(BeatsMixes.Person("B", 30, 1, "s2"), BeatsMixes.Person("A", 20, 1, "s1"), BeatsMixes.Person("Gone", 10, 1, "s9"),
+                BeatsMixes.Person("A again", 5, 1, "s3")))
+        val songs = listOf(
+            app.siansa.data.Song("s1", "One", artist = "A", artistId = "ar1"),
+            app.siansa.data.Song("s2", "Two", artist = "B", artistId = "ar2"),
+            app.siansa.data.Song("s3", "Three", artist = "A", artistId = "ar1"),
+        )
+        val known = mapOf("ar2" to app.siansa.data.Artist("ar2", "B", coverArt = "ar-ar2-photo"))
+        val found = app.siansa.ui.forgottenArtists(mix, songs) { known[it] }
+        assertEquals(listOf("ar2", "ar1"), found.map { it.artist.id })
+        assertEquals("ar-ar2-photo", found[0].artist.coverArt)
+        // Not in the phone's artists: its name from the song, and the server's artist picture.
+        assertEquals("A", found[1].artist.name)
+        assertEquals("ar-ar1", found[1].artist.picture)
     }
 }

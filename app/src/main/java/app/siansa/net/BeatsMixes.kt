@@ -115,12 +115,17 @@ class BeatsMixes(
         val key: String = "",
         /** Its sound's shape (Siansa Beats 0.65, issue #153): energy, danceable, happy, relaxed, voice, 0 to 1. */
         val shape: List<Float>? = null,
+        /** Forgotten artists' artists (Siansa Beats 0.66), the most played first: Home shows them in place of the mix. */
+        val people: List<Person> = emptyList(),
     ) {
         /** Your energy's mixes show their shape on Auto. */
         val shapeFirst: Boolean get() = id.startsWith("energy-")
         /** What Home shows under it: what's in it, never the artists (they're on its own page; the owner, 17 Nov). */
         val caption: String get() = about.ifBlank { genres.take(2).joinToString(", ").ifBlank { why } }
     }
+
+    /** An artist of a mix: [name], your [plays] of them, when you last played them ([last], seconds), a [song] of theirs in it. */
+    data class Person(val name: String, val plays: Int, val last: Long, val song: String)
 
     data class Shelf(val key: String, val title: String, val note: String, val mixes: List<BeatsMix>)
 
@@ -141,6 +146,22 @@ class BeatsMixes(
     companion object {
         const val SIZE = 40
         const val EVERY_MS = 15 * 60_000L
+
+        /**
+         * The line under a forgotten artist (the owner, 26 Nov): how long since you played them, from [last] (seconds)
+         * to [nowMs]; empty when it isn't known.
+         */
+        fun forgottenLine(last: Long, nowMs: Long): String {
+            if (last <= 0) return ""
+            val days = ((nowMs / 1000 - last) / 86_400).coerceAtLeast(0)
+            val months = days / 30
+            return when {
+                days < 60 -> "Not played for $days days"
+                months < 12 -> "Not played for $months months"
+                months < 24 -> "Not played for a year"
+                else -> "Not played for ${months / 12} years"
+            }
+        }
 
         /** The shelves' titles as Home shows them: Siansa Beats' page says "For now" for the part of the day's. */
         fun title(shelf: Shelf): String = if (shelf.key == "now") "For now" else shelf.title
@@ -186,6 +207,14 @@ class BeatsMixes(
                                 key = m.text("key").orEmpty(),
                                 shape = (m["shape"] as? JsonObject)?.let { s ->
                                     app.siansa.ui.SHAPE_AXES.map { (s[it] as? JsonPrimitive)?.doubleOrNull?.toFloat() ?: return@let null }
+                                },
+                                people = (m["people"] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }.mapNotNull { p ->
+                                    Person(
+                                        name = p.text("name")?.takeIf { it.isNotBlank() } ?: return@mapNotNull null,
+                                        plays = (p["plays"] as? JsonPrimitive)?.content?.toIntOrNull() ?: 0,
+                                        last = (p["last"] as? JsonPrimitive)?.content?.toLongOrNull() ?: 0L,
+                                        song = p.text("song") ?: return@mapNotNull null,
+                                    )
                                 },
                             )
                         },
