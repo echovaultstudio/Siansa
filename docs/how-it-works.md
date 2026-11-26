@@ -73,6 +73,11 @@ Each song gets one volume, from **one** source, never two at once:
   and the song is measured; otherwise the song's ReplayGain tags. The tags bring a song to −18 LUFS, so with the −14
   target their gain is raised by 4 dB.
 - **Album** levelling keeps the album's tags when the song has them, since the plugin measures songs one by one.
+- **Smart** levelling looks at the songs around the one playing. When it runs straight on from the one before in the
+  same album (the next track, or track 1 of the next disc), or into the next, the run gets one level: the album's
+  ReplayGain tags when it has them, else the level of the run's first song, carried on (a measurement that arrives
+  later doesn't change it). When the whole queue is one album, shuffled, each song gets the album's level: its tags,
+  or the album's songs measured so far taken together. Otherwise each song gets its own level, as with Track.
 - Like ReplayGain, levelling works through the player's volume, so it can only **turn songs down**. That's why −14
   can't raise quiet songs to it.
 

@@ -77,8 +77,10 @@ size, so they stay gapless too.
 
 **Settings › Playback**:
 
-- **Levelling**: **Track** plays every song at the same level. **Album** keeps an album's loud and quiet songs
-  apart. **Off** plays songs as they are.
+- **Levelling**: **Smart** (as it comes) decides for itself: an album playing in order keeps one level for the run, so
+  a DJ mix or live album never jumps in volume between tracks; one album shuffled gets the album's level; songs from
+  different albums each get their own. **Track** plays every song at the same level. **Album** keeps an album's loud
+  and quiet songs apart. **Off** plays songs as they are. A level you chose before stays.
 - **Where loudness comes from**: song tags (ReplayGain), or the **Siansa plugin**, which measures the audio itself
   (useful when your files have no ReplayGain tags). Songs the plugin hasn't measured yet use their tags.
 - **Target**: how loud songs are brought to, by the plugin's measurement or by ReplayGain tags alone. −18 LUFS is

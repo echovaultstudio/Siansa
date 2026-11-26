@@ -256,6 +256,9 @@ internal fun FadeSlider(name: String, ms: Int, tag: String, nameWidth: androidx.
 
 private fun levellingHint(s: AppSettings): String = when {
     s.replayGain == ReplayGainMode.OFF -> "Levelling is off: songs play at their own loudness."
+    // The owner, 26 Nov: it decides.
+    s.replayGain == ReplayGainMode.SMART ->
+        "Smart decides: an album playing in order keeps one level, so a DJ mix or live album never jumps between tracks; one album shuffled gets the album's level; songs from different albums each get their own."
     s.loudnessSource == LoudnessSource.PLUGIN && s.replayGain == ReplayGainMode.ALBUM ->
         "Each song is levelled one way only: songs with album tags keep them, the rest by ${s.measurers} measurement."
     s.loudnessSource == LoudnessSource.PLUGIN ->
@@ -378,7 +381,7 @@ private fun CrossfadeLengthRow(seconds: Int, smart: Boolean, onDone: (Int) -> Un
 @Composable
 internal fun ReplayGainRow(selected: ReplayGainMode, onPick: (ReplayGainMode) -> Unit) {
     Row(horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
-        listOf(ReplayGainMode.OFF, ReplayGainMode.TRACK, ReplayGainMode.ALBUM).forEach { mode ->
+        listOf(ReplayGainMode.OFF, ReplayGainMode.SMART, ReplayGainMode.TRACK, ReplayGainMode.ALBUM).forEach { mode ->
             FilterChip(selected = selected == mode, onClick = { onPick(mode) }, label = { Text(mode.label) })
         }
     }
@@ -401,7 +404,8 @@ internal fun LevellingNow(settings: AppSettings) {
         }
     }
     val song = player.current?.let { SongRegistry.get(it.id) ?: it }
-    val decision = remember(song, settings, tick) { Levelling.decide(song, settings, song?.let { graph.profiles.cached(it.id) }) }
+    // What the player set, when it's this song's: Smart looks at the songs around it, which only the player knows.
+    val decision = remember(song, settings, tick) { Levelling.latest?.takeIf { it.first == song?.id }?.second ?: Levelling.decide(song, settings, song?.let { graph.profiles.cached(it.id) }) }
     val (icon, text) = levellingNowText(song?.title, decision, settings.measurer)
     Row(
         Modifier.fillMaxWidth().testTag("levelling-now"),
