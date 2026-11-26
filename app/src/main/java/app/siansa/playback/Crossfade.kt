@@ -747,6 +747,27 @@ object Levelling {
     enum class Source { NONE, PLUGIN, REPLAYGAIN }
 
     /**
+     * What Smart levelling looks at around [song] (the owner, 26 Nov: a DJ mix album's tracks each levelled on their own
+     * dipped and rose at every change): the song before it and the level it played at, the song after it, whether the
+     * whole queue is one album, and that album's loudness from the measured songs of it in the queue.
+     */
+    data class Around(
+        val previous: Song? = null,
+        val previousVolume: Float? = null,
+        val previousSource: Source = Source.NONE,
+        val next: Song? = null,
+        val oneAlbum: Boolean = false,
+        val albumLufs: Double? = null,
+    )
+
+    /** The loudness of songs measured at [lufs] together: the mean of their power, as one long recording. */
+    fun togetherLufs(lufs: List<Double>): Double? =
+        if (lufs.isEmpty()) null else 10 * kotlin.math.log10(lufs.map { 10.0.pow(it / 10) }.average())
+
+    /** The last level the player set, for the levelling line in Settings while it plays: Smart needs what's around. */
+    @Volatile var latest: Pair<String, Decision>? = null
+
+    /**
      * How [song] is levelled: by the Siansa plugin's measurement or by its ReplayGain tags, never both, and
      * the player volume that gives. [why] says in plain words why that one was picked.
      */
@@ -761,9 +782,10 @@ object Levelling {
      * mode keeps the album's tags when the song has them, since the plugin measures songs one by one. Every
      * other song uses its ReplayGain tags alone.
      */
-    fun decide(song: Song?, settings: AppSettings, profile: TrackProfile?): Decision {
+    fun decide(song: Song?, settings: AppSettings, profile: TrackProfile?, around: Around = Around()): Decision {
         if (song == null) return Decision(Source.NONE, 1f, "nothing playing")
         if (settings.replayGain == ReplayGainMode.OFF) return Decision(Source.NONE, 1f, "levelling is off")
+        if (settings.replayGain == ReplayGainMode.SMART) return smart(song, settings, profile, around)
         val fromPlugin = settings.loudnessSource == LoudnessSource.PLUGIN
         val measured = profile?.takeIf { fromPlugin && it.trackId == song.id }
         val albumTags = settings.replayGain == ReplayGainMode.ALBUM && song.albumGain != null
@@ -784,5 +806,37 @@ object Levelling {
     }
 
     /** The player volume for [song]: from [decide], so the Siansa plugin and ReplayGain never both apply. */
-    fun songVolume(song: Song?, settings: AppSettings, profile: TrackProfile?): Float = decide(song, settings, profile).volume
+    fun songVolume(song: Song?, settings: AppSettings, profile: TrackProfile?, around: Around = Around()): Float = decide(song, settings, profile, around).volume
+
+    /**
+     * Smart (the owner, 26 Nov): it decides.
+     * - An album playing in order (the song runs straight on from the one before, or into the next): one level for the
+     *   run, so a DJ mix or a live album never jumps between tracks. The album's ReplayGain tags when it has them;
+     *   else the level the run started at, carried on.
+     * - The queue one album, shuffled: the album's level, from its tags or its measured songs together.
+     * - Anything else: each song its own level, as Track.
+     */
+    private fun smart(song: Song, settings: AppSettings, profile: TrackProfile?, around: Around): Decision {
+        val fromBefore = around.previous?.let { Crossfade.runsStraightOn(it, song) } == true
+        val intoNext = around.next?.let { Crossfade.runsStraightOn(song, it) } == true
+        val album = settings.copy(replayGain = ReplayGainMode.ALBUM)
+        if ((fromBefore || intoNext) && song.albumGain != null) {
+            return Decision(Source.REPLAYGAIN, replayGainVolume(song, album), "smart: an album playing in order, one level from its album tags, brought to ${settings.loudnessTarget} LUFS")
+        }
+        if (fromBefore && around.previousVolume != null) {
+            return Decision(around.previousSource, around.previousVolume, "smart: an album playing in order, the level its run started at, kept")
+        }
+        val own = decide(song, settings.copy(replayGain = ReplayGainMode.TRACK), profile)
+        if (intoNext) return own.copy(why = "smart: the start of an album playing in order, kept for the run (${own.why})")
+        if (around.oneAlbum) {
+            if (song.albumGain != null) {
+                return Decision(Source.REPLAYGAIN, replayGainVolume(song, album), "smart: one album shuffled, its album tags, brought to ${settings.loudnessTarget} LUFS")
+            }
+            around.albumLufs?.let { lufs ->
+                val v = 10.0.pow((settings.loudnessTarget - lufs) / 20.0).toFloat().coerceIn(0f, 1f)
+                return Decision(Source.PLUGIN, v, "smart: one album shuffled, the album's level (${"%.1f".format(java.util.Locale.ROOT, lufs)} LUFS from its measured songs), brought to ${settings.loudnessTarget} LUFS")
+            }
+        }
+        return own.copy(why = "smart: songs from different albums, each its own (${own.why})")
+    }
 }

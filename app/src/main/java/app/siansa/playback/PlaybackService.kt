@@ -207,7 +207,7 @@ class PlaybackService : MediaLibraryService() {
             newTail = { PlayerFactory.build(this, graph, ::kbpsFor, handleAudioFocus = false, engine = mixer, mixDeck = tailMix) },
             settings = { graph.settings.current },
             profiles = graph.profiles,
-            levelOf = { song -> Levelling.songVolume(song, graph.settings.current, graph.profiles.cached(song.id)) },
+            levelOf = { song -> Levelling.songVolume(song, graph.settings.current, graph.profiles.cached(song.id), events?.around(song, exo) ?: Levelling.Around()) },
             sleepLevel = { sleepLevel },
             // A Dolby or DTS song going to the receiver as a bitstream can't be mixed (issue #860): no blend into or out of it.
             allowed = { session?.player === phone && !exo.pauseAtEndOfMediaItems && graph.sleepTimer.state.value?.finishing != true && !passthroughNearby() &&
@@ -224,7 +224,7 @@ class PlaybackService : MediaLibraryService() {
             settings = { graph.settings.current },
             profiles = graph.profiles,
             mainDeck = built.deck,
-            levelOf = { song -> Levelling.songVolume(song, graph.settings.current, graph.profiles.cached(song.id)) },
+            levelOf = { song -> Levelling.songVolume(song, graph.settings.current, graph.profiles.cached(song.id), events?.around(song, exo) ?: Levelling.Around()) },
             sleepLevel = { sleepLevel },
             // A Dolby or DTS song going to the receiver as a bitstream can't be mixed (issue #860): no blend into or out of it.
             allowed = { session?.player === phone && !exo.pauseAtEndOfMediaItems && graph.sleepTimer.state.value?.finishing != true && !passthroughNearby() &&
@@ -564,6 +564,9 @@ class PlaybackService : MediaLibraryService() {
 
     /** The ReplayGain volume of the current song, and how far the sleep timer has faded it (1 = not at all). */
     private var baseVolume = 1f
+    private var baseSource = Levelling.Source.NONE
+    /** Smart levelling takes a queue of up to this many songs, all from one album, as that album. */
+    private val ONE_ALBUM_MOST = 300
     private var sleepLevel = 1f
 
     private fun applyVolume(player: Player) {
@@ -1022,6 +1025,10 @@ class PlaybackService : MediaLibraryService() {
             // A seek to another song is the listener's own doing; a song that ran out, or a queue swapped for another, isn't.
             finishCurrent(movedOn = reason == Player.MEDIA_ITEM_TRANSITION_REASON_SEEK && mediaItem != null && mediaItem.mediaId != current?.id)
             val song = mediaItem?.toSong() ?: return
+            // Smart levelling looks at the song before: an album playing in order keeps its run's level.
+            val before = current
+            val beforeVolume = baseVolume
+            val beforeSource = baseSource
             current = song
             startedAtMs = System.currentTimeMillis()
             listenedMs = 0
@@ -1045,8 +1052,10 @@ class PlaybackService : MediaLibraryService() {
                 startRequestedAt = 0L
                 handler.removeCallbacks(startWatch)
             } else if (player.playWhenReady) armStartWatch()
-            val level = Levelling.decide(song, graph.settings.current, graph.profiles.cached(song.id))
+            val level = Levelling.decide(song, graph.settings.current, graph.profiles.cached(song.id), around(song, player, before, beforeVolume, beforeSource))
             baseVolume = level.volume
+            baseSource = level.source
+            Levelling.latest = song.id to level
             AppLog.i("Loudness", "Song ${song.id} levelled by ${level.source.name.lowercase()}: ${"%+.1f".format(level.gainDb)} dB (${level.why})")
             if (onPhone) applyVolume(player)
             streamTitle = null
@@ -1079,12 +1088,40 @@ class PlaybackService : MediaLibraryService() {
         /** Levels the current song again, after a setting changed or its measured loudness arrived. */
         fun relevel(profile: TrackProfile? = null) {
             val song = current ?: return
-            val level = Levelling.decide(song, graph.settings.current, profile ?: graph.profiles.cached(song.id))
+            val settings = graph.settings.current
+            // Smart, an album run carried on at the level it started at: a measurement arriving now changes nothing.
+            if (settings.replayGain == app.siansa.data.ReplayGainMode.SMART && profile != null && Levelling.latest?.let { it.first == song.id && it.second.why.contains("kept") } == true) return
+            val level = Levelling.decide(song, settings, profile ?: graph.profiles.cached(song.id), around(song, player, runPrevious, runPreviousVolume, runPreviousSource))
+            Levelling.latest = song.id to level
+            baseSource = level.source
             val volume = level.volume
             if (volume == baseVolume) return
             AppLog.i("Loudness", "Song ${song.id} now levelled by ${level.source.name.lowercase()}: ${"%+.1f".format(level.gainDb)} dB (${level.why})")
             baseVolume = volume
             if (onPhone) applyVolume(player)
+        }
+
+        // The song before the one playing and its level, for Smart levelling when the level is worked out again.
+        private var runPrevious: Song? = null
+        private var runPreviousVolume: Float? = null
+        private var runPreviousSource = Levelling.Source.NONE
+
+        /**
+         * What's around [song] in [player]'s queue, for Smart levelling (the owner, 26 Nov): [before] the song played
+         * before it at [beforeVolume], the next song in the queue, and whether the queue is one album (and that album's
+         * loudness from its measured songs).
+         */
+        fun around(song: Song, player: Player, before: Song? = current?.takeIf { it.id != song.id }, beforeVolume: Float? = baseVolume, beforeSource: Levelling.Source = baseSource): Levelling.Around {
+            if (graph.settings.current.replayGain != app.siansa.data.ReplayGainMode.SMART) return Levelling.Around()
+            if (before?.id != song.id) { runPrevious = before; runPreviousVolume = beforeVolume; runPreviousSource = beforeSource }
+            val count = player.mediaItemCount
+            val songs = (0 until minOf(count, ONE_ALBUM_MOST)).map { player.getMediaItemAt(it).toSong() }
+            val index = songs.indexOfFirst { it.id == song.id }
+            val next = if (index >= 0) songs.getOrNull(index + 1) else null
+            val album = song.albumId
+            val oneAlbum = album != null && count in 2..ONE_ALBUM_MOST && songs.all { it.albumId == album }
+            val lufs = if (oneAlbum) Levelling.togetherLufs(songs.mapNotNull { s -> graph.profiles.cached(s.id)?.refLufs }) else null
+            return Levelling.Around(before, beforeVolume, beforeSource, next, oneAlbum, lufs)
         }
 
         /**

@@ -14,7 +14,11 @@ import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import java.net.URLDecoder
 import app.siansa.net.SourceKind
 
-enum class ReplayGainMode(val label: String) { TRACK("Track"), ALBUM("Album"), OFF("Off") }
+/**
+ * How songs are levelled. Smart (the owner, 26 Nov) picks for itself: one level for an album playing in order, the
+ * album's for one album shuffled, each song's own otherwise.
+ */
+enum class ReplayGainMode(val label: String) { TRACK("Track"), ALBUM("Album"), OFF("Off"), SMART("Smart") }
 
 /** The phone's top bar, with the clock and battery (issue #681, Settings › Theme › Status bar). */
 enum class TopBarStyle(val label: String, val hint: String) {
@@ -148,7 +152,7 @@ data class AppSettings(
      * alone and shown nowhere, as if it weren't set up, while its login stays for when it's switched back on.
      */
     val servicesOff: Set<String> = emptySet(),
-    val replayGain: ReplayGainMode = ReplayGainMode.TRACK,
+    val replayGain: ReplayGainMode = ReplayGainMode.SMART,
     val preampDb: Float = 0f,
     val syncFolders: Set<String> = emptySet(),
     /** Image cache limit in MB; 0 = no limit. */
@@ -526,8 +530,9 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         fadeOutMs = fadeChoice(prefs.getInt("fade_out_ms", AppSettings.DEFAULT_FADE_OUT_MS)),
         djKeepKey = prefs.getBoolean("dj_keep_key", true),
         aiTitles = prefs.getBoolean("ai_titles", true),
-        replayGain = runCatching { ReplayGainMode.valueOf(prefs.getString("rg", "TRACK") ?: "TRACK") }
-            .getOrDefault(ReplayGainMode.TRACK),
+        // Smart as it comes (the owner, 26 Nov); a mode chosen before stays.
+        replayGain = runCatching { ReplayGainMode.valueOf(prefs.getString("rg", "SMART") ?: "SMART") }
+            .getOrDefault(ReplayGainMode.SMART),
         preampDb = prefs.getFloat("preamp", 0f),
         syncFolders = prefs.getStringSet("sync_folders", emptySet())?.toSet() ?: emptySet(),
         imageCacheMb = prefs.getInt("image_cache_mb", 500),
