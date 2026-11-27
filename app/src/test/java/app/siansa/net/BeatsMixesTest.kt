@@ -57,8 +57,6 @@ class BeatsMixesTest {
         assertEquals(2, first.own)
         assertFalse(got.shelves[1].mixes.single().aiNamed)
         assertNull(got.shelves[1].mixes.single().energy)
-        // Before Siansa Beats 0.65 no shape (issue #153).
-        assertNull(first.shape)
         assertEquals("Dark outside: the sun rises at 08:22", got.daylight?.said)
         assertEquals("early morning", got.said)
     }
@@ -182,24 +180,6 @@ class BeatsMixesTest {
         val failing = BeatsMixes({ throw ApiException("down") }, { settings }, { ZoneId.of("Europe/Helsinki") }, { clock.toInstant().toEpochMilli() })
         assertNull(failing.refresh())
         assertEquals(first.shelves.size, mixes.refresh(force = true)!!.shelves.size)
-    }
-
-    /** Siansa Beats 0.65 (issue #153): each mix's sound as five shares; Your energy shows it on Auto. */
-    @Test fun aMixsShapeIsRead() {
-        val answer = """{"part":"evening","said":"evening","based":"","basis":"slot","shelves":[{"key":"more","title":"More of you","note":"","mixes":[
-            {"id":"energy-high","name":"Your high energy","why":"","tags":[],"genres":[],"artists":[],"own":2,
-             "shape":{"energy":0.9,"danceable":0.8,"happy":0.5,"relaxed":0.1,"voice":0.7},"songs":[{"id":"s1"},{"id":"s2"}]},
-            {"id":"deep","name":"Deep cuts","why":"","tags":[],"genres":[],"artists":[],"own":0,
-             "shape":{"energy":0.5,"danceable":0.5},"songs":[{"id":"s3"}]}]}]}"""
-        val mixes = BeatsMixes.parse(AppJson.parseToJsonElement(answer).jsonObject, 1L).shelves.single().mixes
-        assertEquals(listOf(0.9f, 0.8f, 0.5f, 0.1f, 0.7f), mixes[0].shape)
-        assertEquals(true, mixes[0].shapeFirst)
-        // Not all five: no shape.
-        assertNull(mixes[1].shape)
-        assertEquals(false, mixes[1].shapeFirst)
-        app.siansa.ui.MixShapes.put(listOf("s2", "s1"), mixes[0].shape, mixes[0].shapeFirst)
-        assertEquals(mixes[0].shape, app.siansa.ui.MixShapes.of(listOf("s1", "s2"))?.values)
-        assertNull(app.siansa.ui.MixShapes.of(listOf("s1")))
     }
 
     /** Forgotten artists' artists (Siansa Beats 0.66, the owner, 26 Nov): read in order; one without a name or song is dropped. */

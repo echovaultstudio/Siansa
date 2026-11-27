@@ -609,19 +609,6 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     }
                 }
             },
-            // Shape with Siansa Beats' numbers (issue #153): a lively mix and a calm one.
-            Scene("card_pictures_shape") {
-                androidx.compose.foundation.layout.FlowRow(Modifier.padding(Space.Page), horizontalArrangement = Arrangement.spacedBy(Space.Medium), verticalArrangement = Arrangement.spacedBy(Space.Medium)) {
-                        for ((label, values) in listOf("High energy" to listOf(0.92f, 0.81f, 0.55f, 0.12f, 0.7f), "Wind down" to listOf(0.1f, 0.2f, 0.35f, 0.9f, 0.4f))) {
-                            val ids = listOf("shape-$label-1", "shape-$label-2")
-                            app.siansa.ui.MixShapes.put(ids, values, first = true)
-                            Column(Modifier.width(104.dp), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
-                                app.siansa.ui.CardPicture(emptyList(), null, Color(0xFF5B2A86) to Color(0xFF1E1E22), "Your $label", Modifier.size(104.dp), songIds = ids, showName = true)
-                                Text("Shape: $label", style = MaterialTheme.typography.labelMedium)
-                            }
-                        }
-                }
-            },
             // Each set of picture colours on a Colour picture and a sticker pile (the owner, 20 Nov).
             Scene("picture_colours") {
                 val fakes = mapOf("a" to Color(0xFFE8D44D), "b" to Color(0xFF1F6F78), "c" to Color(0xFFF2F2F3), "d" to Color(0xFFC2185B))
