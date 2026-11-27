@@ -45,7 +45,8 @@ import java.util.Locale
 /**
  * Home's On this day (the owner, 27 Nov: "similar to how photo apps show photos from the year before"): a row of tall
  * memory cards, each a collage of its covers, from the look back lists Your listening's card already keeps. A tap
- * plays one, held it opens its list. The day's card is new each morning: it has a ring.
+ * opens its list, as Your listening's Look back does (the owner, 27 Nov); held, it plays. The day's card is new each
+ * morning: it has a ring.
  */
 object OnThisDay {
     /** The kinds it shows, in its order: the day first, as it's the one that's new every morning. */
@@ -100,7 +101,7 @@ private fun MemoryCard(list: TimeCardList, onPlay: () -> Unit, onOpen: () -> Uni
         Modifier.size(MEMORY_WIDTH, MEMORY_HEIGHT)
             .clip(shape)
             .then(if (new) Modifier.border(MEMORY_RING, MEMORY_ACCENT, shape) else Modifier)
-            .combinedClickable(onClickLabel = "Play ${words.title}", onClick = onPlay, onLongClickLabel = "Open ${words.title}", onLongClick = onOpen)
+            .combinedClickable(onClickLabel = "Open ${words.title}", onClick = onOpen, onLongClickLabel = "Play ${words.title}", onLongClick = onPlay)
             // Its own layer: the collage is drawn once and kept while the row scrolls.
             .graphicsLayer {}
             .background(Brush.verticalGradient(listOf(light, dark, MEMORY_FOOT)))
