@@ -233,8 +233,11 @@ private fun SpotlightCard(list: TimeCardList, onPlay: () -> Unit, onOpen: () -> 
             color = Color.White.copy(alpha = 0.07f), maxLines = 1, softWrap = false,
             modifier = Modifier.align(Alignment.TopEnd).offset(x = Space.Small, y = -Space.Large),
         )
-        // The most played biggest, then two smaller, each with a soft shadow.
-        pictures.forEachIndexed { i, id ->
+        // Its own look, Collage: the most played biggest, then two smaller, each with a soft shadow. Grid, Top one and Fan
+        // lay them out as on the other styles (the owner, 27 Nov: "in spotlight the pictures options doesn't change anything").
+        if (LocalMemoryPicture.current != MemoryPicture.COLLAGE) {
+            Collage(list, Modifier.align(Alignment.TopCenter).padding(top = Space.Large).size(SPOT_PICTURE), SPOT_PICTURE)
+        } else pictures.forEachIndexed { i, id ->
             val spot = SPOT_CIRCLES[i]
             draw(id, if (i == 0) COVER_PX else COVER_PX / 2,
                 Modifier.align(Alignment.TopStart).offset(spot.x, spot.y).size(spot.size).shadow(MEMORY_SHADOW, CircleShape)
@@ -439,6 +442,8 @@ private val SPOT_WIDTH = 262.dp
 private val SPOT_HEIGHT = 360.dp
 private val SPOT_CORNER = 22.dp
 private val SPOT_FADE = 150.dp
+/** Where Grid, Top one and Fan sit on a Spotlight card: square, over its words. */
+private val SPOT_PICTURE = 176.dp
 private val SPOT_EDGE = 3.dp
 private val SPOT_BACKDROP_SIZE = 190.sp
 private val WIDE_WIDTH = 300.dp

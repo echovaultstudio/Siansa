@@ -647,6 +647,21 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     }
                 }
             },
+            // Spotlight with its pictures in a grid (the owner, 27 Nov): Pictures changes it too.
+            Scene("on_this_day_spotlight_grid") {
+                val fakes = mapOf("a" to Color(0xFFE8D44D), "b" to Color(0xFF1F6F78), "c" to Color(0xFFF2F2F3), "d" to Color(0xFFC2185B))
+                val draw: app.siansa.ui.CoverDraw = { id, _, modifier, shape, filter ->
+                    val c = fakes[id] ?: Color.DarkGray
+                    Box(modifier.clip(shape).drawBehind { drawRect(Brush.linearGradient(listOf(c, Color.Black)), colorFilter = filter) })
+                }
+                val lists = listOf(
+                    app.siansa.mix.TimeCardList(app.siansa.mix.TimeListKind.DAY.id, "This day last year", "27 NOV", "27 November 2025", (1..12).map { "s$it" }, covers = listOf("d", "a", "c", "b"), year = 2025, month = 11),
+                    app.siansa.mix.TimeCardList(app.siansa.mix.TimeListKind.YEAR_AGO.id, "This time last year", "NOV 2025", "November 2025", (1..50).map { "s$it" }, covers = listOf("b", "c", "d", "a"), year = 2025, month = 11),
+                )
+                androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalCoverDraw provides draw) {
+                    app.siansa.ui.OnThisDayRow(lists, onPlay = {}, onOpen = {}, style = app.siansa.ui.MemoryStyle.SPOTLIGHT, picture = app.siansa.ui.MemoryPicture.GRID)
+                }
+            },
             Scene("on_this_day_styles_dialog") { app.siansa.ui.MemoryStyleDialog(app.siansa.ui.MemoryStyle.SPOTLIGHT, onPick = {}, artists = true, picture = app.siansa.ui.MemoryPicture.FAN, onDismiss = {}) },
             // With its artists' pictures (the owner, 27 Nov): round faces, scattered even on the year's card.
             Scene("on_this_day_artists") {
