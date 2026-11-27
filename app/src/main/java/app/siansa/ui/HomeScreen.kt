@@ -407,7 +407,7 @@ fun HomeScreen(nav: NavController) {
     fun phoneHas(row: HomeSection): Boolean = MixRules.personalIn(row).any { kind ->
         MixRules.showsPersonalTile(kind, homeSettings.soundReady, madeToday = todaysMixes.any { it.selectorId == kind.id }, notEnough = kind.id in notEnough, smoothOn = homeSettings.phoneSmoothRun)
     } || (row == HomeSection.MADE_FOR_YOU && ((aiMixes && applicable.isNotEmpty()) || customCards.orEmpty().isNotEmpty()))
-    CompositionLocalProvider(LocalSectionGap provides homeGap(homeSettings.homeGap), LocalPictureMotion provides homeStill) {
+    CompositionLocalProvider(LocalSectionGap provides homeGap(homeSettings.homeGap), LocalPictureMotion provides homeStill, LocalTapPlays provides homeSettings.homeTapPlays) {
     HomePullToRefresh(onRefresh = pull) {
     LazyColumn(
         Modifier.fillMaxSize().aboveKeyboard(),
@@ -575,13 +575,7 @@ fun HomeScreen(nav: NavController) {
                             HomeLookRow(look, "rediscover", "Rediscover", albums.map { r -> albumItem(r.album, rediscoverSubtitle(r), play = { playAlbums(r.album.name, listOf(r.album)) }) { nav.navigate("album/${r.album.id}") } },
                                 openAll = nav.openAll(app.siansa.ui.HomeSection.Rediscover), play = albums.takeIf { it.isNotEmpty() }?.let { { playAlbums("Rediscover", it.map { r -> r.album }) } })
                         } else Shelf("Rediscover", lovedBefore.valueOrNull().orEmpty(), key = { it.album.id }, onOpenAll = nav.openAll(app.siansa.ui.HomeSection.Rediscover)) { r ->
-                            AlbumTile(
-                                name = r.album.name,
-                                subtitle = rediscoverSubtitle(r),
-                                coverArt = r.album.coverArt,
-                                onClick = { nav.navigate("album/${r.album.id}") },
-                                modifier = Modifier.width(150.dp),
-                            )
+                            AlbumTapTile(r.album.name, rediscoverSubtitle(r), r.album.coverArt, open = { nav.navigate("album/${r.album.id}") }, play = { playAlbums(r.album.name, listOf(r.album)) })
                         }
                     }
                 }
@@ -609,7 +603,7 @@ fun HomeScreen(nav: NavController) {
                                 HomeItem(p.id, p.name, if (p.songCount > 0) "${p.songCount} songs" else "", p.coverArt, open = { nav.navigate("playlist/${p.id}") })
                             }, openAll = nav.openAll(app.siansa.ui.HomeSection.Playlists))
                         } else Shelf("Your playlists", playlists.valueOrNull().orEmpty(), key = { it.id }, onOpenAll = nav.openAll(app.siansa.ui.HomeSection.Playlists)) { playlist ->
-                            PlaylistTile(playlist) { nav.navigate("playlist/${playlist.id}") }
+                            PlaylistTile(playlist, onPlay = { launch(playlist.name) { graph.source.playlist(playlist.id).songs } }) { nav.navigate("playlist/${playlist.id}") }
                         }
                     }
                 }
@@ -620,7 +614,7 @@ fun HomeScreen(nav: NavController) {
                             HomeLookRow(look, "recent", "Recently played", albums.map { a -> albumItem(a, a.artist, play = { playAlbums(a.name, listOf(a)) }) { nav.navigate("album/${a.id}") } },
                                 openAll = nav.openAll(app.siansa.ui.HomeSection.RecentlyPlayed), play = albums.takeIf { it.isNotEmpty() }?.let { { playAlbums("Recently played", it) } })
                         } else Shelf("Recently played", recentAlbums.valueOrNull().orEmpty(), key = { it.id }, onOpenAll = nav.openAll(app.siansa.ui.HomeSection.RecentlyPlayed)) { album ->
-                            AlbumTile(album.name, album.artist, album.coverArt, { nav.navigate("album/${album.id}") }, Modifier.width(150.dp))
+                            AlbumTapTile(album.name, album.artist, album.coverArt, open = { nav.navigate("album/${album.id}") }, play = { playAlbums(album.name, listOf(album)) })
                         }
                     }
                 }
@@ -653,7 +647,7 @@ fun HomeScreen(nav: NavController) {
                             HomeLookRow(look, "added", "Recently added", albums.map { a -> albumItem(a, a.artist, play = { playAlbums(a.name, listOf(a)) }) { nav.navigate("album/${a.id}") } },
                                 openAll = nav.openAll(app.siansa.ui.HomeSection.RecentlyAdded), play = albums.takeIf { it.isNotEmpty() }?.let { { playAlbums("Recently added", it) } })
                         } else Shelf("Recently added", newest.valueOrNull().orEmpty(), key = { it.id }, onOpenAll = nav.openAll(app.siansa.ui.HomeSection.RecentlyAdded)) { album ->
-                            AlbumTile(album.name, album.artist, album.coverArt, { nav.navigate("album/${album.id}") }, Modifier.width(150.dp))
+                            AlbumTapTile(album.name, album.artist, album.coverArt, open = { nav.navigate("album/${album.id}") }, play = { playAlbums(album.name, listOf(album)) })
                         }
                     }
                 }
@@ -719,7 +713,7 @@ fun HomeScreen(nav: NavController) {
                             HomeLookRow(look, "random", "Random picks", albums.map { a -> albumItem(a, a.artist, play = { playAlbums(a.name, listOf(a)) }) { nav.navigate("album/${a.id}") } },
                                 openAll = nav.openAll(app.siansa.ui.HomeSection.RandomPicks), play = albums.takeIf { it.isNotEmpty() }?.let { { playAlbums("Random picks", it) } })
                         } else Shelf("Random picks", rediscover.valueOrNull().orEmpty(), key = { it.id }, onOpenAll = nav.openAll(app.siansa.ui.HomeSection.RandomPicks)) { album ->
-                            AlbumTile(album.name, album.artist, album.coverArt, { nav.navigate("album/${album.id}") }, Modifier.width(150.dp))
+                            AlbumTapTile(album.name, album.artist, album.coverArt, open = { nav.navigate("album/${album.id}") }, play = { playAlbums(album.name, listOf(album)) })
                         }
                     }
                 }
@@ -806,14 +800,24 @@ private fun albumItem(album: Album, subtitle: String, play: (() -> Unit)? = null
 
 private const val PLAY_ALBUMS = 10
 
+/** An album on Home: a tap opens it, held it plays; or the other way round with Play on tap on (the owner, 27 Nov). */
 @Composable
-fun PlaylistTile(playlist: Playlist, onClick: () -> Unit) {
+private fun AlbumTapTile(name: String, subtitle: String, coverArt: String?, open: () -> Unit, play: () -> Unit) {
+    val tapPlays = LocalTapPlays.current
+    AlbumTile(name, subtitle, coverArt, if (tapPlays) play else open, Modifier.width(150.dp), onLongClick = if (tapPlays) open else play)
+}
+
+@Composable
+fun PlaylistTile(playlist: Playlist, onPlay: (() -> Unit)? = null, onClick: () -> Unit) {
+    // With Play on tap on, a tap plays it and held it opens (the owner, 27 Nov).
+    val tapPlays = LocalTapPlays.current && onPlay != null
     AlbumTile(
         name = playlist.name,
         subtitle = "${playlist.songCount} songs" + (playlist.owner?.let { " · $it" } ?: ""),
         coverArt = playlist.coverArt,
-        onClick = onClick,
+        onClick = if (tapPlays) onPlay!! else onClick,
         modifier = Modifier.width(150.dp),
+        onLongClick = if (tapPlays) onClick else onPlay,
     )
 }
 

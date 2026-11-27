@@ -76,7 +76,16 @@ data class HomeItem(
 ) {
     val songIds: List<String> get() = songIdList.ifEmpty { songs.map { it.id } }
     val artists: String get() = artistLine(songs)
+
+    /**
+     * As a tap does it (the owner, 27 Nov: "allow instant playback … or open content first"): with [plays] and a way to
+     * play it, a tap plays it and holding opens it; otherwise as it is (an artist's radio already plays).
+     */
+    fun tapped(plays: Boolean): HomeItem = if (plays && play != null) copy(open = play, hold = open) else this
 }
+
+/** Home's Play on tap (Settings › Home): a tap on a card plays it straight away, held it opens. */
+val LocalTapPlays = androidx.compose.runtime.staticCompositionLocalOf { false }
 
 /**
  * A row of Home in one of the custom cards' looks (issue #655), for rows that aren't [HomeLook.AS_IS]:
@@ -99,10 +108,15 @@ fun HomeLookRow(
     // With [HomeLook.GRID]: how many tiles (2 to 8, Arrange Home's choice for the row).
     gridSize: Int = LocalGridSize.current,
 ) {
-    if (items.isEmpty()) return
+    // Play on tap (the owner, 27 Nov): each card as a tap does it.
+    val tapPlays = LocalTapPlays.current
     // Without their lines when the row hides them (the owner, 22 Nov), whichever look draws them.
+    val lines = LocalCardLines.current
     @Suppress("NAME_SHADOWING")
-    val items = if (LocalCardLines.current) items else androidx.compose.runtime.remember(items) { items.map { it.copy(subtitle = "", meta = "") } }
+    val items = androidx.compose.runtime.remember(items, tapPlays, lines) {
+        items.map { it.tapped(tapPlays).let { item -> if (lines) item else item.copy(subtitle = "", meta = "") } }
+    }
+    if (items.isEmpty()) return
     val open = openAll ?: items.first().open
     when (look) {
         HomeLook.AS_IS -> Shelf(title, items, key = { it.key }, onOpenAll = openAll) { item -> HomeItemTile(item) }
@@ -427,6 +441,7 @@ internal fun crateRecordOf(item: HomeItem): CrateRecord = CrateRecord(
     onOpen = item.open,
     colors = item.colors,
     round = item.round,
+    onHold = item.hold,
 )
 
 /**

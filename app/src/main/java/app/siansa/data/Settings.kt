@@ -152,6 +152,8 @@ data class AppSettings(
     val artistRadiosFrom: String = app.siansa.mix.ArtistsFrom.BOTH.id,
     /** On this day's style ([app.siansa.ui.MemoryStyle], the owner, 27 Nov): Stories, Prints or Wide. */
     val onThisDayStyle: String = "stories",
+    /** A tap on a card on Home plays it straight away (the owner, 27 Nov); held, it opens. Off: a tap opens it first. */
+    val homeTapPlays: Boolean = false,
     val aiTitles: Boolean = true,
     /**
      * Services switched off under Settings › Services (the owner, 13 Nov): [Service] ids. One that's off is left
@@ -538,6 +540,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         phoneSmoothRun = prefs.getBoolean("phone_smooth_run", true),
         artistRadiosFrom = prefs.getString("artist_radios_from", null) ?: app.siansa.mix.ArtistsFrom.BOTH.id,
         onThisDayStyle = prefs.getString("on_this_day_style", null) ?: "stories",
+        homeTapPlays = prefs.getBoolean("home_tap_plays", false),
         aiTitles = prefs.getBoolean("ai_titles", true),
         // Smart as it comes (the owner, 26 Nov); a mode chosen before stays.
         replayGain = runCatching { ReplayGainMode.valueOf(prefs.getString("rg", "SMART") ?: "SMART") }
@@ -761,6 +764,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
             .putBoolean("phone_smooth_run", s.phoneSmoothRun)
             .putString("artist_radios_from", s.artistRadiosFrom)
             .putString("on_this_day_style", s.onThisDayStyle)
+            .putBoolean("home_tap_plays", s.homeTapPlays)
             .apply()
         _state.value = s
     }

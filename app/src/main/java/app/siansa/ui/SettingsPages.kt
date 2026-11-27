@@ -104,6 +104,17 @@ fun HomeSettingsScreen(nav: NavController) {
             PageLink("Arrange Home", "Order, what shows, each row's look", "homeArrange") { nav.navigate("settings/home/arrange") }
             HorizontalDivider()
             PageLink("Your cards", "Made for you and your own cards", "homeCards") { nav.navigate("settings/cards") }
+            HorizontalDivider()
+            // One setting for every card on Home (the owner, 27 Nov): play at once, or open first.
+            SwitchRow(
+                "Play on tap",
+                if (settings.homeTapPlays) "A tap on a card on Home plays it. Hold it to open it." else "A tap on a card on Home opens it. Hold it to play it.",
+                settings.homeTapPlays,
+                tag = "homeTapPlays",
+            ) { on ->
+                AppLog.i("Settings", "Home cards play on tap: $on")
+                graph.settings.save(graph.settings.current.copy(homeTapPlays = on))
+            }
         }
     }
 }

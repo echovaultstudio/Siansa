@@ -126,7 +126,7 @@ private fun PrintCard(list: TimeCardList, i: Int, onPlay: () -> Unit, onOpen: ()
             Modifier.size(PRINT_WIDTH, PRINT_HEIGHT)
                 .shadow(MEMORY_SHADOW, shape)
                 .clip(shape)
-                .combinedClickable(onClickLabel = "Open ${words.title}", onClick = onOpen, onLongClickLabel = "Play ${words.title}", onLongClick = onPlay)
+                .memoryTap(words.title, onPlay, onOpen)
                 .graphicsLayer {}
                 .background(PRINT_PAPER)
                 .padding(start = Space.Small, end = Space.Small, top = Space.Small, bottom = Space.Medium)
@@ -159,7 +159,7 @@ private fun WideCard(list: TimeCardList, onPlay: () -> Unit, onOpen: () -> Unit)
         Modifier.size(WIDE_WIDTH, WIDE_HEIGHT)
             .clip(shape)
             .then(if (new) Modifier.border(MEMORY_RING, MEMORY_ACCENT, shape) else Modifier)
-            .combinedClickable(onClickLabel = "Open ${words.title}", onClick = onOpen, onLongClickLabel = "Play ${words.title}", onLongClick = onPlay)
+            .memoryTap(words.title, onPlay, onOpen)
             .graphicsLayer {}
             .background(Brush.radialGradient(listOf(light, dark, MEMORY_FOOT), center = androidx.compose.ui.geometry.Offset(Float.POSITIVE_INFINITY, 0f), radius = 900f))
             .testTag("onThisDayCard"),
@@ -216,7 +216,7 @@ private fun MemoryCard(list: TimeCardList, onPlay: () -> Unit, onOpen: () -> Uni
         Modifier.size(MEMORY_WIDTH, MEMORY_HEIGHT)
             .clip(shape)
             .then(if (new) Modifier.border(MEMORY_RING, MEMORY_ACCENT, shape) else Modifier)
-            .combinedClickable(onClickLabel = "Open ${words.title}", onClick = onOpen, onLongClickLabel = "Play ${words.title}", onLongClick = onPlay)
+            .memoryTap(words.title, onPlay, onOpen)
             // Its own layer: the collage is drawn once and kept while the row scrolls.
             .graphicsLayer {}
             .background(Brush.verticalGradient(listOf(light, dark, MEMORY_FOOT)))
@@ -234,6 +234,15 @@ private fun MemoryCard(list: TimeCardList, onPlay: () -> Unit, onOpen: () -> Uni
         }
     }
 }
+
+/**
+ * A memory's tap: it opens its list and plays when held, or the other way round with Play on tap on (the owner, 27 Nov).
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun Modifier.memoryTap(title: String, onPlay: () -> Unit, onOpen: () -> Unit): Modifier =
+    if (LocalTapPlays.current) combinedClickable(onClickLabel = "Play $title", onClick = onPlay, onLongClickLabel = "Open $title", onLongClick = onOpen)
+    else combinedClickable(onClickLabel = "Open $title", onClick = onOpen, onLongClickLabel = "Play $title", onLongClick = onPlay)
 
 /**
  * The card's covers: a year's top four two by two, a day's or a month's scattered at small angles; one cover alone
