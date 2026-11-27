@@ -119,7 +119,13 @@ object OnThisDay {
     }
 
     /** The day's card: new each morning, so it has a ring. */
-    fun isNew(list: TimeCardList): Boolean = list.kind == TimeListKind.DAY.id
+    fun isNew(list: TimeCardList, seen: Boolean = false): Boolean = list.kind == TimeListKind.DAY.id && !seen
+
+    /**
+     * Whether the day's card was opened or played today (the owner, 27 Nov: "new label should disappear once it has been
+     * clicked on once"): [seenDay] is the day of the card last opened, [cardDay] the card's own; a new card is new again.
+     */
+    fun seen(seenDay: String?, cardDay: String?): Boolean = cardDay != null && seenDay == cardDay
 }
 
 /** The row: its title, then the cards side by side in its [style]. Nothing without a list. */
@@ -131,9 +137,11 @@ fun OnThisDayRow(
     style: MemoryStyle = MemoryStyle.STORIES,
     artists: Boolean = false,
     picture: MemoryPicture = MemoryPicture.COLLAGE,
+    // The day's card was opened or played: no NEW, no ring.
+    seen: Boolean = false,
 ) {
     if (lists.isEmpty()) return
-    androidx.compose.runtime.CompositionLocalProvider(LocalMemoryArtists provides artists, LocalMemoryPicture provides picture) {
+    androidx.compose.runtime.CompositionLocalProvider(LocalMemoryArtists provides artists, LocalMemoryPicture provides picture, LocalMemorySeen provides seen) {
     Column(Modifier.fillMaxWidth().testTag("onThisDay")) {
         SectionTitle("On this day")
         if (style == MemoryStyle.PRINTS) PrintStack(lists, onPlay, onOpen) else LazyRow(
@@ -151,6 +159,9 @@ fun OnThisDayRow(
 
 /** Whether On this day pictures its artists rather than its albums ([OnThisDay.pictures]). */
 private val LocalMemoryArtists = androidx.compose.runtime.staticCompositionLocalOf { false }
+
+/** Whether today's card was opened or played already ([OnThisDay.seen]). */
+private val LocalMemorySeen = androidx.compose.runtime.staticCompositionLocalOf { false }
 
 /** How On this day lays out its pictures ([MemoryPicture]). */
 private val LocalMemoryPicture = androidx.compose.runtime.staticCompositionLocalOf { MemoryPicture.COLLAGE }
@@ -261,7 +272,7 @@ private fun PrintCard(list: TimeCardList, of: Int, onPlay: () -> Unit, onOpen: (
     val words = OnThisDay.words(list)
     val (light, dark) = timeListColours(list.kind)
     val shape = RoundedCornerShape(PRINT_CORNER)
-    val new = OnThisDay.isNew(list)
+    val new = OnThisDay.isNew(list, LocalMemorySeen.current)
     Box {
         Column(
             // As tall as its words need, at a larger text size too.
@@ -299,7 +310,7 @@ private fun WideCard(list: TimeCardList, onPlay: () -> Unit, onOpen: () -> Unit)
     val words = OnThisDay.words(list)
     val (light, dark) = timeListColours(list.kind)
     val shape = RoundedCornerShape(WIDE_CORNER)
-    val new = OnThisDay.isNew(list)
+    val new = OnThisDay.isNew(list, LocalMemorySeen.current)
     Box(
         Modifier.size(WIDE_WIDTH, WIDE_HEIGHT)
             .clip(shape)
@@ -362,7 +373,7 @@ private fun MemoryCard(list: TimeCardList, onPlay: () -> Unit, onOpen: () -> Uni
     val words = OnThisDay.words(list)
     val (light, dark) = timeListColours(list.kind)
     val shape = RoundedCornerShape(MEMORY_CORNER)
-    val new = OnThisDay.isNew(list)
+    val new = OnThisDay.isNew(list, LocalMemorySeen.current)
     Box(
         Modifier.size(MEMORY_WIDTH, MEMORY_HEIGHT)
             .clip(shape)

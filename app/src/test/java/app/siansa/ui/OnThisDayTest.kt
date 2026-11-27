@@ -75,6 +75,17 @@ class OnThisDayTest {
         assertEquals(MemoryPicture.FAN, MemoryPicture.of("fan"))
     }
 
+    /** NEW goes once today's card was opened or played (the owner, 27 Nov), and comes back with the next day's card. */
+    @Test fun newGoesOnceSeen() {
+        assertTrue(OnThisDay.isNew(day))
+        assertFalse(OnThisDay.isNew(day, seen = true))
+        assertFalse(OnThisDay.isNew(month))
+        assertTrue(OnThisDay.seen("2026-11-27", "2026-11-27"))
+        assertFalse(OnThisDay.seen("2026-11-26", "2026-11-27"))
+        assertFalse(OnThisDay.seen("", "2026-11-27"))
+        assertFalse(OnThisDay.seen("", null))
+    }
+
     @Test fun itHasThreeStyles() {
         assertEquals(listOf("Stories", "Prints", "Wide"), MemoryStyle.entries.map { it.label })
         assertEquals(MemoryStyle.STORIES, MemoryStyle.of(null))
