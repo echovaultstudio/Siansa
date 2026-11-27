@@ -161,6 +161,8 @@ data class TimeCardList(
     val covers: List<String> = emptyList(),
     val year: Int,
     val month: Int? = null,
+    /** Its most played artists, for On this day's pictures when it shows artists (the owner, 27 Nov). */
+    val artists: List<CardArtist> = emptyList(),
 )
 
 /** The card as kept on the phone: the [day] it was made for (ISO), and its lists, the big one first. */
@@ -184,9 +186,10 @@ data class TimeCard(
 
 /**
  * The make of card this version keeps: 2 had Your listening's pages and each song's plays, 3 has them for each time,
- * 4 has five artists and five genres (the owner, 23 Nov: "only shows top 4 and not top 5… the same for genres and songs").
+ * 4 has five artists and five genres (the owner, 23 Nov: "only shows top 4 and not top 5… the same for genres and songs"),
+ * 5 has each look back list's artists, for On this day (the owner, 27 Nov).
  */
-const val TIME_CARD_MAKE = 4
+const val TIME_CARD_MAKE = 5
 
 /** What's in the card's file: nothing until it was first made. */
 @Serializable
@@ -201,7 +204,13 @@ fun timeCardStale(card: TimeCard?, today: LocalDate): Boolean = card?.day != tod
  * of lists because of it: then the one already on the phone stays, and it's tried again later. A card with no lists
  * (no history yet) is a card: Home shows nothing for it.
  */
-suspend fun buildTimeCard(today: LocalDate, plans: List<TimeListPlan>, songsOf: suspend (TimeListPlan) -> List<PlayedSong>?): TimeCard? {
+suspend fun buildTimeCard(
+    today: LocalDate,
+    plans: List<TimeListPlan>,
+    // A list's artists, when they can be had: without them it shows its covers.
+    artistsOf: suspend (TimeListPlan) -> List<CardArtist>? = { null },
+    songsOf: suspend (TimeListPlan) -> List<PlayedSong>?,
+): TimeCard? {
     val lists = ArrayList<TimeCardList>()
     var failed = false
     for (plan in plans) {
@@ -209,7 +218,7 @@ suspend fun buildTimeCard(today: LocalDate, plans: List<TimeListPlan>, songsOf: 
         val songs = songsOf(plan)
         if (songs == null) { failed = true; continue }
         if (songs.size < plan.fewest) continue
-        lists += keptList(plan, songs)
+        lists += keptList(plan, songs).copy(artists = artistsOf(plan).orEmpty().take(TIME_LIST_ARTISTS))
     }
     return if (failed && lists.size < TIME_CARD_LISTS) null else TimeCard(today.toString(), lists, TIME_CARD_MAKE)
 }
@@ -233,7 +242,7 @@ suspend fun buildListeningCard(
     artistsOf: suspend (TimeWindow) -> List<CardArtist>?,
     genresOf: suspend (List<Song>) -> ((Song) -> List<String>),
 ): TimeCard? {
-    val back = buildTimeCard(today, plans) { songsOf(it, TIME_LIST_SONGS) } ?: return null
+    val back = buildTimeCard(today, plans, artistsOf = { artistsOf(it.window) }) { songsOf(it, TIME_LIST_SONGS) } ?: return null
     val ranges = ListenRange.entries.map { range ->
         val plan = rangePlan(range, today)
         val songs = songsOf(plan, GENRE_SONGS) ?: return null
@@ -243,6 +252,9 @@ suspend fun buildListeningCard(
     }
     return back.copy(ranges = ranges)
 }
+
+/** How many artists a look back list keeps, for On this day's pictures. */
+const val TIME_LIST_ARTISTS = 4
 
 /** How many covers a list keeps for its picture. */
 const val TIME_CARD_COVERS = 6

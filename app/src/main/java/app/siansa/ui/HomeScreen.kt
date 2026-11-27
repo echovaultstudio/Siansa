@@ -696,6 +696,7 @@ fun HomeScreen(nav: NavController) {
                             },
                             onOpen = { nav.navigate(app.siansa.mix.timeListRoute(it.kind)) },
                             style = MemoryStyle.of(homeSettings.onThisDayStyle),
+                            artists = homeSettings.onThisDayArtists,
                         )
                     }
                 }

@@ -57,6 +57,16 @@ class OnThisDayTest {
     }
 
     /** Its three styles from the mockup (the owner, 27 Nov), Stories as it comes; one unknown is Stories. */
+    /** Artists' pictures with the switch on and artists in the library (the owner, 27 Nov), else the covers. */
+    @Test fun itPicturesArtistsOrAlbums() {
+        val faces = listOf(app.siansa.mix.CardArtist("One", 9, "ar1"), app.siansa.mix.CardArtist("Not in the library", 5), app.siansa.mix.CardArtist("Two", 3, "ar2", coverArt = "ar-2_x"))
+        val withBoth = month.copy(covers = listOf("al-1", "al-2"), artists = faces)
+        assertEquals(OnThisDay.Pictures(listOf("al-1", "al-2"), round = false), OnThisDay.pictures(withBoth, artists = false))
+        assertEquals(OnThisDay.Pictures(listOf("ar-ar1", "ar-2_x"), round = true), OnThisDay.pictures(withBoth, artists = true))
+        // A card made before it kept artists shows its covers either way.
+        assertEquals(OnThisDay.Pictures(listOf("al-1"), round = false), OnThisDay.pictures(month.copy(covers = listOf("al-1")), artists = true))
+    }
+
     @Test fun itHasThreeStyles() {
         assertEquals(listOf("Stories", "Prints", "Wide"), MemoryStyle.entries.map { it.label })
         assertEquals(MemoryStyle.STORIES, MemoryStyle.of(null))
