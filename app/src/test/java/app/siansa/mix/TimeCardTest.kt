@@ -81,6 +81,14 @@ class TimeCardTest {
         assertEquals(3, buildTimeCard(today, plans) { if (it.kind == TimeListKind.DAY) songs(3) else emptyList() }!!.lists.single().songIds.size)
     }
 
+    /** Each list keeps its top artists, for On this day's pictures (the owner, 27 Nov); without them it keeps none. */
+    @Test fun eachListKeepsItsArtists() = runBlocking {
+        val faces = (1..6).map { CardArtist("Artist $it", 10 - it, "ar$it") }
+        val card = buildTimeCard(today, plans, artistsOf = { if (it.kind == TimeListKind.DAY) null else faces }) { songs(10) }!!
+        assertEquals(listOf("ar1", "ar2", "ar3", "ar4"), card.lists.first { it.kind == TimeListKind.YEAR_AGO.id }.artists.map { it.id })
+        assertTrue(card.lists.first { it.kind == TimeListKind.DAY.id }.artists.isEmpty())
+    }
+
     /** A list that couldn't be fetched isn't taken for an empty one: the card on the phone stays, and it's tried again. */
     @Test fun aListThatCouldNotBeFetchedKeepsTheOldCard() = runBlocking {
         assertNull(buildTimeCard(today, plans) { if (it.kind == TimeListKind.DAY) null else songs(10) }.takeIf { it?.lists?.size != 4 })

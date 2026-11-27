@@ -114,6 +114,16 @@ fun HomeSettingsSheet(nav: androidx.navigation.NavController, startOnSources: Bo
             AppLog.i("Home", "On this day's style: ${it.label}")
             graph.settings.save(graph.settings.current.copy(onThisDayStyle = it.id))
         },
+        memoryArtists = s.onThisDayArtists,
+        onMemoryArtists = {
+            AppLog.i("Home", "On this day shows ${if (it) "artists" else "albums"}")
+            graph.settings.save(graph.settings.current.copy(onThisDayArtists = it))
+        },
+        memoryPicture = MemoryPicture.of(s.onThisDayPicture),
+        onMemoryPicture = {
+            AppLog.i("Home", "On this day's pictures: ${it.label}")
+            graph.settings.save(graph.settings.current.copy(onThisDayPicture = it.id))
+        },
         gap = s.homeGap, onGapChange = {
         AppLog.i("Home", "Spacing: ${homeGapLabel(it)}")
         graph.settings.setHomeGap(it)
@@ -252,6 +262,10 @@ fun ArrangeHomeSheet(
     onListenColour: (app.siansa.data.ListenColour) -> Unit = {},
     memoryStyle: MemoryStyle = MemoryStyle.STORIES,
     onMemoryStyle: (MemoryStyle) -> Unit = {},
+    memoryArtists: Boolean = false,
+    onMemoryArtists: (Boolean) -> Unit = {},
+    memoryPicture: MemoryPicture = MemoryPicture.COLLAGE,
+    onMemoryPicture: (MemoryPicture) -> Unit = {},
     noLines: Set<HomeSection> = emptySet(),
     onLinesShownChange: (HomeSection, Boolean) -> Unit = { _, _ -> },
     untitled: Set<HomeSection> = emptySet(),
@@ -294,7 +308,10 @@ fun ArrangeHomeSheet(
     if (colouring) ListenColourDialog(colour, onPick = { colour = it; onListenColour(it) }) { colouring = false }
     var styling by remember { mutableStateOf(false) }
     var memory by remember(memoryStyle) { mutableStateOf(memoryStyle) }
-    if (styling) MemoryStyleDialog(memory, onPick = { memory = it; onMemoryStyle(it) }) { styling = false }
+    var faces by remember(memoryArtists) { mutableStateOf(memoryArtists) }
+    var layout by remember(memoryPicture) { mutableStateOf(memoryPicture) }
+    if (styling) MemoryStyleDialog(memory, onPick = { memory = it; onMemoryStyle(it) }, artists = faces, onArtists = { faces = it; onMemoryArtists(it) },
+        picture = layout, onPicture = { layout = it; onMemoryPicture(it) }) { styling = false }
     var hiddenItems by remember { mutableStateOf(hidden) }
     picking?.let { section ->
         HomeLookDialog(
@@ -1103,9 +1120,18 @@ internal fun ListenColourDialog(chosen: app.siansa.data.ListenColour, onPick: (a
     )
 }
 
-/** On this day's cog (the owner, 27 Nov): its three styles, each with a line on what it is. */
+/** On this day's cog (the owner, 27 Nov): its three styles, each with a line on what it is, artists or albums, and how its pictures sit. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
-internal fun MemoryStyleDialog(chosen: MemoryStyle, onPick: (MemoryStyle) -> Unit, onDismiss: () -> Unit) {
+internal fun MemoryStyleDialog(
+    chosen: MemoryStyle,
+    onPick: (MemoryStyle) -> Unit,
+    artists: Boolean = false,
+    onArtists: (Boolean) -> Unit = {},
+    picture: MemoryPicture = MemoryPicture.COLLAGE,
+    onPicture: (MemoryPicture) -> Unit = {},
+    onDismiss: () -> Unit,
+) {
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("On this day") },
@@ -1123,6 +1149,13 @@ internal fun MemoryStyleDialog(chosen: MemoryStyle, onPick: (MemoryStyle) -> Uni
                             Text(style.label, style = MaterialTheme.typography.bodyLarge, fontWeight = if (style == chosen) FontWeight.Bold else FontWeight.Normal)
                             Text(style.blurb, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
+                    }
+                }
+                SwitchRow("Artists' pictures", if (artists) "The artists you played most" else "Album covers", artists, tag = "memoryArtists", onChange = onArtists)
+                Text("Pictures", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(top = Space.Small))
+                androidx.compose.foundation.layout.FlowRow(Modifier.padding(top = Space.Small).testTag("memoryPictures"), horizontalArrangement = Arrangement.spacedBy(Space.Small)) {
+                    MemoryPicture.entries.forEach { p ->
+                        FilterChip(selected = p == picture, onClick = { onPicture(p) }, label = { Text(p.label) }, modifier = Modifier.testTag("memoryPicture-${p.id}"))
                     }
                 }
             }

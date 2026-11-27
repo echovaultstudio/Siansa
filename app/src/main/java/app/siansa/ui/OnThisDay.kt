@@ -26,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
@@ -35,6 +36,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.siansa.data.picture
 import app.siansa.mix.TimeCard
 import app.siansa.mix.TimeCardList
 import app.siansa.mix.TimeListKind
@@ -71,14 +73,35 @@ object OnThisDay {
         else -> Words(list.title, songCount(list.songIds.size), "LAST YEAR")
     }
 
+    /**
+     * What [list]'s card pictures: its artists' pictures when [artists] (the owner, 27 Nov: "allow choosing via toggle
+     * to show artist or album images") and it has artists in the library, else its album covers.
+     */
+    fun pictures(list: TimeCardList, artists: Boolean): Pictures {
+        val faces = if (artists) list.artists.filter { it.id != null || it.coverArt != null }
+            .map { app.siansa.data.Artist(it.id ?: it.name, it.name, coverArt = it.coverArt, imageUrl = it.imageUrl).picture } else emptyList()
+        return if (faces.isNotEmpty()) Pictures(faces, round = true) else Pictures(list.covers, round = false)
+    }
+
+    /** A card's pictures, and whether they're artists (round) or albums. */
+    data class Pictures(val ids: List<String>, val round: Boolean)
+
     /** The day's card: new each morning, so it has a ring. */
     fun isNew(list: TimeCardList): Boolean = list.kind == TimeListKind.DAY.id
 }
 
 /** The row: its title, then the cards side by side in its [style]. Nothing without a list. */
 @Composable
-fun OnThisDayRow(lists: List<TimeCardList>, onPlay: (TimeCardList) -> Unit, onOpen: (TimeCardList) -> Unit, style: MemoryStyle = MemoryStyle.STORIES) {
+fun OnThisDayRow(
+    lists: List<TimeCardList>,
+    onPlay: (TimeCardList) -> Unit,
+    onOpen: (TimeCardList) -> Unit,
+    style: MemoryStyle = MemoryStyle.STORIES,
+    artists: Boolean = false,
+    picture: MemoryPicture = MemoryPicture.COLLAGE,
+) {
     if (lists.isEmpty()) return
+    androidx.compose.runtime.CompositionLocalProvider(LocalMemoryArtists provides artists, LocalMemoryPicture provides picture) {
     Column(Modifier.fillMaxWidth().testTag("onThisDay")) {
         SectionTitle("On this day")
         LazyRow(
@@ -95,7 +118,18 @@ fun OnThisDayRow(lists: List<TimeCardList>, onPlay: (TimeCardList) -> Unit, onOp
             }
         }
     }
+    }
 }
+
+/** Whether On this day pictures its artists rather than its albums ([OnThisDay.pictures]). */
+private val LocalMemoryArtists = androidx.compose.runtime.staticCompositionLocalOf { false }
+
+/** How On this day lays out its pictures ([MemoryPicture]). */
+private val LocalMemoryPicture = androidx.compose.runtime.staticCompositionLocalOf { MemoryPicture.COLLAGE }
+
+/** A picture's shape: an artist's is round, an album's a rounded square. */
+private fun pictureShape(round: Boolean): androidx.compose.ui.graphics.Shape =
+    if (round) androidx.compose.foundation.shape.CircleShape else RoundedCornerShape(MEMORY_COVER_CORNER)
 
 /**
  * On this day's styles (the owner, 27 Nov: "the 3 types from the mockup"), picked under its cog: Stories, tall cards
@@ -108,6 +142,22 @@ enum class MemoryStyle(val id: String, val label: String, val blurb: String) {
 
     companion object {
         fun of(id: String?): MemoryStyle = entries.firstOrNull { it.id == id } ?: STORIES
+    }
+}
+
+/**
+ * How a card's pictures are laid out (the owner, 27 Nov: "not just the mosaic pictures but some options"), for
+ * covers and artists alike: [COLLAGE] scattered at small angles (a year's covers two by two), [GRID] four two by
+ * two, [ONE] the most played alone and big, [FAN] three fanned out side by side.
+ */
+enum class MemoryPicture(val id: String, val label: String) {
+    COLLAGE("collage", "Collage"),
+    GRID("grid", "Grid"),
+    ONE("one", "Top one"),
+    FAN("fan", "Fan");
+
+    companion object {
+        fun of(id: String?): MemoryPicture = entries.firstOrNull { it.id == id } ?: COLLAGE
     }
 }
 
@@ -165,14 +215,20 @@ private fun WideCard(list: TimeCardList, onPlay: () -> Unit, onOpen: () -> Unit)
             .testTag("onThisDayCard"),
     ) {
         // The covers fanned at the right, the last on top.
-        val covers = list.covers.take(3)
+        val pictures = OnThisDay.pictures(list, LocalMemoryArtists.current)
+        val covers = pictures.ids.take(3)
+        val shape = pictureShape(pictures.round)
         val draw = LocalCoverDraw.current
-        covers.forEachIndexed { n, cover ->
+        // A grid or the top one sits square at the right; a collage or a fan is its own fan.
+        val layout = LocalMemoryPicture.current
+        if (layout == MemoryPicture.GRID || layout == MemoryPicture.ONE) {
+            Collage(list, Modifier.align(Alignment.TopEnd).padding(top = Space.Medium, end = Space.Page).size(WIDE_PICTURE), WIDE_PICTURE)
+        } else covers.forEachIndexed { n, cover ->
             val fromRight = (covers.size - 1 - n)
             draw(cover, COVER_PX / 2,
                 Modifier.align(Alignment.TopEnd).padding(top = Space.Page, end = Space.Page).offset(x = -WIDE_FAN_STEP * fromRight)
-                    .size(WIDE_COVER).rotate(WIDE_LEANS[(n + 3 - covers.size) % 3]).shadow(MEMORY_SHADOW, RoundedCornerShape(MEMORY_COVER_CORNER)),
-                RoundedCornerShape(MEMORY_COVER_CORNER), null)
+                    .size(WIDE_COVER).rotate(WIDE_LEANS[(n + 3 - covers.size) % 3]).shadow(MEMORY_SHADOW, shape),
+                shape, null)
         }
         // The date on a small chip: "27 NOV", "NOV 2025", "2025".
         Text(
@@ -250,32 +306,50 @@ private fun Modifier.memoryTap(title: String, onPlay: () -> Unit, onOpen: () -> 
  */
 @Composable
 private fun Collage(list: TimeCardList, modifier: Modifier, size: androidx.compose.ui.unit.Dp) {
-    val covers = list.covers.take(4)
+    val pictures = OnThisDay.pictures(list, LocalMemoryArtists.current)
+    val layout = LocalMemoryPicture.current
+    val covers = pictures.ids.take(if (layout == MemoryPicture.FAN) 3 else 4)
+    val shape = pictureShape(pictures.round)
     val draw = LocalCoverDraw.current
     Box(modifier) {
         when {
             covers.isEmpty() -> Unit
-            covers.size == 1 -> draw(covers[0], COVER_PX, Modifier.align(Alignment.Center).size(size * 0.8f).shadow(MEMORY_SHADOW, RoundedCornerShape(MEMORY_COVER_CORNER)), RoundedCornerShape(MEMORY_COVER_CORNER), null)
-            list.kind == TimeListKind.LAST_YEAR.id && covers.size == 4 -> Column(Modifier.fillMaxSize().shadow(MEMORY_SHADOW, RoundedCornerShape(MEMORY_COVER_CORNER)).clip(RoundedCornerShape(MEMORY_COVER_CORNER))) {
+            covers.size == 1 || layout == MemoryPicture.ONE ->
+                draw(covers[0], COVER_PX, Modifier.align(Alignment.Center).size(size * 0.86f).shadow(MEMORY_SHADOW, shape), shape, null)
+            layout == MemoryPicture.FAN -> covers.forEachIndexed { n, cover ->
+                // Side by side across the middle, leaning out, the first on top.
+                val at = n - (covers.size - 1) / 2f
+                draw(cover, COVER_PX / 2,
+                    Modifier.align(Alignment.Center).offset(x = size * 0.22f * at).size(size * 0.5f).rotate(at * 9f).zIndex(-n.toFloat())
+                        .shadow(MEMORY_SHADOW, shape), shape, null)
+            }
+            // Four two by two: in a grid, round ones each in its corner.
+            layout == MemoryPicture.GRID && covers.size == 4 && pictures.round -> Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
+                for (row in 0..1) Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(Space.Tight)) {
+                    for (col in 0..1) draw(covers[row * 2 + col], COVER_PX / 2, Modifier.weight(1f).fillMaxSize().shadow(MEMORY_SHADOW, shape), shape, null)
+                }
+            }
+            // Artists are round: scattered in a collage, never squared up.
+            !pictures.round && covers.size == 4 && (layout == MemoryPicture.GRID || list.kind == TimeListKind.LAST_YEAR.id) -> Column(Modifier.fillMaxSize().shadow(MEMORY_SHADOW, RoundedCornerShape(MEMORY_COVER_CORNER)).clip(RoundedCornerShape(MEMORY_COVER_CORNER))) {
                 for (row in 0..1) Row(Modifier.weight(1f)) {
                     for (col in 0..1) draw(covers[row * 2 + col], COVER_PX / 2, Modifier.weight(1f).fillMaxSize(), RectangleShape, null)
                 }
             }
-            else -> covers.forEachIndexed { i, cover -> Scattered(cover, i, covers.size, size) }
+            else -> covers.forEachIndexed { i, cover -> Scattered(cover, i, covers.size, size, shape) }
         }
     }
 }
 
 /** One cover of a scattered collage: where it sits and how it leans, the same every time. */
 @Composable
-private fun BoxScope.Scattered(cover: String, i: Int, of: Int, collage: androidx.compose.ui.unit.Dp) {
+private fun BoxScope.Scattered(cover: String, i: Int, of: Int, collage: androidx.compose.ui.unit.Dp, shape: androidx.compose.ui.graphics.Shape) {
     val spot = SCATTER[of.coerceIn(2, 4) - 2][i]
     val size = collage * spot.size
     LocalCoverDraw.current(
         cover, COVER_PX / 2,
         Modifier.align(Alignment.TopStart).offset(collage * spot.x, collage * spot.y).size(size).rotate(spot.lean)
-            .shadow(MEMORY_SHADOW, RoundedCornerShape(MEMORY_COVER_CORNER)),
-        RoundedCornerShape(MEMORY_COVER_CORNER), null,
+            .shadow(MEMORY_SHADOW, shape),
+        shape, null,
     )
 }
 
@@ -310,6 +384,7 @@ private val WIDE_WIDTH = 300.dp
 private val WIDE_HEIGHT = 180.dp
 private val WIDE_CORNER = 16.dp
 private val WIDE_COVER = 84.dp
+private val WIDE_PICTURE = 88.dp
 private val WIDE_FAN_STEP = 28.dp
 private val WIDE_LEANS = listOf(-12f, -2f, 9f)
 private val WIDE_FADE = 96.dp

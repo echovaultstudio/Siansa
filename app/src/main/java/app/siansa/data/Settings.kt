@@ -152,6 +152,10 @@ data class AppSettings(
     val artistRadiosFrom: String = app.siansa.mix.ArtistsFrom.BOTH.id,
     /** On this day's style ([app.siansa.ui.MemoryStyle], the owner, 27 Nov): Stories, Prints or Wide. */
     val onThisDayStyle: String = "stories",
+    /** On this day shows its artists' pictures instead of album covers (the owner, 27 Nov). */
+    val onThisDayArtists: Boolean = false,
+    /** How On this day lays out its pictures ([app.siansa.ui.MemoryPicture], the owner, 27 Nov). */
+    val onThisDayPicture: String = "collage",
     /** A tap on a card on Home plays it straight away (the owner, 27 Nov); held, it opens. Off: a tap opens it first. */
     val homeTapPlays: Boolean = false,
     val aiTitles: Boolean = true,
@@ -540,6 +544,8 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         phoneSmoothRun = prefs.getBoolean("phone_smooth_run", true),
         artistRadiosFrom = prefs.getString("artist_radios_from", null) ?: app.siansa.mix.ArtistsFrom.BOTH.id,
         onThisDayStyle = prefs.getString("on_this_day_style", null) ?: "stories",
+        onThisDayArtists = prefs.getBoolean("on_this_day_artists", false),
+        onThisDayPicture = prefs.getString("on_this_day_picture", null) ?: "collage",
         homeTapPlays = prefs.getBoolean("home_tap_plays", false),
         aiTitles = prefs.getBoolean("ai_titles", true),
         // Smart as it comes (the owner, 26 Nov); a mode chosen before stays.
@@ -764,6 +770,8 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
             .putBoolean("phone_smooth_run", s.phoneSmoothRun)
             .putString("artist_radios_from", s.artistRadiosFrom)
             .putString("on_this_day_style", s.onThisDayStyle)
+            .putBoolean("on_this_day_artists", s.onThisDayArtists)
+            .putString("on_this_day_picture", s.onThisDayPicture)
             .putBoolean("home_tap_plays", s.homeTapPlays)
             .apply()
         _state.value = s
