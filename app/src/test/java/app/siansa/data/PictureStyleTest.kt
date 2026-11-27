@@ -62,11 +62,8 @@ class PictureStyleTest {
         // An album keeps its cover.
         assertEquals(PictureStyle.COVER, pictureShown(PictureStyle.AUTO, 1, true, mix = false, tones = blues))
         assertEquals(PictureStyle.AURA, pictureShown(PictureStyle.AUTO, 0, false, tones = blues))
-        // Shape (issue #153): with Siansa Beats' numbers; Auto picks it for Your energy only; without, as Auto.
-        assertEquals(PictureStyle.SHAPE, pictureShown(PictureStyle.SHAPE, 4, true, hasShape = true, tones = blues))
-        assertEquals(PictureStyle.MOSAIC, pictureShown(PictureStyle.SHAPE, 4, true, tones = blues))
-        assertEquals(PictureStyle.SHAPE, pictureShown(PictureStyle.AUTO, 4, true, hasShape = true, shapeFirst = true, tones = blues))
-        assertEquals(PictureStyle.MOSAIC, pictureShown(PictureStyle.AUTO, 4, true, hasShape = true, tones = blues))
+        // Shape was taken out (the owner, 27 Nov): a row saved with it is Auto.
+        assertEquals(emptyMap<HomeSection, PictureStyle>(), PictureStyle.parse("made_for_you:shape"))
     }
 
     @Test fun whatSitsWell() {

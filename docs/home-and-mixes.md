@@ -95,9 +95,7 @@ that move: **Aura** (its colours drifting like light through water, slow for a c
 name big at the foot), **Frost** (its cover blurred and slowly breathing, the sleeve floating on it, its name and main
 artists on glass) and **Poster** (three of its covers washed in one bold colour, its name in heavy type with its
 artists), and three made of its covers: **Stickers** (stuck on at angles, with white edges), **Taped** (taped on paper,
-its name on a label) and **Cut-outs** (circles and squares, like a scrapbook). **Shape** draws a Siansa Beats mix's
-sound as a still five-sided shape (energy, danceable, happy, relaxed, voice); on Auto, Your high energy and Your wind
-down show theirs, and a card without one shows what Auto would. Where each sticker sits comes from the card itself, so no two look
+its name on a label) and **Cut-outs** (circles and squares, like a scrapbook). Where each sticker sits comes from the card itself, so no two look
 the same and one always looks the same. A card without enough covers for its style shows one cover, or Aura when it has
 none. An artist keeps its round photo.
 
@@ -231,9 +229,9 @@ zone). Three shelves, the same as on Siansa Beats' page:
 
 - **For now**: this part of the day, as you listen in it.
 - **Made for you**: the kinds of music you play most, each with more like it.
-- **More of you**: On repeat, Rediscover, New for you, Deep cuts, Forgotten artists, Your high energy, Your wind down
-  and the Smooth runs (Siansa Beats 0.65). A Smooth run plays in its order. **Forgotten artists** (Siansa Beats 0.66)
-  join **Artist radios** instead (below), unless that row is set to your listening only.
+- **More of you**: On repeat, Rediscover, New for you, Deep cuts and Forgotten artists (Siansa Beats 0.65).
+  **Forgotten artists** (Siansa Beats 0.66) join **Artist radios** instead (below), unless that row is set to your
+  listening only.
 
 If you'd rather have them together, **Mix settings › In Siansa › All in one row** (Siansa Beats 0.62) puts every mix in one row, in For now's place, and **How many cards** says how many it has at most. The other two rows then stay away.
 
@@ -263,8 +261,8 @@ flick through), **Tiles** is a row of tiles each with four of the mix's covers, 
 mixes by itself, from what you play, the time of day, the season and the light outside: change only what you want.
 The page has three parts, one line each:
 
-- **Mixes**: For now and Made for you. **Your sound**: On repeat, Rediscover, New for you, Deep cuts, Forgotten artists,
-  Your energy and Smooth run. Each line has a switch
+- **Mixes**: For now and Made for you. **Your sound**: On repeat, Rediscover, New for you, Deep cuts and Forgotten
+  artists. Each line has a switch
   and says **AUTO** while it's as it comes, **TUNED** once you've changed something of it.
 - **For all mixes**: **What's in a mix** (songs in a mix, how many you know, songs by one artist), **Leave out**
   (songs played lately, genres, artists), **Made around** (the part of the day, weekends, the dark, this time of year,
@@ -368,10 +366,10 @@ anywhere but its ▶) for everything on it, ready to play or save as a playlist.
 Home with its switch in Settings.
 
 **A Siansa Beats card** (with Siansa Beats making Home's mixes): under **Comes from**, pick **Siansa Beats**, then
-switch on the mixes it shows: **For now**, **Made for you**, **On repeat**, **Rediscover**, **New for you**, **Deep
-cuts**, **Your energy** and **Smooth run** (a new one starts with the last six). They come from Siansa Beats' answer,
-new as it makes them, as one row in the card's name and look: **Carousel** as it comes, or any other look. Make a few
-(a "Daily" one, a "Deep listening" one) and **Duplicate** one to start the next. Forgotten artists are in Artist radios.
+switch on the mixes it shows: **For now**, **Made for you**, **On repeat**, **Rediscover**, **New for you** and
+**Deep cuts** (a new one starts with the last four). They come from Siansa Beats' answer, new as it makes them, as
+one row in the card's name and look: **Carousel** as it comes, or any other look. Make a few (a "Daily" one, a "Deep
+listening" one) and **Duplicate** one to start the next. Forgotten artists are in Artist radios.
 
 ## Radios
 

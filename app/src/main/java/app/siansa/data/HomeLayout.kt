@@ -301,10 +301,8 @@ enum class PictureStyle(val id: String, val label: String, val blurb: String) {
     GLOW("glow", "Glow", "One cover on its own light"),
     PILE("pile", "Stickers", "Its covers stuck on at angles"),
     TAPED("taped", "Taped", "Its covers taped on paper"),
-    CUTOUTS("cutouts", "Cut-outs", "Circles and squares, like a scrapbook"),
-    // Issue #153 (the owner, 26 Nov: a cover like the Listening fingerprint, "without laggyness"): five numbers from
-    // Siansa Beats drawn once as a still shape.
-    SHAPE("shape", "Shape", "Its sound as a shape: energy, danceable, happy, relaxed, voice (Siansa Beats' mixes)");
+    // Shape (issue #153) was taken out on 27 Nov (the owner): a row set to it shows Auto.
+    CUTOUTS("cutouts", "Cut-outs", "Circles and squares, like a scrapbook");
 
     companion object {
         /** Reads the saved styles ("made_for_you:glow,quick:colour"); unknown sections and styles are dropped. */

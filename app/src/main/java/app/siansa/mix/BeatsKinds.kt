@@ -12,13 +12,11 @@ enum class BeatsKind(val id: String, val label: String, val hint: String, privat
     REPEAT("repeat", "On repeat", "Your most played lately", { it == "repeat" }),
     REDISCOVER("rediscover", "Rediscover", "Old favourites you haven't played for a while", { it == "rediscover" }),
     NEW("new", "New for you", "Songs you've never played, near your taste", { it == "new" }),
-    DEEP("deep", "Deep cuts", "Unplayed songs from albums you love", { it == "deep" }),
-    ENERGY("energy", "Your energy", "Your high energy and your wind down", { it.startsWith("energy-") }),
-    SMOOTH("smooth", "Smooth run", "Flowing by key and tempo", { it.startsWith("smooth-") });
+    DEEP("deep", "Deep cuts", "Unplayed songs from albums you love", { it == "deep" });
 
     companion object {
         /** A new card's: your own sound, as More of you. */
-        val FIRST = listOf(REPEAT, REDISCOVER, NEW, DEEP, ENERGY, SMOOTH)
+        val FIRST = listOf(REPEAT, REDISCOVER, NEW, DEEP)
 
         fun of(mixId: String): BeatsKind? = entries.firstOrNull { it.ids(mixId) }
 

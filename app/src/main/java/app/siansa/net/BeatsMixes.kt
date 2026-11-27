@@ -113,13 +113,9 @@ class BeatsMixes(
         val about: String = "",
         /** What Siansa Beats keeps it by, which no other mix has (0.55); "" from an older Siansa Beats. */
         val key: String = "",
-        /** Its sound's shape (Siansa Beats 0.65, issue #153): energy, danceable, happy, relaxed, voice, 0 to 1. */
-        val shape: List<Float>? = null,
         /** Forgotten artists' artists (Siansa Beats 0.66), the most played first: Home shows them in place of the mix. */
         val people: List<Person> = emptyList(),
     ) {
-        /** Your energy's mixes show their shape on Auto. */
-        val shapeFirst: Boolean get() = id.startsWith("energy-")
         /** What Home shows under it: what's in it, never the artists (they're on its own page; the owner, 17 Nov). */
         val caption: String get() = about.ifBlank { genres.take(2).joinToString(", ").ifBlank { why } }
     }
@@ -205,9 +201,6 @@ class BeatsMixes(
                                 own = (m["own"] as? JsonPrimitive)?.content?.toIntOrNull() ?: 0,
                                 about = m.text("about").orEmpty(),
                                 key = m.text("key").orEmpty(),
-                                shape = (m["shape"] as? JsonObject)?.let { s ->
-                                    app.siansa.ui.SHAPE_AXES.map { (s[it] as? JsonPrimitive)?.doubleOrNull?.toFloat() ?: return@let null }
-                                },
                                 people = (m["people"] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }.mapNotNull { p ->
                                     Person(
                                         name = p.text("name")?.takeIf { it.isNotBlank() } ?: return@mapNotNull null,
