@@ -87,25 +87,28 @@ class OnThisDayTest {
     }
 
     @Test fun itHasThreeStyles() {
-        assertEquals(listOf("Stories", "Prints", "Wide"), MemoryStyle.entries.map { it.label })
+        assertEquals(listOf("Stories", "Spotlight", "Wide"), MemoryStyle.entries.map { it.label })
         assertEquals(MemoryStyle.STORIES, MemoryStyle.of(null))
         assertEquals(MemoryStyle.STORIES, MemoryStyle.of("nope"))
-        assertEquals(MemoryStyle.PRINTS, MemoryStyle.of("prints"))
+        assertEquals(MemoryStyle.SPOTLIGHT, MemoryStyle.of("spotlight"))
+        // Prints, which Spotlight took the place of, is Spotlight.
+        assertEquals(MemoryStyle.SPOTLIGHT, MemoryStyle.of("prints"))
         assertEquals(MemoryStyle.WIDE, MemoryStyle.of("wide"))
     }
 
-    /** Prints, a stack (the owner, 27 Nov: "P3 looks awesome"): round and round, saying what comes next. */
-    @Test fun thePrintsGoRoundAndSayWhatsNext() {
-        assertEquals(listOf(1, 2, 0), (0..2).map { OnThisDay.nextPrint(it, 3) })
-        assertEquals(0, OnThisDay.nextPrint(0, 1))
-        assertEquals("3 MEMORIES", OnThisDay.howMany(3))
-        assertEquals("1 MEMORY", OnThisDay.howMany(1))
-        val three = listOf(day, month, year)
-        assertEquals("Swipe it away for the next: November, last year, then Your 2025.", OnThisDay.comesNext(three, 0, Locale.ENGLISH))
-        assertEquals("Swipe it away for the next: Your 2025, then A year ago today.", OnThisDay.comesNext(three, 1, Locale.ENGLISH))
-        assertEquals("Swipe it away for the next: A year ago today.", OnThisDay.comesNext(listOf(day, year), 1, Locale.ENGLISH))
-        // The day's print says its date and how many songs; the others how many songs.
-        assertEquals("27 Nov 2025 · 12 songs", OnThisDay.printLine(day, Locale.ENGLISH))
-        assertEquals("50 songs", OnThisDay.printLine(month, Locale.ENGLISH))
+    /** Spotlight (the owner, 27 Nov): the date huge behind, NEW while new, and who's on it under the title. */
+    @Test fun spotlightSaysWhatAndWho() {
+        assertEquals("27", OnThisDay.backdrop(day.copy(tag = "27 NOV")))
+        assertEquals("NOV", OnThisDay.backdrop(month.copy(tag = "NOV 2025")))
+        assertEquals("2025", OnThisDay.backdrop(year.copy(tag = "2025")))
+        assertEquals("NEW · 27 NOV 2025", OnThisDay.spotlightKicker(day, locale = Locale.ENGLISH))
+        assertEquals("1 YEAR AGO TODAY", OnThisDay.spotlightKicker(day, seen = true, locale = Locale.ENGLISH))
+        assertEquals("1 YEAR AGO", OnThisDay.spotlightKicker(month, locale = Locale.ENGLISH))
+        fun with(vararg names: String) = month.copy(artists = names.map { app.siansa.mix.CardArtist(it, 1) })
+        assertEquals("50 songs", OnThisDay.spotlightLine(month, Locale.ENGLISH))
+        assertEquals("12 songs", OnThisDay.spotlightLine(day, Locale.ENGLISH))
+        assertEquals("Deftones", OnThisDay.spotlightLine(with("Deftones"), Locale.ENGLISH))
+        assertEquals("Deftones and Moderat", OnThisDay.spotlightLine(with("Deftones", "Moderat"), Locale.ENGLISH))
+        assertEquals("Deftones, Moderat and 2 more", OnThisDay.spotlightLine(with("Deftones", "Moderat", "Bicep", "Burial"), Locale.ENGLISH))
     }
 }
