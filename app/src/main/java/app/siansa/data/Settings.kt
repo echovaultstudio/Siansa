@@ -150,6 +150,8 @@ data class AppSettings(
     val phoneSmoothRun: Boolean = true,
     /** Whose artists Home's Artist radios are ([app.siansa.mix.ArtistsFrom], the owner, 26 Nov): yours, Siansa Beats', or both. */
     val artistRadiosFrom: String = app.siansa.mix.ArtistsFrom.BOTH.id,
+    /** On this day's style ([app.siansa.ui.MemoryStyle], the owner, 27 Nov): Stories, Prints or Wide. */
+    val onThisDayStyle: String = "stories",
     val aiTitles: Boolean = true,
     /**
      * Services switched off under Settings › Services (the owner, 13 Nov): [Service] ids. One that's off is left
@@ -535,6 +537,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         djKeepKey = prefs.getBoolean("dj_keep_key", true),
         phoneSmoothRun = prefs.getBoolean("phone_smooth_run", true),
         artistRadiosFrom = prefs.getString("artist_radios_from", null) ?: app.siansa.mix.ArtistsFrom.BOTH.id,
+        onThisDayStyle = prefs.getString("on_this_day_style", null) ?: "stories",
         aiTitles = prefs.getBoolean("ai_titles", true),
         // Smart as it comes (the owner, 26 Nov); a mode chosen before stays.
         replayGain = runCatching { ReplayGainMode.valueOf(prefs.getString("rg", "SMART") ?: "SMART") }
@@ -757,6 +760,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
             .putBoolean("dj_keep_key", s.djKeepKey)
             .putBoolean("phone_smooth_run", s.phoneSmoothRun)
             .putString("artist_radios_from", s.artistRadiosFrom)
+            .putString("on_this_day_style", s.onThisDayStyle)
             .apply()
         _state.value = s
     }

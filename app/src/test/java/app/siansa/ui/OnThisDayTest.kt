@@ -30,9 +30,9 @@ class OnThisDayTest {
     }
 
     @Test fun eachCardSaysWhatItIs() {
-        assertEquals(OnThisDay.Words("A year ago today", "27 Nov 2025"), OnThisDay.words(day, Locale.UK))
-        assertEquals(OnThisDay.Words("November, last year", "50 songs"), OnThisDay.words(month, Locale.UK))
-        assertEquals(OnThisDay.Words("Your 2025", "50 songs"), OnThisDay.words(year, Locale.UK))
+        assertEquals(OnThisDay.Words("A year ago today", "27 Nov 2025", "1 YEAR AGO TODAY"), OnThisDay.words(day, Locale.UK))
+        assertEquals(OnThisDay.Words("November, last year", "50 songs", "1 YEAR AGO"), OnThisDay.words(month, Locale.UK))
+        assertEquals(OnThisDay.Words("Your 2025", "50 songs", "LAST YEAR"), OnThisDay.words(year, Locale.UK))
         assertEquals("1 song", OnThisDay.words(list(TimeListKind.LAST_YEAR, "Your 2025", "2025", 1)).line)
     }
 
@@ -43,17 +43,27 @@ class OnThisDayTest {
         assertFalse(OnThisDay.isNew(year))
     }
 
-    /** Its own row on Home, after Your listening; it has nothing to set, and needs the day's lists made. */
+    /** Its own row on Home, after Your listening; its look is its own, and it needs the day's lists made. */
     @Test fun itIsARowOfItsOwn() {
         val order = HomeSection.default
         assertEquals(order.indexOf(HomeSection.TIME_MACHINE) + 1, order.indexOf(HomeSection.ON_THIS_DAY))
         assertFalse(HomeSection.ON_THIS_DAY.lookable)
-        assertFalse(HomeSection.ON_THIS_DAY.hasCog)
         assertTrue(HomeSection.ON_THIS_DAY.usesTimeCard)
         assertTrue(HomeSection.TIME_MACHINE.usesTimeCard)
         assertFalse(HomeSection.RADIOS.usesTimeCard)
         // A saved order from before gets it after Your listening.
         val saved = HomeSection.parse("quick,time_machine,radios")
         assertEquals(saved.indexOf(HomeSection.TIME_MACHINE) + 1, saved.indexOf(HomeSection.ON_THIS_DAY))
+    }
+
+    /** Its three styles from the mockup (the owner, 27 Nov), Stories as it comes; one unknown is Stories. */
+    @Test fun itHasThreeStyles() {
+        assertEquals(listOf("Stories", "Prints", "Wide"), MemoryStyle.entries.map { it.label })
+        assertEquals(MemoryStyle.STORIES, MemoryStyle.of(null))
+        assertEquals(MemoryStyle.STORIES, MemoryStyle.of("nope"))
+        assertEquals(MemoryStyle.PRINTS, MemoryStyle.of("prints"))
+        assertEquals(MemoryStyle.WIDE, MemoryStyle.of("wide"))
+        // Prints lean one way, the other, a little the first: never all alike.
+        assertEquals(listOf(-2f, 1.5f, -1f, -2f), (0..3).map { printLean(it) })
     }
 }
