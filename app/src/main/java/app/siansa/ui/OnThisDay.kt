@@ -35,6 +35,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.siansa.data.picture
 import app.siansa.mix.TimeCard
 import app.siansa.mix.TimeCardList
 import app.siansa.mix.TimeListKind
