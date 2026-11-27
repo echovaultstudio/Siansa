@@ -81,7 +81,20 @@ class OnThisDayTest {
         assertEquals(MemoryStyle.STORIES, MemoryStyle.of("nope"))
         assertEquals(MemoryStyle.PRINTS, MemoryStyle.of("prints"))
         assertEquals(MemoryStyle.WIDE, MemoryStyle.of("wide"))
-        // Prints lean one way, the other, a little the first: never all alike.
-        assertEquals(listOf(-2f, 1.5f, -1f, -2f), (0..3).map { printLean(it) })
+    }
+
+    /** Prints, a stack (the owner, 27 Nov: "P3 looks awesome"): round and round, saying what comes next. */
+    @Test fun thePrintsGoRoundAndSayWhatsNext() {
+        assertEquals(listOf(1, 2, 0), (0..2).map { OnThisDay.nextPrint(it, 3) })
+        assertEquals(0, OnThisDay.nextPrint(0, 1))
+        assertEquals("3 MEMORIES", OnThisDay.howMany(3))
+        assertEquals("1 MEMORY", OnThisDay.howMany(1))
+        val three = listOf(day, month, year)
+        assertEquals("Swipe it away for the next: November, last year, then Your 2025.", OnThisDay.comesNext(three, 0, Locale.ENGLISH))
+        assertEquals("Swipe it away for the next: Your 2025, then A year ago today.", OnThisDay.comesNext(three, 1, Locale.ENGLISH))
+        assertEquals("Swipe it away for the next: A year ago today.", OnThisDay.comesNext(listOf(day, year), 1, Locale.ENGLISH))
+        // The day's print says its date and how many songs; the others how many songs.
+        assertEquals("27 Nov 2025 · 12 songs", OnThisDay.printLine(day, Locale.ENGLISH))
+        assertEquals("50 songs", OnThisDay.printLine(month, Locale.ENGLISH))
     }
 }
