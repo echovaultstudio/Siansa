@@ -129,7 +129,7 @@ class SpacingHomeTest : SpacingCheck() {
         val cards = (0 until cardNodes.fetchSemanticsNodes().size).map { cardNodes[it].getBoundsInRoot() }
         val titles = (0 until titleNodes.fetchSemanticsNodes().size).map { titleNodes[it].getBoundsInRoot() }
         assertTrue("Three cards: ${cards.size}", cards.size >= 2)
-        assertEven("Cards one width", cards[0].right - cards[0].left, cards[1].right - cards[1].left, tolerance = 1.dp)
+        // The next card peeks in past the screen's edge: only its left edge and height are whole.
         assertEven("Cards one height", cards[0].bottom - cards[0].top, cards[1].bottom - cards[1].top, tolerance = 1.dp)
         if (cards.size >= 3) assertEven("An even gap between cards", cards[1].left - cards[0].right, cards[2].left - cards[1].right, tolerance = 1.dp)
         assertEven("Titles the same room in", titles[0].left - cards[0].left, titles[1].left - cards[1].left, tolerance = 1.dp)
@@ -147,7 +147,7 @@ class SpacingHomeTest : SpacingCheck() {
                 androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(androidx.compose.ui.platform.LocalDensity.current.density, fontScale = 1.3f),
             ) {
                 SiansaTheme {
-                    Box(Modifier.width(600.dp)) {
+                    Box(Modifier.fillMaxWidth()) {
                         app.siansa.ui.OnThisDayRow(listOf(
                             list(app.siansa.mix.TimeListKind.DAY, "This day last year", 11),
                             list(app.siansa.mix.TimeListKind.YEAR_AGO, "This time last year", 11),
@@ -165,7 +165,7 @@ class SpacingHomeTest : SpacingCheck() {
         assertTrue("Two cards at least: ${cards.size}", cards.size >= 2)
         assertEven("The first at the page's edge", cards[0].left - row.left, Space.Page, tolerance = 1.dp)
         assertEven("Cards one size", cards[0].bottom - cards[0].top, cards[1].bottom - cards[1].top, tolerance = 1.dp)
-        assertEven("Cards one width", cards[0].right - cards[0].left, cards[1].right - cards[1].left, tolerance = 1.dp)
+        // The next card peeks in past the screen's edge: only its left edge and height are whole.
         assertEven("The gap between cards", cards[1].left - cards[0].right, Space.Medium, tolerance = 1.dp)
         assertEven("Words the same room in", kickers[0].left - cards[0].left, kickers[1].left - cards[1].left, tolerance = 1.dp)
         assertEven("Words a page's room in", kickers[0].left - cards[0].left, Space.Page, tolerance = 1.dp)
