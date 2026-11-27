@@ -102,6 +102,39 @@ class SpacingHomeTest : SpacingCheck() {
         assertEven("The buttons, in line", all.top + (all.bottom - all.top) / 2, done.top + (done.bottom - done.top) / 2, tolerance = 1.dp)
     }
 
+    /**
+     * On this day (the owner, 27 Nov): its cards the same size and an even gap apart, each title the same room in
+     * from its card's left edge, at a larger text size too.
+     */
+    @Test fun onThisDayCardsAreEvenlySpaced() {
+        fun list(kind: app.siansa.mix.TimeListKind, title: String, month: Int? = null) =
+            app.siansa.mix.TimeCardList(kind.id, title, "TAG", "27 November 2025", listOf("s1", "s2", "s3"), year = 2025, month = month)
+        compose.setContent {
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(androidx.compose.ui.platform.LocalDensity.current.density, fontScale = 1.3f),
+            ) {
+                SiansaTheme {
+                    Box(Modifier.width(420.dp)) {
+                        app.siansa.ui.OnThisDayRow(listOf(
+                            list(app.siansa.mix.TimeListKind.DAY, "This day last year", 11),
+                            list(app.siansa.mix.TimeListKind.YEAR_AGO, "This time last year", 11),
+                            list(app.siansa.mix.TimeListKind.LAST_YEAR, "Your 2025"),
+                        ), onPlay = {}, onOpen = {})
+                    }
+                }
+            }
+        }
+        val cardNodes = compose.onAllNodesWithTag("onThisDayCard")
+        val titleNodes = compose.onAllNodesWithTag("onThisDayTitle", useUnmergedTree = true)
+        val cards = (0 until cardNodes.fetchSemanticsNodes().size).map { cardNodes[it].getBoundsInRoot() }
+        val titles = (0 until titleNodes.fetchSemanticsNodes().size).map { titleNodes[it].getBoundsInRoot() }
+        assertTrue("Three cards: ${cards.size}", cards.size >= 2)
+        assertEven("Cards one width", cards[0].right - cards[0].left, cards[1].right - cards[1].left, tolerance = 1.dp)
+        assertEven("Cards one height", cards[0].bottom - cards[0].top, cards[1].bottom - cards[1].top, tolerance = 1.dp)
+        if (cards.size >= 3) assertEven("An even gap between cards", cards[1].left - cards[0].right, cards[2].left - cards[1].right, tolerance = 1.dp)
+        assertEven("Titles the same room in", titles[0].left - cards[0].left, titles[1].left - cards[1].left, tolerance = 1.dp)
+    }
+
     /** Home's notice chips are Your Library's pills (issue #794): the same height, so Home and the library match. */
     @Test fun noticeChipsMatchTheLibrarysPills() {
         compose.setContent {

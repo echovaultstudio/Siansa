@@ -609,6 +609,24 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     }
                 }
             },
+            // On this day (the owner, 27 Nov): the day's card new with its ring, a month's covers scattered, a year's two by two.
+            Scene("on_this_day") {
+                val fakes = mapOf("a" to Color(0xFFE8D44D), "b" to Color(0xFF1F6F78), "c" to Color(0xFFF2F2F3), "d" to Color(0xFFC2185B))
+                val draw: app.siansa.ui.CoverDraw = { id, _, modifier, shape, filter ->
+                    val c = fakes[id] ?: Color.DarkGray
+                    Box(modifier.clip(shape).drawBehind { drawRect(Brush.linearGradient(listOf(c, Color.Black)), colorFilter = filter) })
+                }
+                fun list(kind: app.siansa.mix.TimeListKind, title: String, line: String, covers: List<String>, month: Int? = null) =
+                    app.siansa.mix.TimeCardList(kind.id, title, "TAG", line, (1..50).map { "s$it" }, covers = covers, year = 2025, month = month)
+                val lists = listOf(
+                    list(app.siansa.mix.TimeListKind.DAY, "This day last year", "27 November 2025", listOf("a", "d", "b", "c"), 11),
+                    list(app.siansa.mix.TimeListKind.YEAR_AGO, "This time last year", "November 2025", listOf("b", "c", "d"), 11),
+                    list(app.siansa.mix.TimeListKind.LAST_YEAR, "Your 2025", "2025", listOf("d", "a", "c", "b")),
+                )
+                androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalCoverDraw provides draw) {
+                    Column { app.siansa.ui.OnThisDayRow(lists, onPlay = {}, onOpen = {}) }
+                }
+            },
             // Each set of picture colours on a Colour picture and a sticker pile (the owner, 20 Nov).
             Scene("picture_colours") {
                 val fakes = mapOf("a" to Color(0xFFE8D44D), "b" to Color(0xFF1F6F78), "c" to Color(0xFFF2F2F3), "d" to Color(0xFFC2185B))

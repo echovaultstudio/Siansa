@@ -136,7 +136,7 @@ fun HomeScreen(nav: NavController) {
     // Home's Time Machine card (issue #1341): what's on the phone at once, made again in the background when it's
     // from another day.
     val timeCard by graph.timeCards.card.collectAsStateWithLifecycle(initialValue = null)
-    val timeCardShown = HomeSection.TIME_MACHINE !in homeHidden
+    val timeCardShown = HomeSection.entries.any { it.usesTimeCard && it !in homeHidden }
     LaunchedEffect(timeCardShown) {
         if (timeCardShown) withContext(Dispatchers.IO) { runCatching { graph.timeCards.refresh() } }
     }
@@ -685,6 +685,21 @@ fun HomeScreen(nav: NavController) {
                                     setRange = { graph.settings.setListenRange(it.id) },
                                 )
                             })
+                    }
+                }
+                // On this day (the owner, 27 Nov): this day, this month and last year, like a photo app's memories.
+                HomeSection.ON_THIS_DAY -> OnThisDay.lists(timeCard).takeIf { it.isNotEmpty() && homeSettings.navidromeReady }?.let { lists ->
+                    item(key = "on-this-day", contentType = "on-this-day") {
+                        OnThisDayRow(
+                            lists,
+                            onPlay = { list ->
+                                scope.launch {
+                                    val songs = withContext(Dispatchers.IO) { graph.library.songs(list.songIds) }
+                                    if (songs.isNotEmpty()) graph.player.play(songs)
+                                }
+                            },
+                            onOpen = { nav.navigate(app.siansa.mix.timeListRoute(it.kind)) },
+                        )
                     }
                 }
                 // More of you, a row of its own (the owner, 17 Nov): Siansa Beats', or this phone's own.
