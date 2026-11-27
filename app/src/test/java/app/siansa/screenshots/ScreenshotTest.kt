@@ -616,17 +616,19 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     val c = fakes[id] ?: Color.DarkGray
                     Box(modifier.clip(shape).drawBehind { drawRect(Brush.linearGradient(listOf(c, Color.Black)), colorFilter = filter) })
                 }
-                fun list(kind: app.siansa.mix.TimeListKind, title: String, line: String, covers: List<String>, month: Int? = null) =
-                    app.siansa.mix.TimeCardList(kind.id, title, "TAG", line, (1..50).map { "s$it" }, covers = covers, year = 2025, month = month)
+                fun list(kind: app.siansa.mix.TimeListKind, title: String, tag: String, line: String, covers: List<String>, month: Int? = null) =
+                    app.siansa.mix.TimeCardList(kind.id, title, tag, line, (1..50).map { "s$it" }, covers = covers, year = 2025, month = month)
                 val lists = listOf(
-                    list(app.siansa.mix.TimeListKind.DAY, "This day last year", "27 November 2025", listOf("a", "d", "b", "c"), 11),
-                    list(app.siansa.mix.TimeListKind.YEAR_AGO, "This time last year", "November 2025", listOf("b", "c", "d"), 11),
-                    list(app.siansa.mix.TimeListKind.LAST_YEAR, "Your 2025", "2025", listOf("d", "a", "c", "b")),
+                    list(app.siansa.mix.TimeListKind.DAY, "This day last year", "27 NOV", "27 November 2025", listOf("a", "d", "b", "c"), 11),
+                    list(app.siansa.mix.TimeListKind.YEAR_AGO, "This time last year", "NOV 2025", "November 2025", listOf("b", "c", "d"), 11),
+                    list(app.siansa.mix.TimeListKind.LAST_YEAR, "Your 2025", "2025", "2025", listOf("d", "a", "c", "b")),
                 )
                 androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalCoverDraw provides draw) {
-                    Column { app.siansa.ui.OnThisDayRow(lists, onPlay = {}, onOpen = {}) }
+                    // Its three styles (the owner, 27 Nov), one under the other.
+                    Column { app.siansa.ui.MemoryStyle.entries.forEach { style -> app.siansa.ui.OnThisDayRow(lists, onPlay = {}, onOpen = {}, style = style) } }
                 }
             },
+            Scene("on_this_day_styles_dialog") { app.siansa.ui.MemoryStyleDialog(app.siansa.ui.MemoryStyle.PRINTS, onPick = {}, onDismiss = {}) },
             // Each set of picture colours on a Colour picture and a sticker pile (the owner, 20 Nov).
             Scene("picture_colours") {
                 val fakes = mapOf("a" to Color(0xFFE8D44D), "b" to Color(0xFF1F6F78), "c" to Color(0xFFF2F2F3), "d" to Color(0xFFC2185B))

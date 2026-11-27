@@ -26,7 +26,7 @@ enum class HomeSection(val id: String, val label: String) {
     TIME_MACHINE("time_machine", "Your listening"),
     /**
      * On this day (the owner, 27 Nov: "similar to how photo apps show photos from the year before"): this day, this
-     * month and last year as memory cards, from Your listening's look back lists. Its look is fixed and it has no cog.
+     * month and last year as memory cards, from Your listening's look back lists. Its cog has its own three styles.
      */
     ON_THIS_DAY("on_this_day", "On this day"),
     /** Custom cards pinned to Home (issue #622); each shows in its own look, in the order set in Settings › Home › Cards. */
@@ -42,9 +42,6 @@ enum class HomeSection(val id: String, val label: String) {
 
     /** Its look can be changed under Arrange Home (issue #655); Your cards each have their own, in Settings › Home › Cards. */
     val lookable: Boolean get() = this != CARDS && this != NOTICES && this != TIME_MACHINE && this != ON_THIS_DAY
-
-    /** It has a cog under Arrange Home: every row but On this day, which has nothing to set. */
-    val hasCog: Boolean get() = this != ON_THIS_DAY
 
     /** It shows the look back lists the phone makes each day ([app.siansa.mix.TimeCards]). */
     val usesTimeCard: Boolean get() = this == TIME_MACHINE || this == ON_THIS_DAY

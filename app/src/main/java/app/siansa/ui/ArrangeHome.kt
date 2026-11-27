@@ -34,6 +34,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -107,6 +109,11 @@ fun HomeSettingsSheet(nav: androidx.navigation.NavController, startOnSources: Bo
     ArrangeHomeSheet(s.homeOrder - offered - HomeSection.NOTICES, s.homeHidden, holds = beatsRows,
         sections = HomeSection.default - HomeSection.NOTICES - offered,
         listenColour = app.siansa.data.ListenColour.of(s.listenColour), onListenColour = { graph.settings.setListenColour(it.id) },
+        memoryStyle = MemoryStyle.of(s.onThisDayStyle),
+        onMemoryStyle = {
+            AppLog.i("Home", "On this day's style: ${it.label}")
+            graph.settings.save(graph.settings.current.copy(onThisDayStyle = it.id))
+        },
         gap = s.homeGap, onGapChange = {
         AppLog.i("Home", "Spacing: ${homeGapLabel(it)}")
         graph.settings.setHomeGap(it)
@@ -243,6 +250,8 @@ fun ArrangeHomeSheet(
     // Your listening's colour (issue #1347), set in its cog.
     listenColour: app.siansa.data.ListenColour = app.siansa.data.ListenColour.TEAL,
     onListenColour: (app.siansa.data.ListenColour) -> Unit = {},
+    memoryStyle: MemoryStyle = MemoryStyle.STORIES,
+    onMemoryStyle: (MemoryStyle) -> Unit = {},
     noLines: Set<HomeSection> = emptySet(),
     onLinesShownChange: (HomeSection, Boolean) -> Unit = { _, _ -> },
     untitled: Set<HomeSection> = emptySet(),
@@ -283,6 +292,9 @@ fun ArrangeHomeSheet(
     var colouring by remember { mutableStateOf(false) }
     var colour by remember(listenColour) { mutableStateOf(listenColour) }
     if (colouring) ListenColourDialog(colour, onPick = { colour = it; onListenColour(it) }) { colouring = false }
+    var styling by remember { mutableStateOf(false) }
+    var memory by remember(memoryStyle) { mutableStateOf(memoryStyle) }
+    if (styling) MemoryStyleDialog(memory, onPick = { memory = it; onMemoryStyle(it) }) { styling = false }
     var hiddenItems by remember { mutableStateOf(hidden) }
     picking?.let { section ->
         HomeLookDialog(
@@ -490,11 +502,17 @@ fun ArrangeHomeSheet(
                                     tint = if (isHidden) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurface,
                                 )
                             }
-                            // On this day has nothing to set: no cog, its place kept so the eyes line up.
-                            if (!section.hasCog) Box(Modifier.size(NO_COG)) else IconButton(
+                            IconButton(
                                 // Every row's cog opens the same choices (#1261), Your cards' too. Your listening's
-                                // look is fixed: its cog has its colour alone (issue #1347).
-                                onClick = { if (section.fixed) colouring = true else if (section != HomeSection.NOTICES) picking = section else onOpenSettings(section) },
+                                // look is fixed: its cog has its colour alone (issue #1347); On this day's, its styles.
+                                onClick = {
+                                    when {
+                                        section == HomeSection.ON_THIS_DAY -> styling = true
+                                        section.fixed -> colouring = true
+                                        section != HomeSection.NOTICES -> picking = section
+                                        else -> onOpenSettings(section)
+                                    }
+                                },
                                 modifier = Modifier.testTag("homeLookCog"),
                             ) {
                                 Icon(
@@ -1055,6 +1073,34 @@ internal fun ListenColourDialog(chosen: app.siansa.data.ListenColour, onPick: (a
     )
 }
 
+/** On this day's cog (the owner, 27 Nov): its three styles, each with a line on what it is. */
+@Composable
+internal fun MemoryStyleDialog(chosen: MemoryStyle, onPick: (MemoryStyle) -> Unit, onDismiss: () -> Unit) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("On this day") },
+        text = {
+            Column(Modifier.selectableGroup().testTag("memoryStyles")) {
+                MemoryStyle.entries.forEach { style ->
+                    Row(
+                        Modifier.fillMaxWidth().heightIn(min = 56.dp)
+                            .selectable(style == chosen, role = androidx.compose.ui.semantics.Role.RadioButton) { onPick(style) }
+                            .testTag("memoryStyle-${style.id}"),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        androidx.compose.material3.RadioButton(selected = style == chosen, onClick = null)
+                        Column(Modifier.padding(start = Space.Medium)) {
+                            Text(style.label, style = MaterialTheme.typography.bodyLarge, fontWeight = if (style == chosen) FontWeight.Bold else FontWeight.Normal)
+                            Text(style.blurb, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss, modifier = Modifier.testTag("memoryStyleDone")) { Text("Done") } },
+    )
+}
+
 /** The swatches, three to a row, evenly spread. */
 @Composable
 internal fun ListenColourSwatches(chosen: app.siansa.data.ListenColour, onPick: (app.siansa.data.ListenColour) -> Unit) {
@@ -1120,6 +1166,3 @@ internal fun cardSwatchFade(look: CardLook, home: CardLook): Pair<androidx.compo
 
 private val LISTEN_SWATCH = 52.dp
 private val LISTEN_SWATCH_CORNER = 12.dp
-
-/** Where a row without a cog keeps its place: an icon button's size. */
-private val NO_COG = 48.dp
