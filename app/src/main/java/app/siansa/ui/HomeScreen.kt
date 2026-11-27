@@ -135,7 +135,9 @@ fun HomeScreen(nav: NavController) {
     val homeHidden = homeSettings.homeHidden
     // Home's Time Machine card (issue #1341): what's on the phone at once, made again in the background when it's
     // from another day.
-    val timeCard by graph.timeCards.card.collectAsStateWithLifecycle(initialValue = null)
+    // From its first frame (the owner, 27 Nov): with it missing for a moment, Your listening and On this day weren't
+    // rows yet, so the place Home kept, a row's number, was another row's when it came back.
+    val timeCard by graph.timeCards.card.collectAsStateWithLifecycle(initialValue = graph.timeCards.current)
     val timeCardShown = HomeSection.entries.any { it.usesTimeCard && it !in homeHidden }
     LaunchedEffect(timeCardShown) {
         if (timeCardShown) withContext(Dispatchers.IO) { runCatching { graph.timeCards.refresh() } }

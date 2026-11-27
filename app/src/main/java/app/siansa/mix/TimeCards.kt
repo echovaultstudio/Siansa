@@ -26,6 +26,13 @@ class TimeCards(private val graph: AppGraph) {
     val card: Flow<TimeCard?> = file.state.map { it?.card }
 
     /**
+     * The card as last read, at once: what Home draws first when it comes back, so Your listening and On this day are
+     * there from its first frame and Home lands where it was (the owner, 27 Nov: going back "randomly goes back to some
+     * other spot").
+     */
+    val current: TimeCard? get() = file.state.value?.card
+
+    /**
      * Reads the card, and makes it again when it's from another day (or [force]). A try that couldn't reach the
      * history keeps the card there is, and isn't repeated for [RETRY_MS].
      */
