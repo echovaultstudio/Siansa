@@ -67,6 +67,14 @@ class OnThisDayTest {
         assertEquals(OnThisDay.Pictures(listOf("al-1"), round = false), OnThisDay.pictures(month.copy(covers = listOf("al-1")), artists = true))
     }
 
+    /** Its pictures' layouts (the owner, 27 Nov: "some options"): Collage as it comes. */
+    @Test fun itsPicturesHaveLayouts() {
+        assertEquals(listOf("Collage", "Grid", "Top one", "Fan"), MemoryPicture.entries.map { it.label })
+        assertEquals(MemoryPicture.COLLAGE, MemoryPicture.of(null))
+        assertEquals(MemoryPicture.COLLAGE, MemoryPicture.of("nope"))
+        assertEquals(MemoryPicture.FAN, MemoryPicture.of("fan"))
+    }
+
     @Test fun itHasThreeStyles() {
         assertEquals(listOf("Stories", "Prints", "Wide"), MemoryStyle.entries.map { it.label })
         assertEquals(MemoryStyle.STORIES, MemoryStyle.of(null))

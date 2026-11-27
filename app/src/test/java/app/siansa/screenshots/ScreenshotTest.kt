@@ -628,7 +628,7 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     Column { app.siansa.ui.MemoryStyle.entries.forEach { style -> app.siansa.ui.OnThisDayRow(lists, onPlay = {}, onOpen = {}, style = style) } }
                 }
             },
-            Scene("on_this_day_styles_dialog") { app.siansa.ui.MemoryStyleDialog(app.siansa.ui.MemoryStyle.PRINTS, onPick = {}, artists = true, onDismiss = {}) },
+            Scene("on_this_day_styles_dialog") { app.siansa.ui.MemoryStyleDialog(app.siansa.ui.MemoryStyle.PRINTS, onPick = {}, artists = true, picture = app.siansa.ui.MemoryPicture.FAN, onDismiss = {}) },
             // With its artists' pictures (the owner, 27 Nov): round faces, scattered even on the year's card.
             Scene("on_this_day_artists") {
                 val fakes = mapOf("a" to Color(0xFFE8D44D), "b" to Color(0xFF1F6F78), "c" to Color(0xFFF2F2F3), "d" to Color(0xFFC2185B))
@@ -648,6 +648,29 @@ class ScreenshotTest(private val scene: Scene, private val dark: Boolean, privat
                     Column {
                         app.siansa.ui.OnThisDayRow(lists, onPlay = {}, onOpen = {}, style = app.siansa.ui.MemoryStyle.STORIES, artists = true)
                         app.siansa.ui.OnThisDayRow(lists, onPlay = {}, onOpen = {}, style = app.siansa.ui.MemoryStyle.WIDE, artists = true)
+                    }
+                }
+            },
+            Scene("on_this_day_pictures") {
+                val fakes = mapOf("a" to Color(0xFFE8D44D), "b" to Color(0xFF1F6F78), "c" to Color(0xFFF2F2F3), "d" to Color(0xFFC2185B))
+                val draw: app.siansa.ui.CoverDraw = { id, _, modifier, shape, filter ->
+                    val c = fakes[id] ?: Color.DarkGray
+                    Box(modifier.clip(shape).drawBehind { drawRect(Brush.linearGradient(listOf(c, Color.Black)), colorFilter = filter) })
+                }
+                val faces = listOf("a", "d", "b", "c").mapIndexed { i, c -> app.siansa.mix.CardArtist("Artist $i", 10 - i, "ar$i", coverArt = c) }
+                fun list(kind: app.siansa.mix.TimeListKind, title: String, tag: String, line: String, month: Int? = null) =
+                    app.siansa.mix.TimeCardList(kind.id, title, tag, line, (1..50).map { "s$it" }, covers = listOf("b"), year = 2025, month = month, artists = faces)
+                val lists = listOf(
+                    list(app.siansa.mix.TimeListKind.DAY, "This day last year", "27 NOV", "27 November 2025", 11),
+                    list(app.siansa.mix.TimeListKind.YEAR_AGO, "This time last year", "NOV 2025", "November 2025", 11),
+                    list(app.siansa.mix.TimeListKind.LAST_YEAR, "Your 2025", "2025", "2025"),
+                )
+                androidx.compose.runtime.CompositionLocalProvider(app.siansa.ui.LocalCoverDraw provides draw) {
+                    Column {
+                        // The other ways to lay out its pictures (the owner, 27 Nov): a grid of faces, covers fanned, the top one alone.
+                        app.siansa.ui.OnThisDayRow(lists, onPlay = {}, onOpen = {}, artists = true, picture = app.siansa.ui.MemoryPicture.GRID)
+                        app.siansa.ui.OnThisDayRow(lists.map { it.copy(covers = listOf("a", "d", "b", "c")) }, onPlay = {}, onOpen = {}, picture = app.siansa.ui.MemoryPicture.FAN)
+                        app.siansa.ui.OnThisDayRow(lists, onPlay = {}, onOpen = {}, style = app.siansa.ui.MemoryStyle.WIDE, artists = true, picture = app.siansa.ui.MemoryPicture.ONE)
                     }
                 }
             },
