@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -96,26 +97,25 @@ object OnThisDay {
     /** A card's pictures, and whether they're artists (round) or albums. */
     data class Pictures(val ids: List<String>, val round: Boolean)
 
-    /** The print after [at] of [of]: after the last, the first again. */
-    fun nextPrint(at: Int, of: Int): Int = if (of <= 0) 0 else (at + 1) % of
+    /** Spotlight's date, huge and faint behind its pictures: "27" for the day, "NOV" for a month, "2025" for a year. */
+    fun backdrop(list: TimeCardList): String = list.tag.substringBefore(' ')
 
-    /** Beside the pile of prints: "3 MEMORIES", "1 MEMORY". */
-    fun howMany(n: Int): String = if (n == 1) "1 MEMORY" else "$n MEMORIES"
-
-    /** Which come next, after the print on top: "Swipe it away for the next: November, last year, then Your 2025." */
-    fun comesNext(lists: List<TimeCardList>, at: Int, locale: Locale = Locale.getDefault()): String {
-        val rest = (1 until lists.size).map { words(lists[(at + it) % lists.size], locale).title }
-        return "Swipe it away for the next: " + when (rest.size) {
-            0 -> ""
-            1 -> rest[0]
-            else -> rest.dropLast(1).joinToString(", ") + ", then " + rest.last()
-        } + "."
+    /** Spotlight's small line over the title: "NEW · 27 NOV 2025" while the day's card is new, else what it is. */
+    fun spotlightKicker(list: TimeCardList, seen: Boolean = false, locale: Locale = Locale.getDefault()): String {
+        val words = words(list, locale)
+        return if (isNew(list, seen)) "NEW · ${words.line.uppercase(locale)}" else words.kicker
     }
 
-    /** A print's line: the day's date with how many songs, or how many songs. */
-    fun printLine(list: TimeCardList, locale: Locale = Locale.getDefault()): String {
-        val line = words(list, locale).line
-        return if (list.kind == TimeListKind.DAY.id) "$line · ${songCount(list.songIds.size)}" else line
+    /** Spotlight's line under the title: who's on it ("Deftones, Moderat and 2 more"), else its date or songs. */
+    fun spotlightLine(list: TimeCardList, locale: Locale = Locale.getDefault()): String {
+        val names = list.artists.map { it.name }.filter { it.isNotBlank() }
+        return when (names.size) {
+            // The day's kicker says its date already: here, how many songs.
+            0 -> if (list.kind == TimeListKind.DAY.id) songCount(list.songIds.size) else words(list, locale).line
+            1 -> names[0]
+            2 -> "${names[0]} and ${names[1]}"
+            else -> "${names[0]}, ${names[1]} and ${names.size - 2} more"
+        }
     }
 
     /** The day's card: new each morning, so it has a ring. */
@@ -144,13 +144,16 @@ fun OnThisDayRow(
     androidx.compose.runtime.CompositionLocalProvider(LocalMemoryArtists provides artists, LocalMemoryPicture provides picture, LocalMemorySeen provides seen) {
     Column(Modifier.fillMaxWidth().testTag("onThisDay")) {
         SectionTitle("On this day")
-        if (style == MemoryStyle.PRINTS) PrintStack(lists, onPlay, onOpen) else LazyRow(
+        LazyRow(
             contentPadding = PaddingValues(horizontal = Space.Page),
             horizontalArrangement = Arrangement.spacedBy(Space.Medium),
         ) {
             items(lists, key = { it.kind }) { list ->
-                if (style == MemoryStyle.WIDE) WideCard(list, { onPlay(list) }, { onOpen(list) })
-                else MemoryCard(list, { onPlay(list) }, { onOpen(list) })
+                when (style) {
+                    MemoryStyle.STORIES -> MemoryCard(list, { onPlay(list) }, { onOpen(list) })
+                    MemoryStyle.SPOTLIGHT -> SpotlightCard(list, { onPlay(list) }, { onOpen(list) })
+                    MemoryStyle.WIDE -> WideCard(list, { onPlay(list) }, { onOpen(list) })
+                }
             }
         }
     }
@@ -172,15 +175,16 @@ private fun pictureShape(round: Boolean): androidx.compose.ui.graphics.Shape =
 
 /**
  * On this day's styles (the owner, 27 Nov: "the 3 types from the mockup"), picked under its cog: Stories, tall cards
- * with a collage; Prints, prints on a table, the date typed under; Wide, one wide card at a time, its covers fanned.
+ * with a collage; Spotlight, big cards with its artists or covers as circles; Wide, one wide card at a time, its covers fanned.
  */
 enum class MemoryStyle(val id: String, val label: String, val blurb: String) {
     STORIES("stories", "Stories", "Tall cards, a collage of covers on each"),
-    PRINTS("prints", "Prints", "A stack of prints: swipe the top one away for the next"),
+    SPOTLIGHT("spotlight", "Spotlight", "Big cards, its top artists or covers as circles"),
     WIDE("wide", "Wide", "One wide card at a time, its covers fanned out");
 
     companion object {
-        fun of(id: String?): MemoryStyle = entries.firstOrNull { it.id == id } ?: STORIES
+        // Prints, which Spotlight took the place of (the owner, 27 Nov: "the prints look terrible"), is Spotlight.
+        fun of(id: String?): MemoryStyle = if (id == "prints") SPOTLIGHT else entries.firstOrNull { it.id == id } ?: STORIES
     }
 }
 
@@ -201,107 +205,60 @@ enum class MemoryPicture(val id: String, val label: String) {
 }
 
 /**
- * Prints (the owner, 27 Nov: "P3 looks awesome"): one pile of prints, the top one in front and the next ones' paper
- * peeking out under it. Swipe the top print away, either way, for the next; after the last comes the first again.
- * Beside the pile: how many memories, which comes next, and a dot for each.
+ * Spotlight (the owner, 27 Nov, in place of Prints: "sleek"): a big card at a time, the next peeking in. Its top
+ * artists or covers as circles of three sizes, the most played biggest; its date huge and faint behind them; at its
+ * foot what it is, its name, and who's on it.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun PrintStack(lists: List<TimeCardList>, onPlay: (TimeCardList) -> Unit, onOpen: (TimeCardList) -> Unit) {
-    var top by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableIntStateOf(0) }
-    val at = top % lists.size
-    val list = lists[at]
-    val scope = androidx.compose.runtime.rememberCoroutineScope()
-    val shift = androidx.compose.runtime.remember { androidx.compose.animation.core.Animatable(0f) }
-    val density = androidx.compose.ui.platform.LocalDensity.current
-    val away = with(density) { PRINT_SWIPE.toPx() }
-    val next: () -> Unit = {
-        top = OnThisDay.nextPrint(at, lists.size)
-    }
-    Row(
-        Modifier.fillMaxWidth().padding(horizontal = Space.Page).testTag("onThisDayStack"),
-        horizontalArrangement = Arrangement.spacedBy(Space.Page),
-        verticalAlignment = Alignment.CenterVertically,
+private fun SpotlightCard(list: TimeCardList, onPlay: () -> Unit, onOpen: () -> Unit) {
+    val words = OnThisDay.words(list)
+    val seen = LocalMemorySeen.current
+    val new = OnThisDay.isNew(list, seen)
+    val (light, dark) = timeListColours(list.kind)
+    val shape = RoundedCornerShape(SPOT_CORNER)
+    val pictures = OnThisDay.pictures(list, LocalMemoryArtists.current).ids.take(3)
+    val draw = LocalCoverDraw.current
+    Box(
+        Modifier.size(SPOT_WIDTH, SPOT_HEIGHT)
+            .clip(shape)
+            .then(if (new) Modifier.border(MEMORY_RING, MEMORY_ACCENT, shape) else Modifier)
+            .memoryTap(words.title, onPlay, onOpen)
+            .graphicsLayer {}
+            .background(Brush.linearGradient(listOf(MEMORY_FOOT, dark, light)))
+            .testTag("onThisDayCard"),
     ) {
-        // The pile: room round the print for the ones under it to peek out at their angles.
-        Box(Modifier.padding(vertical = Space.Medium)) {
-            // The paper of the next ones under it, at angles, as tall as the print on top.
-            for (n in (lists.size - 1).coerceAtMost(2) downTo 1) {
-                Box(Modifier.matchParentSize().padding(horizontal = Space.Medium).rotate(PRINT_UNDER[n - 1])
-                    .shadow(MEMORY_SHADOW, RoundedCornerShape(PRINT_CORNER)).background(PRINT_UNDER_PAPER[n - 1]))
-            }
-            Box(
-                Modifier.padding(horizontal = Space.Medium)
-                    .graphicsLayer { translationX = shift.value; rotationZ = shift.value / away * PRINT_SWIPE_LEAN }
-                    .pointerInput(at) {
-                        detectHorizontalDragGestures(
-                            onDragEnd = {
-                                scope.launch {
-                                    if (kotlin.math.abs(shift.value) > away / 3) {
-                                        shift.animateTo(kotlin.math.sign(shift.value) * away * 2)
-                                        next()
-                                    }
-                                    shift.snapTo(0f)
-                                }
-                            },
-                            onDragCancel = { scope.launch { shift.animateTo(0f) } },
-                        ) { change, dx -> change.consume(); scope.launch { shift.snapTo(shift.value + dx) } }
-                    },
-            ) { PrintCard(list, lists.size, { onPlay(list) }, { onOpen(list) }, next) }
+        Text(
+            OnThisDay.backdrop(list), fontSize = SPOT_BACKDROP_SIZE, fontWeight = FontWeight.Black, letterSpacing = (-8).sp, lineHeight = SPOT_BACKDROP_SIZE,
+            color = Color.White.copy(alpha = 0.07f), maxLines = 1, softWrap = false,
+            modifier = Modifier.align(Alignment.TopEnd).offset(x = Space.Small, y = -Space.Large),
+        )
+        // The most played biggest, then two smaller, each with a soft shadow.
+        pictures.forEachIndexed { i, id ->
+            val spot = SPOT_CIRCLES[i]
+            draw(id, if (i == 0) COVER_PX else COVER_PX / 2,
+                Modifier.align(Alignment.TopStart).offset(spot.x, spot.y).size(spot.size).shadow(MEMORY_SHADOW, CircleShape)
+                    .then(if (i > 0) Modifier.border(SPOT_EDGE, Color.Black.copy(alpha = 0.25f), CircleShape) else Modifier),
+                CircleShape, null)
         }
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
-            // The theme's amber: Siansa's bright amber doesn't read on a light page.
-            Text(OnThisDay.howMany(lists.size), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp, color = MaterialTheme.colorScheme.primary)
-            if (lists.size > 1) {
-                Text(OnThisDay.comesNext(lists, at), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.testTag("onThisDayNext"))
-                Row(horizontalArrangement = Arrangement.spacedBy(Space.Tight), verticalAlignment = Alignment.CenterVertically) {
-                    lists.indices.forEach { n ->
-                        Box(Modifier.size(if (n == at) PRINT_DOT_ON else PRINT_DOT, PRINT_DOT_HEIGHT).clip(RoundedCornerShape(PRINT_DOT_HEIGHT))
-                            .background(if (n == at) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)))
-                    }
-                }
-            }
+        Box(Modifier.align(Alignment.BottomCenter).size(SPOT_WIDTH, SPOT_FADE)
+            .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.55f)))))
+        Column(Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(Space.Page), verticalArrangement = Arrangement.spacedBy(Space.Tight)) {
+            Text(OnThisDay.spotlightKicker(list, seen), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, letterSpacing = 1.sp,
+                color = if (new) MEMORY_ACCENT else Color.White.copy(alpha = 0.8f), maxLines = 1, overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.testTag("onThisDayKicker"))
+            Text(words.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold, color = Color.White, maxLines = 2,
+                overflow = TextOverflow.Ellipsis, modifier = Modifier.testTag("onThisDayTitle"))
+            Text(OnThisDay.spotlightLine(list), style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.75f), maxLines = 2,
+                overflow = TextOverflow.Ellipsis)
         }
     }
 }
 
-/** The print on top: a cream print, its picture square, its name written under it and the date or how many songs. */
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun PrintCard(list: TimeCardList, of: Int, onPlay: () -> Unit, onOpen: () -> Unit, onNext: () -> Unit) {
-    val words = OnThisDay.words(list)
-    val (light, dark) = timeListColours(list.kind)
-    val shape = RoundedCornerShape(PRINT_CORNER)
-    val new = OnThisDay.isNew(list, LocalMemorySeen.current)
-    Box {
-        Column(
-            // As tall as its words need, at a larger text size too.
-            Modifier.width(PRINT_WIDTH).heightIn(min = PRINT_HEIGHT)
-                .shadow(MEMORY_SHADOW, shape)
-                .clip(shape)
-                .then(if (new) Modifier.border(MEMORY_RING, MEMORY_ACCENT, shape) else Modifier)
-                .memoryTap(words.title, onPlay, onOpen)
-                // TalkBack can't swipe the pile: the next print is an action of its own.
-                .then(if (of > 1) Modifier.semantics { customActions = listOf(CustomAccessibilityAction("Next memory") { onNext(); true }) } else Modifier)
-                .graphicsLayer {}
-                .background(PRINT_PAPER)
-                .padding(start = Space.Small, end = Space.Small, top = Space.Small, bottom = Space.Small)
-                .testTag("onThisDayCard"),
-            verticalArrangement = Arrangement.spacedBy(Space.Small),
-        ) {
-            Box(Modifier.size(PRINT_PHOTO).clip(RoundedCornerShape(PRINT_CORNER)).background(Brush.linearGradient(listOf(light, dark)))) {
-                Collage(list, Modifier.align(Alignment.Center).size(PRINT_COLLAGE), PRINT_COLLAGE)
-            }
-            Column(Modifier.padding(horizontal = Space.Tight)) {
-                Text(words.title, style = MaterialTheme.typography.titleMedium, fontFamily = androidx.compose.ui.text.font.FontFamily.Cursive,
-                    fontWeight = FontWeight.Bold, color = PRINT_INK, maxLines = 2, overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.testTag("onThisDayTitle"))
-                Text(OnThisDay.printLine(list), style = MaterialTheme.typography.labelSmall, color = PRINT_INK_SOFT, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            }
-        }
-        if (new) NewTag(Modifier.align(Alignment.TopEnd).offset(Space.Tight, -Space.Small))
-    }
-}
+/** Where Spotlight's circles sit, from the card's top left, and how big each is. */
+private data class Circle(val x: androidx.compose.ui.unit.Dp, val y: androidx.compose.ui.unit.Dp, val size: androidx.compose.ui.unit.Dp)
+
+private val SPOT_CIRCLES = listOf(Circle(22.dp, 34.dp, 150.dp), Circle(150.dp, 108.dp, 92.dp), Circle(96.dp, 168.dp, 60.dp))
 
 /** Wide: a wide card, its covers fanned at the right, the date at the top left, words and Play at its foot. */
 @OptIn(ExperimentalFoundationApi::class)
@@ -478,23 +435,12 @@ private val MEMORY_COVER_CORNER = 6.dp
 private val MEMORY_RING = 2.dp
 private val MEMORY_SHADOW = 8.dp
 private const val COVER_PX = 300
-private val PRINT_WIDTH = 150.dp
-private val PRINT_HEIGHT = 190.dp
-private val PRINT_PHOTO = 134.dp
-private val PRINT_COLLAGE = 108.dp
-/** How the prints under the top one lean, and their paper, a shade darker the further down. */
-private val PRINT_UNDER = listOf(-5f, 7f)
-private val PRINT_UNDER_PAPER = listOf(Color(0xFFEFEBE3), Color(0xFFE9E4DA))
-/** How far a swiped print goes, and how much it leans on the way. */
-private val PRINT_SWIPE = 220.dp
-private const val PRINT_SWIPE_LEAN = 12f
-private val PRINT_DOT = 8.dp
-private val PRINT_DOT_ON = 18.dp
-private val PRINT_DOT_HEIGHT = 4.dp
-private val PRINT_CORNER = 3.dp
-private val PRINT_PAPER = Color(0xFFF2EEE6)
-private val PRINT_INK = Color(0xFF1A1712)
-private val PRINT_INK_SOFT = Color(0xFF5E564A)
+private val SPOT_WIDTH = 262.dp
+private val SPOT_HEIGHT = 360.dp
+private val SPOT_CORNER = 22.dp
+private val SPOT_FADE = 150.dp
+private val SPOT_EDGE = 3.dp
+private val SPOT_BACKDROP_SIZE = 190.sp
 private val WIDE_WIDTH = 300.dp
 private val WIDE_HEIGHT = 180.dp
 private val WIDE_CORNER = 16.dp

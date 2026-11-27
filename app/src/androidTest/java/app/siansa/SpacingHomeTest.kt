@@ -129,43 +129,46 @@ class SpacingHomeTest : SpacingCheck() {
         val cards = (0 until cardNodes.fetchSemanticsNodes().size).map { cardNodes[it].getBoundsInRoot() }
         val titles = (0 until titleNodes.fetchSemanticsNodes().size).map { titleNodes[it].getBoundsInRoot() }
         assertTrue("Three cards: ${cards.size}", cards.size >= 2)
-        assertEven("Cards one width", cards[0].right - cards[0].left, cards[1].right - cards[1].left, tolerance = 1.dp)
+        // The next card peeks in past the screen's edge: only its left edge and height are whole.
         assertEven("Cards one height", cards[0].bottom - cards[0].top, cards[1].bottom - cards[1].top, tolerance = 1.dp)
         if (cards.size >= 3) assertEven("An even gap between cards", cards[1].left - cards[0].right, cards[2].left - cards[1].right, tolerance = 1.dp)
         assertEven("Titles the same room in", titles[0].left - cards[0].left, titles[1].left - cards[1].left, tolerance = 1.dp)
     }
 
     /**
-     * On this day's Prints, a stack of prints (the owner, 27 Nov): the pile at the page's edge, the print on top in
-     * the middle of it, and the words beside it a page's gap away, at a larger text size too.
+     * On this day's Spotlight (the owner, 27 Nov): its cards the same size and an even gap apart, the first at the
+     * page's edge, and its words the same room in from each card's left, at a larger text size too.
      */
-    @Test fun onThisDaysPrintStackSitsEvenly() {
+    @Test fun onThisDaysSpotlightCardsSitEvenly() {
         fun list(kind: app.siansa.mix.TimeListKind, title: String, month: Int? = null) =
-            app.siansa.mix.TimeCardList(kind.id, title, "TAG", "27 November 2025", listOf("s1", "s2", "s3"), year = 2025, month = month)
+            app.siansa.mix.TimeCardList(kind.id, title, "27 NOV", "27 November 2025", listOf("s1", "s2", "s3"), year = 2025, month = month)
         compose.setContent {
             androidx.compose.runtime.CompositionLocalProvider(
                 androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(androidx.compose.ui.platform.LocalDensity.current.density, fontScale = 1.3f),
             ) {
                 SiansaTheme {
-                    Box(Modifier.width(420.dp)) {
+                    Box(Modifier.fillMaxWidth()) {
                         app.siansa.ui.OnThisDayRow(listOf(
                             list(app.siansa.mix.TimeListKind.DAY, "This day last year", 11),
                             list(app.siansa.mix.TimeListKind.YEAR_AGO, "This time last year", 11),
                             list(app.siansa.mix.TimeListKind.LAST_YEAR, "Your 2025"),
-                        ), onPlay = {}, onOpen = {}, style = app.siansa.ui.MemoryStyle.PRINTS)
+                        ), onPlay = {}, onOpen = {}, style = app.siansa.ui.MemoryStyle.SPOTLIGHT)
                     }
                 }
             }
         }
-        val row = compose.onNodeWithTag("onThisDayStack").getBoundsInRoot()
-        val card = compose.onNodeWithTag("onThisDayCard").getBoundsInRoot()
-        val next = compose.onNodeWithTag("onThisDayNext", useUnmergedTree = true).getBoundsInRoot()
-        val pileLeft = card.left - row.left
-        val pileRight = next.left - card.right
-        // The pile is wider than the print by the same room each side; the words start a page's gap past the pile.
-        assertEven("The print in the middle of its pile", pileLeft, pileRight - Space.Page, tolerance = 1.dp)
-        assertTrue("Only one print on top: ${compose.onAllNodesWithTag("onThisDayCard").fetchSemanticsNodes().size}",
-            compose.onAllNodesWithTag("onThisDayCard").fetchSemanticsNodes().size == 1)
+        val row = compose.onNodeWithTag("onThisDay").getBoundsInRoot()
+        val cardNodes = compose.onAllNodesWithTag("onThisDayCard")
+        val kickerNodes = compose.onAllNodesWithTag("onThisDayKicker", useUnmergedTree = true)
+        val cards = (0 until cardNodes.fetchSemanticsNodes().size).map { cardNodes[it].getBoundsInRoot() }
+        val kickers = (0 until kickerNodes.fetchSemanticsNodes().size).map { kickerNodes[it].getBoundsInRoot() }
+        assertTrue("Two cards at least: ${cards.size}", cards.size >= 2)
+        assertEven("The first at the page's edge", cards[0].left - row.left, Space.Page, tolerance = 1.dp)
+        assertEven("Cards one size", cards[0].bottom - cards[0].top, cards[1].bottom - cards[1].top, tolerance = 1.dp)
+        // The next card peeks in past the screen's edge: only its left edge and height are whole.
+        assertEven("The gap between cards", cards[1].left - cards[0].right, Space.Medium, tolerance = 1.dp)
+        assertEven("Words the same room in", kickers[0].left - cards[0].left, kickers[1].left - cards[1].left, tolerance = 1.dp)
+        assertEven("Words a page's room in", kickers[0].left - cards[0].left, Space.Page, tolerance = 1.dp)
     }
 
     /** Home's notice chips are Your Library's pills (issue #794): the same height, so Home and the library match. */
