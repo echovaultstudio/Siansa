@@ -490,7 +490,8 @@ fun ArrangeHomeSheet(
                                     tint = if (isHidden) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurface,
                                 )
                             }
-                            IconButton(
+                            // On this day has nothing to set: no cog, its place kept so the eyes line up.
+                            if (!section.hasCog) Box(Modifier.size(NO_COG)) else IconButton(
                                 // Every row's cog opens the same choices (#1261), Your cards' too. Your listening's
                                 // look is fixed: its cog has its colour alone (issue #1347).
                                 onClick = { if (section.fixed) colouring = true else if (section != HomeSection.NOTICES) picking = section else onOpenSettings(section) },
@@ -1119,3 +1120,6 @@ internal fun cardSwatchFade(look: CardLook, home: CardLook): Pair<androidx.compo
 
 private val LISTEN_SWATCH = 52.dp
 private val LISTEN_SWATCH_CORNER = 12.dp
+
+/** Where a row without a cog keeps its place: an icon button's size. */
+private val NO_COG = 48.dp

@@ -28,7 +28,10 @@ class HomeLookTest {
         assertFalse(HomeSection.NOTICES.lookable)
         // The Time Machine card's look is fixed (issue #1341).
         assertFalse(HomeSection.TIME_MACHINE.lookable)
-        assertTrue(HomeSection.entries.filter { it != HomeSection.CARDS && it != HomeSection.NOTICES && it != HomeSection.TIME_MACHINE }.all { it.lookable })
+        // On this day's too (the owner, 27 Nov).
+        assertFalse(HomeSection.ON_THIS_DAY.lookable)
+        val fixed = setOf(HomeSection.CARDS, HomeSection.NOTICES, HomeSection.TIME_MACHINE, HomeSection.ON_THIS_DAY)
+        assertTrue(HomeSection.entries.filter { it !in fixed }.all { it.lookable })
         assertTrue(HomeLook.parse("cards:banner").isEmpty())
         assertTrue(HomeLook.parse("notices:list").isEmpty())
     }

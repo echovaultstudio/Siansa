@@ -21,7 +21,7 @@ class MixWorker(context: Context, params: WorkerParameters) : CoroutineWorker(co
         // Without AudioMuse the vibe's mix comes from the library (beta #25).
         if (!settings.navidromeReady) return Result.success()
         // Home's Time Machine card for today (issue #1341): made once a day; later runs find it ready.
-        if (app.siansa.data.HomeSection.TIME_MACHINE !in settings.homeHidden) runCatching { graph.timeCards.refresh() }
+        if (app.siansa.data.HomeSection.entries.any { it.usesTimeCard && it !in settings.homeHidden }) runCatching { graph.timeCards.refresh() }
         // The vibe's mix is an AI mix: only with AudioMuse (issue #486).
         // Only the day's first mix: a new vibe for the hour doesn't replace the one you have (beta testers #37). Made
         // whoever makes the other mixes: Today's mix is the phone's own (the owner, 26 Nov).
