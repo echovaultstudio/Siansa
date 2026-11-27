@@ -443,7 +443,8 @@ class SpacingHomeTest : SpacingCheck() {
         cards.forEach { assertEven("Cards: each as wide as the first", it.right - it.left, width, 1.dp) }
         cards.chunked(3).forEach { row ->
             assertEven("Cards: left margin", row.first().left - screen.left, Space.Page, 1.dp)
-            assertEven("Cards: right margin", screen.right - row.last().right, Space.Page, 1.dp)
+            // A full row reaches the right margin; the last row, with Vivid one more than six, may be shorter.
+            if (row.size == 3) assertEven("Cards: right margin", screen.right - row.last().right, Space.Page, 1.dp)
             row.zipWithNext { a, b -> b.left - a.right }.forEach { assertEven("Cards: the gap between them", it, Space.Small, 1.dp) }
         }
     }

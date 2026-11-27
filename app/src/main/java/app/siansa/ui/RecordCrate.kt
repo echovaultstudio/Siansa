@@ -5,6 +5,7 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -65,7 +66,14 @@ data class CrateRecord(
     val colors: Pair<Color, Color>? = null,
     /** An artist: its photo is round on the sleeve (issue #1355). */
     val round: Boolean = false,
-)
+    /** Plays it straight away, when it can be (a mix): a tap does it with Play on tap on (the owner, 27 Nov). */
+    val onPlay: (() -> Unit)? = null,
+    /** Held: with Play on tap on, what a tap would otherwise do, open it. */
+    val onHold: (() -> Unit)? = null,
+) {
+    /** As a tap does it: played straight away when [plays] and it can be, held it opens; else as it is. */
+    fun tapped(plays: Boolean): CrateRecord = if (plays && onPlay != null) copy(onOpen = onPlay, onHold = onOpen) else this
+}
 
 /**
  * Mixes as sleeves to flick through (the owner, 17 Nov: "a beautiful carousel card for them on Home that resembles
@@ -95,8 +103,13 @@ fun RecordCrate(
     size: app.siansa.data.CrateSize = LocalCrateSize.current,
 ) {
     // Without their lines when the row hides them (the owner, 22 Nov).
+    // Play on tap (the owner, 27 Nov): a tap plays a mix, held it opens.
+    val lines = LocalCardLines.current
+    val tapPlays = LocalTapPlays.current
     @Suppress("NAME_SHADOWING")
-    val records = if (LocalCardLines.current) records else remember(records) { records.map { it.copy(caption = "") } }
+    val records = remember(records, lines, tapPlays) {
+        records.map { it.tapped(tapPlays).let { r -> if (lines) r else r.copy(caption = "") } }
+    }
     if (records.isEmpty()) return
     if (size == app.siansa.data.CrateSize.SMALL) {
         CrateStrip(records, namesOnCover, modifier)
@@ -144,7 +157,7 @@ fun RecordCrate(
                             val blur = look.blur.toPx() * away
                             renderEffect = if (blur >= 0.5f) BlurEffect(blur, blur, TileMode.Decal) else null
                         }
-                        .clickable(onClickLabel = "Open ${record.name}") { if (page == pager.currentPage) record.onOpen() else scope.launch { pager.animateScrollToPage(page) } }
+                        .combinedClickable(onClickLabel = "Open ${record.name}", onLongClick = record.onHold) { if (page == pager.currentPage) record.onOpen() else scope.launch { pager.animateScrollToPage(page) } }
                         .semantics { contentDescription = record.name },
                 )
             }
@@ -156,7 +169,7 @@ fun RecordCrate(
                 Modifier
                     .fillMaxWidth()
                     .graphicsLayer { alpha = (1f - 2f * abs(pager.currentPageOffsetFraction)).coerceIn(0f, 1f) }
-                    .clickable(onClick = record.onOpen)
+                    .combinedClickable(onLongClick = record.onHold, onClick = record.onOpen)
                     .padding(horizontal = Space.Page),
                 verticalArrangement = Arrangement.spacedBy(Space.Tight),
             ) {
@@ -194,7 +207,7 @@ private fun CrateStrip(records: List<CrateRecord>, namesOnCover: Boolean, modifi
             Column(
                 Modifier
                     .width(CRATE_STRIP)
-                    .clickable(onClickLabel = "Open ${record.name}", onClick = record.onOpen)
+                    .combinedClickable(onClickLabel = "Open ${record.name}", onLongClick = record.onHold, onClick = record.onOpen)
                     .semantics { contentDescription = record.name },
                 verticalArrangement = Arrangement.spacedBy(Space.Small),
             ) {

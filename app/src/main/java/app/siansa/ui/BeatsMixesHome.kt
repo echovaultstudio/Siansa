@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -184,8 +185,9 @@ internal suspend fun forgottenArtists(mix: BeatsMixes.BeatsMix, songs: List<Song
 
 /** A mix as a tile: four of its covers two by two, its name, and what's in it. */
 @Composable
-internal fun MixMosaicTile(record: CrateRecord) {
-    Column(Modifier.width(tileWidth(LocalCrateSize.current)).clickable(onClickLabel = "Open ${record.name}", onClick = record.onOpen).padding(LocalTileInset.current).testTag("mixMosaicTile")) {
+internal fun MixMosaicTile(given: CrateRecord) {
+    val record = given.tapped(LocalTapPlays.current)
+    Column(Modifier.width(tileWidth(LocalCrateSize.current)).combinedClickable(onClickLabel = "Open ${record.name}", onLongClick = record.onHold, onClick = record.onOpen).padding(LocalTileInset.current).testTag("mixMosaicTile")) {
         val square = Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(8.dp))
         val colors = remember(record.key, record.colors) { record.colors ?: tileColors(record.key) }
         val names = LocalCardNames.current
@@ -223,15 +225,27 @@ private fun homeMix(mix: BeatsMixes.BeatsMix, songs: List<Song>, keepDays: Int, 
         }
         Unit
     }
+    // Played straight away, with Play on tap on (the owner, 27 Nov): kept first, as when it's opened, so Now playing
+    // names it.
+    val play = {
+        graph.scope.launch {
+            runCatching { graph.mixes.save(saved()) }.onFailure { AppLog.w("Home", "Siansa Beats' mix ${mix.name} wasn't kept: ${it.message}") }
+            withContext(Dispatchers.Main) {
+                graph.player.play(songs)
+                graph.playingFrom.note("mix/$id", mix.name)
+            }
+        }
+        Unit
+    }
     // Each album's cover once: four different ones for the tile's square.
     val covers = songs.mapNotNull { it.cover }.distinct().take(4)
-    return CrateRecord(key = id, name = mix.name, caption = mix.caption, covers = covers, songs = songs, onOpen = open)
+    return CrateRecord(key = id, name = mix.name, caption = mix.caption, covers = covers, songs = songs, onOpen = open, onPlay = play)
 }
 
 /** A Siansa Beats mix as an item any of Home's looks can draw: its name, what's in it, its first cover. */
 internal fun homeItemOf(record: CrateRecord): HomeItem = HomeItem(
     key = record.key, title = record.name, subtitle = record.caption, coverArt = record.covers.firstOrNull { it != null },
-    colors = record.colors ?: tileColors(record.key), open = record.onOpen, mosaic = record.covers,
+    colors = record.colors ?: tileColors(record.key), open = record.onOpen, play = record.onPlay, mosaic = record.covers,
     meta = app.siansa.mix.CoverRows.songCount(record.songs.size).orEmpty(),
     songs = record.songs,
 )
