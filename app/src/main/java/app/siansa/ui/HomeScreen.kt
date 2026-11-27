@@ -686,18 +686,28 @@ fun HomeScreen(nav: NavController) {
                 // On this day (the owner, 27 Nov): this day, this month and last year, like a photo app's memories.
                 HomeSection.ON_THIS_DAY -> OnThisDay.lists(timeCard).takeIf { it.isNotEmpty() && homeSettings.navidromeReady }?.let { lists ->
                     item(key = "on-this-day", contentType = "on-this-day") {
+                        // Today's card opened or played once: it isn't new any more (the owner, 27 Nov).
+                        val seenNow: (app.siansa.mix.TimeCardList) -> Unit = { list ->
+                            val day = timeCard?.day
+                            if (OnThisDay.isNew(list) && day != null && homeSettings.onThisDaySeen != day) {
+                                AppLog.i("Home", "On this day: today's card seen")
+                                graph.settings.save(graph.settings.current.copy(onThisDaySeen = day))
+                            }
+                        }
                         OnThisDayRow(
                             lists,
                             onPlay = { list ->
+                                seenNow(list)
                                 scope.launch {
                                     val songs = withContext(Dispatchers.IO) { graph.library.songs(list.songIds) }
                                     if (songs.isNotEmpty()) graph.player.play(songs)
                                 }
                             },
-                            onOpen = { nav.navigate(app.siansa.mix.timeListRoute(it.kind)) },
+                            onOpen = { seenNow(it); nav.navigate(app.siansa.mix.timeListRoute(it.kind)) },
                             style = MemoryStyle.of(homeSettings.onThisDayStyle),
                             artists = homeSettings.onThisDayArtists,
                             picture = MemoryPicture.of(homeSettings.onThisDayPicture),
+                            seen = OnThisDay.seen(homeSettings.onThisDaySeen, timeCard?.day),
                         )
                     }
                 }

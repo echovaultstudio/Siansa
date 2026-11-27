@@ -156,6 +156,8 @@ data class AppSettings(
     val onThisDayArtists: Boolean = false,
     /** How On this day lays out its pictures ([app.siansa.ui.MemoryPicture], the owner, 27 Nov). */
     val onThisDayPicture: String = "collage",
+    /** The day of the last On this day card whose day card was opened or played: it shows no NEW (the owner, 27 Nov). */
+    val onThisDaySeen: String = "",
     /** A tap on a card on Home plays it straight away (the owner, 27 Nov); held, it opens. Off: a tap opens it first. */
     val homeTapPlays: Boolean = false,
     val aiTitles: Boolean = true,
@@ -546,6 +548,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
         onThisDayStyle = prefs.getString("on_this_day_style", null) ?: "stories",
         onThisDayArtists = prefs.getBoolean("on_this_day_artists", false),
         onThisDayPicture = prefs.getString("on_this_day_picture", null) ?: "collage",
+        onThisDaySeen = prefs.getString("on_this_day_seen", null) ?: "",
         homeTapPlays = prefs.getBoolean("home_tap_plays", false),
         aiTitles = prefs.getBoolean("ai_titles", true),
         // Smart as it comes (the owner, 26 Nov); a mode chosen before stays.
@@ -772,6 +775,7 @@ class SettingsRepository(context: Context, user: Int = Users.active) {
             .putString("on_this_day_style", s.onThisDayStyle)
             .putBoolean("on_this_day_artists", s.onThisDayArtists)
             .putString("on_this_day_picture", s.onThisDayPicture)
+            .putString("on_this_day_seen", s.onThisDaySeen)
             .putBoolean("home_tap_plays", s.homeTapPlays)
             .apply()
         _state.value = s
