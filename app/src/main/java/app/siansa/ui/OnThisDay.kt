@@ -222,7 +222,7 @@ private fun WideCard(list: TimeCardList, onPlay: () -> Unit, onOpen: () -> Unit)
         // A grid or the top one sits square at the right; a collage or a fan is its own fan.
         val layout = LocalMemoryPicture.current
         if (layout == MemoryPicture.GRID || layout == MemoryPicture.ONE) {
-            Collage(list, Modifier.align(Alignment.TopEnd).padding(top = Space.Page, end = Space.Page).size(WIDE_PICTURE), WIDE_PICTURE)
+            Collage(list, Modifier.align(Alignment.TopEnd).padding(top = Space.Medium, end = Space.Page).size(WIDE_PICTURE), WIDE_PICTURE)
         } else covers.forEachIndexed { n, cover ->
             val fromRight = (covers.size - 1 - n)
             draw(cover, COVER_PX / 2,
@@ -384,7 +384,7 @@ private val WIDE_WIDTH = 300.dp
 private val WIDE_HEIGHT = 180.dp
 private val WIDE_CORNER = 16.dp
 private val WIDE_COVER = 84.dp
-private val WIDE_PICTURE = 96.dp
+private val WIDE_PICTURE = 88.dp
 private val WIDE_FAN_STEP = 28.dp
 private val WIDE_LEANS = listOf(-12f, -2f, 9f)
 private val WIDE_FADE = 96.dp
