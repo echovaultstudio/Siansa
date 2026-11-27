@@ -133,7 +133,7 @@ dependencies {
     implementation("androidx.media3:media3-datasource-okhttp:1.9.0")
     implementation("androidx.media3:media3-database:1.9.0")
     implementation("androidx.media3:media3-cast:1.9.0")
-    implementation("androidx.mediarouter:mediarouter:1.7.0")
+    implementation("androidx.mediarouter:mediarouter:1.9.0")
     implementation("org.jellyfin.media3:media3-ffmpeg-decoder:1.9.0+1")
 
     implementation("androidx.room:room-runtime:2.8.5")
