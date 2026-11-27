@@ -350,11 +350,17 @@ fun ArrangeHomeSheet(
 
     fun dragBy(dy: Float) {
         val section = dragging ?: return
-        offset += dy
-        val visible = list.layoutInfo.visibleItemsInfo
+        val info = list.layoutInfo
+        val visible = info.visibleItemsInfo
         val current = visible.firstOrNull { it.key == section.id } ?: return
-        val middle = current.offset + offset + current.size / 2f
-        val target = visible.firstOrNull { it.key != section.id && middle >= it.offset && middle <= it.offset + it.size } ?: return
+        // Kept inside the list's box (the owner, 27 Nov: dragged too far up it vanished, cut off by the box's edge);
+        // at an edge the list scrolls under it instead.
+        offset = clampDrag(offset + dy, current.offset, current.size, info.viewportStartOffset, info.viewportEndOffset)
+        // Only past the next row's middle, that row being the one beside it in the way it's going: rows of different
+        // heights (a Siansa Beats tag makes one taller) no longer swap back and forth on one spot (the owner, 27 Nov).
+        val down = offset > 0f
+        val target = visible.firstOrNull { it.index == current.index + if (down) 1 else -1 } ?: return
+        if (!passesMiddle(current.offset + offset, current.size, target.offset, target.size, down)) return
         // Within its own group: the rows on Home, or the hidden ones under them (the owner, 26 Nov); not onto the heading.
         val over = items.firstOrNull { it.id == target.key } ?: return
         if ((over in hiddenItems) != (section in hiddenItems)) return
@@ -364,8 +370,9 @@ fun ArrangeHomeSheet(
             list.requestScrollToItem(list.firstVisibleItemIndex, list.firstVisibleItemScrollOffset)
         }
         items = items.moved(items.indexOf(section), items.indexOf(over))
-        // The row is laid out at its new place next frame; keep it under the finger meanwhile.
-        offset += current.offset - target.offset
+        // The row is laid out at its new place next frame; keep it under the finger meanwhile. Its new place is where
+        // the other row began going up, and under it going down: the two needn't be one height.
+        offset += current.offset - offsetAfterSwap(current.size, target.offset, target.size, down)
         haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
     }
 
@@ -905,6 +912,29 @@ internal const val AUTO_SCROLL_MAX = 18f
  * How far to scroll the list this frame while a row is held between [top] and [bottom] (issue #701): nothing in the
  * middle; within [edge] of the viewport's end or start, faster the deeper the row is into that edge, up to [max].
  */
+/**
+ * Where a held row's drag [offset] stays so the row ([itemOffset], [itemSize]) is all inside the list's box
+ * ([viewStart] to [viewEnd]): never dragged out of sight.
+ */
+internal fun clampDrag(offset: Float, itemOffset: Int, itemSize: Int, viewStart: Int, viewEnd: Int): Float {
+    val least = (viewStart - itemOffset).toFloat()
+    val most = (viewEnd - itemSize - itemOffset).toFloat()
+    return if (most < least) offset else offset.coerceIn(least, most)
+}
+
+/**
+ * Whether a held row at [top] ([size] tall) has gone past the middle of the row beside it ([targetOffset],
+ * [targetSize]) going [down] (its foot past it) or up (its top past it): when the two swap.
+ */
+internal fun passesMiddle(top: Float, size: Int, targetOffset: Int, targetSize: Int, down: Boolean): Boolean {
+    val middle = targetOffset + targetSize / 2f
+    return if (down) top + size > middle else top < middle
+}
+
+/** Where a held row is laid out once it has swapped with the row at [targetOffset] ([targetSize] tall). */
+internal fun offsetAfterSwap(size: Int, targetOffset: Int, targetSize: Int, down: Boolean): Int =
+    if (down) targetOffset + targetSize - size else targetOffset
+
 internal fun autoScrollSpeed(top: Float, bottom: Float, viewportStart: Float, viewportEnd: Float, edge: Float, max: Float = AUTO_SCROLL_MAX): Float {
     if (edge <= 0f) return 0f
     val intoEnd = bottom - (viewportEnd - edge)
