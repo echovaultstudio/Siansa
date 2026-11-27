@@ -135,6 +135,39 @@ class SpacingHomeTest : SpacingCheck() {
         assertEven("Titles the same room in", titles[0].left - cards[0].left, titles[1].left - cards[1].left, tolerance = 1.dp)
     }
 
+    /**
+     * On this day's Prints, a stack of prints (the owner, 27 Nov): the pile at the page's edge, the print on top in
+     * the middle of it, and the words beside it a page's gap away, at a larger text size too.
+     */
+    @Test fun onThisDaysPrintStackSitsEvenly() {
+        fun list(kind: app.siansa.mix.TimeListKind, title: String, month: Int? = null) =
+            app.siansa.mix.TimeCardList(kind.id, title, "TAG", "27 November 2025", listOf("s1", "s2", "s3"), year = 2025, month = month)
+        compose.setContent {
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(androidx.compose.ui.platform.LocalDensity.current.density, fontScale = 1.3f),
+            ) {
+                SiansaTheme {
+                    Box(Modifier.width(420.dp)) {
+                        app.siansa.ui.OnThisDayRow(listOf(
+                            list(app.siansa.mix.TimeListKind.DAY, "This day last year", 11),
+                            list(app.siansa.mix.TimeListKind.YEAR_AGO, "This time last year", 11),
+                            list(app.siansa.mix.TimeListKind.LAST_YEAR, "Your 2025"),
+                        ), onPlay = {}, onOpen = {}, style = app.siansa.ui.MemoryStyle.PRINTS)
+                    }
+                }
+            }
+        }
+        val row = compose.onNodeWithTag("onThisDayStack").getBoundsInRoot()
+        val card = compose.onNodeWithTag("onThisDayCard").getBoundsInRoot()
+        val next = compose.onNodeWithTag("onThisDayNext", useUnmergedTree = true).getBoundsInRoot()
+        val pileLeft = card.left - row.left
+        val pileRight = next.left - card.right
+        // The pile is wider than the print by the same room each side; the words start a page's gap past the pile.
+        assertEven("The print in the middle of its pile", pileLeft, pileRight - Space.Page, tolerance = 1.dp)
+        assertTrue("Only one print on top: ${compose.onAllNodesWithTag("onThisDayCard").fetchSemanticsNodes().size}",
+            compose.onAllNodesWithTag("onThisDayCard").fetchSemanticsNodes().size == 1)
+    }
+
     /** Home's notice chips are Your Library's pills (issue #794): the same height, so Home and the library match. */
     @Test fun noticeChipsMatchTheLibrarysPills() {
         compose.setContent {

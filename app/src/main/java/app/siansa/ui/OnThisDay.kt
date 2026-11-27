@@ -5,6 +5,14 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
@@ -12,11 +20,13 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -86,6 +96,28 @@ object OnThisDay {
     /** A card's pictures, and whether they're artists (round) or albums. */
     data class Pictures(val ids: List<String>, val round: Boolean)
 
+    /** The print after [at] of [of]: after the last, the first again. */
+    fun nextPrint(at: Int, of: Int): Int = if (of <= 0) 0 else (at + 1) % of
+
+    /** Beside the pile of prints: "3 MEMORIES", "1 MEMORY". */
+    fun howMany(n: Int): String = if (n == 1) "1 MEMORY" else "$n MEMORIES"
+
+    /** Which come next, after the print on top: "Swipe it away for the next: November, last year, then Your 2025." */
+    fun comesNext(lists: List<TimeCardList>, at: Int, locale: Locale = Locale.getDefault()): String {
+        val rest = (1 until lists.size).map { words(lists[(at + it) % lists.size], locale).title }
+        return "Swipe it away for the next: " + when (rest.size) {
+            0 -> ""
+            1 -> rest[0]
+            else -> rest.dropLast(1).joinToString(", ") + ", then " + rest.last()
+        } + "."
+    }
+
+    /** A print's line: the day's date with how many songs, or how many songs. */
+    fun printLine(list: TimeCardList, locale: Locale = Locale.getDefault()): String {
+        val line = words(list, locale).line
+        return if (list.kind == TimeListKind.DAY.id) "$line · ${songCount(list.songIds.size)}" else line
+    }
+
     /** The day's card: new each morning, so it has a ring. */
     fun isNew(list: TimeCardList): Boolean = list.kind == TimeListKind.DAY.id
 }
@@ -104,17 +136,13 @@ fun OnThisDayRow(
     androidx.compose.runtime.CompositionLocalProvider(LocalMemoryArtists provides artists, LocalMemoryPicture provides picture) {
     Column(Modifier.fillMaxWidth().testTag("onThisDay")) {
         SectionTitle("On this day")
-        LazyRow(
-            // Prints lean: room above and below inside the row, so their corners and shadows aren't cut off.
-            contentPadding = if (style == MemoryStyle.PRINTS) PaddingValues(horizontal = Space.Page, vertical = Space.Small) else PaddingValues(horizontal = Space.Page),
+        if (style == MemoryStyle.PRINTS) PrintStack(lists, onPlay, onOpen) else LazyRow(
+            contentPadding = PaddingValues(horizontal = Space.Page),
             horizontalArrangement = Arrangement.spacedBy(Space.Medium),
         ) {
-            itemsIndexed(lists, key = { _, it -> it.kind }) { i, list ->
-                when (style) {
-                    MemoryStyle.STORIES -> MemoryCard(list, { onPlay(list) }, { onOpen(list) })
-                    MemoryStyle.PRINTS -> PrintCard(list, i, { onPlay(list) }, { onOpen(list) })
-                    MemoryStyle.WIDE -> WideCard(list, { onPlay(list) }, { onOpen(list) })
-                }
+            items(lists, key = { it.kind }) { list ->
+                if (style == MemoryStyle.WIDE) WideCard(list, { onPlay(list) }, { onOpen(list) })
+                else MemoryCard(list, { onPlay(list) }, { onOpen(list) })
             }
         }
     }
@@ -137,7 +165,7 @@ private fun pictureShape(round: Boolean): androidx.compose.ui.graphics.Shape =
  */
 enum class MemoryStyle(val id: String, val label: String, val blurb: String) {
     STORIES("stories", "Stories", "Tall cards, a collage of covers on each"),
-    PRINTS("prints", "Prints", "Like prints on a table, the date under each"),
+    PRINTS("prints", "Prints", "A stack of prints: swipe the top one away for the next"),
     WIDE("wide", "Wide", "One wide card at a time, its covers fanned out");
 
     companion object {
@@ -161,39 +189,106 @@ enum class MemoryPicture(val id: String, val label: String) {
     }
 }
 
-/** How a print leans, the same each time: one way, the other, a little the first again. */
-internal fun printLean(i: Int): Float = listOf(-2f, 1.5f, -1f)[i % 3]
+/**
+ * Prints (the owner, 27 Nov: "P3 looks awesome"): one pile of prints, the top one in front and the next ones' paper
+ * peeking out under it. Swipe the top print away, either way, for the next; after the last comes the first again.
+ * Beside the pile: how many memories, which comes next, and a dot for each.
+ */
+@Composable
+private fun PrintStack(lists: List<TimeCardList>, onPlay: (TimeCardList) -> Unit, onOpen: (TimeCardList) -> Unit) {
+    var top by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableIntStateOf(0) }
+    val at = top % lists.size
+    val list = lists[at]
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val shift = androidx.compose.runtime.remember { androidx.compose.animation.core.Animatable(0f) }
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val away = with(density) { PRINT_SWIPE.toPx() }
+    val next: () -> Unit = {
+        top = OnThisDay.nextPrint(at, lists.size)
+    }
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = Space.Page).testTag("onThisDayStack"),
+        horizontalArrangement = Arrangement.spacedBy(Space.Page),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // The pile: room round the print for the ones under it to peek out at their angles.
+        Box(Modifier.padding(vertical = Space.Medium)) {
+            // The paper of the next ones under it, at angles, as tall as the print on top.
+            for (n in (lists.size - 1).coerceAtMost(2) downTo 1) {
+                Box(Modifier.matchParentSize().padding(horizontal = Space.Medium).rotate(PRINT_UNDER[n - 1])
+                    .shadow(MEMORY_SHADOW, RoundedCornerShape(PRINT_CORNER)).background(PRINT_UNDER_PAPER[n - 1]))
+            }
+            Box(
+                Modifier.padding(horizontal = Space.Medium)
+                    .graphicsLayer { translationX = shift.value; rotationZ = shift.value / away * PRINT_SWIPE_LEAN }
+                    .pointerInput(at) {
+                        detectHorizontalDragGestures(
+                            onDragEnd = {
+                                scope.launch {
+                                    if (kotlin.math.abs(shift.value) > away / 3) {
+                                        shift.animateTo(kotlin.math.sign(shift.value) * away * 2)
+                                        next()
+                                    }
+                                    shift.snapTo(0f)
+                                }
+                            },
+                            onDragCancel = { scope.launch { shift.animateTo(0f) } },
+                        ) { change, dx -> change.consume(); scope.launch { shift.snapTo(shift.value + dx) } }
+                    },
+            ) { PrintCard(list, lists.size, { onPlay(list) }, { onOpen(list) }, next) }
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Space.Small)) {
+            // The theme's amber: Siansa's bright amber doesn't read on a light page.
+            Text(OnThisDay.howMany(lists.size), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp, color = MaterialTheme.colorScheme.primary)
+            if (lists.size > 1) {
+                Text(OnThisDay.comesNext(lists, at), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.testTag("onThisDayNext"))
+                Row(horizontalArrangement = Arrangement.spacedBy(Space.Tight), verticalAlignment = Alignment.CenterVertically) {
+                    lists.indices.forEach { n ->
+                        Box(Modifier.size(if (n == at) PRINT_DOT_ON else PRINT_DOT, PRINT_DOT_HEIGHT).clip(RoundedCornerShape(PRINT_DOT_HEIGHT))
+                            .background(if (n == at) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)))
+                    }
+                }
+            }
+        }
+    }
+}
 
-/** Prints: a cream print with a collage, slightly tilted, its name and line typed under it. */
+/** The print on top: a cream print, its picture square, its name written under it and the date or how many songs. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun PrintCard(list: TimeCardList, i: Int, onPlay: () -> Unit, onOpen: () -> Unit) {
+private fun PrintCard(list: TimeCardList, of: Int, onPlay: () -> Unit, onOpen: () -> Unit, onNext: () -> Unit) {
     val words = OnThisDay.words(list)
     val (light, dark) = timeListColours(list.kind)
     val shape = RoundedCornerShape(PRINT_CORNER)
-    Box(Modifier.rotate(printLean(i))) {
+    val new = OnThisDay.isNew(list)
+    Box {
         Column(
-            Modifier.size(PRINT_WIDTH, PRINT_HEIGHT)
+            // As tall as its words need, at a larger text size too.
+            Modifier.width(PRINT_WIDTH).heightIn(min = PRINT_HEIGHT)
                 .shadow(MEMORY_SHADOW, shape)
                 .clip(shape)
+                .then(if (new) Modifier.border(MEMORY_RING, MEMORY_ACCENT, shape) else Modifier)
                 .memoryTap(words.title, onPlay, onOpen)
+                // TalkBack can't swipe the pile: the next print is an action of its own.
+                .then(if (of > 1) Modifier.semantics { customActions = listOf(CustomAccessibilityAction("Next memory") { onNext(); true }) } else Modifier)
                 .graphicsLayer {}
                 .background(PRINT_PAPER)
-                .padding(start = Space.Small, end = Space.Small, top = Space.Small, bottom = Space.Medium)
+                .padding(start = Space.Small, end = Space.Small, top = Space.Small, bottom = Space.Small)
                 .testTag("onThisDayCard"),
             verticalArrangement = Arrangement.spacedBy(Space.Small),
         ) {
-            Box(Modifier.fillMaxWidth().size(PRINT_WIDTH, PRINT_PHOTO).clip(RoundedCornerShape(PRINT_CORNER)).background(Brush.linearGradient(listOf(light, dark)))) {
+            Box(Modifier.size(PRINT_PHOTO).clip(RoundedCornerShape(PRINT_CORNER)).background(Brush.linearGradient(listOf(light, dark)))) {
                 Collage(list, Modifier.align(Alignment.Center).size(PRINT_COLLAGE), PRINT_COLLAGE)
             }
             Column(Modifier.padding(horizontal = Space.Tight)) {
-                Text(words.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.ExtraBold, color = PRINT_INK, maxLines = 2,
-                    overflow = TextOverflow.Ellipsis, modifier = Modifier.testTag("onThisDayTitle"))
-                Text(words.line, style = MaterialTheme.typography.labelSmall, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                    color = PRINT_INK_SOFT, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(words.title, style = MaterialTheme.typography.titleMedium, fontFamily = androidx.compose.ui.text.font.FontFamily.Cursive,
+                    fontWeight = FontWeight.Bold, color = PRINT_INK, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.testTag("onThisDayTitle"))
+                Text(OnThisDay.printLine(list), style = MaterialTheme.typography.labelSmall, color = PRINT_INK_SOFT, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
         }
-        if (OnThisDay.isNew(list)) NewTag(Modifier.align(Alignment.TopEnd).offset(Space.Tight, -Space.Small))
+        if (new) NewTag(Modifier.align(Alignment.TopEnd).offset(Space.Tight, -Space.Small))
     }
 }
 
@@ -372,10 +467,19 @@ private val MEMORY_COVER_CORNER = 6.dp
 private val MEMORY_RING = 2.dp
 private val MEMORY_SHADOW = 8.dp
 private const val COVER_PX = 300
-private val PRINT_WIDTH = 148.dp
-private val PRINT_HEIGHT = 214.dp
-private val PRINT_PHOTO = 132.dp
-private val PRINT_COLLAGE = 104.dp
+private val PRINT_WIDTH = 150.dp
+private val PRINT_HEIGHT = 190.dp
+private val PRINT_PHOTO = 134.dp
+private val PRINT_COLLAGE = 108.dp
+/** How the prints under the top one lean, and their paper, a shade darker the further down. */
+private val PRINT_UNDER = listOf(-5f, 7f)
+private val PRINT_UNDER_PAPER = listOf(Color(0xFFEFEBE3), Color(0xFFE9E4DA))
+/** How far a swiped print goes, and how much it leans on the way. */
+private val PRINT_SWIPE = 220.dp
+private const val PRINT_SWIPE_LEAN = 12f
+private val PRINT_DOT = 8.dp
+private val PRINT_DOT_ON = 18.dp
+private val PRINT_DOT_HEIGHT = 4.dp
 private val PRINT_CORNER = 3.dp
 private val PRINT_PAPER = Color(0xFFF2EEE6)
 private val PRINT_INK = Color(0xFF1A1712)
