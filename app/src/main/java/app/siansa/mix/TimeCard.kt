@@ -174,6 +174,8 @@ data class TimeCard(
     val make: Int = 0,
     /** Your listening's times (issues #1343, #1347): the songs, artists and genres of each [ListenRange]. */
     val ranges: List<RangeData> = emptyList(),
+    /** Which history it was made from ([cardHistory]): made again when that changes. */
+    val from: String = "",
 ) {
     fun range(range: ListenRange): RangeData? = ranges.firstOrNull { it.range == range.id }
 
@@ -195,8 +197,23 @@ const val TIME_CARD_MAKE = 5
 @Serializable
 data class TimeCardKept(val card: TimeCard? = null)
 
-/** Whether the card must be made again: there's none, or it was made for another day ("this day last year" moved on). */
-fun timeCardStale(card: TimeCard?, today: LocalDate): Boolean = card?.day != today.toString() || card.make != TIME_CARD_MAKE
+/**
+ * Whether the card must be made again: there's none, it was made for another day ("this day last year" moved on), or
+ * from another history than [from] (the owner, 28 Nov: with Siansa Beats off for a night, the card was made from the
+ * phone's own history, with no look back, and stayed so all day after Siansa Beats was on again).
+ */
+fun timeCardStale(card: TimeCard?, today: LocalDate, from: String? = null): Boolean =
+    card?.day != today.toString() || card.make != TIME_CARD_MAKE || (from != null && card.from != from)
+
+/**
+ * Which history the card's plays come from, as [app.siansa.mix.Insights.topOnce] asks it: Siansa Beats' when that's on,
+ * else Koito and Last.fm, else the phone's own.
+ */
+fun cardHistory(beats: Boolean, koito: Boolean, lastFm: Boolean): String = when {
+    beats -> "beats"
+    koito || lastFm -> listOfNotNull("koito".takeIf { koito }, "lastfm".takeIf { lastFm }).joinToString("+")
+    else -> "phone"
+}
 
 /**
  * The card for [today] from [plans], asking [songsOf] for each list's songs in the library (null: its plays couldn't

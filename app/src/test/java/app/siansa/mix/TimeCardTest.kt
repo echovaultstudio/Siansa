@@ -89,6 +89,14 @@ class TimeCardTest {
         assertTrue(card.lists.first { it.kind == TimeListKind.DAY.id }.artists.isEmpty())
     }
 
+    /** Which history the card is from, as the Time Machine asks it: Siansa Beats first, else Koito and Last.fm, else the phone. */
+    @Test fun theCardKnowsItsHistory() {
+        assertEquals("beats", cardHistory(beats = true, koito = true, lastFm = true))
+        assertEquals("koito+lastfm", cardHistory(beats = false, koito = true, lastFm = true))
+        assertEquals("lastfm", cardHistory(beats = false, koito = false, lastFm = true))
+        assertEquals("phone", cardHistory(beats = false, koito = false, lastFm = false))
+    }
+
     /** A list that couldn't be fetched isn't taken for an empty one: the card on the phone stays, and it's tried again. */
     @Test fun aListThatCouldNotBeFetchedKeepsTheOldCard() = runBlocking {
         assertNull(buildTimeCard(today, plans) { if (it.kind == TimeListKind.DAY) null else songs(10) }.takeIf { it?.lists?.size != 4 })
@@ -106,6 +114,12 @@ class TimeCardTest {
         assertTrue(timeCardStale(card.copy(make = 0), today))
         assertFalse(timeCardStale(card, today))
         assertTrue(timeCardStale(card, today.plusDays(1)))
+        // Made from another history: made again (the owner, 28 Nov), but not when no history is given.
+        val fromBeats = card.copy(from = "beats")
+        assertFalse(timeCardStale(fromBeats, today, "beats"))
+        assertTrue(timeCardStale(fromBeats, today, "phone"))
+        assertTrue(timeCardStale(card, today, "beats"))
+        assertFalse(timeCardStale(fromBeats, today))
     }
 
     /** Your listening's times (issue #1347): the days back from today each covers, today among them. */

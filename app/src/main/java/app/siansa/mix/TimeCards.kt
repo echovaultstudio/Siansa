@@ -38,9 +38,15 @@ class TimeCards(private val graph: AppGraph) {
      */
     suspend fun refresh(today: LocalDate = LocalDate.now(), force: Boolean = false): TimeCard? = asking.withLock {
         val kept = file.read().card
-        if (!force && !timeCardStale(kept, today)) return@withLock kept
+        val s = graph.settings.current
+        val from = cardHistory(graph.beatsHistory.on, s.listenBrainzReady && graph.historyApi.isKoito(s.listenBrainzUrl),
+            s.lastFmEnabled && s.lastFmApiKey.isNotBlank() && s.lastFmUser.isNotBlank())
+        if (!force && !timeCardStale(kept, today, from)) return@withLock kept
+        // A new history isn't a try that failed: it's made again now, not after the wait.
+        val newHistory = kept != null && kept.day == today.toString() && kept.from != from
         val now = System.currentTimeMillis()
-        if (!force && now - triedAt < RETRY_MS) return@withLock kept
+        if (!force && !newHistory && now - triedAt < RETRY_MS) return@withLock kept
+        if (newHistory) AppLog.i("TimeCard", "Made again: its history is now ${from} (was ${kept?.from?.ifEmpty { "unknown" }})")
         if (!graph.settings.current.navidromeReady) return@withLock kept
         triedAt = now
         val made = buildListeningCard(
@@ -69,7 +75,7 @@ class TimeCards(private val graph: AppGraph) {
             AppLog.w("TimeCard", "Not made for $today: the history couldn't be reached; ${if (kept == null) "no card yet" else "keeping the one from ${kept.day}"}")
             return@withLock kept
         }
-        file.update { TimeCardKept(made) }
+        file.update { TimeCardKept(made.copy(from = from)) }
         AppLog.i("TimeCard", "Made for $today in ${System.currentTimeMillis() - now}ms: " +
             made.lists.joinToString { "${it.title} (${it.songIds.size})" }.ifEmpty { "no look back has enough plays" } + " · " +
             made.ranges.joinToString { "${it.range}: ${it.songs?.songIds?.size ?: 0} songs, ${it.artists.size} artists, ${it.genres.size} genres" })
